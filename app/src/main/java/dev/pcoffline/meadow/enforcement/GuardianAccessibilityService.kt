@@ -84,6 +84,11 @@ class GuardianAccessibilityService : AccessibilityService() {
                 withContext(Dispatchers.Main) { block(pkg) }
                 return
             }
+            if (budget.emergency) {
+                // Wake up when the emergency unlock ends, or sooner if it's ended early.
+                delay((budget.emergencyUntilMillis - System.currentTimeMillis()).coerceIn(1_000L, 15_000L))
+                continue
+            }
             AppGraph.notifier.maybeWarn(budget)
             delay(budget.remainingMs.coerceIn(1_000L, 15_000L))
         }

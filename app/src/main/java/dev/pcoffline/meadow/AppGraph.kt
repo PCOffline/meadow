@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseApp
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.EmergencyRepository
 import dev.pcoffline.meadow.data.LimitsRepository
 import dev.pcoffline.meadow.data.LocalStore
 import dev.pcoffline.meadow.data.RequestRepository
@@ -44,7 +45,8 @@ object AppGraph {
     val tracker by lazy { UsageTracker(app) }
     val catalog by lazy { AppCatalog(app) }
     val history by lazy { UsageHistory(app, tracker, catalog) }
-    val engine by lazy { LimitEngine(store, tracker, history) }
+    val engine by lazy { LimitEngine(store, tracker, history, catalog) }
+    val emergency by lazy { EmergencyRepository(app, backend, store) }
     val notifier by lazy { Notifier(app, store) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }
 

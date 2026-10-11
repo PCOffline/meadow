@@ -49,6 +49,7 @@ import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.MeadowHills
 import dev.pcoffline.meadow.ui.components.SectionTitle
+import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
 import dev.pcoffline.meadow.ui.greeting
 import dev.pcoffline.meadow.ui.switchTab
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -69,7 +70,8 @@ private data class GardenState(
 fun GardenScreen(profile: UserProfile, nav: NavController) {
     val limits by AppGraph.store.limits.collectAsStateWithLifecycle()
     val grants by AppGraph.store.grants.collectAsStateWithLifecycle()
-    val state by produceState(GardenState(), limits, grants) {
+    val emergency by AppGraph.store.emergency.collectAsStateWithLifecycle()
+    val state by produceState(GardenState(), limits, grants, emergency) {
         while (true) {
             value = withContext(Dispatchers.IO) {
                 val usage = AppGraph.catalog.userFacing(AppGraph.engine.todayUsage())
@@ -87,6 +89,7 @@ fun GardenScreen(profile: UserProfile, nav: NavController) {
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GardenHeader(profile, state, onSettings = { nav.navigate("settings") }) }
+        item { EmergencyBanner(Modifier.padding(horizontal = 20.dp)) }
 
         if (state.protection?.essentialsReady == false) {
             item {
@@ -199,7 +202,8 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Uni
         )
         val period = if (budget.weeklyIsTighter) "this week" else "today"
         Text(
-            if (budget.exhausted) "Resting until ${if (budget.weeklyIsTighter) "next week" else "tomorrow"} 🌙"
+            if (budget.emergency) "Paused for an emergency 🚨"
+            else if (budget.exhausted) "Resting until ${if (budget.weeklyIsTighter) "next week" else "tomorrow"} 🌙"
             else "${formatDuration(budget.remainingMs)} left $period",
             style = MaterialTheme.typography.bodySmall,
             color = if (budget.exhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,

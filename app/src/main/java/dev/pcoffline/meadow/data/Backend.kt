@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import kotlinx.coroutines.tasks.await
+import java.io.IOException
 
 /** Thin access point to Firebase. Only touched once [dev.pcoffline.meadow.AppGraph.backendReady] is true. */
 class Backend {
@@ -25,9 +26,17 @@ class Backend {
             @Suppress("UNCHECKED_CAST")
             return (result.getData() as? Map<String, Any?>) ?: emptyMap()
         } catch (e: FirebaseFunctionsException) {
-            throw IllegalStateException(e.message ?: "Something went wrong (${e.code}).", e)
+            val unreachable = e.code == FirebaseFunctionsException.Code.UNAVAILABLE ||
+                e.code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ||
+                e.cause is IOException
+            throw CallFailed(e.message ?: "Something went wrong (${e.code}).", unreachable, e)
+        } catch (e: IOException) {
+            throw CallFailed("Couldn't reach Meadow. Check your connection.", unreachable = true, cause = e)
         }
     }
+
+    /** A failed Cloud Function call. [unreachable] means the backend couldn't be reached at all. */
+    class CallFailed(message: String, val unreachable: Boolean, cause: Throwable?) : IllegalStateException(message, cause)
 
     companion object {
         const val FUNCTIONS_REGION = "us-central1"

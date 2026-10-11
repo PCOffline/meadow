@@ -53,6 +53,8 @@ import androidx.navigation.NavController
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.Days
+import dev.pcoffline.meadow.data.Emergency
+import dev.pcoffline.meadow.data.formatDuration
 import dev.pcoffline.meadow.data.Invite
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.data.formatMinutes
@@ -340,6 +342,17 @@ fun FriendScreen(me: UserProfile, uid: String, nav: NavController) {
                         )
                     }
                 }
+                val used = Emergency.ALLOWANCE - f.emergenciesLeft
+                Text(
+                    if (f.emergencyUntilMillis > System.currentTimeMillis()) {
+                        "🚨 Emergency unlock active for ${formatDuration(f.emergencyUntilMillis - System.currentTimeMillis())}"
+                    } else {
+                        "Emergency unlocks: $used of ${Emergency.ALLOWANCE} used in the last 30 days"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (used > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
                 Text(
                     f.lastHeartbeatMillis?.let { "Phone last checked in ${relativeTime(it)}" } ?: "Their phone hasn't checked in yet",
                     style = MaterialTheme.typography.bodySmall,

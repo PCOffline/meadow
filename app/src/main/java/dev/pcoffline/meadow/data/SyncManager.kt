@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.data
 import android.util.Log
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.messaging.FirebaseMessaging
+import dev.pcoffline.meadow.AppGraph
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,11 +64,18 @@ class SyncManager(
             val profile = doc.toProfile()
             store.setStrictMode(profile.strictMode)
             store.setApproverCount(profile.approverIds.size)
+            // An unreported offline unlock wins until the backend has recorded it.
+            if (store.pendingEmergency == null) {
+                store.setEmergency(
+                    if (profile.emergencyUntilMillis > 0L) Emergency(profile.emergencyUntilMillis, profile.emergencyPackage) else null,
+                )
+            }
             _profile.value = ProfileState.Ready(profile)
             // The profile document must exist before the token can be added to it.
             if (!tokenRegistered && !doc.metadata.isFromCache) {
                 tokenRegistered = true
                 scope.launch { registerPushToken(uid) }
+                scope.launch { runCatching { AppGraph.emergency.flushPending() } }
             }
         }
     }

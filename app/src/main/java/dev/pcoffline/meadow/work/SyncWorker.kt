@@ -24,6 +24,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         GuardianService.start(applicationContext)
         if (!AppGraph.backendReady || AppGraph.backend.uid == null) return Result.success()
         return runCatching {
+            AppGraph.emergency.flushPending()
             AppGraph.share.upload(todaySummary())
             AppGraph.share.heartbeat(AppGraph.protection.current().asMap())
             AppGraph.protection.check()

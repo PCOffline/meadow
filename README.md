@@ -17,6 +17,12 @@ your approvers, and they say yes or no from their own phone.
   - Strict mode (optional) keeps Meadow's App info, accessibility toggle, uninstall dialogs and
     the date/time settings out of reach. Turning it off needs approval.
   - Device-admin uninstall protection.
+  - **Emergency unlock:** in a real emergency you can lift all limits (or one app's) for 15, 30 or
+    60 minutes without waiting for anyone. It's rationed to 3 per rolling 30 days (counted by the
+    backend), needs a written reason and a 5-second confirm, can be ended early, and every approver
+    is notified at once with the reason. Without a connection, one offline unlock per 30 days is
+    allowed and reported as soon as the phone is back online.
+  - Phone, dialer and emergency apps can never be limited.
   - Approvers are alerted when a protection is switched off, or when a phone stops checking in
     for 6+ hours.
   - All of the above is enforced **server-side** by Firestore rules and Cloud Functions, not just
@@ -119,10 +125,12 @@ deliberate and visible — approvers are told when protections go off or the pho
 
 ```
 users/{uid}                 displayName, flower, friendCode, approverIds[], approveeIds[], strictMode,
-                            fcmTokens[], protection{}, lastHeartbeat
+                            fcmTokens[], protection{}, lastHeartbeat,
+                            emergencyUntil, emergencyPackage, emergencyUses[]   (functions only, except ending early)
   limits/{package}          packageName, appName, dailyMinutes, weeklyMinutes (0 = none)
   grants/{requestId}        packageName, minutes, dayKey          (functions only)
   usage/{yyyy-MM-dd}        totalMinutes, apps[]                  (readable by approvers)
+  emergencies/{id}          reason, minutes, packageName, offline, overAllowance (functions only)
   alerts/{id}               kind, detail                          (triggers approver push)
 friendCodes/{code}          uid                                   (functions only)
 invites/{id}                fromUid, toUid, status

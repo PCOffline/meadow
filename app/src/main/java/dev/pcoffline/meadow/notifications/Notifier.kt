@@ -115,6 +115,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             "chat" -> CH_CHAT to "chat/${data["chatId"]}"
             "invite", "invite_accepted", "approver_left" -> CH_SOCIAL to "circle"
             "alert" -> CH_ALERTS to "circle"
+            "emergency" -> CH_ALERTS to (data["uid"]?.let { "friend/$it" } ?: "circle")
             else -> CH_SOCIAL to null
         }
         val builder = NotificationCompat.Builder(context, channel)

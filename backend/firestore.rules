@@ -31,7 +31,9 @@ service cloud.firestore {
         && (me() == uid || me() in resource.data.approverIds || me() in resource.data.approveeIds);
       allow create, delete: if false;
       allow update: if signedIn() && me() == uid
-        && changed().hasOnly(['displayName', 'flower', 'fcmTokens', 'lastHeartbeat', 'protection', 'strictMode'])
+        && changed().hasOnly(['displayName', 'flower', 'fcmTokens', 'lastHeartbeat', 'protection', 'strictMode', 'emergencyUntil'])
+        // An emergency unlock can only be ended early from the phone, never started or extended.
+        && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time)
         && (!('displayName' in changed())
             || (request.resource.data.displayName is string
                 && request.resource.data.displayName.size() > 0
@@ -59,6 +61,11 @@ service cloud.firestore {
       match /usage/{day} {
         allow read: if signedIn() && (me() == uid || isApproverOf(uid));
         allow write: if signedIn() && me() == uid;
+      }
+
+      match /emergencies/{emergencyId} {
+        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow write: if false;
       }
 
       match /alerts/{alertId} {

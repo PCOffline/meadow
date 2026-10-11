@@ -4,6 +4,7 @@ import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.Grant
 import dev.pcoffline.meadow.data.LocalStore
+import dev.pcoffline.meadow.usage.AppCatalog
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
 
@@ -14,7 +15,11 @@ data class AppBudget(
     val usedWeekMs: Long,
     val bonusTodayMinutes: Int,
     val bonusWeekMinutes: Int,
+    /** An emergency unlock covering this app ends at this time; 0 when none is active. */
+    val emergencyUntilMillis: Long = 0L,
 ) {
+    val emergency: Boolean get() = emergencyUntilMillis > System.currentTimeMillis()
+
     val dailyAllowedMs: Long? =
         if (limit.dailyMinutes > 0) (limit.dailyMinutes + bonusTodayMinutes) * MINUTE else null
     val weeklyAllowedMs: Long? =
@@ -26,7 +31,7 @@ data class AppBudget(
     /** Time left before the tighter of the two limits is reached. */
     val remainingMs: Long = listOfNotNull(dailyRemainingMs, weeklyRemainingMs).minOrNull()?.coerceAtLeast(0) ?: Long.MAX_VALUE
 
-    val exhausted: Boolean get() = remainingMs <= 0
+    val exhausted: Boolean get() = remainingMs <= 0 && !emergency
 
     /** True when the weekly limit, not the daily one, is the one that runs out first. */
     val weeklyIsTighter: Boolean =
@@ -54,6 +59,7 @@ class LimitEngine(
     private val store: LocalStore,
     private val tracker: UsageTracker,
     private val history: UsageHistory,
+    private val catalog: AppCatalog,
 ) {
     private var todayKey: String = ""
     private var todayUsage: Map<String, Long> = emptyMap()
@@ -70,15 +76,21 @@ class LimitEngine(
         foregroundSince = System.currentTimeMillis()
     }
 
-    fun limitFor(packageName: String): AppLimit? = store.limits.value.firstOrNull { it.packageName == packageName }
+    /** Phone and emergency apps are never limited, whatever is stored. */
+    fun limitFor(packageName: String): AppLimit? {
+        if (packageName in catalog.essentialPackages()) return null
+        return store.limits.value.firstOrNull { it.packageName == packageName }
+    }
 
     fun budget(packageName: String, forceRefresh: Boolean = false): AppBudget? {
         val limit = limitFor(packageName) ?: return null
         return computeBudgets(listOf(limit), forceRefresh).firstOrNull()
     }
 
-    fun budgets(forceRefresh: Boolean = false): List<AppBudget> =
-        computeBudgets(store.limits.value, forceRefresh)
+    fun budgets(forceRefresh: Boolean = false): List<AppBudget> {
+        val essentials = catalog.essentialPackages()
+        return computeBudgets(store.limits.value.filter { it.packageName !in essentials }, forceRefresh)
+    }
 
     /** Today's usage per app, measured fresh enough for display. */
     @Synchronized
@@ -109,6 +121,7 @@ class LimitEngine(
             weekMeasuredFor = key
         }
         val extra = foregroundExtra()
+        val emergency = store.emergency.value
         return limits.map { limit ->
             val pkg = limit.packageName
             val usedToday = (todayUsage[pkg] ?: 0L) + if (pkg == foregroundPackage) extra else 0L
@@ -120,6 +133,7 @@ class LimitEngine(
                 bonusWeekMinutes = grants.bonus(pkg) { dayKey ->
                     Days.parse(dayKey)?.let { Days.isSameWeek(it, today) } == true
                 },
+                emergencyUntilMillis = emergency?.takeIf { it.covers(pkg) }?.untilMillis ?: 0L,
             )
         }
     }

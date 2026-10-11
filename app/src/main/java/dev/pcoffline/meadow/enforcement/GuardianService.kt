@@ -67,7 +67,7 @@ class GuardianService : Service() {
         AppGraph.engine.setForeground(pkg)
         val budget = AppGraph.engine.budget(pkg) ?: return
         if (!budget.exhausted) {
-            AppGraph.notifier.maybeWarn(budget)
+            if (!budget.emergency) AppGraph.notifier.maybeWarn(budget)
             return
         }
         val now = System.currentTimeMillis()
@@ -81,7 +81,10 @@ class GuardianService : Service() {
 
     private fun updateSummary() {
         val budgets = AppGraph.engine.budgets()
+        val emergency = AppGraph.store.emergency.value
         val text = when {
+            emergency?.isActive() == true ->
+                "🚨 Emergency unlock — limits paused for ${formatDuration(emergency.untilMillis - System.currentTimeMillis())}"
             budgets.isEmpty() -> "No limits yet — plant one in Meadow 🌱"
             else -> {
                 val open = budgets.filter { !it.exhausted }.minByOrNull { it.remainingMs }

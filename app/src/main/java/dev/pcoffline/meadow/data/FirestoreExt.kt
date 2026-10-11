@@ -58,6 +58,10 @@ fun DocumentSnapshot.toProfile() = UserProfile(
         ?.mapNotNull { (k, v) -> if (k is String && v is Boolean) k to v else null }
         ?.toMap() ?: emptyMap(),
     lastHeartbeatMillis = getTimestamp("lastHeartbeat")?.toDate()?.time,
+    emergencyUntilMillis = getTimestamp("emergencyUntil")?.toDate()?.time ?: 0L,
+    emergencyPackage = getString("emergencyPackage"),
+    emergencyUsesMillis = (get("emergencyUses") as? List<*>)?.filterIsInstance<Timestamp>()?.map { it.toDate().time }
+        ?: emptyList(),
 )
 
 fun DocumentSnapshot.toLimit() = AppLimit(

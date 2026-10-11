@@ -33,10 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.ChangeOutcome
+import dev.pcoffline.meadow.data.Emergency
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.FlowerPicker
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
+import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.rememberAction
 
@@ -46,6 +49,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
     var flower by rememberSaveable { mutableStateOf(profile.flower) }
     var confirmStrictOff by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
+    var showEmergency by remember { mutableStateOf(false) }
     val action = rememberAction()
 
     Column(Modifier.fillMaxSize()) {
@@ -90,6 +94,29 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
                 }
             }
 
+            EmergencyBanner()
+            MeadowCard(Modifier.fillMaxWidth()) {
+                Text("Emergency unlock", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Lifts all limits for up to an hour without waiting for an approver. You get " +
+                        "${Emergency.ALLOWANCE} every 30 days, and your approvers are told each time, with your reason. " +
+                        "Calls and emergency apps are never limited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "${profile.emergenciesLeft} of ${Emergency.ALLOWANCE} left",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                OutlinedButton(
+                    onClick = { showEmergency = true },
+                    enabled = profile.emergenciesLeft > 0,
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text("Use an emergency unlock") }
+            }
+
             MeadowCard(Modifier.fillMaxWidth()) {
                 Text("Protections", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -105,6 +132,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
                 Text(
                     "• Tightening a limit applies right away.\n" +
                         "• Loosening or removing one, turning off strict mode, or changing approvers needs an approver's yes.\n" +
+                        "• In a real emergency you can lift limits yourself for up to an hour, a few times a month — your approvers are told.\n" +
                         "• When an app's time is up it closes and rests until tomorrow, unless a friend gifts more time.\n" +
                         "• If protections are switched off or your phone goes quiet, your approvers are told.\n" +
                         "• Limits stay on this phone even when you're offline or signed out.",
@@ -119,6 +147,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
         }
     }
 
+    if (showEmergency) EmergencyDialog(packageName = null, appName = null, onDismiss = { showEmergency = false })
     if (confirmStrictOff) {
         AlertDialog(
             onDismissRequest = { confirmStrictOff = false },

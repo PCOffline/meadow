@@ -27,6 +27,9 @@ class LocalStore(context: Context) {
     private val _approverCount = MutableStateFlow(prefs.getInt(KEY_APPROVERS, 0))
     val approverCount: StateFlow<Int> = _approverCount.asStateFlow()
 
+    private val _emergency = MutableStateFlow(readEmergency())
+    val emergency: StateFlow<Emergency?> = _emergency.asStateFlow()
+
     var ownerUid: String?
         get() = prefs.getString(KEY_OWNER, null)
         set(value) = prefs.edit().putString(KEY_OWNER, value).apply()
@@ -79,6 +82,29 @@ class LocalStore(context: Context) {
         _approverCount.value = count
     }
 
+    fun setEmergency(emergency: Emergency?) {
+        prefs.edit()
+            .putLong(KEY_EMERGENCY_UNTIL, emergency?.untilMillis ?: 0L)
+            .putString(KEY_EMERGENCY_PACKAGE, emergency?.packageName)
+            .apply()
+        _emergency.value = emergency
+    }
+
+    /** When the last offline emergency unlock was taken; offline ones are limited to one per 30 days. */
+    var lastOfflineEmergencyMillis: Long
+        get() = prefs.getLong(KEY_OFFLINE_EMERGENCY, 0L)
+        set(value) = prefs.edit().putLong(KEY_OFFLINE_EMERGENCY, value).apply()
+
+    /** An offline emergency unlock that still has to be reported to the backend. */
+    var pendingEmergency: JSONObject?
+        get() = prefs.getString(KEY_PENDING_EMERGENCY, null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+        set(value) = prefs.edit().putString(KEY_PENDING_EMERGENCY, value?.toString()).apply()
+
+    private fun readEmergency(): Emergency? {
+        val until = prefs.getLong(KEY_EMERGENCY_UNTIL, 0L)
+        return if (until > 0L) Emergency(until, prefs.getString(KEY_EMERGENCY_PACKAGE, null)) else null
+    }
+
     private fun readLimits(): List<AppLimit> = parseArray(prefs.getString(KEY_LIMITS, null)) {
         AppLimit(
             packageName = it.getString("p"),
@@ -113,5 +139,9 @@ class LocalStore(context: Context) {
         const val KEY_OWNER = "owner_uid"
         const val KEY_PROTECTION = "last_protection"
         const val KEY_WARNED = "warned_keys"
+        const val KEY_EMERGENCY_UNTIL = "emergency_until"
+        const val KEY_EMERGENCY_PACKAGE = "emergency_package"
+        const val KEY_OFFLINE_EMERGENCY = "offline_emergency_at"
+        const val KEY_PENDING_EMERGENCY = "pending_emergency"
     }
 }

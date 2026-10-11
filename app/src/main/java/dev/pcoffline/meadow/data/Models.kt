@@ -26,7 +26,32 @@ data class UserProfile(
     val strictMode: Boolean,
     val protection: Map<String, Boolean>,
     val lastHeartbeatMillis: Long?,
-)
+    val emergencyUntilMillis: Long,
+    val emergencyPackage: String?,
+    val emergencyUsesMillis: List<Long>,
+) {
+    /** Emergency unlocks still available in the rolling 30-day window. */
+    val emergenciesLeft: Int
+        get() {
+            val since = System.currentTimeMillis() - Emergency.WINDOW_MS
+            return (Emergency.ALLOWANCE - emergencyUsesMillis.count { it > since }).coerceAtLeast(0)
+        }
+}
+
+/** Limits lifted without approval until [untilMillis], for one app or (when null) all of them. */
+data class Emergency(val untilMillis: Long, val packageName: String?) {
+    fun isActive(now: Long = System.currentTimeMillis()) = untilMillis > now
+
+    fun covers(pkg: String, now: Long = System.currentTimeMillis()) =
+        isActive(now) && (packageName == null || packageName == pkg)
+
+    companion object {
+        /** Must match EMERGENCY_ALLOWANCE / EMERGENCY_WINDOW_MS in the backend. */
+        const val ALLOWANCE = 3
+        const val WINDOW_MS = 30L * 24 * 60 * 60_000
+        val MINUTE_OPTIONS = listOf(15, 30, 60)
+    }
+}
 
 enum class RequestType(val wire: String) {
     EXTRA_TIME("extra_time"),

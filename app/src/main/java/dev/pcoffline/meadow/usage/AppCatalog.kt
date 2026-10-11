@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
+import android.telecom.TelecomManager
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -20,13 +21,14 @@ class AppCatalog(private val context: Context) {
 
     @Volatile private var launchableCache: Set<String>? = null
     @Volatile private var homeCache: Set<String>? = null
+    @Volatile private var essentialCache: Set<String>? = null
 
     fun launchableApps(): List<InstalledApp> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         return pm.queryIntentActivities(intent, 0)
             .map { it.activityInfo.packageName }
             .distinct()
-            .filter { it != context.packageName }
+            .filter { it != context.packageName && it !in essentialPackages() }
             .map { InstalledApp(it, label(it)) }
             .sortedBy { it.label.lowercase() }
     }
@@ -39,6 +41,13 @@ class AppCatalog(private val context: Context) {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val homes = pm.queryIntentActivities(intent, 0).map { it.activityInfo.packageName }.toSet()
         (homes + setOf("com.android.systemui", context.packageName)).also { homeCache = it }
+    }
+
+    /** The phone, dialer and emergency apps: always reachable, never limitable. */
+    fun essentialPackages(): Set<String> = essentialCache ?: run {
+        val dialers = pm.queryIntentActivities(Intent(Intent.ACTION_DIAL), 0).map { it.activityInfo.packageName }
+        val defaultDialer = runCatching { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()
+        (dialers + listOfNotNull(defaultDialer) + ALWAYS_ALLOWED).toSet().also { essentialCache = it }
     }
 
     /** Keeps only user-facing apps, dropping launchers, system UI and this app. */
@@ -72,5 +81,18 @@ class AppCatalog(private val context: Context) {
     fun invalidate() {
         launchableCache = null
         homeCache = null
+        essentialCache = null
+    }
+
+    private companion object {
+        val ALWAYS_ALLOWED = setOf(
+            "com.android.phone",
+            "com.android.server.telecom",
+            "com.android.emergency",
+            "com.google.android.apps.safetyhub",
+            "com.android.dialer",
+            "com.google.android.dialer",
+            "com.samsung.android.dialer",
+        )
     }
 }

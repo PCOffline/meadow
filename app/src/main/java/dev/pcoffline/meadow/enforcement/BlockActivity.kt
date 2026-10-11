@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -49,6 +50,7 @@ import dev.pcoffline.meadow.ui.LocalSnackbar
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowHills
+import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
 import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
@@ -109,8 +111,10 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
     val garden = Garden.colors
     val snackbar = remember { SnackbarHostState() }
     var asking by remember { mutableStateOf(false) }
+    var emergency by remember { mutableStateOf(false) }
     val grants by AppGraph.store.grants.collectAsStateWithLifecycle()
-    val budget by produceState<AppBudget?>(null, pkg, grants) {
+    val activeEmergency by AppGraph.store.emergency.collectAsStateWithLifecycle()
+    val budget by produceState<AppBudget?>(null, pkg, grants, activeEmergency) {
         while (true) {
             value = withContext(Dispatchers.IO) { AppGraph.engine.budget(pkg, forceRefresh = true) }
             delay(15_000L)
@@ -140,12 +144,18 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
                 AppIcon(pkg, size = 56.dp)
                 BloomFlower(if (unlocked) 0.9f else 0.05f, garden.petalPink, Modifier.size(110.dp, 150.dp))
                 Text(
-                    if (unlocked) "Your friend said yes 🌸" else "$appName is resting 🌙",
+                    when {
+                        unlocked && b?.emergency == true -> "Emergency unlock active 🚨"
+                        unlocked -> "Your friend said yes 🌸"
+                        else -> "$appName is resting 🌙"
+                    },
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     when {
+                        unlocked && b!!.emergency ->
+                            "$appName is open for ${formatDuration(b.emergencyUntilMillis - System.currentTimeMillis())}. Take care of what you need to."
                         unlocked -> "You have ${formatDuration(b!!.remainingMs)} more. Enjoy it mindfully."
                         b != null && b.weeklyIsTighter ->
                             "You've used the ${formatMinutes(b.limit.weeklyMinutes)} you set aside for this week."
@@ -178,9 +188,15 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
                     else -> Button(onClick = { asking = true }, modifier = Modifier.fillMaxWidth()) { Text("Ask a friend for more time") }
                 }
                 OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text("Go do something lovely") }
+                if (!unlocked) {
+                    TextButton(onClick = { emergency = true }) {
+                        Text("Emergency? Unlock now", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
     if (asking) AskForTimeDialog(packageName = pkg, onDismiss = { asking = false })
+    if (emergency) EmergencyDialog(packageName = pkg, appName = appName, onDismiss = { emergency = false })
 }
