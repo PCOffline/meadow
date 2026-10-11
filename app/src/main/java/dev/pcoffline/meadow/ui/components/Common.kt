@@ -1,0 +1,155 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package dev.pcoffline.meadow.ui.components
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.ui.theme.Garden
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+@Composable
+fun MeadowCard(
+    modifier: Modifier = Modifier,
+    tint: Color = Garden.colors.cardTint,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = CardDefaults.cardColors(containerColor = tint)
+    val shape = RoundedCornerShape(24.dp)
+    val border = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+    if (onClick != null) {
+        Card(onClick = onClick, modifier = modifier.then(border), shape = shape, colors = colors) {
+            Column(Modifier.padding(18.dp), content = content)
+        }
+    } else {
+        Card(modifier = modifier.then(border), shape = shape, colors = colors) {
+            Column(Modifier.padding(18.dp), content = content)
+        }
+    }
+}
+
+@Composable
+fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composable (() -> Unit)? = null) {
+    Row(
+        modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Daisy(Modifier.size(14.dp), petal = Garden.colors.petalPink)
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        trailing?.invoke()
+    }
+}
+
+@Composable
+fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null) {
+    Column(
+        modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(emoji, fontSize = 44.sp)
+        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(
+            body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (action != null) {
+            Spacer(Modifier.height(4.dp))
+            action()
+        }
+    }
+}
+
+@Composable
+fun Loading(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+fun FlowerAvatar(flower: String, modifier: Modifier = Modifier, size: Dp = 44.dp, tint: Color = MaterialTheme.colorScheme.primaryContainer) {
+    Box(
+        modifier.size(size).clip(CircleShape).background(tint),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(flower, fontSize = (size.value * 0.5f).sp)
+    }
+}
+
+@Composable
+fun AppIcon(packageName: String, modifier: Modifier = Modifier, size: Dp = 40.dp) {
+    val icon by produceState<ImageBitmap?>(null, packageName) {
+        value = withContext(Dispatchers.IO) { AppGraph.catalog.icon(packageName) }
+    }
+    val bitmap = icon
+    if (bitmap != null) {
+        Image(bitmap, contentDescription = null, modifier = modifier.size(size).clip(RoundedCornerShape(size * 0.28f)))
+    } else {
+        Box(
+            modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("🌱", fontSize = (size.value * 0.45f).sp)
+        }
+    }
+}
+
+@Composable
+fun Pill(text: String, color: Color, modifier: Modifier = Modifier, textColor: Color = MaterialTheme.colorScheme.onSurface) {
+    Box(
+        modifier.clip(RoundedCornerShape(50)).background(color).padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = textColor, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun ErrorNote(message: String?, modifier: Modifier = Modifier) {
+    if (message.isNullOrBlank()) return
+    Text(
+        "🍂 $message",
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.errorContainer).padding(12.dp),
+        color = MaterialTheme.colorScheme.onErrorContainer,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+}

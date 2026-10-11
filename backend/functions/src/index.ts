@@ -1,0 +1,9 @@
+import { initializeApp } from "firebase-admin/app";
+import { setGlobalOptions } from "firebase-functions/v2";
+
+initializeApp();
+setGlobalOptions({ region: "us-central1", maxInstances: 10 });
+
+export { createProfile, sendInvite, respondInvite, cancelInvite, stepDown } from "./social";
+export { createRequest, decideRequest, cancelRequest } from "./requests";
+export { onChatMessage, onProtectionAlert, hourlyCare } from "./triggers";

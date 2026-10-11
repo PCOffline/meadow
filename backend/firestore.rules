@@ -1,0 +1,111 @@
+rules_version = '2';
+
+// Everything that changes who approves whom, or that loosens a commitment, goes through
+// Cloud Functions (which bypass these rules). Clients may only make things stricter.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function userData(uid) { return get(/databases/$(database)/documents/users/$(uid)).data; }
+    function isApproverOf(uid) { return me() in userData(uid).approverIds; }
+    function hasNoApprovers(uid) { return userData(uid).approverIds.size() == 0; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    function validLimit(d, pkg) {
+      return d.packageName == pkg
+        && d.appName is string && d.appName.size() <= 100
+        && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
+        && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
+        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0);
+    }
+
+    // 0 means "no limit" for that period, so going from 0 to anything is stricter.
+    function isStricter(old, next) {
+      return (old.dailyMinutes == 0 || (next.dailyMinutes > 0 && next.dailyMinutes <= old.dailyMinutes))
+        && (old.weeklyMinutes == 0 || (next.weeklyMinutes > 0 && next.weeklyMinutes <= old.weeklyMinutes));
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn()
+        && (me() == uid || me() in resource.data.approverIds || me() in resource.data.approveeIds);
+      allow create, delete: if false;
+      allow update: if signedIn() && me() == uid
+        && changed().hasOnly(['displayName', 'flower', 'fcmTokens', 'lastHeartbeat', 'protection', 'strictMode'])
+        && (!('displayName' in changed())
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() > 0
+                && request.resource.data.displayName.size() <= 30))
+        && (!('flower' in changed()) || (request.resource.data.flower is string && request.resource.data.flower.size() <= 8))
+        && (!('fcmTokens' in changed()) || request.resource.data.fcmTokens.size() <= 10)
+        // Strict mode can always be switched on, but only switched off without approvers.
+        && (!('strictMode' in changed())
+            || request.resource.data.strictMode == true
+            || resource.data.approverIds.size() == 0);
+
+      match /limits/{pkg} {
+        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow create: if signedIn() && me() == uid && validLimit(request.resource.data, pkg);
+        allow update: if signedIn() && me() == uid && validLimit(request.resource.data, pkg)
+          && (hasNoApprovers(uid) || isStricter(resource.data, request.resource.data));
+        allow delete: if signedIn() && me() == uid && hasNoApprovers(uid);
+      }
+
+      match /grants/{grantId} {
+        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow write: if false;
+      }
+
+      match /usage/{day} {
+        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow write: if signedIn() && me() == uid;
+      }
+
+      match /alerts/{alertId} {
+        allow create: if signedIn() && me() == uid
+          && request.resource.data.keys().hasOnly(['kind', 'detail', 'createdAt'])
+          && request.resource.data.kind is string && request.resource.data.kind.size() <= 40
+          && request.resource.data.detail is string && request.resource.data.detail.size() <= 200;
+        allow read, update, delete: if false;
+      }
+    }
+
+    match /friendCodes/{code} {
+      allow read, write: if false;
+    }
+
+    match /invites/{inviteId} {
+      allow read: if signedIn() && (resource.data.fromUid == me() || resource.data.toUid == me());
+      allow write: if false;
+    }
+
+    match /requests/{requestId} {
+      allow read: if signedIn() && (resource.data.requesterId == me() || me() in resource.data.approverIds);
+      allow write: if false;
+    }
+
+    match /chats/{chatId} {
+      function participant() {
+        return signedIn() && me() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      }
+
+      allow read: if signedIn() && me() in resource.data.participants;
+      allow create, delete: if false;
+      allow update: if signedIn() && me() in resource.data.participants
+        && changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastRead'])
+        && (!('lastSenderId' in changed()) || request.resource.data.lastSenderId == me());
+
+      match /messages/{messageId} {
+        allow read: if participant();
+        allow create: if participant()
+          && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
+          && request.resource.data.senderId == me()
+          && request.resource.data.kind == 'text'
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

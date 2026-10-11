@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Meadow</string>
+    <string name="accessibility_label">Meadow garden keeper</string>
+    <string name="accessibility_description">Meadow watches which app is on screen so it can gently close apps once you have used up the time you committed to. It never reads what you type and never sends screen content anywhere.</string>
+    <string name="device_admin_label">Meadow uninstall protection</string>
+    <string name="device_admin_description">Prevents Meadow from being uninstalled without first turning this off. Your approvers are told if it is turned off.</string>
+</resources>
