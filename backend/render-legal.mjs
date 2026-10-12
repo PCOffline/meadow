@@ -1,5 +1,5 @@
 // Renders the legal documents in /legal into static pages for Firebase Hosting.
-// Runs before every hosting deploy (see firebase.json); the output is not committed.
+// Runs before every hosting deploy (see predeploy.cjs); the output is not committed.
 import { readFileSync, writeFileSync } from "node:fs";
 import { marked } from "marked";
 
@@ -32,7 +32,7 @@ export function render(markdown) {
   return template(title, html);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function writeLegalPages() {
   for (const [source, target] of pages) {
     const markdown = readFileSync(new URL(`../legal/${source}`, import.meta.url), "utf8");
     writeFileSync(new URL(`hosting/${target}`, import.meta.url), render(markdown));

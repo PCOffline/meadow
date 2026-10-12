@@ -15,9 +15,8 @@ if (hasFirebaseConfig) {
 
 // Invite links are served by Firebase Hosting at https://<project-id>.web.app/i/<token>.
 val firebaseProjectId: String? = if (hasFirebaseConfig) {
-    @Suppress("UNCHECKED_CAST")
-    val json = groovy.json.JsonSlurper().parse(firebaseConfig) as Map<String, Any?>
-    (json["project_info"] as? Map<String, Any?>)?.get("project_id") as? String
+    val json = groovy.json.JsonSlurper().parse(firebaseConfig) as Map<*, *>
+    (json["project_info"] as? Map<*, *>)?.get("project_id") as? String
 } else {
     null
 }

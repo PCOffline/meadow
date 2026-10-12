@@ -1,7 +1,9 @@
 // The hosted legal pages: every document renders to a complete, accessible page.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { render } from "../render-legal.mjs";
 
 const docs = ["privacy_notice.md", "terms_of_use.md", "licenses.md"];
@@ -50,4 +52,12 @@ test("app links list every signing key, and refuse anything that isn't a fingerp
   assert.equal(entry.target.package_name, "dev.pcoffline.meadow");
   assert.deepEqual(entry.target.sha256_cert_fingerprints, [key]);
   assert.throws(() => assetLinks({ packageName: "x", sha256: ["REPLACE_ME"] }), /fingerprint/);
+});
+
+test("the predeploy script writes every hosted page", () => {
+  const backend = fileURLToPath(new URL("..", import.meta.url));
+  execFileSync(process.execPath, ["predeploy.cjs"], { cwd: backend, stdio: "pipe" });
+  for (const page of ["privacy.html", "terms.html", "licenses.html"]) {
+    assert.ok(existsSync(new URL(`../hosting/${page}`, import.meta.url)), page);
+  }
 });
