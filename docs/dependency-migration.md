@@ -31,7 +31,7 @@ Latest stable versions as of 12 October 2026.
 | lifecycle | 2.9.0 | 2.11.0 | None used |
 | navigation-compose | 2.9.0 | 2.10.2 | `handleDeepLink` ignores unknown links; not used (deep links go through `DeepLinks.toRoute`) |
 | work | 2.10.1 | 2.12.0 | Default executor is `Dispatchers.Default`; no effect |
-| Compose BOM | 2025.05.01 | 2026.09.00 | Material 3 1.4: the selected navigation bar label colour changes, so screenshots change. v1 test rules deprecated, still work |
+| Compose BOM | 2025.05.01 | 2026.09.00 | Material 3 1.4: the selected navigation bar label colour changes, so screenshots change. v1 test rules deprecated, still work. New lint errors: composables must read the locale and resources observably, so they use `LocalConfiguration` (`currentLocale()`) and `LocalResources` instead of `Locale.getDefault()` and `LocalContext.current.resources` |
 | material-icons-extended | 1.7.8 | 1.7.8 | No longer updated; still in the BOM |
 | Firebase BoM | 35.0.0 | 35.0.0 | Already latest |
 | google-services plugin | 4.5.0 | 4.5.0 | Already latest; uses AGP's public API |

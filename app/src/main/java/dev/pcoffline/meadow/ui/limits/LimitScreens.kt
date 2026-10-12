@@ -81,7 +81,7 @@ import dev.pcoffline.meadow.ui.components.ShareDialog
 import dev.pcoffline.meadow.ui.requests.BeePicks
 import dev.pcoffline.meadow.ui.requests.BumblebeePicker
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.json.Json
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.rememberAction
@@ -374,7 +374,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
         )
     }
     if (sharing && existing != null) {
-        val text = LocalContext.current.resources.let { res ->
+        val text = LocalResources.current.let { res ->
             res.getString(R.string.share_limit, existing.appName, res.limitText(existing.dailyMinutes, existing.weeklyMinutes, existing.schedule))
         }
         ShareDialog(text, onDismiss = { sharing = false })
