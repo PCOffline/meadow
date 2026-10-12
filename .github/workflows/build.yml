@@ -26,7 +26,7 @@ jobs:
             echo "No GOOGLE_SERVICES_JSON secret; building without a backend"
           fi
       - name: Build, unit test and lint
-        run: ./gradlew assembleDebug testDebugUnitTest lintDebug --stacktrace
+        run: ./gradlew assembleDebug assembleRelease testDebugUnitTest lintDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: meadow-debug-apk

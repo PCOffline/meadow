@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 class GuardianAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchJob: Job? = null
-    private var currentPackage: String? = null
+    @Volatile private var currentPackage: String? = null
     private var lastStrictCheck = 0L
     private val activityCache = LruCache<String, Boolean>(256)
 
