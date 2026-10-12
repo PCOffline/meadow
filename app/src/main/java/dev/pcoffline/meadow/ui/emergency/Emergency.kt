@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,6 +68,7 @@ private const val CONFIRM_DELAY_SECONDS = 5
 @Composable
 fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val profileState by AppGraph.sync.profile.collectAsStateWithLifecycle()
     val profile = (profileState as? ProfileState.Ready)?.profile
     var onlyThisApp by rememberSaveable { mutableStateOf(packageName != null) }
@@ -140,7 +142,7 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         val result = AppGraph.emergency.unlock(minutes, reason, scope, if (onlyThisApp) appName else null)
                         val time = DateFormat.getTimeFormat(context).format(Date(result.untilMillis))
                         action.toast(
-                            context.getString(
+                            resources.getString(
                                 if (result.offline) R.string.emergency_unlocked_offline else R.string.emergency_unlocked,
                                 time,
                             ),
