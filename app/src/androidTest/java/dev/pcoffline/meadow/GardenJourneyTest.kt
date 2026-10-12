@@ -75,6 +75,10 @@ class GardenJourneyTest {
         }.distinct().joinToString(" | ").replace('\n', ' ').take(1500)
     }.getOrElse { "(couldn't read the screen: $it)" }
 
+    /** Snackbars sit over the bottom of the screen; taps there would land on them. */
+    private fun waitForSnackbarToGo(@StringRes id: Int) =
+        compose.waitUntil(15_000) { compose.onAllNodesWithText(text(id)).fetchSemanticsNodes().isEmpty() }
+
     /** Reads a document straight from the Firestore emulator, bypassing security rules. */
     private fun backendDoc(path: String): JSONObject? {
         val url = URL("http://${BuildConfig.EMULATOR_HOST}:8080/v1/projects/demo-meadow/databases/(default)/documents/$path")
@@ -124,8 +128,7 @@ class GardenJourneyTest {
             compose.onNode(hasSetTextAction() and hasText(text(R.string.profile_bio))).performTextInput("Growing calmer days")
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.profile_saved)
-            // Let the snackbar go, so it can't sit over the next screen's controls.
-            compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.profile_saved)).fetchSemanticsNodes().isEmpty() }
+            waitForSnackbarToGo(R.string.profile_saved)
             assertEquals("Growing calmer days", backendDoc("users/$uid")!!.getJSONObject("bio").getString("stringValue"))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
@@ -137,6 +140,8 @@ class GardenJourneyTest {
                 doc.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
                     .getJSONObject("shareUsage").getBoolean("booleanValue").not()
             }
+            waitFor(R.string.settings_privacy_saved)
+            waitForSnackbarToGo(R.string.settings_privacy_saved)
 
             // The privacy notice is a tap away.
             node(R.string.legal_privacy).performScrollTo().performClick()
