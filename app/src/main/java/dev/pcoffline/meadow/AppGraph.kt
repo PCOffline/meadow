@@ -54,7 +54,7 @@ object AppGraph {
     val history by lazy { UsageHistory(app, tracker, catalog) }
     val engine by lazy { LimitEngine(store, tracker, history, catalog) }
     val emergency by lazy { EmergencyRepository(app, backend, store) }
-    val profiles by lazy { ProfileRepository(app, backend, store) }
+    val profiles by lazy { ProfileRepository(app, backend, store) { sync } }
     val notifier by lazy { Notifier(app, store) }
     val updater by lazy { Updater(app) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }

@@ -40,6 +40,7 @@ class SyncManager(
         scope.launch {
             auth.uid.collectLatest { uid ->
                 if (uid == null) {
+                    leaving = false
                     _profile.value = ProfileState.SignedOut
                     return@collectLatest
                 }
@@ -55,6 +56,17 @@ class SyncManager(
         }
     }
 
+    /** Set while the account is being deleted, so its vanishing profile isn't mistaken for a new one. */
+    @Volatile private var leaving = false
+
+    fun beginLeaving() {
+        leaving = true
+    }
+
+    fun cancelLeaving() {
+        leaving = false
+    }
+
     private val _accountConfirmed = MutableStateFlow(false)
 
     /** True once the account has been read from the server, so choices like accepted terms are known. */
@@ -67,7 +79,7 @@ class SyncManager(
         // The public profile plus the owner-only account (who looks after whom, preferences).
         combine(backend.user(uid).observe(), backend.account(uid).observe()) { doc, accountDoc -> doc to accountDoc }.collect { (doc, accountDoc) ->
             if (!doc.exists()) {
-                if (!doc.metadata.isFromCache) _profile.value = ProfileState.Missing
+                if (!doc.metadata.isFromCache && !leaving) _profile.value = ProfileState.Missing
                 return@collect
             }
             val account = if (accountDoc.exists()) accountDoc.toAccount() else Account()

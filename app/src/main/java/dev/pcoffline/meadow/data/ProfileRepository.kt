@@ -25,6 +25,7 @@ class ProfileRepository(
     private val context: Context,
     private val backend: Backend,
     private val store: LocalStore,
+    private val sync: () -> SyncManager,
 ) {
     private val storage by lazy { FirebaseStorage.getInstance() }
 
@@ -103,7 +104,14 @@ class ProfileRepository(
 
     /** Deletes the account and everything tied to it, then forgets it on this phone too. */
     suspend fun deleteAccount() {
-        backend.call("deleteAccount")
+        // The profile disappears mid-call; keep the app from offering to create a new one.
+        sync().beginLeaving()
+        try {
+            backend.call("deleteAccount")
+        } catch (e: Exception) {
+            sync().cancelLeaving()
+            throw e
+        }
         runCatchingCancellable { backend.auth.signOut() }
         store.clearAll()
         context.filesDir.resolve("usage_history.json").delete()
