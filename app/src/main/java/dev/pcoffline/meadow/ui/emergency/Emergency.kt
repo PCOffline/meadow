@@ -2,6 +2,10 @@
 
 package dev.pcoffline.meadow.ui.emergency
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -84,7 +88,7 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.emergency_dialog_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.emergency_dialog_body), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     when {
@@ -119,6 +123,7 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         value = reason,
                         onValueChange = { reason = it.take(280) },
                         label = { Text(stringResource(R.string.emergency_dialog_reason)) },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                         supportingText = { if (!reasonOk) Text(stringResource(R.string.emergency_dialog_reason_hint)) },
                         modifier = Modifier.fillMaxWidth(),
                     )

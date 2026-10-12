@@ -2,6 +2,9 @@
 
 package dev.pcoffline.meadow.ui.auth
 
+import dev.pcoffline.meadow.ui.components.rememberReducedMotion
+import java.util.Locale
+import java.time.DayOfWeek
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -150,8 +153,9 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
                 modifier = Modifier.asHeading().align(Alignment.CenterHorizontally).padding(top = 20.dp),
             )
             HorizontalPager(pager, Modifier.weight(1f)) { index ->
+                // Scrolls when large text or a short screen can't fit the page.
                 Column(
-                    Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(Modifier.height(260.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
@@ -211,13 +215,12 @@ private fun PlantIllustration() {
 
 @Composable
 private fun FriendsIllustration() {
-    val transition = rememberInfiniteTransition(label = "heart")
-    val beat by transition.animateFloat(
+    val beat = if (rememberReducedMotion()) null else rememberInfiniteTransition(label = "heart").animateFloat(
         0.9f, 1.15f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "beat",
     )
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 40.dp)) {
         FlowerAvatar("🌻", size = 96.dp, tint = MaterialTheme.colorScheme.primaryContainer)
-        Text("🐝", fontSize = 34.sp, modifier = Modifier.padding(horizontal = 14.dp).graphicsLayer { scaleX = beat; scaleY = beat })
+        Text("🐝", fontSize = 34.sp, modifier = Modifier.padding(horizontal = 14.dp).graphicsLayer { val b = beat?.value ?: 1f; scaleX = b; scaleY = b })
         FlowerAvatar("🌷", size = 96.dp, tint = MaterialTheme.colorScheme.secondaryContainer)
     }
 }
@@ -227,7 +230,7 @@ private fun GrowthIllustration() {
     MeadowCard(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         StalkBarChart(
             values = listOf(140f, 120f, 95f, 110f, 80f, 60f, 45f),
-            labels = listOf("M", "T", "W", "T", "F", "S", "S"),
+            labels = DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()) },
             highlightIndex = 6,
             referenceLine = 93f,
             height = 150.dp,

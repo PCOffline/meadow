@@ -2,6 +2,8 @@
 
 package dev.pcoffline.meadow.ui.limits
 
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -265,6 +267,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
                 OutlinedTextField(
                     value = message, onValueChange = { message = it.take(280) },
                     label = { Text(stringResource(R.string.limit_editor_note)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
             }

@@ -131,7 +131,20 @@ class StatsViewModel : ViewModel() {
         val perApp = HashMap<String, Long>()
         days.forEach { (_, apps) -> apps.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0L) + ms } }
         val previousFrom = if (sel.period == Period.MONTH) from.minusMonths(1) else from.minusDays(ChronoUnit.DAYS.between(from, to) + 1)
-        val previous = history.range(previousFrom, from.minusDays(1)).sumOf { (_, apps) -> apps.values.sum() }
+        val previousTo = from.minusDays(1)
+        val previous = if (sel.offset == 0) {
+            // The current period is still running, so compare it with the same stretch of the last one.
+            val fullDays = ChronoUnit.DAYS.between(from, today)
+            val partial = previousFrom.plusDays(fullDays)
+            if (partial.isAfter(previousTo)) {
+                history.range(previousFrom, previousTo).sumOf { (_, apps) -> apps.values.sum() }
+            } else {
+                history.range(previousFrom, partial.minusDays(1)).sumOf { (_, apps) -> apps.values.sum() } +
+                    history.partialDay(partial, System.currentTimeMillis() - Days.startMillis(today)).values.sum()
+            }
+        } else {
+            history.range(previousFrom, previousTo).sumOf { (_, apps) -> apps.values.sum() }
+        }
         return PeriodStats(
             selection = sel,
             from = from,
@@ -227,7 +240,10 @@ private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
         }
         Period.WEEK -> if (selection.offset == 0) stringResource(R.string.stats_this_week)
         else stringResource(R.string.stats_range, stats.from.format(medium), stats.to.format(medium))
-        Period.MONTH -> stats.from.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.getDefault()))
+        // The locale decides the order and form, e.g. "October 2026" or "2026年10月".
+        Period.MONTH -> Locale.getDefault().let { locale ->
+            stats.from.format(DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "LLLLyyyy"), locale))
+        }
     }
 }
 
@@ -279,9 +295,9 @@ private fun Summary(s: PeriodStats) {
             val change = ((s.totalMs - s.previousTotalMs) * 100 / s.previousTotalMs).toInt()
             val previous = stringResource(
                 when (s.selection.period) {
-                    Period.DAY -> R.string.stats_previous_day
-                    Period.WEEK -> R.string.stats_previous_week
-                    Period.MONTH -> R.string.stats_previous_month
+                    Period.DAY -> if (s.selection.offset == 0) R.string.stats_so_far_day else R.string.stats_previous_day
+                    Period.WEEK -> if (s.selection.offset == 0) R.string.stats_so_far_week else R.string.stats_previous_week
+                    Period.MONTH -> if (s.selection.offset == 0) R.string.stats_so_far_month else R.string.stats_previous_month
                 },
             )
             Spacer(Modifier.height(8.dp))

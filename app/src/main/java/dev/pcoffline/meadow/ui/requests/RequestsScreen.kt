@@ -2,6 +2,10 @@
 
 package dev.pcoffline.meadow.ui.requests
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -252,6 +256,7 @@ private fun DecideDialog(request: LimitRequest, approve: Boolean, onDismiss: () 
                     value = note,
                     onValueChange = { note = it.take(200) },
                     label = { Text(stringResource(R.string.request_decide_note)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -273,19 +278,20 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
     var minutes by rememberSaveable { mutableIntStateOf(15) }
     var message by rememberSaveable { mutableStateOf("") }
     val action = rememberAction()
-    val limit: AppLimit? = limits.firstOrNull { it.packageName == selected }
+    // Limits may arrive after the dialog opens, so fall back to the first one once they do.
+    val limit: AppLimit? = limits.firstOrNull { it.packageName == selected } ?: limits.firstOrNull().takeIf { packageName == null }
     val asked = stringResource(R.string.ask_sent)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.ask_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (packageName == null) {
                     if (limits.isEmpty()) Text(stringResource(R.string.ask_no_limits))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         limits.forEach {
-                            FilterChip(selected = selected == it.packageName, onClick = { selected = it.packageName }, label = { Text(it.appName) })
+                            FilterChip(selected = limit?.packageName == it.packageName, onClick = { selected = it.packageName }, label = { Text(it.appName) })
                         }
                     }
                 }
@@ -299,6 +305,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
                     value = message,
                     onValueChange = { message = it.take(280) },
                     label = { Text(stringResource(R.string.ask_why)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 ErrorNote(action.error)
