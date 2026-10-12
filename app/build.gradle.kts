@@ -34,7 +34,7 @@ val releaseKeystore = System.getenv("MEADOW_KEYSTORE_PATH")?.let(::file)?.takeIf
 
 android {
     namespace = "dev.pcoffline.meadow"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.pcoffline.meadow"
@@ -108,7 +108,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
