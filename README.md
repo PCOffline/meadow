@@ -126,7 +126,8 @@ project. To run your own copy, see [Running your own Meadow](docs/self-hosting.m
 | Hosted legal pages | `cd backend && npm run test:hosting` |
 | End to end, on an Android emulator | Start the Firebase emulators (`npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2` |
 
-The emulator-based tests need Java 21. CI runs everything on every push.
+Building and testing need Java 21 or newer (CI uses 25) and Node 24; `mise install` sets both up.
+CI runs everything on every push.
 
 ## Contributing
 

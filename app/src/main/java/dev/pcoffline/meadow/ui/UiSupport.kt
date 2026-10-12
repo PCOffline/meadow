@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
@@ -22,6 +23,7 @@ import dev.pcoffline.meadow.data.FriendlyException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 val LocalSnackbar = staticCompositionLocalOf { SnackbarHostState() }
 
@@ -124,3 +126,7 @@ fun relativeTime(context: Context, millis: Long): String {
 
 @Composable
 fun relativeTime(millis: Long): String = relativeTime(LocalContext.current, millis)
+
+/** The app's language, read so that composables update when it changes. */
+@Composable
+fun currentLocale(): Locale = LocalConfiguration.current.locales[0]

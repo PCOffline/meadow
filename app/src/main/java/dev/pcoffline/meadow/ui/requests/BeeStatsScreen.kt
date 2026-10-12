@@ -25,7 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -70,7 +70,7 @@ fun BeeStatsScreen(
 @Composable
 fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
     var sharing by rememberSaveable { mutableStateOf(false) }
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     Column(Modifier.fillMaxSize()) {
         BackTopBar(stringResource(R.string.bee_stats_title), onBack = onBack, actions = {
             if (stats != null && stats.answered > 0) {

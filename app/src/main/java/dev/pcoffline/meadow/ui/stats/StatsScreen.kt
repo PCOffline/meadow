@@ -34,7 +34,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -63,6 +63,7 @@ import dev.pcoffline.meadow.ui.components.MonthHeatmap
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.StalkBarChart
+import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.stateWhileVisible
@@ -78,7 +79,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 enum class Period { DAY, WEEK, MONTH }
 
@@ -174,7 +174,7 @@ fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel {
 @Composable
 fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: (Int) -> Unit = {}, onOpenSetup: () -> Unit = {}) {
     var sharing by rememberSaveable { mutableStateOf(false) }
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 8.dp)) {
             Text(
@@ -247,7 +247,8 @@ private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit) {
 @Composable
 private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
     if (stats == null) return "…"
-    val medium = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+    val locale = currentLocale()
+    val medium = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
     return when (selection.period) {
         Period.DAY -> when (selection.offset) {
             0 -> stringResource(R.string.stats_today)
@@ -257,9 +258,7 @@ private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
         Period.WEEK -> if (selection.offset == 0) stringResource(R.string.stats_this_week)
         else stringResource(R.string.stats_range, stats.from.format(medium), stats.to.format(medium))
         // The locale decides the order and form, e.g. "October 2026" or "2026年10月".
-        Period.MONTH -> Locale.getDefault().let { locale ->
-            stats.from.format(DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "LLLLyyyy"), locale))
-        }
+        Period.MONTH -> stats.from.format(DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "LLLLyyyy"), locale))
     }
 }
 
@@ -335,7 +334,7 @@ private fun Chart(s: PeriodStats) {
         if (s.selection.period == Period.WEEK) {
             StalkBarChart(
                 values = minutes,
-                labels = s.days.map { it.first.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()) },
+                labels = s.days.map { it.first.dayOfWeek.getDisplayName(TextStyle.SHORT, currentLocale()) },
                 highlightIndex = highlight,
                 referenceLine = minutes.filter { it > 0 }.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
             )

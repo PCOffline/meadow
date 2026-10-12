@@ -3,7 +3,6 @@
 package dev.pcoffline.meadow.ui.auth
 
 import dev.pcoffline.meadow.ui.components.rememberReducedMotion
-import java.util.Locale
 import java.time.DayOfWeek
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -94,6 +93,7 @@ import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.StalkBarChart
 import dev.pcoffline.meadow.ui.components.pressBounce
 import dev.pcoffline.meadow.ui.components.rememberSkyMood
+import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.legal.ConsentLinks
 import dev.pcoffline.meadow.ui.legal.LegalDialog
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -230,7 +230,7 @@ private fun GrowthIllustration() {
     MeadowCard(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         StalkBarChart(
             values = listOf(140f, 120f, 95f, 110f, 80f, 60f, 45f),
-            labels = DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()) },
+            labels = DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, currentLocale()) },
             highlightIndex = 6,
             referenceLine = 93f,
             height = 150.dp,

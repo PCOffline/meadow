@@ -38,9 +38,9 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.clockText
+import dev.pcoffline.meadow.ui.currentLocale
 import java.time.DayOfWeek
 import java.time.format.TextStyle
-import java.util.Locale
 
 /** Most windows a day can have; matches the backend. */
 const val MAX_WINDOWS = 4
@@ -74,7 +74,7 @@ fun ScheduleEditor(schedule: Schedule, onChange: (Schedule) -> Unit) {
                     FilterChip(
                         selected = d == day,
                         onClick = { day = d },
-                        label = { Text(DayOfWeek.of(d).getDisplayName(TextStyle.SHORT, Locale.getDefault())) },
+                        label = { Text(DayOfWeek.of(d).getDisplayName(TextStyle.SHORT, currentLocale())) },
                     )
                 }
             }

@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -186,6 +187,7 @@ fun CircleContent(
 @Composable
 private fun InviteCard(modifier: Modifier) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var code by rememberSaveable { mutableStateOf("") }
     val linkAction = rememberAction()
     val codeAction = rememberAction()
@@ -197,7 +199,7 @@ private fun InviteCard(modifier: Modifier) {
         Button(
             onClick = {
                 var url: String? = null
-                linkAction.run(onSuccess = { url?.let { context.shareText(context.getString(R.string.invite_share_text, it), shareTitle) } }) {
+                linkAction.run(onSuccess = { url?.let { context.shareText(resources.getString(R.string.invite_share_text, it), shareTitle) } }) {
                     url = AppGraph.social.createInviteLink().url
                 }
             },
@@ -231,6 +233,7 @@ private fun InviteCard(modifier: Modifier) {
 @Composable
 private fun JoinCard(profile: UserProfile, modifier: Modifier) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var pasted by rememberSaveable { mutableStateOf("") }
     val action = rememberAction()
     val copied = stringResource(R.string.join_code_copied)
@@ -268,7 +271,7 @@ private fun JoinCard(profile: UserProfile, modifier: Modifier) {
             }
             IconButton(onClick = {
                 context.getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText(context.getString(R.string.join_code_title), profile.friendCode))
+                    .setPrimaryClip(ClipData.newPlainText(resources.getString(R.string.join_code_title), profile.friendCode))
                 action.toast(copied)
             }) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.join_code_copy)) }
         }

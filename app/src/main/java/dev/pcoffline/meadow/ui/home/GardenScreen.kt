@@ -52,6 +52,7 @@ import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.SleepyZs
 import dev.pcoffline.meadow.ui.components.rememberResumedNow
 import dev.pcoffline.meadow.ui.components.rememberSkyMood
+import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
 import dev.pcoffline.meadow.ui.minutesText
@@ -225,7 +226,8 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
     val mood = rememberSkyMood()
     val minutes by animateIntAsState((state.todayTotalMs / 60_000L).toInt(), tween(1100), label = "todayMinutes")
     val now = rememberResumedNow()
-    val today = remember(now.toLocalDate()) { now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
+    val locale = currentLocale()
+    val today = remember(now.toLocalDate(), locale) { now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)) }
     Box(Modifier.fillMaxWidth().height(250.dp)) {
         SkyScene(mood, Modifier.fillMaxSize())
         Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {

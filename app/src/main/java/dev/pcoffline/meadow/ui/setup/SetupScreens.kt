@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -62,6 +63,7 @@ import dev.pcoffline.meadow.ui.theme.Garden
 @Composable
 fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var state by remember { mutableStateOf(AppGraph.protection.current()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         state = AppGraph.protection.current()
@@ -145,7 +147,7 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
                     .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, AppGraph.protection.adminComponent())
                     .putExtra(
                         DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                        context.getString(R.string.setup_admin_explanation),
+                        resources.getString(R.string.setup_admin_explanation),
                     ),
             )
         }

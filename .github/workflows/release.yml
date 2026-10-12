@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
       - uses: gradle/actions/setup-gradle@v6
       - name: Check the tag is a version
         run: |
@@ -52,7 +52,7 @@ jobs:
           MEADOW_KEY_ALIAS: ${{ secrets.MEADOW_KEY_ALIAS }}
           MEADOW_KEY_PASSWORD: ${{ secrets.MEADOW_KEY_PASSWORD }}
         # Copies built from a fork look for updates on that fork's releases.
-        run: ./gradlew testReleaseUnitTest assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
+        run: ./gradlew testDebugUnitTest assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}

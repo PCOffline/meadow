@@ -2,7 +2,7 @@ package dev.pcoffline.meadow.ui
 
 import android.content.res.Resources
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestType
@@ -86,14 +86,14 @@ fun Resources.requestSummary(request: LimitRequest): String {
 }
 
 @Composable
-fun minutesText(minutes: Int): String = LocalContext.current.resources.minutesText(minutes)
+fun minutesText(minutes: Int): String = LocalResources.current.minutesText(minutes)
 
 @Composable
-fun durationText(millis: Long): String = LocalContext.current.resources.durationText(millis)
+fun durationText(millis: Long): String = LocalResources.current.durationText(millis)
 
 @Composable
 fun limitText(dailyMinutes: Int, weeklyMinutes: Int, schedule: Schedule? = null): String =
-    LocalContext.current.resources.limitText(dailyMinutes, weeklyMinutes, schedule)
+    LocalResources.current.limitText(dailyMinutes, weeklyMinutes, schedule)
 
 @Composable
-fun requestSummary(request: LimitRequest): String = LocalContext.current.resources.requestSummary(request)
+fun requestSummary(request: LimitRequest): String = LocalResources.current.requestSummary(request)
