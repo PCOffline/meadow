@@ -2,7 +2,12 @@ package dev.pcoffline.meadow
 
 import android.app.Application
 import androidx.annotation.StringRes
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -51,8 +56,24 @@ class GardenJourneyTest {
     private fun text(@StringRes id: Int) = app.getString(id)
     private fun node(@StringRes id: Int): SemanticsNodeInteraction = compose.onNodeWithText(text(id))
     private fun waitFor(@StringRes id: Int, substring: Boolean = false) = waitForText(text(id), substring)
-    private fun waitForText(value: String, substring: Boolean = false, timeout: Long = 60_000) =
-        compose.waitUntil(timeout) { compose.onAllNodesWithText(value, substring).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitForText(value: String, substring: Boolean = false, timeout: Long = 60_000) {
+        try {
+            compose.waitUntil(timeout) { compose.onAllNodesWithText(value, substring).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: ComposeTimeoutException) {
+            // One line, so CI logs show where it stopped and what was on screen instead.
+            throw AssertionError("Never saw \"$value\". On screen: ${screenText()}", e)
+        }
+    }
+
+    private fun screenText(): String = runCatching {
+        compose.onAllNodes(isRoot()).fetchSemanticsNodes().flatMap { root ->
+            fun walk(node: SemanticsNode): List<String> =
+                node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
+                    node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
+                    node.children.flatMap(::walk)
+            walk(root)
+        }.distinct().joinToString(" | ").replace('\n', ' ').take(1500)
+    }.getOrElse { "(couldn't read the screen: $it)" }
 
     /** Reads a document straight from the Firestore emulator, bypassing security rules. */
     private fun backendDoc(path: String): JSONObject? {

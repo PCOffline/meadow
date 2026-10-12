@@ -143,6 +143,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
+      - name: Show end-to-end results
+        if: failure()
+        run: |
+          cat app/build/outputs/androidTest-results/connected/debug/*.xml 2>/dev/null || true
+          tail -n 80 backend/emulators.log || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
