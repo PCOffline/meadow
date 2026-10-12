@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -140,12 +142,14 @@ fun FlowerAvatar(flower: String, modifier: Modifier = Modifier, size: Dp = 44.dp
 @Composable
 fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp, contentDescription: String? = null) {
     val circle = AvatarColor.fromKey(avatar.color).let { if (LocalDarkTheme.current) it.dark else it.light }
-    Box(modifier.size(size).clip(CircleShape).background(circle), contentAlignment = Alignment.Center) {
+    // With a description, the avatar reads as that one label (photo or emoji); without, as its emoji.
+    val semantics = if (contentDescription != null) Modifier.clearAndSetSemantics { this.contentDescription = contentDescription } else Modifier
+    Box(modifier.size(size).clip(CircleShape).background(circle).then(semantics), contentAlignment = Alignment.Center) {
         Text(avatar.emoji, fontSize = (size.value * 0.5f).sp)
         if (avatar.photoUrl != null) {
             AsyncImage(
                 model = avatar.photoUrl,
-                contentDescription = contentDescription,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
