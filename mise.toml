@@ -1,3 +1,4 @@
 [tools]
 firebase = "latest"
 java = "24"
+node = "24"
