@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, emergencyHeadline, emergencyScope, errors, pushes } from "./copy";
-import { db, notify, parse, postToChat, requireAuth, userOf, users } from "./db";
+import { accountOf, accountRef, db, notify, parse, postToChat, profileOf, requireAuth, users } from "./db";
 import { chatIdFor } from "./format";
 import { EmergencyInput } from "./schemas";
 
@@ -37,8 +37,8 @@ export const emergencyUnlock = onCall(async (req) => {
   const userRef = users().doc(uid);
 
   const { user, remaining, overAllowance } = await db().runTransaction(async (tx) => {
-    const snap = await tx.get(userRef);
-    const user = userOf(snap);
+    const [snap, accountSnap] = await Promise.all([tx.get(userRef), tx.get(accountRef(uid))]);
+    const user = { ...profileOf(snap), approverIds: accountOf(accountSnap).approverIds };
     const uses = recentUses(snap.get("emergencyUses"), now);
     const overAllowance = uses.length >= EMERGENCY_ALLOWANCE;
     if (overAllowance && !offline) throw new HttpsError("resource-exhausted", errors.emergencyUsedUp(EMERGENCY_ALLOWANCE));

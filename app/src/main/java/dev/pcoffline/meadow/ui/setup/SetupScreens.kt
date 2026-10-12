@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -69,6 +70,8 @@ fun SetupScreen(onDone: () -> Unit) {
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         state = AppGraph.protection.current()
     }
+    // Prominent disclosure: explain what each sensitive permission is used for before asking.
+    var disclosure by remember { mutableStateOf<Disclosure?>(null) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(20.dp),
@@ -95,13 +98,13 @@ fun SetupScreen(onDone: () -> Unit) {
             title = R.string.setup_usage_title,
             body = R.string.setup_usage_body,
             done = state.usageAccess,
-        ) { context.openSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS) }
+        ) { disclosure = Disclosure.USAGE }
         SetupStep(
             emoji = "🌿",
             title = R.string.setup_keeper_title,
             body = R.string.setup_keeper_body,
             done = state.accessibility,
-        ) { context.openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS) }
+        ) { disclosure = Disclosure.KEEPER }
         SetupStep(
             emoji = "🔔",
             title = R.string.setup_notifications_title,
@@ -154,6 +157,25 @@ fun SetupScreen(onDone: () -> Unit) {
             Text(stringResource(R.string.setup_later))
         }
     }
+    disclosure?.let { d ->
+        AlertDialog(
+            onDismissRequest = { disclosure = null },
+            title = { Text(stringResource(R.string.disclosure_title)) },
+            text = { Text(stringResource(d.body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    disclosure = null
+                    context.openSettings(d.settingsAction)
+                }) { Text(stringResource(R.string.disclosure_agree)) }
+            },
+            dismissButton = { TextButton(onClick = { disclosure = null }) { Text(stringResource(R.string.disclosure_not_now)) } },
+        )
+    }
+}
+
+private enum class Disclosure(@StringRes val body: Int, val settingsAction: String) {
+    USAGE(R.string.disclosure_usage, Settings.ACTION_USAGE_ACCESS_SETTINGS),
+    KEEPER(R.string.disclosure_keeper, Settings.ACTION_ACCESSIBILITY_SETTINGS),
 }
 
 @Composable

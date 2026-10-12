@@ -39,9 +39,9 @@ class AuthRepository(private val backend: Backend) {
     }
 
     /** Starts without an email: an anonymous account plus a profile. */
-    suspend fun startWithoutEmail(displayName: String, flower: String) {
+    suspend fun startWithoutEmail(displayName: String, flower: String, termsVersion: Int) {
         if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
-        createProfile(displayName, flower)
+        createProfile(displayName, flower, termsVersion)
     }
 
     /**
@@ -62,9 +62,12 @@ class AuthRepository(private val backend: Backend) {
     }
 
     /** Creates the Firestore profile and claims a unique friend code. */
-    suspend fun createProfile(displayName: String, flower: String) {
+    suspend fun createProfile(displayName: String, flower: String, termsVersion: Int) {
         if (displayName.isBlank()) throw FriendlyException(R.string.error_name_required)
-        backend.call("createProfile", mapOf("displayName" to displayName.trim(), "flower" to flower))
+        backend.call(
+            "createProfile",
+            mapOf("displayName" to displayName.trim(), "flower" to flower, "termsVersion" to termsVersion),
+        )
     }
 
     suspend fun signOut() {
@@ -72,7 +75,7 @@ class AuthRepository(private val backend: Backend) {
         if (uid != null) {
             runCatchingCancellable {
                 val token = FirebaseMessaging.getInstance().token.await()
-                backend.user(uid).update("fcmTokens", FieldValue.arrayRemove(token)).await()
+                backend.account(uid).update("fcmTokens", FieldValue.arrayRemove(token)).await()
             }
         }
         backend.auth.signOut()

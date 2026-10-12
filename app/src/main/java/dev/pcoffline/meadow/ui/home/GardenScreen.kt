@@ -46,6 +46,7 @@ import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.SleepyZs
@@ -93,6 +94,7 @@ class GardenViewModel : ViewModel() {
 fun GardenScreen(
     profile: UserProfile,
     onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
     onOpenSetup: () -> Unit,
     onPlantLimit: () -> Unit,
     onOpenLimit: (String) -> Unit,
@@ -102,7 +104,7 @@ fun GardenScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GardenHeader(profile, state, onOpenSettings) }
+        item { GardenHeader(profile, state, onOpenSettings, onOpenProfile) }
         item { EmergencyBanner(Modifier.padding(horizontal = 20.dp)) }
 
         if (!state.essentialsReady) {
@@ -164,7 +166,7 @@ fun GardenScreen(
 }
 
 @Composable
-private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSettings: () -> Unit) {
+private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSettings: () -> Unit, onOpenProfile: () -> Unit) {
     val mood = rememberSkyMood()
     val minutes by animateIntAsState((state.todayTotalMs / 60_000L).toInt(), tween(1100), label = "todayMinutes")
     val today = remember { Days.today().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
@@ -175,10 +177,13 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                 Column(Modifier.weight(1f)) {
                     Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky.copy(alpha = 0.75f))
                     Text(
-                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.flower),
+                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.avatar.emoji),
                         style = MaterialTheme.typography.headlineSmall,
                         color = mood.onSky,
                     )
+                }
+                IconButton(onClick = onOpenProfile) {
+                    PersonAvatar(profile.avatar, size = 34.dp, contentDescription = stringResource(R.string.profile_open))
                 }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.action_settings), tint = mood.onSky)

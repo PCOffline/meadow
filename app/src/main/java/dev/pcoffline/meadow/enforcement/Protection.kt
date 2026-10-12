@@ -79,7 +79,8 @@ class ProtectionMonitor(
 
     /** Compares with the last reported state, alerts Bumblebees on anything switched off. */
     fun check(override: ProtectionState? = null) {
-        if (!backendReady) return
+        // Protection status is only shared, and alerts only sent, while the person allows it.
+        if (!backendReady || !store.privacy.value.shareProtection) return
         val state = override ?: current()
         val map = state.asMap()
         val previous = store.lastReportedProtection

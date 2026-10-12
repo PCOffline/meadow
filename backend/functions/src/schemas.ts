@@ -3,7 +3,11 @@ import { z } from "zod";
 import { errors } from "./copy";
 import { INVITE_TOKEN_LENGTH } from "./format";
 
-export const FLOWERS = ["🌼", "🌸", "🌻", "🌷", "🌹", "🪻", "🌺", "🍀", "🌿", "🍄"] as const;
+/** Must match FlowerAvatars in the app's Models.kt. */
+export const FLOWERS = [
+  "🌼", "🌸", "🌻", "🌷", "🌹", "🪻", "🌺", "🪷", "🍀", "🌿", "🍄", "🌵",
+  "🐝", "🐞", "🦋", "🐌", "🐛", "🐸", "🐰", "🦔", "🐿️", "🦊", "🐱", "🐻", "🐼", "🐢", "🐥", "🦉",
+] as const;
 export const EMERGENCY_MINUTES = [15, 30, 60];
 
 const id = z.string().trim().min(1).max(128);
@@ -16,6 +20,8 @@ export const inviteToken = z.string().trim().regex(new RegExp(`^[A-Za-z0-9]{${IN
 export const ProfileInput = z.object({
   displayName: z.string().trim().min(1, errors.nameRequired).max(30, errors.nameTooLong),
   flower: z.enum(FLOWERS).catch("🌼"),
+  /** Version of the terms and privacy notice the person accepted when signing up. */
+  termsVersion: z.number().int().min(1).max(1000).nullish(),
 });
 
 export const InviteByCodeInput = z.object({

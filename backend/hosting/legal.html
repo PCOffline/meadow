@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meadow</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="card doc" id="doc"><p>Loading…</p></main>
+  <script>
+    // Renders the same Markdown the app ships (copied from /legal at deploy time).
+    const files = { '/privacy': 'privacy_notice.md', '/terms': 'terms_of_use.md', '/licenses': 'licenses.md' };
+    const file = files[location.pathname.replace(/\/$/, '')] || files['/privacy'];
+    const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    function render(md) {
+      const out = []; let para = []; let list = []; let table = [];
+      const flush = () => {
+        if (para.length) out.push('<p>' + inline(para.join(' ')) + '</p>');
+        if (list.length) out.push('<ul>' + list.map(i => '<li>' + inline(i) + '</li>').join('') + '</ul>');
+        if (table.length) out.push('<table>' + table.map((r, i) =>
+          '<tr>' + r.map(c => (i ? '<td>' : '<th>') + inline(c) + (i ? '</td>' : '</th>')).join('') + '</tr>').join('') + '</table>');
+        para = []; list = []; table = [];
+      };
+      for (const raw of md.split('\n')) {
+        const line = raw.trim();
+        if (!line) { flush(); continue; }
+        const h = line.match(/^(#+)\s*(.*)$/);
+        if (h) { flush(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); if (h[1].length === 1) document.title = h[2] + ' · Meadow'; continue; }
+        if (line.startsWith('- ')) { if (para.length || table.length) flush(); list.push(line.slice(2)); continue; }
+        if (line.startsWith('|')) {
+          const cells = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+          if (!cells.every(c => /^:?-+:?$/.test(c))) table.push(cells);
+          continue;
+        }
+        if (list.length || table.length) flush();
+        para.push(line);
+      }
+      flush();
+      return out.join('\n');
+    }
+    fetch('/legal/' + file)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(md => { document.getElementById('doc').innerHTML = render(md); })
+      .catch(() => { document.getElementById('doc').innerHTML = '<p>This page couldn\'t load. It is also in the Meadow app under Settings.</p>'; });
+  </script>
+</body>
+</html>

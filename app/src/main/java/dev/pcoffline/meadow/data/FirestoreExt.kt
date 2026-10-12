@@ -37,13 +37,25 @@ fun DocumentSnapshot.timestampMap(field: String): Map<String, Long> =
         ?.mapNotNull { (k, v) -> if (k is String && v is Timestamp) k to v.toDate().time else null }
         ?.toMap() ?: emptyMap()
 
-fun DocumentSnapshot.toProfile() = UserProfile(
+fun DocumentSnapshot.toAvatar() = Avatar(
+    emoji = getString("flower") ?: Avatar.Default.emoji,
+    color = getString("avatarColor") ?: Avatar.Default.color,
+    photoUrl = getString("photoUrl"),
+)
+
+/** Someone's public profile. Pass [account] for your own profile to fill in the private lists. */
+fun DocumentSnapshot.toProfile(account: Account? = null) = UserProfile(
     uid = id,
     displayName = getString("displayName") ?: "Friend",
-    flower = getString("flower") ?: "🌼",
+    avatar = toAvatar(),
+    bio = getString("bio").orEmpty(),
     friendCode = getString("friendCode") ?: "",
-    approverIds = stringList("approverIds"),
-    approveeIds = stringList("approveeIds"),
+    approverIds = account?.approverIds.orEmpty(),
+    approveeIds = account?.approveeIds.orEmpty(),
+    privacy = Privacy(
+        shareUsage = getBoolean("privacy.shareUsage") ?: true,
+        shareProtection = getBoolean("privacy.shareProtection") ?: true,
+    ),
     strictMode = getBoolean("strictMode") ?: false,
     protection = (get("protection") as? Map<*, *>)?.entries
         ?.mapNotNull { (k, v) -> if (k is String && v is Boolean) k to v else null }
@@ -53,6 +65,14 @@ fun DocumentSnapshot.toProfile() = UserProfile(
     emergencyPackage = getString("emergencyPackage"),
     emergencyUsesMillis = (get("emergencyUses") as? List<*>)?.filterIsInstance<Timestamp>()?.map { it.toDate().time }
         ?: emptyList(),
+)
+
+fun DocumentSnapshot.toAccount() = Account(
+    approverIds = stringList("approverIds"),
+    approveeIds = stringList("approveeIds"),
+    theme = getString("theme"),
+    darkMode = getString("darkMode"),
+    acceptedTermsVersion = (getLong("acceptedTerms.version") ?: 0L).toInt(),
 )
 
 fun DocumentSnapshot.toLimit() = AppLimit(
@@ -108,7 +128,14 @@ fun DocumentSnapshot.toChat() = Chat(
     id = id,
     participants = stringList("participants"),
     names = stringMap("names"),
-    flowers = stringMap("flowers"),
+    avatars = (get("avatars") as? Map<*, *>)?.entries?.mapNotNull { (k, v) ->
+        val m = v as? Map<*, *> ?: return@mapNotNull null
+        (k as? String ?: return@mapNotNull null) to Avatar(
+            emoji = m["flower"] as? String ?: Avatar.Default.emoji,
+            color = m["color"] as? String ?: Avatar.Default.color,
+            photoUrl = m["photo"] as? String,
+        )
+    }?.toMap() ?: emptyMap(),
     lastMessage = getString("lastMessage") ?: "",
     lastMessageAtMillis = millis("lastMessageAt"),
     lastSenderId = getString("lastSenderId"),

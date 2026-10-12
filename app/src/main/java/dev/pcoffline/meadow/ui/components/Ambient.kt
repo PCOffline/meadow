@@ -111,7 +111,7 @@ data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val on
 /** The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights. */
 @Composable
 fun rememberSkyMood(): SkyMood {
-    val dark = isSystemInDarkTheme()
+    val dark = dev.pcoffline.meadow.ui.theme.LocalDarkTheme.current
     val hour = remember { java.time.LocalTime.now().hour }
     val greeting = when (hour) {
         in 5..11 -> R.string.greeting_morning

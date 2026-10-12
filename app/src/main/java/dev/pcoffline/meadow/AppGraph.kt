@@ -8,6 +8,7 @@ import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.EmergencyRepository
 import dev.pcoffline.meadow.data.LimitsRepository
 import dev.pcoffline.meadow.data.LocalStore
+import dev.pcoffline.meadow.data.ProfileRepository
 import dev.pcoffline.meadow.data.RequestRepository
 import dev.pcoffline.meadow.data.SocialRepository
 import dev.pcoffline.meadow.data.SyncManager
@@ -15,6 +16,7 @@ import dev.pcoffline.meadow.data.UsageShareRepository
 import dev.pcoffline.meadow.enforcement.LimitEngine
 import dev.pcoffline.meadow.enforcement.ProtectionMonitor
 import dev.pcoffline.meadow.notifications.Notifier
+import dev.pcoffline.meadow.update.Updater
 import dev.pcoffline.meadow.usage.AppCatalog
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
@@ -47,7 +49,9 @@ object AppGraph {
     val history by lazy { UsageHistory(app, tracker, catalog) }
     val engine by lazy { LimitEngine(store, tracker, history, catalog) }
     val emergency by lazy { EmergencyRepository(app, backend, store) }
+    val profiles by lazy { ProfileRepository(app, backend, store) }
     val notifier by lazy { Notifier(app, store) }
+    val updater by lazy { Updater(app) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }
 
     fun init(application: Application) {

@@ -14,20 +14,24 @@ import kotlinx.serialization.Serializable
 @Serializable data class LimitRoute(val packageName: String)
 @Serializable data class ChatRoute(val chatId: String)
 @Serializable data class FriendRoute(val uid: String)
+@Serializable data object ProfileRoute
+@Serializable data class LegalRoute(val doc: String)
 
 /**
  * Where a notification asks to go. Notifications carry a small string so they stay valid
- * across app versions: "requests", "circle", "chat/<id>" or "friend/<uid>".
+ * across app versions: "requests", "circle", "settings", "chat/<id>" or "friend/<uid>".
  */
 object DeepLinks {
     fun requests() = "requests"
     fun circle() = "circle"
+    fun settings() = "settings"
     fun chat(chatId: String) = "chat/$chatId"
     fun friend(uid: String) = "friend/$uid"
 
     fun toRoute(link: String): Any? = when {
         link == "requests" -> RequestsRoute
         link == "circle" -> CircleRoute
+        link == "settings" -> SettingsRoute
         link.startsWith("chat/") -> link.removePrefix("chat/").takeIf { it.isNotBlank() }?.let(::ChatRoute)
         link.startsWith("friend/") -> link.removePrefix("friend/").takeIf { it.isNotBlank() }?.let(::FriendRoute)
         else -> null

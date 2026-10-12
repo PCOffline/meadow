@@ -58,6 +58,7 @@
     <string name="error_name_required">Please choose a name.</string>
     <string name="error_email_required">Enter your email first.</string>
     <string name="error_set_a_limit">Set a daily or weekly limit.</string>
+    <string name="error_photo">That picture couldn\'t be opened. Try another one.</string>
     <string name="error_bad_invite_link">That doesn\'t look like a Meadow invite link.</string>
     <string name="error_emergency_minutes">Pick 15, 30 or 60 minutes.</string>
     <string name="error_emergency_reason">Please say briefly what the emergency is.</string>
@@ -68,4 +69,8 @@
     <string name="duration_hours">%1$dh</string>
     <string name="duration_hours_minutes">%1$dh %2$dm</string>
     <string name="duration_under_a_minute">&lt;1m</string>
+    <string name="update_failed_checksum">The download didn\'t check out, so it wasn\'t installed. Please try again.</string>
+    <string name="update_failed_signature">This update wasn\'t signed like your Meadow, so it can\'t replace it. Reinstall from the releases page if you moved between builds.</string>
+    <string name="update_failed_install">Android couldn\'t install the update. Please try again.</string>
+    <string name="update_cancelled">Update cancelled.</string>
 </resources>

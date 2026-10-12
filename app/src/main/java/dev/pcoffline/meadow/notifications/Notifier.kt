@@ -37,6 +37,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             channel(CH_CHAT, R.string.channel_chat, NotificationManager.IMPORTANCE_HIGH),
             channel(CH_SOCIAL, R.string.channel_social, NotificationManager.IMPORTANCE_DEFAULT, R.string.channel_social_description),
             channel(CH_ALERTS, R.string.channel_alerts, NotificationManager.IMPORTANCE_HIGH, R.string.channel_alerts_description),
+            channel(CH_UPDATES, R.string.channel_updates, NotificationManager.IMPORTANCE_LOW, R.string.channel_updates_description),
         ).forEach(nm::createNotificationChannel)
     }
 
@@ -134,6 +135,20 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         post(id, builder.build())
     }
 
+    /** A new release is out; tapping opens Settings, where it can be installed. */
+    fun updateAvailable(version: String) {
+        post(
+            UPDATE_ID,
+            NotificationCompat.Builder(context, CH_UPDATES)
+                .setSmallIcon(R.drawable.ic_flower)
+                .setContentTitle(context.getString(R.string.notify_update_title, version))
+                .setContentText(context.getString(R.string.notify_update_body))
+                .setAutoCancel(true)
+                .setContentIntent(openApp(DeepLinks.settings(), UPDATE_ID))
+                .build(),
+        )
+    }
+
     fun cancel(id: Int) = manager.cancel(id)
 
     private fun openApp(link: String?, requestCode: Int): PendingIntent {
@@ -153,6 +168,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
 
     companion object {
         const val GUARDIAN_ID = 1
+        const val UPDATE_ID = 2
         const val CH_GUARDIAN = "guardian"
         const val CH_WARNINGS = "warnings"
         const val CH_REQUESTS = "requests"
@@ -160,5 +176,6 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         const val CH_CHAT = "chat"
         const val CH_SOCIAL = "social"
         const val CH_ALERTS = "alerts"
+        const val CH_UPDATES = "updates"
     }
 }

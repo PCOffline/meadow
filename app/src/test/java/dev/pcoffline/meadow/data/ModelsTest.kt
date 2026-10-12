@@ -10,8 +10,8 @@ class ModelsTest {
     private val day = 24 * 60 * 60_000L
 
     private fun profile(uses: List<Long>) = UserProfile(
-        uid = "me", displayName = "Sam", flower = "🌼", friendCode = "ABC234",
-        approverIds = emptyList(), approveeIds = emptyList(), strictMode = false, protection = emptyMap(),
+        uid = "me", displayName = "Sam", avatar = Avatar.Default, bio = "", friendCode = "ABC234",
+        approverIds = emptyList(), approveeIds = emptyList(), privacy = Privacy(), strictMode = false, protection = emptyMap(),
         lastHeartbeatMillis = null, emergencyUntilMillis = 0L, emergencyPackage = null, emergencyUsesMillis = uses,
     )
 

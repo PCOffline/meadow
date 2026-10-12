@@ -65,6 +65,7 @@ import dev.pcoffline.meadow.ui.auth.SecureAccountCard
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
+import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.SectionTitle
@@ -318,7 +319,7 @@ private fun BumblebeeRow(bee: UserProfile, others: Int, modifier: Modifier, onCh
     val removed = stringResource(R.string.circle_bee_removed, bee.displayName)
     Column(modifier) {
         Row(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            FlowerAvatar(bee.flower)
+            PersonAvatar(bee.avatar)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(bee.displayName, style = MaterialTheme.typography.titleMedium)
@@ -361,7 +362,7 @@ private fun GardenRow(friend: UserProfile, modifier: Modifier, onClick: () -> Un
     val unprotected = friend.protection["accessibility"] == false || friend.protection["usageAccess"] == false
     MeadowCard(modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FlowerAvatar(friend.flower, tint = MaterialTheme.colorScheme.secondaryContainer)
+            PersonAvatar(friend.avatar)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(friend.displayName, style = MaterialTheme.typography.titleMedium)

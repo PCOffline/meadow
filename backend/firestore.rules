@@ -1,20 +1,26 @@
 rules_version = '2';
 
-// Everything that changes who approves whom, or that loosens a commitment, goes through
-// Cloud Functions (which bypass these rules). Clients may only make things stricter.
+// Everything that changes who looks after whom, or that loosens a commitment, goes through
+// Cloud Functions (which bypass these rules). Phones may only make things stricter.
+//
+// Who looks after whom lives in users/{uid}/private/account, readable only by its owner:
+// managing your Bumblebees is your own business. Rules still read it via get().
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
-    function userData(uid) { return get(/databases/$(database)/documents/users/$(uid)).data; }
-    function isApproverOf(uid) { return me() in userData(uid).approverIds; }
-    function hasNoApprovers(uid) { return userData(uid).approverIds.size() == 0; }
+    function profile(uid) { return get(/databases/$(database)/documents/users/$(uid)).data; }
+    function account(uid) { return get(/databases/$(database)/documents/users/$(uid)/private/account).data; }
+    function isApproverOf(uid) { return me() in account(uid).approverIds; }
+    function isApproveeOf(uid) { return me() in account(uid).approveeIds; }
+    function hasNoApprovers(uid) { return account(uid).approverIds.size() == 0; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function isString(v, max) { return v is string && v.size() <= max; }
 
     function validLimit(d, pkg) {
       return d.packageName == pkg
-        && d.appName is string && d.appName.size() <= 100
+        && isString(d.appName, 100)
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
         && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
         && (d.dailyMinutes > 0 || d.weeklyMinutes > 0);
@@ -26,24 +32,42 @@ service cloud.firestore {
         && (old.weeklyMinutes == 0 || (next.weeklyMinutes > 0 && next.weeklyMinutes <= old.weeklyMinutes));
     }
 
+    function validProfileEdit(d) {
+      return (!('displayName' in changed()) || (d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 30))
+        && (!('flower' in changed()) || isString(d.flower, 16))
+        && (!('avatarColor' in changed()) || isString(d.avatarColor, 20))
+        && (!('photoUrl' in changed()) || d.photoUrl == null || isString(d.photoUrl, 1000))
+        && (!('bio' in changed()) || isString(d.bio, 80))
+        && (!('privacy' in changed()) || (d.privacy.keys().hasOnly(['shareUsage', 'shareProtection'])
+              && d.privacy.shareUsage is bool && d.privacy.shareProtection is bool));
+    }
+
     match /users/{uid} {
-      allow read: if signedIn()
-        && (me() == uid || me() in resource.data.approverIds || me() in resource.data.approveeIds);
+      // You, your Bumblebees, and the people you look after.
+      allow read: if signedIn() && (me() == uid || isApproverOf(uid) || isApproveeOf(uid));
       allow create, delete: if false;
       allow update: if signedIn() && me() == uid
-        && changed().hasOnly(['displayName', 'flower', 'fcmTokens', 'lastHeartbeat', 'protection', 'strictMode', 'emergencyUntil'])
+        && changed().hasOnly(['displayName', 'flower', 'avatarColor', 'photoUrl', 'bio', 'privacy',
+                              'lastHeartbeat', 'protection', 'strictMode', 'emergencyUntil'])
+        && validProfileEdit(request.resource.data)
+        // Strict mode can always be switched on, but only switched off without Bumblebees.
+        && (!('strictMode' in changed()) || request.resource.data.strictMode == true || hasNoApprovers(uid))
         // An emergency unlock can only be ended early from the phone, never started or extended.
-        && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time)
-        && (!('displayName' in changed())
-            || (request.resource.data.displayName is string
-                && request.resource.data.displayName.size() > 0
-                && request.resource.data.displayName.size() <= 30))
-        && (!('flower' in changed()) || (request.resource.data.flower is string && request.resource.data.flower.size() <= 8))
-        && (!('fcmTokens' in changed()) || request.resource.data.fcmTokens.size() <= 10)
-        // Strict mode can always be switched on, but only switched off without approvers.
-        && (!('strictMode' in changed())
-            || request.resource.data.strictMode == true
-            || resource.data.approverIds.size() == 0);
+        && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time);
+
+      match /private/{docId} {
+        allow read: if signedIn() && me() == uid;
+        allow update: if signedIn() && me() == uid && docId == 'account'
+          && changed().hasOnly(['fcmTokens', 'theme', 'darkMode', 'acceptedTerms'])
+          && (!('acceptedTerms' in changed())
+              || (request.resource.data.acceptedTerms.keys().hasOnly(['version', 'at'])
+                  && request.resource.data.acceptedTerms.version is int
+                  && request.resource.data.acceptedTerms.at == request.time))
+          && (!('fcmTokens' in changed()) || request.resource.data.fcmTokens.size() <= 10)
+          && (!('theme' in changed()) || isString(request.resource.data.theme, 20))
+          && (!('darkMode' in changed()) || isString(request.resource.data.darkMode, 10));
+        allow create, delete: if false;
+      }
 
       match /limits/{pkg} {
         allow read: if signedIn() && (me() == uid || isApproverOf(uid));
@@ -58,8 +82,10 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Daily usage is shared with Bumblebees only while the owner allows it.
       match /usage/{day} {
-        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow read: if signedIn() && (me() == uid
+          || (isApproverOf(uid) && profile(uid).get('privacy', {}).get('shareUsage', true) == true));
         allow write: if signedIn() && me() == uid;
       }
 
@@ -118,6 +144,11 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 2000;
         allow update, delete: if false;
       }
+    }
+
+    // Emulator-only record of pushes, read by integration tests through the admin SDK.
+    match /_testOutbox/{id} {
+      allow read, write: if false;
     }
   }
 }

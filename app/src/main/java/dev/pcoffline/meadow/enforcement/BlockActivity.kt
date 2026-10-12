@@ -68,7 +68,7 @@ import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
-import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import dev.pcoffline.meadow.ui.theme.MeadowAppTheme
 import dev.pcoffline.meadow.ui.ticker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -92,7 +92,7 @@ class BlockActivity : ComponentActivity() {
             override fun handleOnBackPressed() = goHome()
         })
         setContent {
-            MeadowTheme {
+            MeadowAppTheme {
                 val pkg by packageState.collectAsStateWithLifecycle()
                 pkg?.let { RestScreen(it, onHome = ::goHome, onOpen = ::openApp) }
             }

@@ -20,6 +20,9 @@ class Backend {
 
     fun user(uid: String) = db.collection("users").document(uid)
 
+    /** Owner-only document: who looks after whom, push tokens and preferences. */
+    fun account(uid: String) = user(uid).collection("private").document("account")
+
     /** Calls an HTTPS callable Cloud Function, turning its error into a readable message. */
     suspend fun call(name: String, data: Map<String, Any?> = emptyMap()): Map<String, Any?> {
         try {

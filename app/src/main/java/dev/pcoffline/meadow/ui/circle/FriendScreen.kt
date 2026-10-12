@@ -39,7 +39,7 @@ import dev.pcoffline.meadow.data.SharedUsage
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.ErrorNote
-import dev.pcoffline.meadow.ui.components.FlowerAvatar
+import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -51,12 +51,25 @@ import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 /** What a Bumblebee can see about a friend they look after. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class FriendViewModel(uid: String) : ViewModel() {
-    val friend: StateFlow<UserProfile?> = AppGraph.social.profile(uid).stateWhileVisible(this, null)
-    val usage: StateFlow<SharedUsage?> = AppGraph.share.usage(uid, Days.todayKey()).stateWhileVisible(this, null)
+    private val profile = AppGraph.social.profile(uid)
+    val friend: StateFlow<UserProfile?> = profile.stateWhileVisible(this, null)
+
+    // Only listened to while the friend shares it; the rules refuse it otherwise.
+    val usage: StateFlow<SharedUsage?> = profile
+        .map { it?.privacy?.shareUsage == true }
+        .distinctUntilChanged()
+        .flatMapLatest { shared -> if (shared) AppGraph.share.usage(uid, Days.todayKey()) else flowOf(null) }
+        .stateWhileVisible(this, null)
     val limits: StateFlow<List<AppLimit>> = AppGraph.share.limits(uid).stateWhileVisible(this, emptyList())
 }
 
@@ -93,10 +106,11 @@ private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppL
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FlowerAvatar(f.flower, size = 64.dp, tint = MaterialTheme.colorScheme.secondaryContainer)
+            PersonAvatar(f.avatar, size = 64.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(f.displayName, style = MaterialTheme.typography.headlineSmall)
+                if (f.bio.isNotBlank()) Text(f.bio, style = MaterialTheme.typography.bodyMedium)
                 Text(
                     stringResource(if (f.strictMode) R.string.friend_strict_on else R.string.friend_strict_off),
                     style = MaterialTheme.typography.bodySmall,
@@ -109,7 +123,9 @@ private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppL
         MeadowCard(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.friend_protections), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
-            listOf(
+            if (!f.privacy.shareProtection) {
+                Text(stringResource(R.string.friend_protection_private, f.displayName), style = MaterialTheme.typography.bodySmall)
+            } else listOf(
                 "usageAccess" to R.string.setup_usage_title,
                 "accessibility" to R.string.setup_keeper_title,
                 "deviceAdmin" to R.string.setup_admin_title,
@@ -150,7 +166,9 @@ private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppL
 
         MeadowCard(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.friend_today), style = MaterialTheme.typography.titleMedium)
-            if (usage == null) {
+            if (!f.privacy.shareUsage) {
+                Text(stringResource(R.string.friend_usage_private, f.displayName), style = MaterialTheme.typography.bodySmall)
+            } else if (usage == null) {
                 Text(stringResource(R.string.friend_no_usage), style = MaterialTheme.typography.bodySmall)
             } else {
                 Text(stringResource(R.string.friend_screen_time, minutesText(usage.totalMinutes)), style = MaterialTheme.typography.headlineSmall)

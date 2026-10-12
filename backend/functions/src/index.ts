@@ -10,4 +10,5 @@ export {
 } from "./social";
 export { createRequest, decideRequest, cancelRequest } from "./requests";
 export { emergencyUnlock } from "./emergency";
-export { onChatMessage, onProtectionAlert, hourlyCare } from "./triggers";
+export { exportMyData, deleteAccount } from "./account";
+export { onChatMessage, onProtectionAlert, onProfileUpdated, hourlyCare } from "./triggers";

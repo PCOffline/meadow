@@ -46,7 +46,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.Avatar
+import dev.pcoffline.meadow.ui.theme.AvatarColor
+import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -128,6 +133,23 @@ fun FlowerAvatar(flower: String, modifier: Modifier = Modifier, size: Dp = 44.dp
         contentAlignment = Alignment.Center,
     ) {
         Text(flower, fontSize = (size.value * 0.5f).sp)
+    }
+}
+
+/** A person: their photo, or their emoji on the soft colour they picked. */
+@Composable
+fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp, contentDescription: String? = null) {
+    val circle = AvatarColor.fromKey(avatar.color).let { if (LocalDarkTheme.current) it.dark else it.light }
+    Box(modifier.size(size).clip(CircleShape).background(circle), contentAlignment = Alignment.Center) {
+        Text(avatar.emoji, fontSize = (size.value * 0.5f).sp)
+        if (avatar.photoUrl != null) {
+            AsyncImage(
+                model = avatar.photoUrl,
+                contentDescription = contentDescription,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

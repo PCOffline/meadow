@@ -20,13 +20,41 @@ data class Grant(
     val dayKey: String,
 )
 
+/** How someone looks: an emoji on a soft coloured circle, or their photo. */
+data class Avatar(val emoji: String, val color: String, val photoUrl: String?) {
+    companion object {
+        val Default = Avatar("🌼", "leaf", null)
+    }
+}
+
+/** What someone shares with their Bumblebees. */
+data class Privacy(val shareUsage: Boolean = true, val shareProtection: Boolean = true)
+
+/**
+ * Owner-only: who looks after whom, and app preferences that follow the person between phones.
+ * Nobody else can read it.
+ */
+data class Account(
+    val approverIds: List<String> = emptyList(),
+    val approveeIds: List<String> = emptyList(),
+    val theme: String? = null,
+    val darkMode: String? = null,
+    val acceptedTermsVersion: Int = 0,
+)
+
+/**
+ * A person's profile. [approverIds] and [approveeIds] are only known for your own profile;
+ * for anyone else they are empty, because those lists are private.
+ */
 data class UserProfile(
     val uid: String,
     val displayName: String,
-    val flower: String,
+    val avatar: Avatar,
+    val bio: String,
     val friendCode: String,
     val approverIds: List<String>,
     val approveeIds: List<String>,
+    val privacy: Privacy,
     val strictMode: Boolean,
     val protection: Map<String, Boolean>,
     val lastHeartbeatMillis: Long?,
@@ -121,7 +149,7 @@ data class Chat(
     val id: String,
     val participants: List<String>,
     val names: Map<String, String>,
-    val flowers: Map<String, String>,
+    val avatars: Map<String, Avatar>,
     val lastMessage: String,
     val lastMessageAtMillis: Long,
     val lastSenderId: String?,
@@ -129,7 +157,7 @@ data class Chat(
 ) {
     fun otherId(me: String) = participants.firstOrNull { it != me } ?: me
     fun otherName(me: String) = names[otherId(me)] ?: "Friend"
-    fun otherFlower(me: String) = flowers[otherId(me)] ?: "🌼"
+    fun otherAvatar(me: String) = avatars[otherId(me)] ?: Avatar.Default
     fun isUnread(me: String) = lastSenderId != null && lastSenderId != me &&
         lastMessageAtMillis > (lastReadMillis[me] ?: 0L)
 }
@@ -160,5 +188,8 @@ data class SharedAppUsage(
     val limitMinutes: Int,
 )
 
-/** Flowers people can pick as their avatar. */
-val FlowerAvatars = listOf("🌼", "🌸", "🌻", "🌷", "🌹", "🪻", "🌺", "🍀", "🌿", "🍄")
+/** Emoji people can pick as their avatar. Must match FLOWERS in the backend's schemas.ts. */
+val FlowerAvatars = listOf(
+    "🌼", "🌸", "🌻", "🌷", "🌹", "🪻", "🌺", "🪷", "🍀", "🌿", "🍄", "🌵",
+    "🐝", "🐞", "🦋", "🐌", "🐛", "🐸", "🐰", "🦔", "🐿️", "🦊", "🐱", "🐻", "🐼", "🐢", "🐥", "🦉",
+)

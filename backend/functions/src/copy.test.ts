@@ -22,10 +22,17 @@ test("emergency notes say what happened", () => {
 });
 
 test("notifications use the Bumblebee wording", () => {
-  for (const push of [pushes.invite(sam), pushes.inviteAccepted(sam), pushes.steppedDown(sam, 0), pushes.removedBumblebee(sam, sam, 1)]) {
-    assert.match(push.title + push.body, /Bumblebee/);
+  const all = [
+    pushes.invite(sam), pushes.inviteAccepted(sam), pushes.steppedDown(sam, 0), pushes.removedBumblebee(sam),
+    pushes.gardenClosed(sam), pushes.bumblebeeLeftMeadow(sam),
+  ];
+  for (const push of all) {
+    assert.match(push.title + push.body, /Bumblebee|Meadow/);
     assert.doesNotMatch(push.title + push.body, /approver|Petal Pal/i);
   }
-  assert.equal(pushes.removedBumblebee(sam, sam, 1).body, "Sam has 1 Bumblebee left.");
-  assert.equal(pushes.removedBumblebee(sam, sam, 2).body, "Sam has 2 Bumblebees left.");
+});
+
+test("a removed Bumblebee isn't told about anyone else", () => {
+  const { title, body } = pushes.removedBumblebee(sam);
+  assert.doesNotMatch(title + body, /\d|other|left/);
 });

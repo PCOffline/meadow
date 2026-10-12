@@ -14,6 +14,11 @@
     <string name="channel_alerts">Protection alerts</string>
     <string name="channel_alerts_description">When a friend you look after turns off a protection or uses an emergency unlock.</string>
 
+    <string name="channel_updates">Updates</string>
+    <string name="channel_updates_description">When a new version of Meadow is ready.</string>
+    <string name="notify_update_title">Meadow %1$s is ready 🌱</string>
+    <string name="notify_update_body">Tap to see what\'s new and update.</string>
+
     <string name="notify_warning_title">%1$s left on %2$s 🌷</string>
     <string name="notify_warning_body_today">Your %1$s time for today is almost up. Time to wind down.</string>
     <string name="notify_warning_body_week">Your %1$s time for this week is almost up. Time to wind down.</string>

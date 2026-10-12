@@ -39,11 +39,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -81,6 +83,9 @@ import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.StalkBarChart
 import dev.pcoffline.meadow.ui.components.pressBounce
 import dev.pcoffline.meadow.ui.components.rememberSkyMood
+import dev.pcoffline.meadow.ui.legal.ConsentLinks
+import dev.pcoffline.meadow.ui.legal.LegalDialog
+import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.launch
@@ -224,6 +229,8 @@ private fun GrowthIllustration() {
 private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var flower by rememberSaveable { mutableStateOf(FlowerAvatars.first()) }
+    var agreed by rememberSaveable { mutableStateOf(false) }
+    var reading by remember { mutableStateOf<LegalDoc?>(null) }
     val action = rememberAction()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().padding(24.dp),
@@ -240,10 +247,16 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
+        ConsentCheckbox(agreed, onChange = { agreed = it }, onOpen = { reading = it })
         ErrorNote(action.error)
         Button(
-            onClick = { action.run { AppGraph.auth.startWithoutEmail(name, flower) } },
-            enabled = !action.busy && name.isNotBlank(),
+            onClick = {
+                action.run {
+                    AppGraph.auth.startWithoutEmail(name, flower, LegalDoc.CURRENT_VERSION)
+                    AppGraph.store.acceptedTermsVersion = LegalDoc.CURRENT_VERSION
+                }
+            },
+            enabled = !action.busy && name.isNotBlank() && agreed,
             modifier = Modifier.fillMaxWidth().height(54.dp),
         ) { Text(stringResource(if (action.busy) R.string.onboarding_planting else R.string.onboarding_plant), style = MaterialTheme.typography.titleMedium) }
         Text(
@@ -253,6 +266,23 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         TextButton(onClick = onSignIn) { Text(stringResource(R.string.intro_have_garden)) }
+    }
+    reading?.let { LegalDialog(it, onDismiss = { reading = null }) }
+}
+
+/** "I've read and agree…" with links to read both documents first. */
+@Composable
+fun ConsentCheckbox(agreed: Boolean, onChange: (Boolean) -> Unit, onOpen: (LegalDoc) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().toggleable(value = agreed, role = Role.Checkbox, onValueChange = onChange),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = agreed, onCheckedChange = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.legal_agree), style = MaterialTheme.typography.bodyMedium)
+        }
+        ConsentLinks(onOpen)
     }
 }
 
@@ -382,6 +412,8 @@ fun FlowerPicker(selected: String, onSelect: (String) -> Unit) {
 fun ProfileSetupScreen() {
     var name by rememberSaveable { mutableStateOf("") }
     var flower by rememberSaveable { mutableStateOf(FlowerAvatars.first()) }
+    var agreed by rememberSaveable { mutableStateOf(false) }
+    var reading by remember { mutableStateOf<LegalDoc?>(null) }
     val action = rememberAction()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().padding(24.dp),
@@ -396,12 +428,19 @@ fun ProfileSetupScreen() {
             shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
+        ConsentCheckbox(agreed, onChange = { agreed = it }, onOpen = { reading = it })
         ErrorNote(action.error)
         Button(
-            onClick = { action.run { AppGraph.auth.createProfile(name, flower) } },
-            enabled = !action.busy && name.isNotBlank(),
+            onClick = {
+                action.run {
+                    AppGraph.auth.createProfile(name, flower, LegalDoc.CURRENT_VERSION)
+                    AppGraph.store.acceptedTermsVersion = LegalDoc.CURRENT_VERSION
+                }
+            },
+            enabled = !action.busy && name.isNotBlank() && agreed,
             modifier = Modifier.fillMaxWidth().height(54.dp),
         ) { Text(stringResource(R.string.profile_setup_continue)) }
         TextButton(onClick = { action.run { AppGraph.auth.signOut() } }) { Text(stringResource(R.string.profile_setup_other_account)) }
     }
+    reading?.let { LegalDialog(it, onDismiss = { reading = null }) }
 }

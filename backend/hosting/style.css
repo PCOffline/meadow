@@ -43,3 +43,11 @@ p { color: var(--soft); margin: 0 0 20px; }
   border-radius: 999px;
   margin-bottom: 20px;
 }
+.links { font-size: 14px; color: var(--soft); }
+.links a { color: var(--moss); }
+.doc { max-width: 720px; text-align: left; margin: 24px auto; }
+.doc h1 { font-size: 28px; margin-top: 0; }
+.doc h2 { font-size: 20px; margin-top: 28px; color: var(--moss); }
+.doc ul { padding-left: 20px; }
+.doc table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0; }
+.doc th, .doc td { text-align: left; padding: 8px; border-bottom: 1px solid color-mix(in srgb, var(--soft) 25%, transparent); vertical-align: top; }

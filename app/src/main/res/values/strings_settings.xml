@@ -24,7 +24,41 @@
     <string name="settings_protections_body">Check usage access, the garden keeper, uninstall protection and notifications.</string>
     <string name="settings_protections_button">Review protections</string>
     <string name="settings_promises_title">How Meadow keeps its promises</string>
-    <string name="settings_promises_body">• Tightening a limit applies straight away.\n• Loosening or removing one, or turning off strict mode, needs a Bumblebee\'s yes.\n• You can add or remove Bumblebees any time. They\'re always told.\n• When an app\'s time is up, it rests until tomorrow, unless a Bumblebee gives you extra time.\n• In a real emergency, you can lift limits yourself for up to an hour, a few times a month. Your Bumblebees are told.\n• If a protection is turned off or your phone goes quiet, your Bumblebees are told.\n• Limits keep working on this phone even offline or signed out.</string>
+    <string name="settings_promises_body">• Tightening a limit applies straight away.\n• Loosening or removing one, or turning off strict mode, needs a Bumblebee\'s yes.\n• You can add or remove Bumblebees any time. Only the Bumblebee affected is told.\n• When an app\'s time is up, it rests until tomorrow, unless a Bumblebee gives you extra time.\n• In a real emergency, you can lift limits yourself for up to an hour, a few times a month. Your Bumblebees are told.\n• If a protection is turned off or your phone goes quiet, your Bumblebees are told.\n• Limits keep working on this phone even offline or signed out.</string>
+    <string name="settings_privacy_title">Privacy</string>
+    <string name="settings_privacy_body">Choose what your Bumblebees can see. They can see these choices, too.</string>
+    <string name="settings_share_usage">Share today\'s screen time</string>
+    <string name="settings_share_usage_body">Your total and top apps for today. Your history never leaves this phone.</string>
+    <string name="settings_share_protection">Tell them when a protection is off</string>
+    <string name="settings_share_protection_body">Lets your Bumblebees know if the garden keeper, usage access or uninstall protection is turned off.</string>
+    <string name="settings_privacy_saved">Privacy choices saved 🔒</string>
+
+    <string name="settings_updates_title">Updates</string>
+    <string name="settings_updates_version">You have Meadow %1$s.</string>
+    <string name="settings_updates_auto">Check for updates daily</string>
+    <string name="settings_updates_auto_body">Looks at Meadow\'s releases on GitHub over Wi-Fi and lets you know. Nothing installs without your OK.</string>
+    <string name="settings_updates_check">Check now</string>
+    <string name="settings_updates_checking">Looking for updates…</string>
+    <string name="settings_updates_current">You\'re up to date 🌿</string>
+    <string name="settings_updates_available">Meadow %1$s is ready</string>
+    <string name="settings_updates_install">Update</string>
+    <string name="settings_updates_downloading">Downloading… %1$d%%</string>
+    <string name="settings_updates_installing">Waiting for Android to install…</string>
+    <string name="settings_updates_allow">Android needs your OK for Meadow to install updates. Allow it, then come back and tap Update.</string>
+    <string name="settings_updates_allow_button">Allow updates</string>
+    <string name="settings_updates_notes">What\'s new</string>
+
+    <string name="settings_legal_title">Your data and the small print</string>
+    <string name="settings_export">Download my data</string>
+    <string name="settings_export_done">Your data is saved 📦</string>
+    <string name="settings_delete">Delete my account</string>
+    <string name="settings_delete_title">Delete your account?</string>
+    <string name="settings_delete_body">This removes your profile, limits, requests, chats and photo from Meadow for good, and signs you out on this phone. The people you look after, and your Bumblebees, will see you\'ve left. It can\'t be undone.</string>
+    <string name="settings_delete_confirm_hint">Type DELETE to confirm</string>
+    <string name="settings_delete_confirm_word">DELETE</string>
+    <string name="settings_delete_button">Delete for good</string>
+    <string name="settings_delete_keep">Keep my account</string>
+
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_sign_out_title">Sign out?</string>
     <string name="settings_sign_out_body">Your limits keep working on this phone while you\'re signed out, but you won\'t be able to ask for extra time.</string>

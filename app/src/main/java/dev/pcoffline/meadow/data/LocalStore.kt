@@ -46,6 +46,71 @@ class LocalStore(context: Context) {
     private val _emergency = MutableStateFlow(read<Emergency>(KEY_EMERGENCY))
     val emergency: StateFlow<Emergency?> = _emergency.asStateFlow()
 
+    private val _theme = MutableStateFlow(prefs.getString(KEY_THEME, null))
+    val theme: StateFlow<String?> = _theme.asStateFlow()
+
+    private val _darkMode = MutableStateFlow(prefs.getString(KEY_DARK_MODE, null))
+    val darkMode: StateFlow<String?> = _darkMode.asStateFlow()
+
+    fun setAppearance(theme: String?, darkMode: String?) {
+        prefs.edit().putString(KEY_THEME, theme).putString(KEY_DARK_MODE, darkMode).apply()
+        _theme.value = theme
+        _darkMode.value = darkMode
+    }
+
+    private val _autoUpdate = MutableStateFlow(prefs.getBoolean(KEY_AUTO_UPDATE, true))
+
+    /** Whether Meadow checks GitHub for new versions on its own. */
+    val autoUpdate: StateFlow<Boolean> = _autoUpdate.asStateFlow()
+
+    fun setAutoUpdate(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_UPDATE, enabled).apply()
+        _autoUpdate.value = enabled
+    }
+
+    private val _privacy = MutableStateFlow(Privacy(prefs.getBoolean(KEY_SHARE_USAGE, true), prefs.getBoolean(KEY_SHARE_PROTECTION, true)))
+
+    /** Mirrors the profile's privacy choices so background work can respect them offline. */
+    val privacy: StateFlow<Privacy> = _privacy.asStateFlow()
+
+    fun setPrivacy(privacy: Privacy) {
+        prefs.edit().putBoolean(KEY_SHARE_USAGE, privacy.shareUsage).putBoolean(KEY_SHARE_PROTECTION, privacy.shareProtection).apply()
+        _privacy.value = privacy
+    }
+
+    /** The last release version a notification was shown for, so each one is offered once. */
+    var notifiedUpdate: String?
+        get() = prefs.getString(KEY_NOTIFIED_UPDATE, null)
+        set(value) = prefs.edit().putString(KEY_NOTIFIED_UPDATE, value).apply()
+
+    private val _acceptedTerms = MutableStateFlow(prefs.getInt(KEY_TERMS, 0))
+
+    /** The version of the terms and privacy notice accepted on this account (0 = none yet). */
+    val acceptedTerms: StateFlow<Int> = _acceptedTerms.asStateFlow()
+
+    var acceptedTermsVersion: Int
+        get() = _acceptedTerms.value
+        set(value) {
+            prefs.edit().putInt(KEY_TERMS, value).apply()
+            _acceptedTerms.value = value
+        }
+
+    /** Wipes everything this phone holds, after the account is deleted. */
+    fun clearAll() {
+        prefs.edit().clear().apply()
+        _limits.value = emptyList()
+        _grants.value = emptyList()
+        _strictMode.value = false
+        _approverCount.value = 0
+        _emergency.value = null
+        _pendingInvite.value = null
+        _privacy.value = Privacy()
+        _theme.value = null
+        _darkMode.value = null
+        _autoUpdate.value = true
+        _acceptedTerms.value = 0
+    }
+
     private val _pendingInvite = MutableStateFlow(prefs.getString(KEY_PENDING_INVITE, null))
 
     /** An invite link opened before (or while) setting up; offered once a profile exists. */
@@ -125,5 +190,12 @@ class LocalStore(context: Context) {
         const val KEY_OFFLINE_EMERGENCY = "offline_emergency_at"
         const val KEY_PENDING_EMERGENCY = "pending_emergency_v2"
         const val KEY_PENDING_INVITE = "pending_invite"
+        const val KEY_THEME = "theme"
+        const val KEY_DARK_MODE = "dark_mode"
+        const val KEY_AUTO_UPDATE = "auto_update"
+        const val KEY_SHARE_USAGE = "share_usage"
+        const val KEY_SHARE_PROTECTION = "share_protection"
+        const val KEY_TERMS = "accepted_terms_version"
+        const val KEY_NOTIFIED_UPDATE = "notified_update"
     }
 }

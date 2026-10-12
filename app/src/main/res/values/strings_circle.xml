@@ -29,7 +29,7 @@
     <string name="circle_bee_role">Looks after your garden</string>
     <string name="circle_chat_with">Chat with %1$s</string>
     <string name="circle_remove_title">Remove %1$s?</string>
-    <string name="circle_remove_body_others">%1$s and your other Bumblebees will be told.</string>
+    <string name="circle_remove_body_others">Only %1$s will be told. Your other Bumblebees won\'t be.</string>
     <string name="circle_remove_body_last">%1$s will be told. Without a Bumblebee, your limits aren\'t locked in anymore.</string>
     <string name="circle_bee_removed">%1$s isn\'t your Bumblebee anymore</string>
 
@@ -73,6 +73,8 @@
     <string name="friend_never_checked_in">Their phone hasn\'t checked in yet</string>
     <string name="friend_today">Today</string>
     <string name="friend_no_usage">Nothing shared yet today.</string>
+    <string name="friend_usage_private">%1$s keeps their screen time private.</string>
+    <string name="friend_protection_private">%1$s keeps their protection status private.</string>
     <string name="friend_screen_time">%1$s of screen time</string>
     <string name="friend_used_of">%1$s of %2$s</string>
     <string name="friend_limits">Their limits</string>

@@ -1,9 +1,9 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
-import { chats, db, notify, requests, userOf, users } from "./db";
+import { accountOf, accountRef, chats, db, loadPerson, notify, profileOf, requests, users } from "./db";
 
 const ALERT_COOLDOWN_MS = 2 * 60_000;
 const REQUEST_TTL_MS = 24 * 60 * 60_000;
@@ -17,9 +17,9 @@ export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{message
   if (!chat.exists) return;
   const participants = (chat.get("participants") as string[] | undefined) ?? [];
   const names = (chat.get("names") as Record<string, string> | undefined) ?? {};
-  const flowers = (chat.get("flowers") as Record<string, string> | undefined) ?? {};
+  const avatars = (chat.get("avatars") as Record<string, { flower?: string }> | undefined) ?? {};
   const sender = String(message.senderId);
-  const person = { displayName: names[sender] ?? "Friend", flower: flowers[sender] ?? "🌼" };
+  const person = { displayName: names[sender] ?? "Friend", flower: avatars[sender]?.flower ?? "🌼" };
   await notify(participants.filter((p) => p !== sender), {
     type: "chat",
     chatId: event.params.chatId,
@@ -40,9 +40,28 @@ export const onProtectionAlert = onDocumentCreated("users/{uid}/alerts/{alertId}
     return true;
   });
   if (!shouldSend) return;
-  const user = userOf(await userRef.get());
+  const person = await loadPerson(event.params.uid);
   const lost = Array.isArray(alert.lost) ? alert.lost.filter((k: unknown): k is string => typeof k === "string") : [];
-  await notify(user.approverIds, { type: "alert", uid: event.params.uid, ...pushes.protectionOff(user, lost) });
+  await notify(person.account.approverIds, { type: "alert", uid: person.uid, ...pushes.protectionOff(person.profile, lost) });
+});
+
+/** Keeps names and avatars in chats up to date when someone edits their profile. */
+export const onProfileUpdated = onDocumentUpdated("users/{uid}", async (event) => {
+  const before = event.data?.before;
+  const after = event.data?.after;
+  if (!before?.exists || !after?.exists) return;
+  const fields = ["displayName", "flower", "avatarColor", "photoUrl"];
+  if (fields.every((f) => before.get(f) === after.get(f))) return;
+  const uid = event.params.uid;
+  const profile = profileOf(after);
+  const writer = db().bulkWriter();
+  for (const chat of (await chats().where("participants", "array-contains", uid).get()).docs) {
+    writer.update(chat.ref, {
+      [`names.${uid}`]: profile.displayName,
+      [`avatars.${uid}`]: { flower: profile.flower, color: profile.avatarColor, photo: profile.photoUrl },
+    });
+  }
+  await writer.close();
 });
 
 /** Hourly housekeeping: expire old requests, flag phones that went quiet. */
@@ -64,11 +83,11 @@ export const hourlyCare = onSchedule("every 60 minutes", async () => {
   const quiet = await users().where("lastHeartbeat", "<", cutoff).limit(400).get();
   for (const doc of quiet.docs) {
     if (doc.get("staleNotified") === true) continue;
-    const user = userOf(doc);
-    if (user.approverIds.length === 0) continue;
+    const approverIds = accountOf(await accountRef(doc.id).get()).approverIds;
+    if (approverIds.length === 0) continue;
     if ((await doc.ref.collection("limits").limit(1).get()).empty) continue;
     await doc.ref.update({ staleNotified: true });
-    await notify(user.approverIds, { type: "alert", ...pushes.quietPhone(user) });
+    await notify(approverIds, { type: "alert", uid: doc.id, ...pushes.quietPhone(profileOf(doc)) });
   }
 
   const recovered = await users().where("staleNotified", "==", true).limit(400).get();

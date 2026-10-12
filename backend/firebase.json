@@ -28,9 +28,13 @@
     "functions": {
       "port": 5001
     },
+    "storage": {
+      "port": 9199
+    },
     "ui": {
-      "enabled": true
-    }
+      "enabled": false
+    },
+    "singleProjectMode": true
   },
   "hosting": {
     "public": "hosting",
@@ -43,6 +47,18 @@
       {
         "source": "/i/**",
         "destination": "/invite.html"
+      },
+      {
+        "source": "/privacy",
+        "destination": "/legal.html"
+      },
+      {
+        "source": "/terms",
+        "destination": "/legal.html"
+      },
+      {
+        "source": "/licenses",
+        "destination": "/legal.html"
       }
     ],
     "headers": [
@@ -55,6 +71,12 @@
           }
         ]
       }
+    ],
+    "predeploy": [
+      "rm -rf \"$PROJECT_DIR/hosting/legal\" && cp -r \"$PROJECT_DIR/../legal\" \"$PROJECT_DIR/hosting/legal\""
     ]
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

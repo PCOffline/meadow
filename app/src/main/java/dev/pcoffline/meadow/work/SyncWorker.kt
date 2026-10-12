@@ -26,8 +26,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         if (!AppGraph.backendReady || AppGraph.backend.uid == null) return Result.success()
         return runCatchingCancellable {
             AppGraph.emergency.flushPending()
-            AppGraph.share.upload(todaySummary())
-            AppGraph.share.heartbeat(AppGraph.protection.current().asMap())
+            val privacy = AppGraph.store.privacy.value
+            if (privacy.shareUsage) AppGraph.share.upload(todaySummary())
+            AppGraph.share.heartbeat(if (privacy.shareProtection) AppGraph.protection.current().asMap() else emptyMap())
             AppGraph.protection.check()
         }.fold(onSuccess = { Result.success() }, onFailure = { Result.retry() })
     }

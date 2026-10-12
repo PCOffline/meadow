@@ -1,5 +1,5 @@
 /** Firestore and FCM plumbing shared by every function. */
-import { getFirestore, FieldValue, DocumentSnapshot, DocumentReference, SetOptions, DocumentData } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, DocumentSnapshot, DocumentReference, SetOptions, DocumentData, Transaction } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
@@ -13,16 +13,34 @@ export const inviteLinks = () => db().collection("inviteLinks");
 export const requests = () => db().collection("requests");
 export const chats = () => db().collection("chats");
 export const friendCodes = () => db().collection("friendCodes");
+/** Owner-only document holding who looks after whom, and push tokens. */
+export const accountRef = (uid: string) => users().doc(uid).collection("private").doc("account");
 
-/** A user's profile. In code a Bumblebee is an "approver"; the people they look after are "approvees". */
-export interface UserDoc {
+export const isEmulator = () => process.env.FUNCTIONS_EMULATOR === "true";
+
+/** What other people in someone's circle may see. */
+export interface Profile {
   displayName: string;
   flower: string;
-  friendCode: string;
+  avatarColor: string;
+  photoUrl: string | null;
+  strictMode: boolean;
+}
+
+/**
+ * Private to the owner. In code a Bumblebee is an "approver"; the people they look after are
+ * "approvees". Nobody else can read these lists: managing Bumblebees is your own business.
+ */
+export interface Account {
   approverIds: string[];
   approveeIds: string[];
-  strictMode: boolean;
   fcmTokens: string[];
+}
+
+export interface Person {
+  uid: string;
+  profile: Profile;
+  account: Account;
 }
 
 export function requireAuth(req: CallableRequest<unknown>): string {
@@ -45,19 +63,30 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
   return result.data;
 }
 
-export function userOf(snap: DocumentSnapshot): UserDoc {
+const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+export function profileOf(snap: DocumentSnapshot): Profile {
   if (!snap.exists) throw new HttpsError("not-found", errors.noProfile);
   const d = snap.data() ?? {};
-  const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
   return {
     displayName: typeof d.displayName === "string" ? d.displayName : "Friend",
     flower: typeof d.flower === "string" ? d.flower : "🌼",
-    friendCode: typeof d.friendCode === "string" ? d.friendCode : "",
-    approverIds: list(d.approverIds),
-    approveeIds: list(d.approveeIds),
+    avatarColor: typeof d.avatarColor === "string" ? d.avatarColor : "leaf",
+    photoUrl: typeof d.photoUrl === "string" ? d.photoUrl : null,
     strictMode: d.strictMode === true,
-    fcmTokens: list(d.fcmTokens),
   };
+}
+
+export function accountOf(snap: DocumentSnapshot): Account {
+  const d = snap.data() ?? {};
+  return { approverIds: list(d.approverIds), approveeIds: list(d.approveeIds), fcmTokens: list(d.fcmTokens) };
+}
+
+/** Reads someone's profile and account, inside a transaction when given one. */
+export async function loadPerson(uid: string, tx?: Transaction): Promise<Person> {
+  const read = (ref: DocumentReference) => (tx ? tx.get(ref) : ref.get());
+  const [profile, account] = await Promise.all([read(users().doc(uid)), read(accountRef(uid))]);
+  return { uid, profile: profileOf(profile), account: accountOf(account) };
 }
 
 export function projectId(): string {
@@ -66,14 +95,15 @@ export function projectId(): string {
 
 type Writer = { set(ref: DocumentReference, data: DocumentData, options: SetOptions): unknown };
 
-/** Creates or refreshes the 1:1 chat between two people. */
-export function ensureChat(writer: Writer, a: { uid: string; user: UserDoc }, b: { uid: string; user: UserDoc }, id: string): void {
+/** Creates or refreshes the 1:1 chat between two people, with their names and avatars. */
+export function ensureChat(writer: Writer, a: Person, b: Person, id: string): void {
+  const avatar = (p: Person) => ({ flower: p.profile.flower, color: p.profile.avatarColor, photo: p.profile.photoUrl });
   writer.set(
     chats().doc(id),
     {
       participants: [a.uid, b.uid].sort(),
-      names: { [a.uid]: a.user.displayName, [b.uid]: b.user.displayName },
-      flowers: { [a.uid]: a.user.flower, [b.uid]: b.user.flower },
+      names: { [a.uid]: a.profile.displayName, [b.uid]: b.profile.displayName },
+      avatars: { [a.uid]: avatar(a), [b.uid]: avatar(b) },
     },
     { merge: true },
   );
@@ -99,19 +129,23 @@ export async function postToChat(
 /**
  * Sends a data-only push to every device of each user; the app builds the notification itself
  * so it can add actions like "Say yes". Dead tokens are cleaned up. Never throws.
+ *
+ * In the emulator every push is also written to `_testOutbox`, so integration tests can check
+ * exactly who was told what.
  */
 export async function notify(uids: string[], data: Record<string, string>): Promise<void> {
   await Promise.all(
     [...new Set(uids)].map(async (uid) => {
       try {
-        const tokens = userOf(await users().doc(uid).get()).fcmTokens;
+        if (isEmulator()) await db().collection("_testOutbox").add({ to: uid, ...data, at: FieldValue.serverTimestamp() });
+        const tokens = accountOf(await accountRef(uid).get()).fcmTokens;
         if (tokens.length === 0) return;
         const result = await getMessaging().sendEachForMulticast({ tokens, data, android: { priority: "high" } });
         const dead = tokens.filter((_, i) => {
           const code = result.responses[i]?.error?.code;
           return code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token";
         });
-        if (dead.length) await users().doc(uid).update({ fcmTokens: FieldValue.arrayRemove(...dead) });
+        if (dead.length) await accountRef(uid).update({ fcmTokens: FieldValue.arrayRemove(...dead) });
       } catch (e) {
         logger.warn("Push failed", { uid, error: String(e) });
       }

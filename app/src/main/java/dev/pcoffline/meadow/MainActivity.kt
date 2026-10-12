@@ -7,7 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import dev.pcoffline.meadow.data.InviteLinks
 import dev.pcoffline.meadow.ui.MeadowRoot
-import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import dev.pcoffline.meadow.ui.theme.MeadowAppTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) handle(intent)
         setContent {
-            MeadowTheme {
+            MeadowAppTheme {
                 MeadowRoot(pendingRoute)
             }
         }

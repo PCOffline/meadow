@@ -12,8 +12,6 @@ interface Person {
   flower: string;
 }
 
-const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-
 export const errors = {
   signIn: "Please sign in first.",
   noProfile: "That person hasn't set up Meadow yet.",
@@ -58,7 +56,7 @@ export const errors = {
 
 export const chatNotes = {
   newBumblebee: (bee: Person, owner: Person) => `${bee.flower} ${bee.displayName} is now ${owner.displayName}'s Bumblebee`,
-  removedBumblebee: (owner: Person, bee: Person) => `${owner.displayName} removed ${bee.displayName} as a Bumblebee`,
+  removedBumblebee: (owner: Person, bee: Person) => `${owner.displayName} ended ${bee.displayName}'s time as their Bumblebee`,
   steppedDown: (bee: Person, owner: Person) => `${bee.displayName} stepped down as ${owner.displayName}'s Bumblebee`,
   request: (owner: Person, summary: string) => `💌 ${owner.displayName} asks for ${summary}`,
   yes: (bee: Person, summary: string) => `🌸 ${bee.displayName} said yes to ${summary}`,
@@ -76,11 +74,10 @@ export const pushes = {
     title: `${bee.flower} ${bee.displayName} is your Bumblebee now`,
     body: "Your limits are locked in. Only your Bumblebees can give you extra time. 🐝",
   }),
-  removedBumblebee: (owner: Person, bee: Person, remaining: number) => ({
-    title: `${owner.flower} ${owner.displayName} removed ${bee.displayName} as a Bumblebee`,
-    body: remaining > 0
-      ? `${owner.displayName} has ${remaining} ${plural(remaining, "Bumblebee", "Bumblebees")} left.`
-      : `${owner.displayName} has no Bumblebees left, so their limits aren't locked in anymore.`,
+  /** Only the Bumblebee who was removed hears about it. */
+  removedBumblebee: (owner: Person) => ({
+    title: `${owner.flower} ${owner.displayName} doesn't need you as their Bumblebee anymore`,
+    body: "Their requests won't come to you anymore. Thanks for looking after their garden. 🌼",
   }),
   steppedDown: (bee: Person, remaining: number) => ({
     title: `${bee.flower} ${bee.displayName} stepped down as your Bumblebee`,
@@ -100,6 +97,14 @@ export const pushes = {
   protectionOff: (owner: Person, lost: string[]) => ({
     title: `⚠️ ${owner.displayName} turned off ${protectionNames(lost)}`,
     body: "Their limits may not be working right now. Maybe check in with them?",
+  }),
+  gardenClosed: (owner: Person) => ({
+    title: `${owner.flower} ${owner.displayName} closed their Meadow garden`,
+    body: "Their account is gone, so you won't get their requests anymore.",
+  }),
+  bumblebeeLeftMeadow: (bee: Person) => ({
+    title: `${bee.flower} ${bee.displayName} left Meadow`,
+    body: "They're no longer one of your Bumblebees. You can invite someone new from Circle.",
   }),
   quietPhone: (owner: Person) => ({
     title: `🌙 ${owner.displayName}'s phone has gone quiet`,

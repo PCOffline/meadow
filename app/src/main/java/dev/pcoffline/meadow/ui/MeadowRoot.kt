@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,7 +71,11 @@ import dev.pcoffline.meadow.ui.circle.FriendScreen
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.PetalBurst
 import dev.pcoffline.meadow.ui.home.GardenScreen
+import dev.pcoffline.meadow.ui.legal.LegalDoc
+import dev.pcoffline.meadow.ui.legal.LegalScreen
+import dev.pcoffline.meadow.ui.legal.TermsUpdateDialog
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
+import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.limits.LimitEditorScreen
 import dev.pcoffline.meadow.ui.navigation.ChatRoute
 import dev.pcoffline.meadow.ui.navigation.ChatsRoute
@@ -78,7 +83,9 @@ import dev.pcoffline.meadow.ui.navigation.CircleRoute
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.navigation.FriendRoute
 import dev.pcoffline.meadow.ui.navigation.GardenRoute
+import dev.pcoffline.meadow.ui.navigation.LegalRoute
 import dev.pcoffline.meadow.ui.navigation.LimitRoute
+import dev.pcoffline.meadow.ui.navigation.ProfileRoute
 import dev.pcoffline.meadow.ui.navigation.PickAppRoute
 import dev.pcoffline.meadow.ui.navigation.RequestsRoute
 import dev.pcoffline.meadow.ui.navigation.SettingsRoute
@@ -94,6 +101,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @Composable
 fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
@@ -169,6 +177,9 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         nav.navigate(target) { launchSingleTop = true }
     }
     val pendingInvite by AppGraph.store.pendingInvite.collectAsStateWithLifecycle()
+    val acceptedTerms by AppGraph.store.acceptedTerms.collectAsStateWithLifecycle()
+    val accountConfirmed by AppGraph.sync.accountConfirmed.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     CompositionLocalProvider(LocalSnackbar provides snackbar, LocalCelebrate provides celebrate) {
         Scaffold(
@@ -204,6 +215,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                         GardenScreen(
                             profile = profile,
                             onOpenSettings = { nav.navigate(SettingsRoute) },
+                            onOpenProfile = { nav.navigate(ProfileRoute) },
                             onOpenSetup = { nav.navigate(SetupRoute) },
                             onPlantLimit = { nav.navigate(PickAppRoute) },
                             onOpenLimit = { nav.navigate(LimitRoute(it)) },
@@ -221,7 +233,17 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                     }
                     composable<ChatsRoute> { ChatListScreen(profile, onOpenChat = { nav.navigate(ChatRoute(it)) }) }
                     composable<SettingsRoute> {
-                        SettingsScreen(profile, onBack = { nav.popBackStack() }, onOpenSetup = { nav.navigate(SetupRoute) })
+                        SettingsScreen(
+                            profile = profile,
+                            onBack = { nav.popBackStack() },
+                            onOpenSetup = { nav.navigate(SetupRoute) },
+                            onOpenProfile = { nav.navigate(ProfileRoute) },
+                            onOpenLegal = { nav.navigate(LegalRoute(it.name)) },
+                        )
+                    }
+                    composable<ProfileRoute> { ProfileScreen(profile, onBack = { nav.popBackStack() }) }
+                    composable<LegalRoute> { entry ->
+                        LegalScreen(LegalDoc.fromName(entry.toRoute<LegalRoute>().doc), onBack = { nav.popBackStack() })
                     }
                     composable<PickAppRoute> {
                         AppPickerScreen(
@@ -246,6 +268,9 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                 }
                 PetalBurst(celebration, Modifier.fillMaxSize())
             }
+        }
+        if (accountConfirmed && acceptedTerms < LegalDoc.CURRENT_VERSION) {
+            TermsUpdateDialog(onAccept = { scope.launch { AppGraph.profiles.acceptTerms(LegalDoc.CURRENT_VERSION) } })
         }
         pendingInvite?.let { token ->
             AcceptInviteDialog(token = token, onClose = { AppGraph.store.setPendingInvite(null) })

@@ -20,25 +20,34 @@ after(async () => {
 const profile = (overrides = {}) => ({
   displayName: "Sam",
   flower: "🌼",
+  avatarColor: "leaf",
+  photoUrl: null,
+  bio: "",
   friendCode: "ABC234",
-  approverIds: [],
-  approveeIds: [],
   strictMode: false,
-  fcmTokens: [],
   protection: {},
+  privacy: { shareUsage: true, shareProtection: true },
   ...overrides,
 });
 
+const account = (overrides = {}) => ({ approverIds: [], approveeIds: [], fcmTokens: ["token"], ...overrides });
+
 const limit = (daily, weekly = 0) => ({ packageName: "com.insta", appName: "Instagram", dailyMinutes: daily, weeklyMinutes: weekly });
 
-/** sam is guarded by bee; stranger has nothing to do with either. */
-async function seed({ samHasBee = true } = {}) {
+/** sam is looked after by bee (and bee2); stranger has nothing to do with them. */
+async function seed({ samHasBee = true, shareUsage = true } = {}) {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, "users/sam"), profile({ approverIds: samHasBee ? ["bee"] : [] }));
-    await setDoc(doc(db, "users/bee"), profile({ displayName: "Bee", approveeIds: samHasBee ? ["sam"] : [] }));
+    await setDoc(doc(db, "users/sam"), profile({ privacy: { shareUsage, shareProtection: true } }));
+    await setDoc(doc(db, "users/sam/private/account"), account({ approverIds: samHasBee ? ["bee", "bee2"] : [] }));
+    for (const bee of ["bee", "bee2"]) {
+      await setDoc(doc(db, `users/${bee}`), profile({ displayName: bee }));
+      await setDoc(doc(db, `users/${bee}/private/account`), account({ approveeIds: samHasBee ? ["sam"] : [] }));
+    }
     await setDoc(doc(db, "users/stranger"), profile({ displayName: "Stranger" }));
+    await setDoc(doc(db, "users/stranger/private/account"), account());
+    await setDoc(doc(db, "users/sam/usage/2026-10-12"), { totalMinutes: 42, apps: [] });
     await setDoc(doc(db, "users/sam/limits/com.insta"), limit(30, 300));
     await setDoc(doc(db, "users/sam/grants/g1"), { packageName: "com.insta", minutes: 15, dayKey: "2026-10-12" });
     await setDoc(doc(db, "requests/r1"), { requesterId: "sam", approverIds: ["bee"], status: "pending" });
@@ -60,17 +69,39 @@ describe("profiles", () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "users/sam")));
   });
 
-  test("you can change your name and flower", async () => {
-    await assertSucceeds(updateDoc(doc(as("sam"), "users/sam"), { displayName: "Sammy", flower: "🌷" }));
-    await assertFails(updateDoc(doc(as("sam"), "users/sam"), { displayName: "" }));
+  test("you can edit your profile within limits", async () => {
+    const me = doc(as("sam"), "users/sam");
+    await assertSucceeds(updateDoc(me, { displayName: "Sammy", flower: "🐝", avatarColor: "honey", bio: "Growing calmer days" }));
+    await assertSucceeds(updateDoc(me, { photoUrl: "https://example.com/a.jpg" }));
+    await assertSucceeds(updateDoc(me, { photoUrl: null, privacy: { shareUsage: false, shareProtection: true } }));
+    await assertFails(updateDoc(me, { displayName: "" }));
+    await assertFails(updateDoc(me, { bio: "x".repeat(81) }));
+    await assertFails(updateDoc(me, { privacy: { shareUsage: false, sneaky: true } }));
+    await assertFails(updateDoc(me, { friendCode: "MINE11" }));
     await assertFails(updateDoc(doc(as("stranger"), "users/sam"), { displayName: "Hacked" }));
   });
 
-  test("Bumblebee lists and profiles are only written by the backend", async () => {
-    await assertFails(updateDoc(doc(as("sam"), "users/sam"), { approverIds: [] }));
-    await assertFails(updateDoc(doc(as("stranger"), "users/stranger"), { approveeIds: ["sam"] }));
+  test("profiles and Bumblebee lists are only created by the backend", async () => {
     await assertFails(setDoc(doc(as("new"), "users/new"), profile()));
     await assertFails(deleteDoc(doc(as("sam"), "users/sam")));
+    await assertFails(updateDoc(doc(as("sam"), "users/sam/private/account"), { approverIds: [] }));
+    await assertFails(updateDoc(doc(as("stranger"), "users/stranger/private/account"), { approveeIds: ["sam"] }));
+    await assertFails(setDoc(doc(as("new"), "users/new/private/account"), account()));
+  });
+
+  test("who looks after whom stays private", async () => {
+    await assertSucceeds(getDoc(doc(as("sam"), "users/sam/private/account")));
+    await assertFails(getDoc(doc(as("bee"), "users/sam/private/account")));
+    await assertFails(getDoc(doc(as("sam"), "users/bee/private/account")));
+    // Bumblebees of the same person can't see each other.
+    await assertFails(getDoc(doc(as("bee"), "users/bee2")));
+  });
+
+  test("you can update your own push tokens and theme, nothing else", async () => {
+    const mine = doc(as("sam"), "users/sam/private/account");
+    await assertSucceeds(updateDoc(mine, { fcmTokens: ["a", "b"], theme: "lavender", darkMode: "system" }));
+    await assertFails(updateDoc(mine, { fcmTokens: Array.from({ length: 11 }, (_, i) => `t${i}`) }));
+    await assertFails(updateDoc(doc(as("bee"), "users/sam/private/account"), { fcmTokens: [] }));
   });
 
   test("strict mode can always go on, but only off without Bumblebees", async () => {
@@ -125,8 +156,15 @@ describe("limits", () => {
     await seed();
     await assertSucceeds(getDoc(doc(as("bee"), "users/sam/limits/com.insta")));
     await assertSucceeds(getDoc(doc(as("bee"), "users/sam/grants/g1")));
+    await assertSucceeds(getDoc(doc(as("bee"), "users/sam/usage/2026-10-12")));
     await assertFails(getDoc(doc(as("stranger"), "users/sam/limits/com.insta")));
     await assertFails(getDoc(doc(as("stranger"), "users/sam/usage/2026-10-12")));
+  });
+
+  test("usage stays private when sharing is off", async () => {
+    await seed({ shareUsage: false });
+    await assertFails(getDoc(doc(as("bee"), "users/sam/usage/2026-10-12")));
+    await assertSucceeds(getDoc(doc(as("sam"), "users/sam/usage/2026-10-12")));
   });
 
   test("extra time can't be granted from a phone", async () => {
@@ -147,10 +185,11 @@ describe("requests, invites and links", () => {
     await assertFails(updateDoc(doc(as("sam"), "requests/r1"), { status: "approved" }));
   });
 
-  test("invite links and friend codes are hidden", async () => {
+  test("invite links, friend codes and the test outbox are hidden", async () => {
     await assertFails(getDoc(doc(as("sam"), "inviteLinks/AbCdEfGh12345678")));
     await assertFails(getDoc(doc(as("stranger"), "inviteLinks/AbCdEfGh12345678")));
     await assertFails(getDoc(doc(as("stranger"), "friendCodes/ABC234")));
+    await assertFails(getDoc(doc(as("sam"), "_testOutbox/x")));
   });
 
   test("protection alerts carry only codes", async () => {

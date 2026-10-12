@@ -82,11 +82,6 @@ class SocialRepository(
         backend.call("removeApprover", mapOf("approverUid" to approverUid))
     }
 
-    suspend fun updateProfile(displayName: String, flower: String) {
-        val uid = backend.requireUid()
-        backend.user(uid).update(mapOf("displayName" to displayName.trim(), "flower" to flower)).await()
-    }
-
     /** Turning strict mode on is instant; turning it off needs a Bumblebee's yes once you have any. */
     suspend fun setStrictMode(enabled: Boolean, message: String = ""): ChangeOutcome {
         val uid = backend.requireUid()

@@ -1,7 +1,7 @@
 import { FieldValue, Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
-import { db, notify, parse, postToChat, requests, requireAuth, userOf, users } from "./db";
+import { db, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
 import { chatIdFor, RequestType, summarize } from "./format";
 import { CreateRequestInput, DecideRequestInput, RequestIdInput } from "./schemas";
 
@@ -25,12 +25,12 @@ export interface RequestDoc {
 export const createRequest = onCall(async (call) => {
   const uid = requireAuth(call);
   const input = parse(CreateRequestInput, call.data);
-  const me = userOf(await users().doc(uid).get());
-  if (me.approverIds.length === 0) throw new HttpsError("failed-precondition", errors.noBumblebees);
+  const me = await loadPerson(uid);
+  if (me.account.approverIds.length === 0) throw new HttpsError("failed-precondition", errors.noBumblebees);
 
   const doc: RequestDoc = {
     requesterId: uid,
-    requesterName: me.displayName,
+    requesterName: me.profile.displayName,
     type: input.type,
     packageName: null,
     appName: null,
@@ -39,11 +39,11 @@ export const createRequest = onCall(async (call) => {
     weeklyMinutes: input.type === "change_limit" ? input.weeklyMinutes : 0,
     message: input.message,
     status: "pending",
-    approverIds: [...me.approverIds],
+    approverIds: [...me.account.approverIds],
     dayKey: input.dayKey,
   };
   if (input.type === "disable_strict_mode") {
-    if (!me.strictMode) throw new HttpsError("failed-precondition", errors.strictAlreadyOff);
+    if (!me.profile.strictMode) throw new HttpsError("failed-precondition", errors.strictAlreadyOff);
   } else {
     const limit = await users().doc(uid).collection("limits").doc(input.packageName).get();
     if (!limit.exists) throw new HttpsError("failed-precondition", errors.noLimit);
@@ -62,10 +62,10 @@ export const createRequest = onCall(async (call) => {
   const summary = summarize(doc);
   await Promise.all(
     doc.approverIds.map((beeUid) =>
-      postToChat(chatIdFor(uid, beeUid), { senderId: uid, kind: "request", text: chatNotes.request(me, summary), requestId: ref.id }),
+      postToChat(chatIdFor(uid, beeUid), { senderId: uid, kind: "request", text: chatNotes.request(me.profile, summary), requestId: ref.id }),
     ),
   );
-  await notify(doc.approverIds, { type: "request_new", requestId: ref.id, ...pushes.request(me, summary, doc.message) });
+  await notify(doc.approverIds, { type: "request_new", requestId: ref.id, ...pushes.request(me.profile, summary, doc.message) });
   return { requestId: ref.id };
 });
 
@@ -118,10 +118,10 @@ export const decideRequest = onCall(async (call) => {
     if (r.requesterId === uid) throw new HttpsError("permission-denied", errors.ownRequest);
     if (!r.approverIds.includes(uid)) throw new HttpsError("permission-denied", errors.notYourRequest);
 
-    const [requesterSnap, deciderSnap] = await Promise.all([tx.get(users().doc(r.requesterId)), tx.get(users().doc(uid))]);
+    const [requester, deciderPerson] = await Promise.all([loadPerson(r.requesterId, tx), loadPerson(uid, tx)]);
     // Bumblebees who were removed or stepped down since the request was made can't answer it.
-    if (!userOf(requesterSnap).approverIds.includes(uid)) throw new HttpsError("permission-denied", errors.noLongerBumblebee);
-    const decider = userOf(deciderSnap);
+    if (!requester.account.approverIds.includes(uid)) throw new HttpsError("permission-denied", errors.noLongerBumblebee);
+    const decider = deciderPerson.profile;
 
     const granted = approve && r.type === "extra_time" && minutes ? Math.min(minutes, r.minutes) : r.minutes;
     if (approve) applyApproval(tx, requestId, r, uid, granted);

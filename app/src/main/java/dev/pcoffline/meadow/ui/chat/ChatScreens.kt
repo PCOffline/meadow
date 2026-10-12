@@ -58,7 +58,7 @@ import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.data.runCatchingCancellable
 import dev.pcoffline.meadow.ui.components.EmptyState
-import dev.pcoffline.meadow.ui.components.FlowerAvatar
+import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.requests.RequestCard
@@ -106,7 +106,7 @@ fun ChatListScreen(
                             fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     },
-                    leadingContent = { FlowerAvatar(chat.otherFlower(profile.uid)) },
+                    leadingContent = { PersonAvatar(chat.otherAvatar(profile.uid)) },
                     trailingContent = {
                         Column(horizontalAlignment = Alignment.End) {
                             Text(relativeTime(chat.lastMessageAtMillis), style = MaterialTheme.typography.labelSmall)
@@ -157,7 +157,7 @@ fun ChatScreen(
     }
 
     Column(Modifier.fillMaxSize().imePadding()) {
-        val title = chat?.let { stringResource(R.string.chat_title, it.otherFlower(profile.uid), it.otherName(profile.uid)) }.orEmpty()
+        val title = chat?.otherName(profile.uid).orEmpty()
         BackTopBar(title, onBack = onBack)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (chat == null) {
