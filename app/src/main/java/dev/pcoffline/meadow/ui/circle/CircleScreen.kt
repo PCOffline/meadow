@@ -110,7 +110,21 @@ fun CircleScreen(
     val incoming by viewModel.incomingInvites.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoingInvites.collectAsStateWithLifecycle()
     val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
+    CircleContent(profile, bumblebees, lookingAfter, incoming, outgoing, anonymous, onOpenChat, onOpenFriend)
+}
 
+/** The circle, drawn from plain state (also used for previews and screenshots). */
+@Composable
+fun CircleContent(
+    profile: UserProfile,
+    bumblebees: List<UserProfile>,
+    lookingAfter: List<UserProfile>,
+    incoming: List<Invite>,
+    outgoing: List<Invite>,
+    anonymous: Boolean,
+    onOpenChat: (String) -> Unit = {},
+    onOpenFriend: (String) -> Unit = {},
+) {
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp)) {

@@ -182,6 +182,12 @@ private val RestingSky = SkyMood(
 private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit) {
     val viewModel = viewModel(key = "rest-$pkg") { RestViewModel(pkg) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    RestContent(pkg, state, onHome, onOpen)
+}
+
+/** The resting screen, drawn from plain state (also used for previews and screenshots). */
+@Composable
+internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {}, onOpen: (String) -> Unit = {}) {
     val snackbar = remember { SnackbarHostState() }
     var asking by remember { mutableStateOf(false) }
     var emergency by remember { mutableStateOf(false) }

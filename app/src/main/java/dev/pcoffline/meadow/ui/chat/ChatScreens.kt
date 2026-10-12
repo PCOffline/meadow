@@ -148,12 +148,28 @@ fun ChatScreen(
 ) {
     val chat by viewModel.chat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    LaunchedEffect(messages.size) { viewModel.markRead() }
+    ChatContent(profile, chat, messages, onSend = viewModel::send, onBack = onBack)
+}
+
+/**
+ * A conversation, drawn from plain state (also used for previews and screenshots).
+ * [requestCard] shows a request message; by default it follows the live request.
+ */
+@Composable
+fun ChatContent(
+    profile: UserProfile,
+    chat: Chat?,
+    messages: List<ChatMessage>,
+    onSend: (String) -> Unit = {},
+    onBack: () -> Unit = {},
+    requestCard: @Composable (requestId: String) -> Unit = { RequestMessage(it, profile.uid) },
+) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-        viewModel.markRead()
     }
 
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -166,7 +182,7 @@ fun ChatScreen(
             items(messages, key = { it.id }) { message ->
                 Box(Modifier.animateItem()) {
                     when (message.kind) {
-                        MessageKind.REQUEST -> message.requestId?.let { RequestMessage(it, profile.uid) }
+                        MessageKind.REQUEST -> message.requestId?.let { requestCard(it) }
                         MessageKind.SYSTEM -> SystemMessage(message)
                         MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
                     }
@@ -186,7 +202,7 @@ fun ChatScreen(
             Spacer(Modifier.width(8.dp))
             FilledIconButton(
                 onClick = {
-                    viewModel.send(draft)
+                    onSend(draft)
                     draft = ""
                 },
                 enabled = draft.isNotBlank() && chat != null,

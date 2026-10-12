@@ -147,6 +147,12 @@ class StatsViewModel : ViewModel() {
 @Composable
 fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel { StatsViewModel() }) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    StatsContent(state, onSelect = viewModel::select, onShift = viewModel::shift, onOpenSetup = onOpenSetup)
+}
+
+/** The statistics, drawn from plain state (also used for previews and screenshots). */
+@Composable
+fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: (Int) -> Unit = {}, onOpenSetup: () -> Unit = {}) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Text(
             stringResource(R.string.stats_title),
@@ -163,7 +169,7 @@ fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel {
             Period.entries.forEachIndexed { i, p ->
                 SegmentedButton(
                     selected = state.selection.period == p,
-                    onClick = { viewModel.select(p) },
+                    onClick = { onSelect(p) },
                     shape = SegmentedButtonDefaults.itemShape(i, Period.entries.size),
                 ) {
                     Text(stringResource(when (p) { Period.DAY -> R.string.stats_day; Period.WEEK -> R.string.stats_week; Period.MONTH -> R.string.stats_month }))
@@ -178,19 +184,19 @@ fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel {
                 action = { Button(onClick = onOpenSetup) { Text(stringResource(R.string.stats_no_access_action)) } },
             )
         } else {
-            StatsBody(state, viewModel)
+            StatsBody(state, onShift)
         }
     }
 }
 
 @Composable
-private fun StatsBody(state: StatsUiState, viewModel: StatsViewModel) {
+private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PeriodNavigator(
             title = periodTitle(state.selection, state.stats),
             canGoForward = state.selection.offset < 0,
-            onBack = { viewModel.shift(-1) },
-            onForward = { viewModel.shift(1) },
+            onBack = { onShift(-1) },
+            onForward = { onShift(1) },
         )
         AnimatedContent(
             targetState = state.selection,

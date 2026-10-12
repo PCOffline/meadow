@@ -128,7 +128,7 @@ fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
     }
 }
 
-private enum class Tab(
+internal enum class Tab(
     val route: Any,
     val matches: (NavDestination) -> Boolean,
     @StringRes val label: Int,
@@ -196,19 +196,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                if (currentTab != null) {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
-                        Tab.entries.forEach { tab ->
-                            val count = when (tab) {
-                                Tab.REQUESTS -> badges.requests
-                                Tab.CIRCLE -> badges.invites
-                                Tab.CHATS -> badges.chats
-                                else -> 0
-                            }
-                            TabItem(tab, selected = tab == currentTab, count = count) { nav.switchTab(tab.route) }
-                        }
-                    }
-                }
+                if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
             },
         ) { padding ->
             Box(Modifier.padding(padding)) {
@@ -284,6 +272,22 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         }
         pendingInvite?.let { token ->
             AcceptInviteDialog(token = token, onClose = { AppGraph.store.setPendingInvite(null) })
+        }
+    }
+}
+
+/** The bottom tab bar, with counts for new requests, invites and messages. */
+@Composable
+internal fun MeadowTabBar(current: Tab, badges: Badges, onSelect: (Tab) -> Unit) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Tab.entries.forEach { tab ->
+            val count = when (tab) {
+                Tab.REQUESTS -> badges.requests
+                Tab.CIRCLE -> badges.invites
+                Tab.CHATS -> badges.chats
+                else -> 0
+            }
+            TabItem(tab, selected = tab == current, count = count) { onSelect(tab) }
         }
     }
 }

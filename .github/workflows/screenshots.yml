@@ -1,0 +1,67 @@
+name: Screenshots
+
+# Renders the README's screenshots and animations on an Android emulator and commits them.
+# Runs for pushes whose commit message contains [screenshots].
+on:
+  push:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    if: contains(github.event.head_commit.message, '[screenshots]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install image tools
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          pip install pillow
+      - name: Build the app and tests
+        run: ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
+      - name: Capture on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          # Animations stay on: the recordings show them.
+          disable-animations: false
+          script: |
+            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
+            mkdir -p build/showcase
+            adb pull /sdcard/Pictures/meadow build/showcase
+      - name: Prepare images
+        run: python3 .github/scripts/prepare_screenshots.py build/showcase/meadow docs/images
+      - name: Commit images
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/images
+          if git diff --cached --quiet; then echo "Images unchanged"; exit 0; fi
+          git commit -m "Update README screenshots and animations"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: showcase-reports
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore

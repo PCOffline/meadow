@@ -102,7 +102,21 @@ fun GardenScreen(
     viewModel: GardenViewModel = viewModel { GardenViewModel() },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    GardenContent(profile, state, onOpenSettings, onOpenProfile, onOpenSetup, onPlantLimit, onOpenLimit, onOpenCircle)
+}
 
+/** The garden itself, drawn from plain state (also used for previews and screenshots). */
+@Composable
+fun GardenContent(
+    profile: UserProfile,
+    state: GardenState,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
+    onOpenSetup: () -> Unit = {},
+    onPlantLimit: () -> Unit = {},
+    onOpenLimit: (String) -> Unit = {},
+    onOpenCircle: () -> Unit = {},
+) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GardenHeader(profile, state, onOpenSettings, onOpenProfile) }
         item { EmergencyBanner(Modifier.padding(horizontal = 20.dp)) }

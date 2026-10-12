@@ -109,11 +109,15 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 @Immutable
 data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
 
+/** Pins the sky to an hour of the day (screenshots); null follows the clock. */
+val LocalSkyHour = androidx.compose.runtime.staticCompositionLocalOf<Int?> { null }
+
 /** The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights. */
 @Composable
 fun rememberSkyMood(): SkyMood {
     val dark = dev.pcoffline.meadow.ui.theme.LocalDarkTheme.current
-    val hour = remember { java.time.LocalTime.now().hour }
+    val pinned = LocalSkyHour.current
+    val hour = pinned ?: remember { java.time.LocalTime.now().hour }
     val greeting = when (hour) {
         in 5..11 -> R.string.greeting_morning
         in 12..16 -> R.string.greeting_afternoon
