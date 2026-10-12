@@ -87,11 +87,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     // The privacy notice, terms and licences live in /legal, shared with the hosted web pages.
-    sourceSets["main"].assets.srcDir("../legal")
+    sourceSets["main"].assets.directories.add("../legal")
     // Sample data and helpers used by both JVM (Robolectric) and on-device tests.
     // Kotlin sources, so they're added as Kotlin source dirs (AGP's built-in Kotlin).
-    sourceSets["test"].kotlin.srcDir("src/sharedTest/java")
-    sourceSets["androidTest"].kotlin.srcDir("src/sharedTest/java")
+    sourceSets["test"].kotlin.directories.add("src/sharedTest/java")
+    sourceSets["androidTest"].kotlin.directories.add("src/sharedTest/java")
 
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
@@ -153,6 +153,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.functions)
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.installations)
     implementation(libs.firebase.storage)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)

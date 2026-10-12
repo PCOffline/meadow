@@ -29,7 +29,10 @@
     <string name="action_more">More options</string>
     <string name="action_settings">Settings</string>
     <string name="action_chat">Chat</string>
+    <string name="action_try_again">Try again</string>
     <string name="loading_garden">Gathering petals…</string>
+    <string name="startup_slow">This is taking longer than usual. Check that you\'re online, then try again.</string>
+    <string name="startup_unavailable_title">Your garden couldn\'t be opened</string>
     <string name="time_just_now">just now</string>
     <string name="greeting_morning">Good morning</string>
     <string name="greeting_afternoon">Good afternoon</string>

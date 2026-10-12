@@ -399,6 +399,19 @@ then deploy again.
 deployed. Check **Firestore → Indexes**; if they're missing, run
 `firebase deploy --only firestore:indexes`.
 
+**The app says "Your garden couldn't be opened", or stays on "Gathering petals…".** The app
+couldn't read your profile from Firestore. The message under the title says why:
+
+- *"Meadow's server turned this down"*: the security rules refused the read. Usually they were
+  never deployed, so Firestore still has the locked-down rules it starts with. Run
+  `firebase deploy --only firestore,storage` from `backend/`.
+- *"Meadow's server can't do this right now"*: there is no Firestore database the app can find.
+  Meadow uses the one named `(default)`; check **Firestore** in the console.
+- *"You seem to be offline"*, or the loader says it's taking longer than usual: the phone can't
+  reach Firebase. Check its connection.
+
+For the exact error, connect the phone and run `adb logcat -s MeadowSync`.
+
 **The app says "Meadow's server can't do this right now".** The app called a function that
 isn't deployed where it looked. Usually the app was built with a different `MEADOW_REGION` than
 the functions were deployed with: check **Functions** in the console for the region, set the same

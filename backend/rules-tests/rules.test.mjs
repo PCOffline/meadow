@@ -31,7 +31,7 @@ const profile = (overrides = {}) => ({
 const account = (overrides = {}) => ({
   approverIds: [],
   approveeIds: [],
-  fcmTokens: ["token"],
+  pushIds: ["phone"],
   friendCode: "ABC234",
   strictMode: false,
   privacy: { shareUsage: true },
@@ -110,14 +110,14 @@ describe("profiles", () => {
 
   test("you can update your own settings, nothing the backend keeps", async () => {
     const mine = doc(as("sam"), "users/sam/private/account");
-    await assertSucceeds(updateDoc(mine, { fcmTokens: ["a", "b"], theme: "lavender", darkMode: "system" }));
+    await assertSucceeds(updateDoc(mine, { pushIds: ["a", "b"], theme: "lavender", darkMode: "system" }));
     await assertSucceeds(updateDoc(mine, { privacy: { shareUsage: false } }));
     await assertFails(updateDoc(mine, { privacy: { shareUsage: false, sneaky: true } }));
-    await assertFails(updateDoc(mine, { fcmTokens: Array.from({ length: 11 }, (_, i) => `t${i}`) }));
+    await assertFails(updateDoc(mine, { pushIds: Array.from({ length: 11 }, (_, i) => `t${i}`) }));
     for (const field of ["friendCode", "pendingRemovals", "emergencyUses", "lastAlertAt"]) {
       await assertFails(updateDoc(mine, { [field]: field === "friendCode" ? "MINE11" : { sneaky: 1 } }));
     }
-    await assertFails(updateDoc(doc(as("bee"), "users/sam/private/account"), { fcmTokens: [] }));
+    await assertFails(updateDoc(doc(as("bee"), "users/sam/private/account"), { pushIds: [] }));
   });
 
   test("strict mode goes on and off without asking anyone, and nobody else can see it", async () => {

@@ -50,7 +50,7 @@ export const createProfile = onCall(async (req) => {
     tx.set(accountRef(uid), {
       approverIds: [],
       approveeIds: [],
-      fcmTokens: [],
+      pushIds: [],
       friendCode: code,
       strictMode: false,
       privacy: { shareUsage: true },

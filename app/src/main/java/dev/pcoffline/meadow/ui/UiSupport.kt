@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
@@ -112,6 +113,17 @@ fun Throwable.friendlyMessage(context: Context): String = when (this) {
         )
     }
     is FirebaseNetworkException -> context.getString(R.string.error_offline)
+    // Reading the database: security rules, a missing database, or no connection.
+    is FirebaseFirestoreException -> context.getString(
+        when (code) {
+            FirebaseFirestoreException.Code.UNAVAILABLE, FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> R.string.error_offline
+            FirebaseFirestoreException.Code.PERMISSION_DENIED -> R.string.error_server_refused
+            FirebaseFirestoreException.Code.NOT_FOUND -> R.string.error_server_missing
+            FirebaseFirestoreException.Code.UNAUTHENTICATED -> R.string.error_auth_recent_login
+            FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED -> R.string.error_server_busy
+            else -> R.string.error_generic
+        },
+    )
     is FirebaseAuthException -> context.getString(
         when (errorCode) {
             "ERROR_INVALID_EMAIL" -> R.string.error_auth_invalid_email

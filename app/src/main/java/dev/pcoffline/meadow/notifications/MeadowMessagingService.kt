@@ -9,7 +9,7 @@ class MeadowMessagingService : FirebaseMessagingService() {
         if (message.data.isNotEmpty()) AppGraph.notifier.fromPush(message.data)
     }
 
-    override fun onNewToken(token: String) {
-        if (AppGraph.backendReady) AppGraph.sync.onNewToken(token)
+    override fun onRegistered(installationId: String) {
+        if (AppGraph.backendReady) AppGraph.sync.onPushRegistered(installationId)
     }
 }

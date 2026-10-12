@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.data
 
 import android.util.Log
+import com.google.firebase.firestore.snapshots
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.pcoffline.meadow.AppGraph
 import kotlinx.coroutines.CoroutineScope
@@ -8,6 +10,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -18,6 +21,9 @@ sealed interface ProfileState {
     data object Loading : ProfileState
     data object Missing : ProfileState
     data class Ready(val profile: UserProfile) : ProfileState
+
+    /** The server refused or failed to send the profile, so it can't be shown; [cause] says why. */
+    data class Unavailable(val cause: Throwable) : ProfileState
 }
 
 /**
@@ -35,9 +41,16 @@ class SyncManager(
 
     val currentProfile: UserProfile? get() = (profile.value as? ProfileState.Ready)?.profile
 
+    /** Bumped to listen again after the profile couldn't be loaded. */
+    private val attempt = MutableStateFlow(0)
+
+    fun retry() {
+        attempt.value++
+    }
+
     fun start() {
         scope.launch {
-            auth.uid.collectLatest { uid ->
+            combine(auth.uid, attempt) { uid, _ -> uid }.collectLatest { uid ->
                 if (uid == null) {
                     leaving = false
                     auth.finishCreatingProfile()
@@ -74,41 +87,51 @@ class SyncManager(
 
     private suspend fun syncProfile(uid: String) {
         _accountConfirmed.value = false
-        var tokenRegistered = false
+        var pushRegistered = false
         var appearanceSynced = false
         // The name card plus the owner-only account (who looks after whom, settings, status).
-        combine(backend.user(uid).observe(), backend.account(uid).observe()) { doc, accountDoc -> doc to accountDoc }.collect { (doc, accountDoc) ->
-            if (!doc.exists()) {
-                if (!doc.metadata.isFromCache && !leaving) _profile.value = ProfileState.Missing
-                return@collect
+        combine(backend.user(uid).snapshots(), backend.account(uid).snapshots()) { doc, accountDoc -> doc to accountDoc }
+            .catch { e ->
+                // Without this the app would wait forever. A profile already shown stays, so
+                // limits keep working; the cause is logged for whoever runs the backend.
+                Log.w(TAG, "Profile listener failed", e)
+                if (_profile.value !is ProfileState.Ready) {
+                    _profile.value = ProfileState.Unavailable(e)
+                    auth.finishCreatingProfile()
+                }
             }
-            val account = if (accountDoc.exists()) accountDoc.toAccount() else Account()
-            val profile = doc.toProfile(accountDoc)
-            store.setStrictMode(profile.strictMode)
-            store.setApproverCount(profile.approverIds.size)
-            store.setPrivacy(profile.privacy)
-            if (account.acceptedTermsVersion > store.acceptedTermsVersion) store.acceptedTermsVersion = account.acceptedTermsVersion
-            if (!accountDoc.metadata.isFromCache) _accountConfirmed.value = true
-            // Theme choices follow the person between phones; this phone's choice wins until synced once.
-            if (!appearanceSynced && accountDoc.exists() && !accountDoc.metadata.isFromCache) {
-                appearanceSynced = true
-                if (account.theme != null || account.darkMode != null) store.setAppearance(account.theme, account.darkMode)
+            .collect { (doc, accountDoc) ->
+                if (!doc.exists()) {
+                    if (!doc.metadata.isFromCache && !leaving) _profile.value = ProfileState.Missing
+                    return@collect
+                }
+                val account = if (accountDoc.exists()) accountDoc.toAccount() else Account()
+                val profile = doc.toProfile(accountDoc)
+                store.setStrictMode(profile.strictMode)
+                store.setApproverCount(profile.approverIds.size)
+                store.setPrivacy(profile.privacy)
+                if (account.acceptedTermsVersion > store.acceptedTermsVersion) store.acceptedTermsVersion = account.acceptedTermsVersion
+                if (!accountDoc.metadata.isFromCache) _accountConfirmed.value = true
+                // Theme choices follow the person between phones; this phone's choice wins until synced once.
+                if (!appearanceSynced && accountDoc.exists() && !accountDoc.metadata.isFromCache) {
+                    appearanceSynced = true
+                    if (account.theme != null || account.darkMode != null) store.setAppearance(account.theme, account.darkMode)
+                }
+                // An unreported offline unlock wins until the backend has recorded it.
+                if (store.pendingEmergency == null) {
+                    store.setEmergency(
+                        if (profile.emergencyUntilMillis > 0L) Emergency(profile.emergencyUntilMillis, profile.emergencyPackage) else null,
+                    )
+                }
+                _profile.value = ProfileState.Ready(profile)
+                auth.finishCreatingProfile()
+                // The account document must exist before the phone can be added to it.
+                if (!pushRegistered && !doc.metadata.isFromCache) {
+                    pushRegistered = true
+                    scope.launch { registerPush(uid) }
+                    scope.launch { runCatchingCancellable { AppGraph.emergency.flushPending() } }
+                }
             }
-            // An unreported offline unlock wins until the backend has recorded it.
-            if (store.pendingEmergency == null) {
-                store.setEmergency(
-                    if (profile.emergencyUntilMillis > 0L) Emergency(profile.emergencyUntilMillis, profile.emergencyPackage) else null,
-                )
-            }
-            _profile.value = ProfileState.Ready(profile)
-            auth.finishCreatingProfile()
-            // The account document must exist before the token can be added to it.
-            if (!tokenRegistered && !doc.metadata.isFromCache) {
-                tokenRegistered = true
-                scope.launch { registerPushToken(uid) }
-                scope.launch { runCatchingCancellable { AppGraph.emergency.flushPending() } }
-            }
-        }
     }
 
     private suspend fun syncLimits(uid: String) {
@@ -133,31 +156,37 @@ class SyncManager(
             }
     }
 
-    private suspend fun registerPushToken(uid: String) {
+    /** Registers this phone for pushes and records its installation ID on the account. */
+    private suspend fun registerPush(uid: String) {
         runCatchingCancellable {
-            val token = FirebaseMessaging.getInstance().token.await()
-            saveToken(uid, token)
-        }.onFailure { Log.w("MeadowSync", "Could not register push token", it) }
+            FirebaseMessaging.getInstance().register().await()
+            savePushId(uid, FirebaseInstallations.getInstance().id.await())
+        }.onFailure { Log.w(TAG, "Could not register for pushes", it) }
     }
 
-    fun onNewToken(token: String) {
+    /** FCM registered this phone again, e.g. after its installation ID changed. */
+    fun onPushRegistered(installationId: String) {
         val uid = backend.uid ?: return
-        scope.launch { runCatchingCancellable { saveToken(uid, token) } }
+        scope.launch { runCatchingCancellable { savePushId(uid, installationId) } }
     }
 
     /**
-     * Adds this phone's push token. Tokens of reinstalled or reset phones are never removed by
+     * Adds this phone's installation ID. IDs of reinstalled or reset phones are never removed by
      * them, so the list keeps only the newest few, or the backend would refuse new phones.
      */
-    private suspend fun saveToken(uid: String, token: String) {
+    private suspend fun savePushId(uid: String, installationId: String) {
         val account = backend.account(uid)
-        val current = account.get().await().stringList("fcmTokens")
-        if (token in current) return
-        account.update("fcmTokens", (current + token).takeLast(MAX_TOKENS)).awaitWrite()
+        val current = account.get().await().stringList(PUSH_IDS)
+        if (installationId in current) return
+        account.update(PUSH_IDS, (current + installationId).takeLast(MAX_PUSH_IDS)).awaitWrite()
     }
 
     private companion object {
+        const val TAG = "MeadowSync"
+
+        const val PUSH_IDS = "pushIds"
+
         /** Must stay within the limit in firestore.rules. */
-        const val MAX_TOKENS = 10
+        const val MAX_PUSH_IDS = 10
     }
 }

@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.data
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException.Code
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.friendlyMessage
@@ -50,5 +51,15 @@ class BackendErrorsTest {
         assertEquals(context.getString(R.string.error_offline), shown("", Code.UNAVAILABLE, unreachable = true))
         assertEquals(context.getString(R.string.error_offline), shown("", null, unreachable = true))
         assertEquals("That request is gone.", shown("That request is gone.", Code.NOT_FOUND))
+    }
+
+    @Test
+    fun `a garden that can't be read says why in plain words`() {
+        fun read(code: FirebaseFirestoreException.Code) =
+            FirebaseFirestoreException(code.name, code).friendlyMessage(context)
+        assertEquals(context.getString(R.string.error_server_refused), read(FirebaseFirestoreException.Code.PERMISSION_DENIED))
+        assertEquals(context.getString(R.string.error_server_missing), read(FirebaseFirestoreException.Code.NOT_FOUND))
+        assertEquals(context.getString(R.string.error_offline), read(FirebaseFirestoreException.Code.UNAVAILABLE))
+        assertEquals(context.getString(R.string.error_generic), read(FirebaseFirestoreException.Code.INTERNAL))
     }
 }
