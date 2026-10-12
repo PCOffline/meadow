@@ -15,7 +15,7 @@ patch of time. When it's used up, the app rests until tomorrow. Want more? Ask o
 friend who has to say yes is much harder to argue with.
 
 <p align="center">
-  <img src="docs/images/garden.gif" alt="The garden: flowers bloom for each app, a petal shower celebrates a good day" width="250">
+  <img src="docs/images/garden.webp" alt="The garden: flowers bloom for each app, a petal shower celebrates a good day" width="250">
   &nbsp;
   <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who said yes to 15 more minutes" width="250">
   &nbsp;
@@ -84,7 +84,7 @@ Built for TalkBack, large text and switch access: every control is labelled, tou
 large, and every theme meets WCAG AA contrast. All motion stops when you turn animations off.
 
 <p align="center">
-  <img src="docs/images/welcome.gif" alt="Meadow's welcome screens" width="250">
+  <img src="docs/images/welcome.webp" alt="Meadow's welcome screens" width="250">
 </p>
 
 ---

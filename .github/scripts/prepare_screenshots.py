@@ -2,10 +2,11 @@
 
 Usage: prepare_screenshots.py <raw dir> <docs/images dir>
 Screenshots become rounded, 540px-wide PNGs; the theme shots are joined into one strip; screen
-recordings become looping GIFs (needs ffmpeg).
+recordings become looping, full-colour animated WebPs (needs ffmpeg).
 """
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -34,12 +35,18 @@ def strip(images: list[Image.Image], gap: int = 28) -> Image.Image:
     return out
 
 
-def gif(video: Path, target: Path) -> None:
-    filters = (
-        "fps=15,scale=360:-1:flags=lanczos,split[a][b];"
-        "[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle"
+def animation(video: Path, target: Path, fps: int = 24) -> None:
+    """A screen recording as a full-colour, looping animated WebP with rounded corners."""
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video), "-vf", f"fps={fps}", f"{tmp}/%04d.png"],
+            check=True,
+        )
+        frames = [rounded(Image.open(p)) for p in sorted(Path(tmp).glob("*.png"))]
+    frames[0].save(
+        target, save_all=True, append_images=frames[1:], duration=round(1000 / fps), loop=0,
+        quality=82, method=6,
     )
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(video), "-vf", filters, "-loop", "0", str(target)], check=True)
 
 
 def main(raw: Path, out: Path) -> None:
@@ -52,7 +59,7 @@ def main(raw: Path, out: Path) -> None:
     if themes:
         strip(themes).save(out / "themes.png", optimize=True)
     for video in sorted(raw.glob("*.mp4")):
-        gif(video, out / f"{video.stem}.gif")
+        animation(video, out / f"{video.stem}.webp")
     print("\n".join(sorted(p.name for p in out.iterdir())))
 
 

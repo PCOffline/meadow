@@ -91,27 +91,27 @@ private val Seeds = mapOf(
         Color(0xFF8FB283),
     ),
     GardenTheme.BLOSSOM to Seed(
-        Color(0xFFB5577A), Color(0xFF7F8F5A), Color(0xFF8E6FB0), Color(0xFFFFF6F7),
+        Color(0xFFB5577A), Color(0xFF7F8F5A), Color(0xFF8E6FB0), Color(0xFFFCEBEE),
         listOf(Color(0xFFF4B6C8), Color(0xFFF9D3DF), Color(0xFFE8A0A6), Color(0xFFD7B6E0), Color(0xFFFFE1A8)),
         Color(0xFF9DB57E),
     ),
     GardenTheme.LAVENDER to Seed(
-        Color(0xFF7461A8), Color(0xFFB26B8A), Color(0xFF5E8C7A), Color(0xFFFAF7FD),
+        Color(0xFF7461A8), Color(0xFFB26B8A), Color(0xFF5E8C7A), Color(0xFFF2EEFA),
         listOf(Color(0xFFB4A7D6), Color(0xFFCFC2EC), Color(0xFF9C8AC9), Color(0xFFE8A0A6), Color(0xFFF2D58C)),
         Color(0xFF95AE8C),
     ),
     GardenTheme.SUNFLOWER to Seed(
-        Color(0xFFA8741A), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFFF9EC),
+        Color(0xFFA8741A), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFDF3D8),
         listOf(Color(0xFFF2C14E), Color(0xFFF6D77F), Color(0xFFE9A23B), Color(0xFFF2B48C), Color(0xFFE8A0A6)),
         Color(0xFF94B061),
     ),
     GardenTheme.POND to Seed(
-        Color(0xFF3F7F86), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFF5FAF8),
+        Color(0xFF3F7F86), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFE7F3F1),
         listOf(Color(0xFFF2B8C6), Color(0xFF9CC3D5), Color(0xFFB7DCD3), Color(0xFFE9D27A), Color(0xFFC7B6E6)),
         Color(0xFF7FB39E),
     ),
     GardenTheme.MUSHROOM to Seed(
-        Color(0xFFA4553F), Color(0xFF7A6A4F), Color(0xFF6F8B5E), Color(0xFFFAF5EE),
+        Color(0xFFA4553F), Color(0xFF7A6A4F), Color(0xFF6F8B5E), Color(0xFFF6EBE0),
         listOf(Color(0xFFD9735B), Color(0xFFF0C9A0), Color(0xFFE9B949), Color(0xFFC9A98B), Color(0xFFB4A7D6)),
         Color(0xFF8DA36F),
     ),
@@ -141,6 +141,9 @@ internal fun readable(color: Color, backgrounds: List<Color>, min: Float = 4.5f)
 internal fun colorSchemeFor(theme: GardenTheme, dark: Boolean): androidx.compose.material3.ColorScheme =
     Seeds.getValue(theme).let { if (dark) darkScheme(it) else lightScheme(it) }
 
+/** Every surface is the theme's background, shaded towards its primary colour. */
+private fun lightSurfaces(s: Seed) = listOf(0.04f, 0.07f, 0.10f, 0.14f).map { lerp(s.background, s.primary, it) }
+
 private fun lightScheme(s: Seed) = lightColorScheme(
     // Seeds are picked for charm; text and buttons are nudged darker where needed to stay readable.
     primary = readable(s.primary, listOf(Color.White, s.background)),
@@ -159,15 +162,15 @@ private fun lightScheme(s: Seed) = lightColorScheme(
     onBackground = lerp(Ink, s.primary, 0.08f),
     surface = s.background,
     onSurface = lerp(Ink, s.primary, 0.08f),
-    surfaceVariant = lerp(s.background, Color(0xFFB0A28A), 0.16f),
-    onSurfaceVariant = lerp(Color(0xFF6F675A), s.primary, 0.15f),
-    surfaceContainerLowest = Color.White,
-    surfaceContainerLow = lerp(s.background, Color.White, 0.6f),
-    surfaceContainer = lerp(s.background, Color(0xFFE0D6C4), 0.25f),
-    surfaceContainerHigh = lerp(s.background, Color(0xFFE0D6C4), 0.4f),
-    surfaceContainerHighest = lerp(s.background, Color(0xFFE0D6C4), 0.55f),
-    outline = lerp(Color(0xFFB8AE9C), s.primary, 0.15f),
-    outlineVariant = lerp(Color(0xFFDDD3C1), s.primary, 0.1f),
+    surfaceVariant = lerp(s.background, s.primary, 0.12f),
+    onSurfaceVariant = readable(lerp(Color(0xFF6F675A), s.primary, 0.15f), listOf(s.background, lerp(s.background, s.primary, 0.14f))),
+    surfaceContainerLowest = lerp(s.background, Color.White, 0.7f),
+    surfaceContainerLow = lightSurfaces(s)[0],
+    surfaceContainer = lightSurfaces(s)[1],
+    surfaceContainerHigh = lightSurfaces(s)[2],
+    surfaceContainerHighest = lightSurfaces(s)[3],
+    outline = lerp(Color(0xFFB8AE9C), s.primary, 0.35f),
+    outlineVariant = lerp(s.background, s.primary, 0.22f),
     error = readable(Color(0xFFC0634A), listOf(Color.White, s.background)),
     onError = Color.White,
     errorContainer = Color(0xFFF7DCD3),
@@ -175,7 +178,7 @@ private fun lightScheme(s: Seed) = lightColorScheme(
 )
 
 private fun darkScheme(s: Seed): androidx.compose.material3.ColorScheme {
-    val night = lerp(Color(0xFF1A1D1B), s.primary, 0.08f)
+    val night = lerp(Color(0xFF1A1D1B), s.primary, 0.14f)
     return darkColorScheme(
         primary = lerp(s.primary, Color.White, 0.45f),
         onPrimary = lerp(s.primary, Color.Black, 0.65f),
@@ -193,15 +196,15 @@ private fun darkScheme(s: Seed): androidx.compose.material3.ColorScheme {
         onBackground = NightInk,
         surface = night,
         onSurface = NightInk,
-        surfaceVariant = lerp(night, Color.White, 0.14f),
+        surfaceVariant = lerp(lerp(night, s.primary, 0.2f), Color.White, 0.1f),
         onSurfaceVariant = Color(0xFFC3BBAC),
         surfaceContainerLowest = lerp(night, Color.Black, 0.3f),
-        surfaceContainerLow = lerp(night, Color.White, 0.03f),
-        surfaceContainer = lerp(night, Color.White, 0.05f),
-        surfaceContainerHigh = lerp(night, Color.White, 0.08f),
-        surfaceContainerHighest = lerp(night, Color.White, 0.11f),
-        outline = Color(0xFF8B8578),
-        outlineVariant = lerp(night, Color.White, 0.2f),
+        surfaceContainerLow = lerp(lerp(night, s.primary, 0.06f), Color.White, 0.03f),
+        surfaceContainer = lerp(lerp(night, s.primary, 0.08f), Color.White, 0.05f),
+        surfaceContainerHigh = lerp(lerp(night, s.primary, 0.10f), Color.White, 0.08f),
+        surfaceContainerHighest = lerp(lerp(night, s.primary, 0.12f), Color.White, 0.11f),
+        outline = lerp(Color(0xFF8B8578), s.primary, 0.3f),
+        outlineVariant = lerp(night, lerp(s.primary, Color.White, 0.4f), 0.22f),
         error = Color(0xFFF0A08B),
         onError = Color(0xFF4D1A0E),
         errorContainer = Color(0xFF6E3324),
@@ -211,7 +214,7 @@ private fun darkScheme(s: Seed): androidx.compose.material3.ColorScheme {
 
 private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
     val p = if (dark) s.petals.map { lerp(it, Color.White, 0.08f) } else s.petals
-    val background = if (dark) lerp(Color(0xFF1A1D1B), s.primary, 0.08f) else s.background
+    val background = if (dark) lerp(Color(0xFF1A1D1B), s.primary, 0.14f) else s.background
     return GardenColors(
         petalPink = p[0],
         petalLavender = p[1],
@@ -224,7 +227,7 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         soil = if (dark) Color(0xFF6B5B47) else Color(0xFFB9A285),
         sky = if (dark) lerp(background, Color.White, 0.04f) else lerp(background, Color(0xFFE6DCC8), 0.3f),
         wilted = if (dark) Color(0xFF7D7363) else Color(0xFFC2B49A),
-        cardTint = if (dark) lerp(background, Color.White, 0.06f) else lerp(background, Color.White, 0.6f),
+        cardTint = if (dark) lerp(lerp(background, s.primary, 0.08f), Color.White, 0.06f) else lerp(background, Color.White, 0.5f),
     )
 }
 

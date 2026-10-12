@@ -125,12 +125,19 @@ fun rememberSkyMood(): SkyMood {
         else -> R.string.greeting_night
     }
     val ink = Color(0xFF3E3A32)
-    return when {
+    val base = when {
         dark || hour !in 5..20 -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
         hour <= 10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
         hour <= 16 -> SkyMood(Color(0xFFD9ECF2), Color(0xFFF8F4E8), false, ink, greeting)
         else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
     }
+    // The sky takes on the theme's colour and fades into the page below it.
+    val scheme = MaterialTheme.colorScheme
+    return base.copy(
+        top = androidx.compose.ui.graphics.lerp(base.top, scheme.primary, if (base.night) 0.10f else 0.14f),
+        // A night sky over a light page keeps its own colours, so its light text stays readable.
+        bottom = if (base.night && !dark) base.bottom else androidx.compose.ui.graphics.lerp(base.bottom, scheme.background, 0.6f),
+    )
 }
 
 /**
