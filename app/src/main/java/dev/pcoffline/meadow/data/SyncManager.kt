@@ -41,6 +41,7 @@ class SyncManager(
             auth.uid.collectLatest { uid ->
                 if (uid == null) {
                     leaving = false
+                    auth.finishCreatingProfile()
                     _profile.value = ProfileState.SignedOut
                     return@collectLatest
                 }
@@ -101,6 +102,7 @@ class SyncManager(
                 )
             }
             _profile.value = ProfileState.Ready(profile)
+            auth.finishCreatingProfile()
             // The account document must exist before the token can be added to it.
             if (!tokenRegistered && !doc.metadata.isFromCache) {
                 tokenRegistered = true

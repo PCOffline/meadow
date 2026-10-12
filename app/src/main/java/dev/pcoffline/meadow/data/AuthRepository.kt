@@ -23,8 +23,16 @@ class AuthRepository(private val backend: Backend) {
 
     private val _creatingProfile = MutableStateFlow(false)
 
-    /** True while a new garden is being set up, so onboarding stays on screen until it's ready. */
+    /**
+     * True from planting a new garden until its profile has loaded (or after a failed try), so
+     * onboarding stays on screen, with any error, instead of flashing other screens.
+     */
     val creatingProfile: StateFlow<Boolean> = _creatingProfile.asStateFlow()
+
+    /** Called once the new profile has loaded, or on signing out. */
+    fun finishCreatingProfile() {
+        _creatingProfile.value = false
+    }
 
     val uid: Flow<String?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener {
@@ -47,12 +55,8 @@ class AuthRepository(private val backend: Backend) {
     suspend fun startWithoutEmail(displayName: String, flower: String, termsVersion: Int) {
         if (displayName.isBlank()) throw FriendlyException(R.string.error_name_required)
         _creatingProfile.value = true
-        try {
-            if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
-            createProfile(displayName, flower, termsVersion)
-        } finally {
-            _creatingProfile.value = false
-        }
+        if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
+        createProfile(displayName, flower, termsVersion)
     }
 
     /**
