@@ -1,6 +1,6 @@
 # Privacy notice
 
-Version 1 · 12 October 2026
+Version 2 · 12 October 2026
 
 Meadow helps you keep the app time limits you choose, with the help of friends you trust (your Bumblebees). This notice explains what Meadow collects, why, who can see it, and the choices you have. We've tried to keep it short and plain.
 
@@ -19,7 +19,7 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 | What | Why |
 |---|---|
 | Your name, picture (emoji or photo), short bio and friend code | So your Bumblebees know who you are |
-| Your email address, if you add one | To sign you in and recover your garden |
+| Your email address, if you add one, and how you sign in (password, emailed link or Google) | To sign you in and recover your garden |
 | Your limits (app name and minutes) | So they can't be loosened without a Bumblebee's yes |
 | Requests for extra time, answers, and chat messages | So you and your Bumblebees can talk and decide |
 | Today's screen time summary (top apps and minutes) | So your Bumblebees can see how you're doing. **Optional** |
@@ -38,6 +38,8 @@ We don't sell your data, show ads, or use analytics or tracking tools.
 ## Where your data is kept
 
 Meadow uses Google Firebase (Authentication, Cloud Firestore, Cloud Functions, Cloud Storage, Cloud Messaging and Hosting) to store and move your data. Google processes it on our behalf and may store it in the United States. Data is encrypted in transit, and security rules only let the right people read it.
+
+If you sign in with Google, Google shares your email address and an account identifier with Meadow, and knows that you signed in to Meadow. Meadow doesn't use your Google name or photo. If you ask for a sign-in link, Firebase emails it to you.
 
 When Meadow checks for updates, your phone asks GitHub for the latest release. GitHub sees your IP address, as with any website. You can turn automatic checks off.
 

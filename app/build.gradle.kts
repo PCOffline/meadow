@@ -49,6 +49,8 @@ android {
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
         buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/meadow"}\"")
         manifestPlaceholders["inviteHost"] = inviteHost
+        // Passwordless sign-in links arrive on the same Hosting domain as invite links.
+        buildConfigField("String", "LINK_HOST", "\"$inviteHost\"")
     }
 
     signingConfigs {
@@ -144,6 +146,9 @@ dependencies {
     implementation(libs.firebase.functions)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)
 

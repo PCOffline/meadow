@@ -55,6 +55,10 @@
     <string name="error_auth_too_many">Too many tries. Take a short break and try again.</string>
     <string name="error_auth_recent_login">For your safety, please sign in again first.</string>
     <string name="error_sign_in_first">Please sign in first.</string>
+    <string name="error_auth_other_method">That email already has a garden with another way to sign in. Sign in that way first.</string>
+    <string name="error_link_invalid">That sign-in link has expired or was already used. Ask for a new one.</string>
+    <string name="error_google_unavailable">Google sign-in isn\'t set up for this copy of Meadow yet.</string>
+    <string name="error_google_no_account">There\'s no Google account on this phone. Add one in Android settings, or use your email.</string>
     <string name="error_name_required">Please choose a name.</string>
     <string name="error_email_required">Enter your email first.</string>
     <string name="error_set_a_limit">Set a daily or weekly limit.</string>

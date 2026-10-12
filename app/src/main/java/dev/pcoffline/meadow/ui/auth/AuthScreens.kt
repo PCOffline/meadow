@@ -52,6 +52,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import dev.pcoffline.meadow.data.GoogleSignIn
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -303,10 +311,6 @@ private fun BigFlower(flower: String) {
 
 @Composable
 private fun SignInStep(onBack: () -> Unit) {
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
-    val action = rememberAction()
-    val resetSent = stringResource(R.string.sign_in_reset_sent)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -318,61 +322,154 @@ private fun SignInStep(onBack: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        EmailFields(email, { email = it }, password, { password = it })
-        ErrorNote(action.error)
-        Button(
-            onClick = { action.run { AppGraph.auth.signIn(email, password) } },
-            enabled = !action.busy && email.isNotBlank() && password.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(54.dp),
-        ) { Text(stringResource(if (action.busy) R.string.sign_in_busy else R.string.sign_in_button)) }
-        TextButton(
-            onClick = {
-                action.run(successMessage = resetSent) { AppGraph.auth.sendPasswordReset(email) }
-            },
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) { Text(stringResource(R.string.sign_in_forgot)) }
+        SignInOptions(
+            passwordButton = R.string.sign_in_button,
+            linkSent = R.string.auth_email_link_sent,
+            offerPasswordReset = true,
+            onPassword = { email, password -> AppGraph.auth.signIn(email, password) },
+        )
     }
 }
 
+/**
+ * The ways into a garden: Google, a link emailed to you (no password), or a password. Used to
+ * sign in, and to keep a garden started without an email: then they attach to that garden.
+ */
 @Composable
-private fun EmailFields(email: String, onEmail: (String) -> Unit, password: String, onPassword: (String) -> Unit) {
-    OutlinedTextField(
-        value = email, onValueChange = onEmail,
-        label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
-        shape = RoundedCornerShape(18.dp),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        modifier = Modifier.fillMaxWidth(),
-    )
-    OutlinedTextField(
-        value = password, onValueChange = onPassword,
-        label = { Text(stringResource(R.string.field_password)) }, singleLine = true,
-        shape = RoundedCornerShape(18.dp),
-        visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-/** Adds an email to a garden started without one. */
-@Composable
-fun SecureAccountCard(@StringRes reason: Int, modifier: Modifier = Modifier) {
+private fun SignInOptions(
+    @StringRes passwordButton: Int,
+    @StringRes linkSent: Int,
+    offerPasswordReset: Boolean,
+    onPassword: suspend (email: String, password: String) -> Unit,
+) {
+    val context = LocalContext.current
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var usePassword by rememberSaveable { mutableStateOf(false) }
+    var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
     val action = rememberAction()
-    val saved = stringResource(R.string.secure_done)
-    MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
-        Text(stringResource(R.string.secure_title), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(reason), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            EmailFields(email, { email = it }, password, { password = it })
+    val resetSent = stringResource(R.string.sign_in_reset_sent)
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedButton(
+            onClick = { action.run { AppGraph.auth.continueWithGoogle(GoogleSignIn.idToken(context)) } },
+            enabled = !action.busy,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) {
+            Image(painterResource(R.drawable.ic_google), contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(stringResource(R.string.auth_google))
         }
-        ErrorNote(action.error, Modifier.padding(top = 8.dp))
-        Button(
-            onClick = { action.run(successMessage = saved) { AppGraph.auth.addEmail(email, password) } },
-            enabled = !action.busy && email.isNotBlank() && password.length >= 6,
-            modifier = Modifier.padding(top = 8.dp),
-        ) { Text(stringResource(if (action.busy) R.string.secure_busy else R.string.secure_button)) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HorizontalDivider(Modifier.weight(1f))
+            Text(
+                stringResource(R.string.auth_or),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            HorizontalDivider(Modifier.weight(1f))
+        }
+        OutlinedTextField(
+            value = email, onValueChange = { email = it; sentTo = null },
+            label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
+            shape = RoundedCornerShape(18.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (usePassword) {
+            OutlinedTextField(
+                value = password, onValueChange = { password = it },
+                label = { Text(stringResource(R.string.field_password)) }, singleLine = true,
+                shape = RoundedCornerShape(18.dp),
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        ErrorNote(action.error)
+        sentTo?.let {
+            Text(stringResource(linkSent, it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+        }
+        if (usePassword) {
+            Button(
+                onClick = { action.run { onPassword(email, password) } },
+                enabled = !action.busy && email.isNotBlank() && password.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text(stringResource(if (action.busy) R.string.sign_in_busy else passwordButton)) }
+            if (offerPasswordReset) {
+                TextButton(onClick = { action.run(successMessage = resetSent) { AppGraph.auth.sendPasswordReset(email) } }) {
+                    Text(stringResource(R.string.sign_in_forgot))
+                }
+            }
+            TextButton(onClick = { usePassword = false }) { Text(stringResource(R.string.auth_link_instead)) }
+        } else {
+            Button(
+                onClick = { action.run(onSuccess = { sentTo = email.trim() }) { AppGraph.auth.sendSignInLink(email) } },
+                enabled = !action.busy && email.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text(stringResource(R.string.auth_email_link)) }
+            TextButton(onClick = { usePassword = true }) { Text(stringResource(R.string.auth_password_instead)) }
+        }
     }
+}
+
+/** Keeps a garden started without an email: attaches Google, an email link or a password to it. */
+@Composable
+fun SecureAccountCard(@StringRes reason: Int, modifier: Modifier = Modifier) {
+    MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
+        Text(stringResource(R.string.secure_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.asHeading())
+        Text(stringResource(reason), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+        SignInOptions(
+            passwordButton = R.string.secure_button,
+            linkSent = R.string.secure_link_sent,
+            offerPasswordReset = false,
+            onPassword = { email, password -> AppGraph.auth.addEmail(email, password) },
+        )
+    }
+}
+
+/** Finishes signing in from an emailed link, asking which address it went to if this phone doesn't know. */
+@Composable
+fun EmailLinkDialog(link: String) {
+    val known = remember { AppGraph.auth.linkEmail }
+    var email by rememberSaveable { mutableStateOf(known.orEmpty()) }
+    val action = rememberAction()
+    val done = stringResource(R.string.link_done)
+    LaunchedEffect(link) {
+        if (known != null) action.run(successMessage = done) { AppGraph.auth.finishSignInLink(link, known) }
+    }
+    AlertDialog(
+        onDismissRequest = { if (!action.busy) AppGraph.auth.dismissLink() },
+        title = { Text(stringResource(R.string.link_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (known == null) {
+                    Text(stringResource(R.string.link_ask_email))
+                    OutlinedTextField(
+                        value = email, onValueChange = { email = it },
+                        label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (action.busy) {
+                    Text(stringResource(R.string.link_busy))
+                }
+                ErrorNote(action.error)
+            }
+        },
+        confirmButton = {
+            if (known == null || action.error != null) {
+                TextButton(
+                    onClick = { action.run(successMessage = done) { AppGraph.auth.finishSignInLink(link, email) } },
+                    enabled = !action.busy && email.isNotBlank(),
+                ) { Text(stringResource(R.string.link_continue)) }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { AppGraph.auth.dismissLink() }, enabled = !action.busy) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }
 
 @Composable

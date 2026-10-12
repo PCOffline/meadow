@@ -1,6 +1,6 @@
 # Terms of use
 
-Version 1 · 12 October 2026
+Version 2 · 12 October 2026
 
 By using Meadow you agree to these terms. Please read them together with the privacy notice.
 

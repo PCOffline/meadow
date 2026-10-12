@@ -47,7 +47,7 @@ enum class LegalDoc(val asset: String, @StringRes val title: Int) {
 
     companion object {
         /** Bump when the privacy notice or terms change in a way people must accept again. */
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2
 
         fun fromName(name: String) = entries.firstOrNull { it.name == name } ?: PRIVACY
     }

@@ -73,7 +73,8 @@ words about yourself.
 </p>
 
 ### Private by default
-No email needed to start. You choose whether your Bumblebees see today's screen time. Your
+No email needed to start; later you can keep your garden safe with Google, a sign-in link emailed
+to you, or a password. You choose whether your Bumblebees see today's screen time. Your
 detailed history never leaves your phone. Who looks after whom is your own business: only the
 person affected is told when you add or remove a Bumblebee. Download everything Meadow holds about
 you, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
@@ -114,18 +115,26 @@ billing account. Expect $0 a month, or a few cents for stored function images.
 2. In the left menu open **⚙ → Usage and billing → Details & settings** and switch to the
    **Blaze** plan. Then, in Google Cloud's **Billing → Budgets & alerts**, add a small budget
    (for example $1) so you hear about any surprise.
-3. **Build → Authentication → Get started.** Under *Sign-in method*, enable **Email/Password** and
-   **Anonymous**.
+3. **Build → Authentication → Get started.** Under *Sign-in method*, add these providers:
+   - **Email/Password**, and inside it also turn on **Email link (passwordless sign-in)**.
+   - **Google**: choose a support email address, then save.
+   - **Anonymous**, so people can start without an account.
+
+   Under *Settings → Authorized domains*, check that `<project-id>.web.app` is listed (it is by
+   default). Sign-in links are delivered through it.
 4. **Build → Firestore Database → Create database.** Pick a location close to your friends (it
    can't be changed later) and start in **production mode**.
 5. **Build → Storage → Get started.** Production mode, same location.
 
 ### 2. Connect the Android app
 1. In **⚙ Project settings → General → Your apps**, choose the **Android** icon.
-2. Package name: `dev.pcoffline.meadow`. Add your signing certificate's **SHA-1** too: run
-   `./gradlew signingReport` and copy the SHA-1 of the key you build with (debug for testing,
-   your release key for releases).
-3. Download **google-services.json** and put it in the `app/` folder.
+2. Package name: `dev.pcoffline.meadow`. Add your signing certificates' **SHA-1** fingerprints:
+   run `./gradlew signingReport` and add the SHA-1 of every key you build with (debug for
+   testing, your release key for releases). **Sign in with Google only works for keys listed
+   here.** You can add more later under *Your apps → Add fingerprint*.
+3. Download **google-services.json** and put it in the `app/` folder. Download it again whenever
+   you add a fingerprint or enable Google sign-in: it carries the OAuth client that Google
+   sign-in needs.
 4. The console then shows how to add the Google services Gradle plugin and the Firebase BoM.
    Meadow already has both (see `gradle/libs.versions.toml`), so choose **Next** through those
    steps. It deliberately leaves out `firebase-analytics`: Meadow doesn't collect analytics.
@@ -151,11 +160,12 @@ firebase deploy --only firestore,functions,storage,hosting
 The first deploy turns on the Cloud APIs it needs, which can take a few minutes. If it asks about
 a cleanup policy for function images, say yes.
 
-### 4. Make invite links open the app
-Invite links look like `https://<project-id>.web.app/i/…`. For Android to open them straight in
-Meadow, put your release key's **SHA-256** (from `./gradlew signingReport`) into
-`backend/hosting/.well-known/assetlinks.json` and deploy hosting again. Without it, links still
-work through the web page's *Open in Meadow* button.
+### 4. Make invite and sign-in links open the app
+Invite links (`https://<project-id>.web.app/i/…`) and passwordless sign-in links
+(`https://<project-id>.web.app/__/auth/links…`) open straight in Meadow once Android trusts your
+domain. Put your signing keys' **SHA-256** fingerprints (from `./gradlew signingReport`) into
+`backend/hosting/.well-known/assetlinks.json` and deploy hosting again. Without it, invite links
+still work through the web page's *Open in Meadow* button, but sign-in links open in the browser.
 
 ### 5. Build
 ```bash

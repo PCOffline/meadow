@@ -17,16 +17,28 @@
     <string name="onboarding_no_email">No email needed to start. You\'ll add one before inviting your first Bumblebee, so your garden can\'t get lost.</string>
 
     <string name="sign_in_title">Welcome back 🌼</string>
-    <string name="sign_in_body">Sign in with the email you added to your garden.</string>
+    <string name="sign_in_body">Sign in the way you set up your garden.</string>
     <string name="sign_in_button">Sign in</string>
     <string name="sign_in_busy">Signing in…</string>
     <string name="sign_in_forgot">Forgot your password?</string>
     <string name="sign_in_reset_sent">Check your inbox for a reset link 💌</string>
+    <string name="auth_google">Continue with Google</string>
+    <string name="auth_or">or</string>
+    <string name="auth_email_link">Email me a sign-in link</string>
+    <string name="auth_email_link_sent">Check your inbox at %1$s and tap the link to sign in 💌</string>
+    <string name="auth_password_instead">Use a password instead</string>
+    <string name="auth_link_instead">Use a sign-in link instead</string>
+    <string name="link_title">Signing you in</string>
+    <string name="link_ask_email">Which email address did you ask for this link with?</string>
+    <string name="link_continue">Sign in</string>
+    <string name="link_busy">Signing you in…</string>
+    <string name="link_done">You\'re signed in 🌼</string>
     <string name="field_email">Email</string>
     <string name="field_password">Password</string>
 
     <string name="secure_title">Keep your garden safe 🔐</string>
-    <string name="secure_button">Add email</string>
+    <string name="secure_button">Add email and password</string>
+    <string name="secure_link_sent">Check your inbox at %1$s and tap the link to keep your garden safe 💌</string>
     <string name="secure_busy">Saving…</string>
     <string name="secure_done">Your garden is safe 🌿</string>
 

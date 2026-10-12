@@ -23,6 +23,7 @@ import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -56,6 +57,40 @@ class OtherScreensTest : ScreenTest() {
         node(R.string.legal_terms).performScrollTo().performClick()
         // The link stays underneath; the dialog adds its title and the document's own heading.
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.legal_terms)).fetchSemanticsNodes().size >= 3 }
+    }
+
+    @Test
+    fun `returning gardeners can use Google, an emailed link, or a password`() {
+        show { AuthScreen() }
+        node(R.string.intro_have_garden).performClick()
+        node(R.string.auth_google).assertIsEnabled()
+        val link = node(R.string.auth_email_link)
+        link.assertIsNotEnabled()
+        compose.onNode(hasSetTextAction() and hasText(text(R.string.field_email))).performTextInput("robin@example.com")
+        link.assertIsEnabled()
+        assertAccessible()
+
+        node(R.string.auth_password_instead).performClick()
+        val signIn = node(R.string.sign_in_button)
+        signIn.assertIsNotEnabled()
+        compose.onNode(hasSetTextAction() and hasText(text(R.string.field_password))).performTextInput("petals")
+        signIn.assertIsEnabled()
+        node(R.string.sign_in_forgot).assertExists()
+        node(R.string.auth_link_instead).performClick()
+        node(R.string.auth_email_link).assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a garden without an email can be kept with Google, a link or a password`() {
+        show { dev.pcoffline.meadow.ui.auth.SecureAccountCard(R.string.settings_secure_reason) }
+        node(R.string.secure_title).assertExists()
+        node(R.string.auth_google).assertExists()
+        node(R.string.auth_email_link).assertExists()
+        node(R.string.auth_password_instead).performClick()
+        node(R.string.secure_button).assertExists()
+        assertTrue(compose.onAllNodesWithText(text(R.string.sign_in_forgot)).fetchSemanticsNodes().isEmpty())
+        assertAccessible(requireHeading = true)
     }
 
     @Test

@@ -78,6 +78,11 @@ class LocalStore(context: Context) {
         _privacy.value = privacy
     }
 
+    /** The address a sign-in link was last sent to from this phone, to finish signing in with it. */
+    var pendingLinkEmail: String?
+        get() = prefs.getString(KEY_LINK_EMAIL, null)
+        set(value) = prefs.edit().putString(KEY_LINK_EMAIL, value).apply()
+
     /** The last release version a notification was shown for, so each one is offered once. */
     var notifiedUpdate: String?
         get() = prefs.getString(KEY_NOTIFIED_UPDATE, null)
@@ -197,5 +202,6 @@ class LocalStore(context: Context) {
         const val KEY_SHARE_PROTECTION = "share_protection"
         const val KEY_TERMS = "accepted_terms_version"
         const val KEY_NOTIFIED_UPDATE = "notified_update"
+        const val KEY_LINK_EMAIL = "link_email"
     }
 }

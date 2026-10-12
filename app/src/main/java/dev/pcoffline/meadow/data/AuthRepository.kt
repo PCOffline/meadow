@@ -1,6 +1,11 @@
 package dev.pcoffline.meadow.data
 
+import com.google.firebase.auth.ActionCodeSettings
+import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.GoogleAuthProvider
+import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -14,7 +19,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 
-class AuthRepository(private val backend: Backend) {
+class AuthRepository(private val backend: Backend, private val store: LocalStore) {
 
     private val _anonymous = MutableStateFlow(false)
 
@@ -71,6 +76,65 @@ class AuthRepository(private val backend: Backend) {
         _anonymous.value = false
     }
 
+    /**
+     * Signs in with a Google ID token. A garden started without an email keeps everything:
+     * the Google account is attached to it instead of starting a new one.
+     */
+    suspend fun continueWithGoogle(idToken: String) {
+        signInOrAttach(GoogleAuthProvider.getCredential(idToken, null))
+    }
+
+    /** Emails a one-time sign-in link: no password needed. */
+    suspend fun sendSignInLink(email: String) {
+        val address = email.trim()
+        if (address.isBlank()) throw FriendlyException(R.string.error_email_required)
+        val settings = ActionCodeSettings.newBuilder()
+            .setUrl("https://${BuildConfig.LINK_HOST}/signed-in")
+            .setHandleCodeInApp(true)
+            .setAndroidPackageName(BuildConfig.APPLICATION_ID, false, null)
+            .setLinkDomain(BuildConfig.LINK_HOST)
+            .build()
+        backend.auth.sendSignInLinkToEmail(address, settings).await()
+        store.pendingLinkEmail = address
+    }
+
+    private val _incomingLink = MutableStateFlow<String?>(null)
+
+    /** A sign-in link that opened the app, waiting to be used. */
+    val incomingLink: StateFlow<String?> = _incomingLink.asStateFlow()
+
+    /** Returns true if [link] is a sign-in link, which is then kept until it's used or dismissed. */
+    fun receiveLink(link: String): Boolean {
+        if (!backend.auth.isSignInWithEmailLink(link)) return false
+        _incomingLink.value = link
+        return true
+    }
+
+    fun dismissLink() {
+        _incomingLink.value = null
+    }
+
+    /** The email a link was sent to from this phone, if any. */
+    val linkEmail: String? get() = store.pendingLinkEmail
+
+    /** Uses a sign-in link. [email] must be the address it was sent to. */
+    suspend fun finishSignInLink(link: String, email: String) {
+        signInOrAttach(EmailAuthProvider.getCredentialWithLink(email.trim(), link))
+        store.pendingLinkEmail = null
+        _incomingLink.value = null
+    }
+
+    private suspend fun signInOrAttach(credential: AuthCredential) {
+        val user = backend.auth.currentUser
+        if (user != null && user.isAnonymous) {
+            user.linkWithCredential(credential).await()
+            user.reload().await()
+            _anonymous.value = false
+        } else {
+            backend.auth.signInWithCredential(credential).await()
+        }
+    }
+
     suspend fun sendPasswordReset(email: String) {
         if (email.isBlank()) throw FriendlyException(R.string.error_email_required)
         backend.auth.sendPasswordResetEmail(email.trim()).await()
@@ -94,5 +158,7 @@ class AuthRepository(private val backend: Backend) {
             }
         }
         backend.auth.signOut()
+        // Forget the Google account choice too, so the next sign-in can pick another.
+        runCatchingCancellable { GoogleSignIn.forget(AppGraph.app) }
     }
 }

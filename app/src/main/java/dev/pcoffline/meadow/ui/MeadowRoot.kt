@@ -62,6 +62,7 @@ import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.AuthScreen
+import dev.pcoffline.meadow.ui.auth.EmailLinkDialog
 import dev.pcoffline.meadow.ui.auth.ProfileSetupScreen
 import dev.pcoffline.meadow.ui.chat.ChatListScreen
 import dev.pcoffline.meadow.ui.chat.ChatScreen
@@ -113,6 +114,8 @@ fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
     val creating by AppGraph.auth.creatingProfile.collectAsStateWithLifecycle()
     val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
     val s = state
+    val signInLink by AppGraph.auth.incomingLink.collectAsStateWithLifecycle()
+    signInLink?.let { EmailLinkDialog(it) }
     // Onboarding stays put while a new garden is planted, and after a failed try (so its error
     // shows), instead of flashing the "Almost there" screen meant for accounts with an email.
     val onboarding = s == ProfileState.SignedOut || creating || (s == ProfileState.Missing && anonymous)

@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
 import dev.pcoffline.meadow.AppGraph
@@ -52,6 +54,8 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
                 }
             } catch (e: CancellationException) {
                 throw e
+            } catch (_: GetCredentialCancellationException) {
+                // Closing Google's account picker isn't an error.
             } catch (e: Exception) {
                 Log.w("Meadow", "Action failed", e)
                 error = e.friendlyMessage(context)
@@ -88,6 +92,7 @@ fun Throwable.friendlyMessage(context: Context): String = when (this) {
         else -> context.getString(R.string.error_generic)
     }
     is FirebaseNetworkException -> context.getString(R.string.error_offline)
+    is NoCredentialException -> context.getString(R.string.error_google_no_account)
     is FirebaseAuthException -> context.getString(
         when (errorCode) {
             "ERROR_INVALID_EMAIL" -> R.string.error_auth_invalid_email
@@ -96,6 +101,8 @@ fun Throwable.friendlyMessage(context: Context): String = when (this) {
             "ERROR_WEAK_PASSWORD" -> R.string.error_auth_weak_password
             "ERROR_TOO_MANY_REQUESTS" -> R.string.error_auth_too_many
             "ERROR_REQUIRES_RECENT_LOGIN" -> R.string.error_auth_recent_login
+            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" -> R.string.error_auth_other_method
+            "ERROR_INVALID_ACTION_CODE", "ERROR_EXPIRED_ACTION_CODE" -> R.string.error_link_invalid
             else -> R.string.error_generic
         },
     )

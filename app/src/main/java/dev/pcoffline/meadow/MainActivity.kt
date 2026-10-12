@@ -33,8 +33,11 @@ class MainActivity : ComponentActivity() {
     private fun handle(intent: Intent?) {
         intent ?: return
         intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRoute.value = it }
+        val data = intent.data ?: return
+        // Passwordless sign-in links finish in a dialog over whatever screen is showing.
+        if (AppGraph.backendReady && AppGraph.auth.receiveLink(data.toString())) return
         // Invite links: kept in storage so they survive onboarding for people new to Meadow.
-        InviteLinks.tokenFrom(intent.data)?.let { AppGraph.store.setPendingInvite(it) }
+        InviteLinks.tokenFrom(data)?.let { AppGraph.store.setPendingInvite(it) }
     }
 
     companion object {

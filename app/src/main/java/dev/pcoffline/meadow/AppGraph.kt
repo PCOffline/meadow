@@ -42,7 +42,7 @@ object AppGraph {
 
     val store by lazy { LocalStore(app) }
     val backend by lazy { Backend() }
-    val auth by lazy { AuthRepository(backend) }
+    val auth by lazy { AuthRepository(backend, store) }
     val sync by lazy { SyncManager(backend, auth, store, scope) }
     val requests by lazy { RequestRepository(backend) }
     val limits by lazy { LimitsRepository(backend, store, requests) }

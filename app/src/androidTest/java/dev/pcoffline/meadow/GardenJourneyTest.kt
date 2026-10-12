@@ -25,6 +25,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.auth.FirebaseAuth
 import dev.pcoffline.meadow.a11y.assertAccessible
+import dev.pcoffline.meadow.ui.legal.LegalDoc
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -117,7 +118,7 @@ class GardenJourneyTest {
             waitFor(R.string.setup_later)
             val uid = FirebaseAuth.getInstance().currentUser!!.uid
             val account = backendDoc("users/$uid/private/account")!!
-            assertEquals("1", account.getJSONObject("acceptedTerms").getJSONObject("mapValue").getJSONObject("fields").getJSONObject("version").getString("integerValue"))
+            assertEquals(LegalDoc.CURRENT_VERSION.toString(), account.getJSONObject("acceptedTerms").getJSONObject("mapValue").getJSONObject("fields").getJSONObject("version").getString("integerValue"))
             compose.onAllNodesWithText(text(R.string.setup_step_allow)).onFirst().performScrollTo().performClick()
             node(R.string.disclosure_usage).assertExists()
             node(R.string.disclosure_not_now).performClick()
