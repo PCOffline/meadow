@@ -28,7 +28,7 @@ class Backend {
         try {
             val result = functions.getHttpsCallable(name).call(data).await()
             @Suppress("UNCHECKED_CAST")
-            return (result.getData() as? Map<String, Any?>) ?: emptyMap()
+            return (result.data as? Map<String, Any?>) ?: emptyMap()
         } catch (e: FirebaseFunctionsException) {
             val unreachable = e.code == FirebaseFunctionsException.Code.UNAVAILABLE ||
                 e.code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ||

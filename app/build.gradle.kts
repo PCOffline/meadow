@@ -47,7 +47,7 @@ android {
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
-        buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/time-limit-app"}\"")
+        buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/meadow"}\"")
         manifestPlaceholders["inviteHost"] = inviteHost
     }
 
@@ -79,9 +79,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     // The privacy notice, terms and licences live in /legal, shared with the hosted web pages.
     sourceSets["main"].assets.srcDir("../legal")
     // Sample data and helpers used by both JVM (Robolectric) and on-device tests.
@@ -98,6 +95,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

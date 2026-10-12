@@ -37,6 +37,6 @@ test("tables get header cells, and the title comes from the first heading", () =
 
 test("the privacy notice says who to contact and names its processors", () => {
   const html = render(read("privacy_notice.md"));
-  assert.match(html, /github\.com\/PCOffline\/time-limit-app/);
+  assert.match(html, /github\.com\/PCOffline\/meadow/);
   assert.match(html, /Firebase|Google/);
 });

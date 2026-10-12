@@ -4,7 +4,7 @@
 </picture>
 
 <p align="center">
-  <a href="https://github.com/PCOffline/time-limit-app/actions/workflows/build.yml"><img src="https://github.com/PCOffline/time-limit-app/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/PCOffline/meadow/actions/workflows/build.yml"><img src="https://github.com/PCOffline/meadow/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-5B7F55" alt="Licence: GPL-3.0"></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-5B7F55" alt="Android 8.0 or newer">
 </p>
@@ -90,7 +90,7 @@ large, and every theme meets WCAG AA contrast. All motion stops when you turn an
 
 ## Get Meadow
 
-Download the latest APK from [Releases](https://github.com/PCOffline/time-limit-app/releases) and
+Download the latest APK from [Releases](https://github.com/PCOffline/meadow/releases) and
 open it on your phone (you may need to allow installing from your browser or files app). Meadow
 checks for new releases once a day on Wi-Fi and asks before updating; you can turn this off in
 Settings.

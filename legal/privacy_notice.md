@@ -6,7 +6,7 @@ Meadow helps you keep the app time limits you choose, with the help of friends y
 
 ## Who runs Meadow
 
-Meadow is an open-source project. Its source code is public at github.com/PCOffline/time-limit-app. For any privacy question or request, open an issue there, or use the contact details published by whoever runs the copy of Meadow you use.
+Meadow is an open-source project. Its source code is public at github.com/PCOffline/meadow. For any privacy question or request, open an issue there, or use the contact details published by whoever runs the copy of Meadow you use.
 
 ## What stays on your phone
 

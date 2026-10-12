@@ -5,7 +5,7 @@ Meadow is built on the work of many people. Thank you. 🌼
 ## Meadow
 
 Copyright the Meadow contributors. Free software under the GNU General Public License v3.0.
-Source: github.com/PCOffline/time-limit-app
+Source: github.com/PCOffline/meadow
 
 ## Fonts
 
