@@ -51,18 +51,6 @@
       {
         "source": "/i/**",
         "destination": "/invite.html"
-      },
-      {
-        "source": "/privacy",
-        "destination": "/legal.html"
-      },
-      {
-        "source": "/terms",
-        "destination": "/legal.html"
-      },
-      {
-        "source": "/licenses",
-        "destination": "/legal.html"
       }
     ],
     "headers": [
@@ -77,7 +65,7 @@
       }
     ],
     "predeploy": [
-      "rm -rf \"$PROJECT_DIR/hosting/legal\" && cp -r \"$PROJECT_DIR/../legal\" \"$PROJECT_DIR/hosting/legal\""
+      "node \"$PROJECT_DIR/render-legal.mjs\""
     ]
   },
   "storage": {

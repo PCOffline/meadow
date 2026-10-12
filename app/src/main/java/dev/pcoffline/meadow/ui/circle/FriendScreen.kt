@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.Days
@@ -109,7 +110,7 @@ private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppL
             PersonAvatar(f.avatar, size = 64.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(f.displayName, style = MaterialTheme.typography.headlineSmall)
+                Text(f.displayName, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
                 if (f.bio.isNotBlank()) Text(f.bio, style = MaterialTheme.typography.bodyMedium)
                 Text(
                     stringResource(if (f.strictMode) R.string.friend_strict_on else R.string.friend_strict_off),

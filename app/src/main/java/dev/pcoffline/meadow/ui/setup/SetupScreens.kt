@@ -46,6 +46,7 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.BloomFlower
@@ -81,7 +82,7 @@ fun SetupScreen(onDone: () -> Unit) {
             .count { it }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading())
                 Text(
                     stringResource(R.string.setup_body),
                     style = MaterialTheme.typography.bodyMedium,
@@ -218,7 +219,7 @@ fun BackendMissingScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("🌱", fontSize = 56.sp)
-        Text(stringResource(R.string.backend_missing_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.backend_missing_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
         MeadowCard(Modifier.fillMaxWidth(), tint = Garden.colors.cardTint) {
             Text(
                 stringResource(R.string.backend_missing_body),

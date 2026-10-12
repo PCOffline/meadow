@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
@@ -89,7 +90,7 @@ fun RequestsScreen(
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Text(stringResource(R.string.requests_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 20.dp, top = 16.dp))
+            Text(stringResource(R.string.requests_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading().padding(start = 20.dp, top = 16.dp))
             Text(
                 stringResource(R.string.requests_subtitle),
                 style = MaterialTheme.typography.bodyMedium,

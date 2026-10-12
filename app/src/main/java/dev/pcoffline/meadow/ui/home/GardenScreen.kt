@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.AppBudget
@@ -193,6 +194,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                     Text(
                         stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.avatar.emoji),
                         style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.asHeading(),
                         color = mood.onSky,
                     )
                 }

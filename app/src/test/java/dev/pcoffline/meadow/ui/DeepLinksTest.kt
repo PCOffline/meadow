@@ -5,6 +5,7 @@ import dev.pcoffline.meadow.ui.navigation.CircleRoute
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.navigation.FriendRoute
 import dev.pcoffline.meadow.ui.navigation.RequestsRoute
+import dev.pcoffline.meadow.ui.navigation.SettingsRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -14,6 +15,7 @@ class DeepLinksTest {
     fun `notification links map to screens`() {
         assertEquals(RequestsRoute, DeepLinks.toRoute(DeepLinks.requests()))
         assertEquals(CircleRoute, DeepLinks.toRoute(DeepLinks.circle()))
+        assertEquals(SettingsRoute, DeepLinks.toRoute(DeepLinks.settings()))
         assertEquals(ChatRoute("a_b"), DeepLinks.toRoute(DeepLinks.chat("a_b")))
         assertEquals(FriendRoute("u1"), DeepLinks.toRoute(DeepLinks.friend("u1")))
     }
@@ -22,5 +24,7 @@ class DeepLinksTest {
     fun `unknown or empty links go nowhere`() {
         assertNull(DeepLinks.toRoute("somewhere"))
         assertNull(DeepLinks.toRoute("chat/"))
+        assertNull(DeepLinks.toRoute("friend/"))
+        assertNull(DeepLinks.toRoute(""))
     }
 }

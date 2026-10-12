@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,6 +74,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.FlowerAvatars
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -137,7 +139,7 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
                 stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = mood.onSky,
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 20.dp),
+                modifier = Modifier.asHeading().align(Alignment.CenterHorizontally).padding(top = 20.dp),
             )
             HorizontalPager(pager, Modifier.weight(1f)) { index ->
                 Column(
@@ -152,7 +154,7 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
                         }
                     }
                     Spacer(Modifier.height(28.dp))
-                    Text(stringResource(introPages[index].title), style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+                    Text(stringResource(introPages[index].title), style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.asHeading())
                     Spacer(Modifier.height(10.dp))
                     Text(
                         stringResource(introPages[index].body),
@@ -239,7 +241,7 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
     ) {
         TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text(stringResource(R.string.action_back)) }
         BigFlower(flower)
-        Text(stringResource(R.string.onboarding_name_title), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.onboarding_name_title), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, modifier = Modifier.asHeading())
         OutlinedTextField(
             value = name, onValueChange = { name = it.take(30) },
             label = { Text(stringResource(R.string.onboarding_name_label)) }, singleLine = true,
@@ -310,7 +312,7 @@ private fun SignInStep(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
-        Text(stringResource(R.string.sign_in_title), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.sign_in_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading())
         Text(
             stringResource(R.string.sign_in_body),
             style = MaterialTheme.typography.bodyMedium,
@@ -377,7 +379,7 @@ fun SecureAccountCard(@StringRes reason: Int, modifier: Modifier = Modifier) {
 fun FlowerPicker(selected: String, onSelect: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.flower_picker_title), style = MaterialTheme.typography.labelLarge)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(FlowerAvatars) { f ->
                 val chosen = f == selected
                 val pickLabel = stringResource(R.string.flower_picker_item, f)
@@ -421,7 +423,7 @@ fun ProfileSetupScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         BigFlower(flower)
-        Text(stringResource(R.string.profile_setup_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.profile_setup_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
         OutlinedTextField(
             value = name, onValueChange = { name = it.take(30) },
             label = { Text(stringResource(R.string.onboarding_name_label)) }, singleLine = true,

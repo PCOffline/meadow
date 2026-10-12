@@ -65,6 +65,10 @@ class ShowcaseTest {
     fun setUp() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("showcase") == "true")
         shell("mkdir -p $DIR")
+        // A freshly booted emulator's launcher often shows "isn't responding"; keep it off screen.
+        shell("settings put global hide_error_dialogs 1")
+        shell("am force-stop com.google.android.apps.nexuslauncher")
+        shell("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS")
         // A tidy status bar: fixed time, full signal and battery, no notification icons.
         shell("settings put global sysui_demo_allowed 1")
         listOf(
@@ -91,6 +95,7 @@ class ShowcaseTest {
 
     /** Records the screen while [drive] plays animations frame by frame on the test clock. */
     private fun record(name: String, seconds: Int, drive: () -> Unit) {
+        play(600) // Draw the first frames before recording starts.
         val recording = automation.executeShellCommand("screenrecord --time-limit $seconds --bit-rate 8000000 $DIR/$name.mp4")
         Thread.sleep(400)
         drive()
@@ -148,9 +153,9 @@ class ShowcaseTest {
     fun themes() {
         val looks = listOf(
             Triple(GardenTheme.BLOSSOM, DarkMode.LIGHT, 8),
-            Triple(GardenTheme.LAVENDER, DarkMode.DARK, 22),
             Triple(GardenTheme.SUNFLOWER, DarkMode.LIGHT, 14),
-            Triple(GardenTheme.POND, DarkMode.DARK, 23),
+            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 18),
+            Triple(GardenTheme.LAVENDER, DarkMode.DARK, 22),
         )
         var look by mutableStateOf(looks.first())
         // Content can only be set once per test, so the look changes through state.
@@ -206,7 +211,8 @@ class ShowcaseTest {
     @Test
     fun profile() {
         show { ProfileScreen(DemoGarden.robin, onBack = {}) }
-        compose.onNodeWithText(compose.activity.getString(R.string.profile_theme)).performScrollTo()
+        // Scroll so the theme cards fill the screen.
+        compose.onNodeWithText(compose.activity.getString(R.string.dark_mode_system)).performScrollTo()
         capture("profile")
     }
 
@@ -230,12 +236,12 @@ class ShowcaseTest {
         compose.mainClock.autoAdvance = false
         show { AuthScreen() }
         val next = compose.activity.getString(R.string.intro_next)
-        record("welcome", seconds = 9) {
+        record("welcome", seconds = 10) {
             play(2_600)
             compose.onNodeWithText(next).performClick()
-            play(2_800)
-            compose.onNodeWithText(next).performClick()
             play(3_000)
+            compose.onNodeWithText(next).performClick()
+            play(3_600)
         }
     }
 

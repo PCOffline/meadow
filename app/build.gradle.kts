@@ -84,6 +84,9 @@ android {
     }
     // The privacy notice, terms and licences live in /legal, shared with the hosted web pages.
     sourceSets["main"].assets.srcDir("../legal")
+    // Sample data and helpers used by both JVM (Robolectric) and on-device tests.
+    sourceSets["test"].java.srcDir("src/sharedTest/java")
+    sourceSets["androidTest"].java.srcDir("src/sharedTest/java")
 
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
@@ -117,6 +120,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.jetbrains.markdown)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -144,4 +148,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.konfetti.compose)
+    implementation(libs.markdown.renderer.m3)
 }

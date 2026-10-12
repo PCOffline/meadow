@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.ui.components.AppIcon
@@ -157,7 +158,7 @@ fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: 
         Text(
             stringResource(R.string.stats_title),
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 20.dp),
+            modifier = Modifier.asHeading().padding(start = 20.dp, top = 16.dp, end = 20.dp),
         )
         Text(
             stringResource(R.string.stats_subtitle),

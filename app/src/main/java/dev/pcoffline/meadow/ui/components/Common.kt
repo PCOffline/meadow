@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
@@ -86,6 +88,9 @@ fun MeadowCard(
     }
 }
 
+/** Marks a title as a heading, so screen reader users can jump between sections. */
+fun Modifier.asHeading(): Modifier = semantics { heading() }
+
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composable (() -> Unit)? = null) {
     Row(
@@ -94,7 +99,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composa
     ) {
         Daisy(Modifier.size(14.dp), petal = Garden.colors.petalPink)
         Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading().weight(1f))
         trailing?.invoke()
     }
 }
@@ -111,7 +116,7 @@ fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = 
             -4f, 4f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "bob",
         )
         Text(emoji, fontSize = 44.sp, modifier = Modifier.graphicsLayer { translationY = bob.dp.toPx() })
-        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.asHeading())
         Text(
             body,
             style = MaterialTheme.typography.bodyMedium,

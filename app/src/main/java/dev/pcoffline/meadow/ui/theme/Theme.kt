@@ -229,15 +229,15 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
 }
 
 /** Soft circle colours behind emoji avatars, keyed so they survive theme changes. */
-enum class AvatarColor(val key: String, val light: Color, val dark: Color) {
-    LEAF("leaf", Color(0xFFDCE8D2), Color(0xFF3B5636)),
-    PETAL("petal", Color(0xFFF8DDE0), Color(0xFF6A3A40)),
-    LAVENDER("lavender", Color(0xFFE7E2F5), Color(0xFF4B4170)),
-    HONEY("honey", Color(0xFFFBEBC0), Color(0xFF6B5420)),
-    PEACH("peach", Color(0xFFFBE0CF), Color(0xFF6E4330)),
-    SKY("sky", Color(0xFFDCEBF2), Color(0xFF2F4F5E)),
-    MINT("mint", Color(0xFFD5F0E3), Color(0xFF2E5546)),
-    CREAM("cream", Color(0xFFF3EBDB), Color(0xFF4E473B));
+enum class AvatarColor(val key: String, @StringRes val label: Int, val light: Color, val dark: Color) {
+    LEAF("leaf", R.string.avatar_color_leaf, Color(0xFFDCE8D2), Color(0xFF3B5636)),
+    PETAL("petal", R.string.avatar_color_petal, Color(0xFFF8DDE0), Color(0xFF6A3A40)),
+    LAVENDER("lavender", R.string.avatar_color_lavender, Color(0xFFE7E2F5), Color(0xFF4B4170)),
+    HONEY("honey", R.string.avatar_color_honey, Color(0xFFFBEBC0), Color(0xFF6B5420)),
+    PEACH("peach", R.string.avatar_color_peach, Color(0xFFFBE0CF), Color(0xFF6E4330)),
+    SKY("sky", R.string.avatar_color_sky, Color(0xFFDCEBF2), Color(0xFF2F4F5E)),
+    MINT("mint", R.string.avatar_color_mint, Color(0xFFD5F0E3), Color(0xFF2E5546)),
+    CREAM("cream", R.string.avatar_color_cream, Color(0xFFF3EBDB), Color(0xFF4E473B));
 
     companion object {
         fun fromKey(key: String?) = entries.firstOrNull { it.key == key } ?: LEAF

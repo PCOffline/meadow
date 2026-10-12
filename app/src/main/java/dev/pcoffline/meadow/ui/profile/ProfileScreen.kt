@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Avatar
 import dev.pcoffline.meadow.data.FlowerAvatars
 import dev.pcoffline.meadow.data.ProfileRepository
@@ -99,7 +102,7 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 PersonAvatar(preview, size = 112.dp, contentDescription = stringResource(R.string.profile_photo_description))
                 Spacer(Modifier.height(8.dp))
-                Text(name.ifBlank { profile.displayName }, style = MaterialTheme.typography.headlineSmall)
+                Text(name.ifBlank { profile.displayName }, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
                 if (bio.isNotBlank()) {
                     Text(bio, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
@@ -127,7 +130,7 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
             SectionTitle(stringResource(R.string.profile_avatar))
             MeadowCard(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.profile_avatar_emoji), style = MaterialTheme.typography.labelLarge)
-                FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     FlowerAvatars.forEach { option ->
                         Choice(selected = option == emoji, label = stringResource(R.string.flower_picker_item, option), onClick = { emoji = option }) {
                             PersonAvatar(Avatar(option, color, null), size = 44.dp)
@@ -135,10 +138,10 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
                     }
                 }
                 Text(stringResource(R.string.profile_avatar_color), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
-                FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AvatarColor.entries.forEach { option ->
                         val swatch = if (LocalDarkTheme.current) option.dark else option.light
-                        Choice(selected = option.key == color, label = option.key, onClick = { color = option.key }) {
+                        Choice(selected = option.key == color, label = stringResource(option.label), onClick = { color = option.key }) {
                             Box(Modifier.size(36.dp).clip(CircleShape).background(swatch))
                         }
                     }
@@ -186,7 +189,7 @@ private fun AppearancePicker() {
     val darkMode = DarkMode.fromKey(darkKey)
     val action = rememberAction()
 
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), maxItemsInEachRow = 3) {
+    FlowRow(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), maxItemsInEachRow = 3) {
         GardenTheme.entries.forEach { theme ->
             MeadowTheme(theme, darkMode) {
                 ThemeCard(theme, selected = theme == current, modifier = Modifier.weight(1f)) {
@@ -235,6 +238,7 @@ private fun ThemeCard(theme: GardenTheme, selected: Boolean, modifier: Modifier,
 private fun Choice(selected: Boolean, label: String, onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(
         Modifier
+            .minimumInteractiveComponentSize()
             .clip(CircleShape)
             .border(if (selected) 3.dp else 0.dp, MaterialTheme.colorScheme.primary, CircleShape)
             .clickable(role = Role.RadioButton, onClick = onClick)

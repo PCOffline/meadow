@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.ProfileState
@@ -238,6 +239,7 @@ private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Uni
                 else -> stringResource(R.string.rest_title, state.appName)
             },
             style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.asHeading(),
             textAlign = TextAlign.Center,
         )
         Text(

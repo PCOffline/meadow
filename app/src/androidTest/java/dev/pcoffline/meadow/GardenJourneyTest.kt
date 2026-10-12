@@ -24,6 +24,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.auth.FirebaseAuth
+import dev.pcoffline.meadow.a11y.assertAccessible
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -124,6 +125,7 @@ class GardenJourneyTest {
 
             // Garden, then the profile.
             waitForText("Robin", substring = true)
+            compose.assertAccessible(compose.density)
             compose.onNodeWithContentDescription(text(R.string.profile_open)).performClick()
             compose.onNode(hasSetTextAction() and hasText(text(R.string.profile_bio))).performTextInput("Growing calmer days")
             node(R.string.action_save).performScrollTo().performClick()
@@ -134,6 +136,8 @@ class GardenJourneyTest {
 
             // Privacy: stop sharing screen time.
             compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
+            waitFor(R.string.settings_privacy_title)
+            compose.assertAccessible(compose.density)
             val shareUsage = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage)))
             shareUsage.performScrollTo().assertIsOn().performClick()
             waitForBackend("users/$uid") { doc ->

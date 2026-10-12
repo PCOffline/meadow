@@ -1,0 +1,78 @@
+package dev.pcoffline.meadow.ui
+
+import android.app.Application
+import android.content.res.Resources
+import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.data.InviteLinks
+import dev.pcoffline.meadow.data.LimitRequest
+import dev.pcoffline.meadow.data.RequestStatus
+import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.data.ProfileRepository
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+
+/** Words and numbers people read: durations, limits, request summaries, invite links, exports. */
+@RunWith(AndroidJUnit4::class)
+@Config(application = Application::class)
+class FormatTest {
+    private val res: Resources = ApplicationProvider.getApplicationContext<Application>().resources
+
+    @Test
+    fun `durations read naturally`() {
+        assertEquals("0m", res.minutesText(0))
+        assertEquals("0m", res.minutesText(-5))
+        assertEquals("45m", res.minutesText(45))
+        assertEquals("2h", res.minutesText(120))
+        assertEquals("1h 30m", res.minutesText(90))
+        assertEquals("<1m", res.durationText(20_000))
+        assertEquals("0m", res.durationText(0))
+        assertEquals("1m", res.durationText(119_000))
+    }
+
+    @Test
+    fun `limits describe days and weeks`() {
+        assertEquals(res.getString(dev.pcoffline.meadow.R.string.limit_none), res.limitText(0, 0))
+        assertEquals(true, res.limitText(30, 0).contains("30m"))
+        assertEquals(true, res.limitText(0, 180).contains("3h"))
+        res.limitText(30, 180).let { assertEquals(true, "30m" in it && "3h" in it) }
+    }
+
+    private fun request(type: RequestType, minutes: Int = 0, app: String? = "Instagram") = LimitRequest(
+        "r", "me", "Robin", type, "pkg", app, minutes, 30, 0, "", RequestStatus.PENDING, emptyList(), null, null, "2026-10-12", 0L,
+    )
+
+    @Test
+    fun `requests are summed up in one phrase`() {
+        assertEquals(true, res.requestSummary(request(RequestType.EXTRA_TIME, 15)).let { "15" in it && "Instagram" in it })
+        assertEquals(true, res.requestSummary(request(RequestType.EXTRA_TIME, 1)).contains("1"))
+        assertEquals(true, res.requestSummary(request(RequestType.CHANGE_LIMIT)).let { "Instagram" in it && "30m" in it })
+        assertEquals(true, res.requestSummary(request(RequestType.REMOVE_LIMIT)).contains("Instagram"))
+        assertEquals(true, res.requestSummary(request(RequestType.REMOVE_LIMIT, app = null)).isNotBlank())
+        assertEquals(true, res.requestSummary(request(RequestType.DISABLE_STRICT_MODE)).isNotBlank())
+    }
+
+    @Test
+    fun `invite links are recognised in both forms and nothing else`() {
+        val token = "AbCdEfGh12345678"
+        assertEquals(token, InviteLinks.tokenFrom(Uri.parse("https://meadow-demo.web.app/i/$token")))
+        assertEquals(token, InviteLinks.tokenFrom(Uri.parse("meadow://invite/$token")))
+        assertNull(InviteLinks.tokenFrom(null))
+        assertNull(InviteLinks.tokenFrom(Uri.parse("https://meadow-demo.web.app/x/$token")))
+        assertNull(InviteLinks.tokenFrom(Uri.parse("https://meadow-demo.web.app/i/$token/extra")))
+        assertNull(InviteLinks.tokenFrom(Uri.parse("http://meadow-demo.web.app/i/$token")))
+        assertNull(InviteLinks.tokenFrom(Uri.parse("meadow://other/$token")))
+        assertNull(InviteLinks.tokenFrom(Uri.parse("https://meadow-demo.web.app/i/short")))
+        assertNull(InviteLinks.tokenFrom(Uri.parse("https://meadow-demo.web.app/i/AbCdEfGh1234567!")))
+    }
+
+    @Test
+    fun `exports turn backend values into plain JSON`() {
+        val json = ProfileRepository.toJson(mapOf("name" to "Robin", "n" to 3L, "ok" to true, "none" to null, "list" to listOf(1, "a")))
+        assertEquals("""{"name":"Robin","n":3,"ok":true,"none":null,"list":[1,"a"]}""", json.toString())
+    }
+}

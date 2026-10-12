@@ -45,6 +45,8 @@ jobs:
           # Animations stay on: the recordings show them.
           disable-animations: false
           script: |
+            adb shell settings put global hide_error_dialogs 1
+            sleep 20
             ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
             mkdir -p build/showcase
             adb pull /sdcard/Pictures/meadow build/showcase

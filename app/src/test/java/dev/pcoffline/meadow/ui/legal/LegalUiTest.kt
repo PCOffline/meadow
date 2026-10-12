@@ -70,9 +70,11 @@ class LegalUiTest {
     @Test
     fun `markdown headings, bullets and bold render as text`() {
         compose.setContent { MeadowTheme { MarkdownText("# Hello\n\nSome **bold** words.\n\n- A bullet") } }
-        compose.onNodeWithText("Hello").assertExists()
-        compose.onNodeWithText("Some bold words.").assertExists()
-        compose.onNodeWithText("A bullet").assertExists()
+        // The library parses off the main thread.
+        compose.waitUntil(5_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("Hello")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Hello").assert(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.Heading))
+        compose.onNodeWithText("Some bold words.", substring = true).assertExists()
+        compose.onNodeWithText("A bullet", substring = true).assertExists()
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextCount(value: String) =

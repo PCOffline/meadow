@@ -16,4 +16,6 @@ backend/firebase-debug.log
 backend/firestore-debug.log
 backend/node_modules/
 backend/*-debug.log
-backend/hosting/legal/
+backend/hosting/privacy.html
+backend/hosting/terms.html
+backend/hosting/licenses.html

@@ -1,8 +1,6 @@
 package dev.pcoffline.meadow.ui.legal
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,9 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -25,21 +21,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mikepenz.markdown.m3.Markdown
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.Loading
@@ -97,54 +86,16 @@ private fun LegalBody(doc: LegalDoc, modifier: Modifier) {
         Loading(modifier)
     } else {
         Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
-            MarkdownText(text)
+            MarkdownText(text, Modifier.fillMaxWidth())
             Spacer(Modifier.height(32.dp))
         }
     }
 }
 
-/** Renders the small Markdown subset used by the legal documents: headings, lists, tables, bold. */
+/** Renders Markdown (GitHub flavour, with tables) in the app's typography and colours. */
 @Composable
-fun MarkdownText(markdown: String) {
-    val blocks = MarkdownBlocks.parse(markdown)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        blocks.forEach { block ->
-            when (block) {
-                is MarkdownBlocks.Block.Heading -> Text(
-                    block.text,
-                    style = if (block.level == 1) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(top = if (block.level == 1) 0.dp else 8.dp).semantics { heading() },
-                )
-                is MarkdownBlocks.Block.Paragraph -> Text(inline(block.text), style = MaterialTheme.typography.bodyMedium)
-                is MarkdownBlocks.Block.Bullet -> Row {
-                    Text("•", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(8.dp))
-                    Text(inline(block.text), style = MaterialTheme.typography.bodyMedium)
-                }
-                is MarkdownBlocks.Block.Table -> Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer),
-                ) {
-                    block.rows.forEachIndexed { i, row ->
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                            row.forEachIndexed { c, cell ->
-                                Text(
-                                    inline(cell),
-                                    style = if (i == 0) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.weight(if (c == 0) 1f else 1.2f).padding(end = 8.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun inline(text: String): AnnotatedString = buildAnnotatedString {
-    MarkdownBlocks.spans(text).forEach { (part, bold) ->
-        if (bold) withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) } else append(part)
-    }
+fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
+    Markdown(content = markdown, modifier = modifier)
 }
 
 /** Asks to accept the terms again after they change. It can't be dismissed without agreeing. */

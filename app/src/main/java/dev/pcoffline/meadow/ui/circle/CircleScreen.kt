@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.FriendlyException
 import dev.pcoffline.meadow.data.Invite
@@ -128,7 +129,7 @@ fun CircleContent(
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp)) {
-                Text(stringResource(R.string.circle_title), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.circle_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading())
                 Text(
                     stringResource(R.string.circle_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
@@ -191,7 +192,7 @@ private fun InviteCard(modifier: Modifier) {
     val shareTitle = stringResource(R.string.invite_share_title)
     val sent = stringResource(R.string.invite_code_sent)
     MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.primaryContainer) {
-        Text(stringResource(R.string.invite_title), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.invite_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
         Text(stringResource(R.string.invite_body), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
         Button(
             onClick = {
