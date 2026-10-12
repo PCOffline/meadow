@@ -53,7 +53,9 @@ service cloud.firestore {
         // Strict mode can always be switched on, but only switched off without Bumblebees.
         && (!('strictMode' in changed()) || request.resource.data.strictMode == true || hasNoApprovers(uid))
         // An emergency unlock can only be ended early from the phone, never started or extended.
-        && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time);
+        && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time)
+        // A heartbeat is always "now": a future one would hide a phone that went quiet.
+        && (!('lastHeartbeat' in changed()) || request.resource.data.lastHeartbeat == request.time);
 
       match /private/{docId} {
         allow read: if signedIn() && me() == uid;
@@ -129,9 +131,16 @@ service cloud.firestore {
 
       allow read: if signedIn() && me() in resource.data.participants;
       allow create, delete: if false;
+      // Each person updates only their own side: the summary of a message they just sent, and
+      // when they last read the chat.
       allow update: if signedIn() && me() in resource.data.participants
         && changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastRead'])
-        && (!('lastSenderId' in changed()) || request.resource.data.lastSenderId == me());
+        && (!changed().hasAny(['lastMessage', 'lastMessageAt', 'lastSenderId'])
+            || (request.resource.data.lastSenderId == me()
+                && request.resource.data.lastMessageAt == request.time
+                && isString(request.resource.data.lastMessage, 140)))
+        && (!('lastRead' in changed())
+            || request.resource.data.lastRead.diff(resource.data.get('lastRead', {})).affectedKeys().hasOnly([me()]));
 
       match /messages/{messageId} {
         allow read: if participant();
@@ -139,6 +148,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
           && request.resource.data.senderId == me()
           && request.resource.data.kind == 'text'
+          && request.resource.data.createdAt == request.time
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;

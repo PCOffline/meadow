@@ -42,6 +42,7 @@ export const createProfile = onCall(async (req) => {
       strictMode: false,
       protection: {},
       privacy: { shareUsage: true, shareProtection: true },
+      staleNotified: false,
       createdAt: FieldValue.serverTimestamp(),
     });
     tx.set(accountRef(uid), {
@@ -189,9 +190,12 @@ export const cancelInvite = onCall(async (req) => {
   const uid = requireAuth(req);
   const { inviteId } = parse(InviteIdInput, req.data);
   const inviteRef = invites().doc(inviteId);
-  const invite = await inviteRef.get();
-  if (!invite.exists || invite.get("fromUid") !== uid) throw new HttpsError("not-found", errors.inviteGone);
-  if (invite.get("status") === "pending") await inviteRef.update({ status: "cancelled" });
+  // In a transaction, so an invite accepted a moment ago isn't marked cancelled.
+  await db().runTransaction(async (tx) => {
+    const invite = await tx.get(inviteRef);
+    if (!invite.exists || invite.get("fromUid") !== uid) throw new HttpsError("not-found", errors.inviteGone);
+    if (invite.get("status") === "pending") tx.update(inviteRef, { status: "cancelled" });
+  });
   return { ok: true };
 });
 

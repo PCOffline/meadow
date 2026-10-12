@@ -64,4 +64,5 @@ export const EmergencyInput = z.object({
   // Set only when reporting an unlock the phone already took while offline.
   startedAt: z.number().int().positive().nullish(),
   endedAt: z.number().int().positive().nullish(),
+  reportId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/).nullish(),
 });

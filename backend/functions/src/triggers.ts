@@ -56,10 +56,13 @@ export const onProfileUpdated = onDocumentUpdated("users/{uid}", async (event) =
   const profile = profileOf(after);
   const writer = db().bulkWriter();
   for (const chat of (await chats().where("participants", "array-contains", uid).get()).docs) {
-    writer.update(chat.ref, {
-      [`names.${uid}`]: profile.displayName,
-      [`avatars.${uid}`]: { flower: profile.flower, color: profile.avatarColor, photo: profile.photoUrl },
-    });
+    // A chat deleted meanwhile (its other person left Meadow) needs no update.
+    void writer
+      .update(chat.ref, {
+        [`names.${uid}`]: profile.displayName,
+        [`avatars.${uid}`]: { flower: profile.flower, color: profile.avatarColor, photo: profile.photoUrl },
+      })
+      .catch((e) => logger.warn("Chat profile update failed", { chat: chat.id, error: String(e) }));
   }
   await writer.close();
 });
@@ -79,10 +82,10 @@ export const hourlyCare = onSchedule("every 60 minutes", async () => {
     await batch.commit();
   }
 
+  // Only phones not yet reported, so ones that stay quiet for good don't crowd out new ones.
   const cutoff = Timestamp.fromMillis(now - STALE_HEARTBEAT_MS);
-  const quiet = await users().where("lastHeartbeat", "<", cutoff).limit(400).get();
+  const quiet = await users().where("staleNotified", "==", false).where("lastHeartbeat", "<", cutoff).limit(400).get();
   for (const doc of quiet.docs) {
-    if (doc.get("staleNotified") === true) continue;
     const approverIds = accountOf(await accountRef(doc.id).get()).approverIds;
     if (approverIds.length === 0) continue;
     if ((await doc.ref.collection("limits").limit(1).get()).empty) continue;
@@ -90,12 +93,11 @@ export const hourlyCare = onSchedule("every 60 minutes", async () => {
     await notify(approverIds, { type: "alert", uid: doc.id, ...pushes.quietPhone(profileOf(doc)) });
   }
 
-  const recovered = await users().where("staleNotified", "==", true).limit(400).get();
-  const back = recovered.docs.filter((d) => ((d.get("lastHeartbeat") as Timestamp | undefined)?.toMillis() ?? 0) >= cutoff.toMillis());
-  if (back.length) {
+  const back = await users().where("staleNotified", "==", true).where("lastHeartbeat", ">=", cutoff).limit(400).get();
+  if (!back.empty) {
     const batch = db().batch();
-    back.forEach((d) => batch.update(d.ref, { staleNotified: false }));
+    back.docs.forEach((d) => batch.update(d.ref, { staleNotified: false }));
     await batch.commit();
   }
-  logger.info("Hourly care done", { expired: expired.size, quiet: quiet.size, recovered: back.length });
+  logger.info("Hourly care done", { expired: expired.size, quiet: quiet.size, recovered: back.size });
 });

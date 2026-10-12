@@ -22,11 +22,19 @@ export interface RequestDoc {
   dayKey: string;
 }
 
+/** The phone's local date is within a day of the server's UTC date, whatever its time zone. */
+export function isAroundToday(dayKey: string, now: number): boolean {
+  const day = Date.parse(`${dayKey}T00:00:00Z`);
+  const today = Math.floor(now / 86_400_000) * 86_400_000;
+  return Number.isFinite(day) && Math.abs(day - today) <= 86_400_000;
+}
+
 export const createRequest = onCall(async (call) => {
   const uid = requireAuth(call);
   const input = parse(CreateRequestInput, call.data);
   const me = await loadPerson(uid);
   if (me.account.approverIds.length === 0) throw new HttpsError("failed-precondition", errors.noBumblebees);
+  if (!isAroundToday(input.dayKey, Date.now())) throw new HttpsError("invalid-argument", errors.badDate);
 
   const doc: RequestDoc = {
     requesterId: uid,

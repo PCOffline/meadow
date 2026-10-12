@@ -112,6 +112,12 @@ describe("profiles", () => {
     await assertSucceeds(updateDoc(doc(as("sam"), "users/sam"), { strictMode: false }));
   });
 
+  test("a heartbeat is always the present moment", async () => {
+    const sam = doc(as("sam"), "users/sam");
+    await assertSucceeds(updateDoc(sam, { lastHeartbeat: serverTimestamp(), protection: { accessibility: true } }));
+    await assertFails(updateDoc(sam, { lastHeartbeat: Timestamp.fromMillis(Date.UTC(2100, 0, 1)) }));
+  });
+
   test("an emergency unlock can be ended from the phone but never started or extended", async () => {
     await assertSucceeds(updateDoc(doc(as("sam"), "users/sam"), { emergencyUntil: serverTimestamp() }));
     const future = Timestamp.fromMillis(Date.now() + 60 * 60_000);
@@ -224,5 +230,18 @@ describe("chats", () => {
     await assertSucceeds(updateDoc(chat, { lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: "sam" }));
     await assertFails(updateDoc(chat, { lastSenderId: "bee" }));
     await assertFails(updateDoc(chat, { participants: ["sam", "stranger"] }));
+    await assertSucceeds(updateDoc(chat, { "lastRead.sam": serverTimestamp() }));
+  });
+
+  test("you can't put words in the other person's mouth or mark their messages read", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { lastMessage: "Hello", lastSenderId: "bee", lastMessageAt: Timestamp.now() }));
+    const chat = doc(as("sam"), "chats/bee_sam");
+    await assertFails(updateDoc(chat, { lastMessage: "Sure, take the whole day off" }));
+    await assertFails(updateDoc(chat, { "lastRead.bee": serverTimestamp() }));
+    await assertFails(updateDoc(chat, { lastMessage: "x".repeat(141), lastMessageAt: serverTimestamp(), lastSenderId: "sam" }));
+    await assertFails(updateDoc(chat, { lastMessage: "Hi", lastMessageAt: Timestamp.fromMillis(Date.now() + 86_400_000), lastSenderId: "sam" }));
+    const messages = collection(as("sam"), "chats/bee_sam/messages");
+    await assertFails(addDoc(messages, { senderId: "sam", text: "Back-dated", kind: "text", createdAt: Timestamp.fromMillis(0) }));
   });
 });

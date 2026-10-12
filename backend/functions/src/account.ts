@@ -58,32 +58,41 @@ export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
   const me = await loadPerson(uid).catch(() => null);
   const userRef = users().doc(uid);
 
+  // Links first, so nobody can join up with this account while it's being taken apart.
+  const cleanup = db().bulkWriter();
+  cleanup.onWriteError((error) => {
+    // A document someone else removed meanwhile is already as clean as it gets.
+    if (error.code === 5 /* NOT_FOUND */) return false;
+    return error.failedAttempts < 3;
+  });
+  for (const query of [inviteLinks().where("ownerUid", "==", uid), inviteLinks().where("usedBy", "==", uid)]) {
+    (await query.get()).docs.forEach((d) => void cleanup.delete(d.ref).catch(() => undefined));
+  }
+  await cleanup.flush();
+
   if (me) {
-    const batch = db().batch();
     for (const beeUid of me.account.approverIds) {
-      batch.set(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(uid) }, { merge: true });
+      void cleanup.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(uid) }).catch(() => undefined);
     }
     for (const ownerUid of me.account.approveeIds) {
-      batch.set(accountRef(ownerUid), { approverIds: FieldValue.arrayRemove(uid) }, { merge: true });
+      void cleanup.update(accountRef(ownerUid), { approverIds: FieldValue.arrayRemove(uid) }).catch(() => undefined);
     }
-    await batch.commit();
+    await cleanup.flush();
     await notify(me.account.approverIds, { type: "approver_left", ...pushes.gardenClosed(me.profile) });
     await notify(me.account.approveeIds, { type: "approver_left", ...pushes.bumblebeeLeftMeadow(me.profile) });
   }
 
   const pendingAsBee = await requests().where("approverIds", "array-contains", uid).get();
-  const cleanup = db().bulkWriter();
-  pendingAsBee.docs.forEach((d) => cleanup.update(d.ref, { approverIds: FieldValue.arrayRemove(uid) }));
+  pendingAsBee.docs.forEach((d) => void cleanup.update(d.ref, { approverIds: FieldValue.arrayRemove(uid) }).catch(() => undefined));
   for (const query of [
     requests().where("requesterId", "==", uid),
     invites().where("fromUid", "==", uid),
     invites().where("toUid", "==", uid),
-    inviteLinks().where("ownerUid", "==", uid),
   ]) {
-    (await query.get()).docs.forEach((d) => cleanup.delete(d.ref));
+    (await query.get()).docs.forEach((d) => void cleanup.delete(d.ref).catch(() => undefined));
   }
   const code = (await userRef.get()).get("friendCode");
-  if (typeof code === "string" && code) cleanup.delete(friendCodes().doc(code));
+  if (typeof code === "string" && code) void cleanup.delete(friendCodes().doc(code)).catch(() => undefined);
   await cleanup.close();
 
   for (const chat of (await chats().where("participants", "array-contains", uid).get()).docs) {

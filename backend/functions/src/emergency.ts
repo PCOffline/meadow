@@ -21,6 +21,9 @@ export function recentUses(raw: unknown, now: number): number[] {
 /**
  * Lifts limits right away for up to an hour. With `startedAt` it records an unlock the phone
  * already took while offline; that one is recorded even beyond the allowance, since it happened.
+ * Phones allow one offline unlock per window, and so does this: any further "offline" report is
+ * recorded and told to Bumblebees, but lifts nothing. Otherwise a modified app could unlock
+ * forever by claiming to be offline.
  */
 export const emergencyUnlock = onCall(async (req) => {
   const uid = requireAuth(req);
@@ -33,34 +36,48 @@ export const emergencyUnlock = onCall(async (req) => {
   const startedAt = offline ? Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, input.startedAt!)) : now;
   // An offline unlock that was ended early on the phone must not come back to life here.
   const endedAt = offline && input.endedAt != null ? Math.max(startedAt, input.endedAt) : Infinity;
-  const until = Math.min(startedAt + minutes * 60_000, endedAt);
   const userRef = users().doc(uid);
+  // A retried report (the reply was lost) reuses its id, so it's recorded and announced once.
+  const emergencyRef = input.reportId ? userRef.collection("emergencies").doc(input.reportId) : userRef.collection("emergencies").doc();
 
-  const { user, remaining, overAllowance } = await db().runTransaction(async (tx) => {
-    const [snap, accountSnap] = await Promise.all([tx.get(userRef), tx.get(accountRef(uid))]);
+  const outcome = await db().runTransaction(async (tx) => {
+    const [snap, accountSnap, existing] = await Promise.all([tx.get(userRef), tx.get(accountRef(uid)), tx.get(emergencyRef)]);
+    const currentUntil = (snap.get("emergencyUntil") as Timestamp | undefined)?.toMillis() ?? 0;
+    if (existing.exists) return { duplicate: true as const, until: currentUntil };
     const user = { ...profileOf(snap), approverIds: accountOf(accountSnap).approverIds };
     const uses = recentUses(snap.get("emergencyUses"), now);
     const overAllowance = uses.length >= EMERGENCY_ALLOWANCE;
     if (overAllowance && !offline) throw new HttpsError("resource-exhausted", errors.emergencyUsedUp(EMERGENCY_ALLOWANCE));
-    const currentUntil = (snap.get("emergencyUntil") as Timestamp | undefined)?.toMillis() ?? 0;
     if (!offline && currentUntil > now) throw new HttpsError("failed-precondition", errors.emergencyActive);
+    const lastOffline = (snap.get("offlineEmergencyAt") as Timestamp | undefined)?.toMillis() ?? 0;
+    const honoured = !offline || now - lastOffline > EMERGENCY_WINDOW_MS;
+    const until = honoured ? Math.min(startedAt + minutes * 60_000, endedAt) : Math.min(now, endedAt);
     tx.update(userRef, {
       emergencyUses: [...uses, startedAt].map((ms) => Timestamp.fromMillis(ms)),
-      emergencyUntil: Timestamp.fromMillis(Math.max(until, currentUntil)),
-      emergencyPackage: packageName,
+      emergencyUntil: Timestamp.fromMillis(honoured ? Math.max(until, currentUntil) : currentUntil),
+      emergencyPackage: honoured ? packageName : (snap.get("emergencyPackage") ?? null),
+      ...(offline && honoured ? { offlineEmergencyAt: Timestamp.fromMillis(now) } : {}),
     });
-    tx.set(userRef.collection("emergencies").doc(), {
+    tx.set(emergencyRef, {
       reason,
       minutes,
       packageName,
       appName,
       offline,
-      overAllowance,
+      overAllowance: overAllowance || !honoured,
       startedAt: Timestamp.fromMillis(startedAt),
       createdAt: FieldValue.serverTimestamp(),
     });
-    return { user, remaining: Math.max(0, EMERGENCY_ALLOWANCE - uses.length - 1), overAllowance };
+    return {
+      duplicate: false as const,
+      user,
+      until,
+      remaining: Math.max(0, EMERGENCY_ALLOWANCE - uses.length - 1),
+      overAllowance: overAllowance || !honoured,
+    };
   });
+  if (outcome.duplicate) return { until: outcome.until, remaining: 0 };
+  const { user, until, remaining, overAllowance } = outcome;
 
   const headline = emergencyHeadline(user, offline, overAllowance);
   const scope = emergencyScope(appName, minutes);
