@@ -7,15 +7,17 @@
 @keyframes glow{from{opacity:.35;transform:scale(.92)}to{opacity:.7;transform:scale(1.08)}}
 .twinkle{animation:twinkle 3s ease-in-out infinite alternate}
 @keyframes twinkle{from{opacity:.25}to{opacity:1}}
-.fall{animation:fall 11s linear infinite}
-@keyframes fall{0%{transform:translate(0,-40px) rotate(0)}100%{transform:translate(-160px,460px) rotate(540deg)}}
-.flight{animation:flight 16s linear infinite}
-@keyframes flight{0%{transform:translate(-90px,250px)}20%{transform:translate(240px,170px)}40%{transform:translate(520px,235px)}
-60%{transform:translate(800px,150px)}80%{transform:translate(1080px,215px)}100%{transform:translate(1380px,160px)}}
+.fall{animation:fall 26s linear infinite}
+@keyframes fall{from{transform:translate(0,-40px)}to{transform:translate(-140px,470px)}}
+.waft{animation:waft 4.5s ease-in-out infinite alternate}
+@keyframes waft{from{transform:translateX(-26px)}to{transform:translateX(26px)}}
+.tumble{transform-box:fill-box;transform-origin:center;animation:tumble 6s ease-in-out infinite alternate}
+@keyframes tumble{0%{transform:rotate(-35deg) scaleX(1)}50%{transform:rotate(25deg) scaleX(.45)}100%{transform:rotate(80deg) scaleX(.95)}}
 .bob{animation:bob .9s ease-in-out infinite alternate}
-@keyframes bob{from{transform:translateY(-5px)}to{transform:translateY(5px)}}
-.wing{transform-box:fill-box;transform-origin:50% 100%;animation:wing .12s linear infinite alternate}
-@keyframes wing{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
+@keyframes bob{from{transform:translateY(-4px)}to{transform:translateY(4px)}}
+.wing{transform-box:fill-box;transform-origin:20% 100%;animation:wing .09s ease-in-out infinite alternate}
+.wing.back{transform-origin:80% 100%;animation-delay:-.045s}
+@keyframes wing{from{transform:rotate(-24deg)}to{transform:rotate(18deg)}}
 .float{animation:float 7s ease-in-out infinite alternate}
 @keyframes float{from{transform:translate(0,0)}to{transform:translate(26px,-22px)}}
 .rise{animation:rise 3s ease-out infinite;opacity:0}

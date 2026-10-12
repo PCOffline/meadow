@@ -54,15 +54,17 @@ MOTION_CSS = """
 @keyframes glow{from{opacity:.35;transform:scale(.92)}to{opacity:.7;transform:scale(1.08)}}
 .twinkle{animation:twinkle 3s ease-in-out infinite alternate}
 @keyframes twinkle{from{opacity:.25}to{opacity:1}}
-.fall{animation:fall 11s linear infinite}
-@keyframes fall{0%{transform:translate(0,-40px) rotate(0)}100%{transform:translate(-160px,460px) rotate(540deg)}}
-.flight{animation:flight 16s linear infinite}
-@keyframes flight{0%{transform:translate(-90px,250px)}20%{transform:translate(240px,170px)}40%{transform:translate(520px,235px)}
-60%{transform:translate(800px,150px)}80%{transform:translate(1080px,215px)}100%{transform:translate(1380px,160px)}}
+.fall{animation:fall 26s linear infinite}
+@keyframes fall{from{transform:translate(0,-40px)}to{transform:translate(-140px,470px)}}
+.waft{animation:waft 4.5s ease-in-out infinite alternate}
+@keyframes waft{from{transform:translateX(-26px)}to{transform:translateX(26px)}}
+.tumble{transform-box:fill-box;transform-origin:center;animation:tumble 6s ease-in-out infinite alternate}
+@keyframes tumble{0%{transform:rotate(-35deg) scaleX(1)}50%{transform:rotate(25deg) scaleX(.45)}100%{transform:rotate(80deg) scaleX(.95)}}
 .bob{animation:bob .9s ease-in-out infinite alternate}
-@keyframes bob{from{transform:translateY(-5px)}to{transform:translateY(5px)}}
-.wing{transform-box:fill-box;transform-origin:50% 100%;animation:wing .12s linear infinite alternate}
-@keyframes wing{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
+@keyframes bob{from{transform:translateY(-4px)}to{transform:translateY(4px)}}
+.wing{transform-box:fill-box;transform-origin:20% 100%;animation:wing .09s ease-in-out infinite alternate}
+.wing.back{transform-origin:80% 100%;animation-delay:-.045s}
+@keyframes wing{from{transform:rotate(-24deg)}to{transform:rotate(18deg)}}
 .float{animation:float 7s ease-in-out infinite alternate}
 @keyframes float{from{transform:translate(0,0)}to{transform:translate(26px,-22px)}}
 .rise{animation:rise 3s ease-out infinite;opacity:0}
@@ -106,16 +108,41 @@ def flower(x: float, y: float, size: float, petal: str, stem: str, delay: float,
     return f'<g class="sway" style="animation-delay:-{delay:.1f}s">{"".join(parts)}</g>'
 
 
-def bee(scale: float = 1) -> str:
+def bee(scale: float = 1, uid: str = "bee") -> str:
     return (
         f'<g transform="scale({scale})">'
-        '<ellipse class="wing" cx="-4" cy="-13" rx="8" ry="11" fill="#FFFFFF" fill-opacity=".75" stroke="#C9D7E0"/>'
-        '<ellipse class="wing" cx="7" cy="-12" rx="7" ry="10" fill="#FFFFFF" fill-opacity=".75" stroke="#C9D7E0" style="animation-delay:-.06s"/>'
+        f'<defs><clipPath id="{uid}-body"><ellipse cx="0" cy="0" rx="17" ry="12"/></clipPath></defs>'
+        '<ellipse class="wing back" cx="-3" cy="-15" rx="7" ry="12" fill="#FFFFFF" fill-opacity=".7" stroke="#B9CBD6" stroke-width="1.2"/>'
+        '<path d="M-17,1 l-6,1 l6,2z" fill="#3E3A32"/>'
         '<ellipse cx="0" cy="0" rx="17" ry="12" fill="#F2C14E"/>'
-        '<path d="M-6,-11 v22 M4,-11 v22" stroke="#3E3A32" stroke-width="4"/>'
-        '<circle cx="13" cy="-2" r="2.2" fill="#3E3A32"/>'
-        '<path d="M-17,0 l-6,2" stroke="#3E3A32" stroke-width="2.5" stroke-linecap="round"/></g>'
+        f'<g clip-path="url(#{uid}-body)" fill="#3E3A32"><rect x="-9" y="-13" width="5" height="26"/><rect x="1" y="-13" width="5" height="26"/></g>'
+        '<ellipse cx="0" cy="0" rx="17" ry="12" fill="none" stroke="#C99A2E" stroke-width="1.2"/>'
+        '<circle cx="11" cy="-3" r="2.3" fill="#3E3A32"/><circle cx="11.8" cy="-3.8" r=".7" fill="#FFFFFF"/>'
+        '<path d="M13,-9 q4,-9 9,-8 M10,-10 q1,-9 6,-10" stroke="#3E3A32" stroke-width="1.6" fill="none" stroke-linecap="round"/>'
+        '<ellipse class="wing" cx="4" cy="-16" rx="8" ry="13" fill="#FFFFFF" fill-opacity=".85" stroke="#B9CBD6" stroke-width="1.2"/>'
+        "</g>"
     )
+
+
+def flight_css(name: str, points: list[tuple[float, float, float]], duration: float) -> str:
+    """A smooth flight through (time, x, y) points, sampled from a Catmull-Rom curve, banking into turns."""
+    def at(t: float) -> tuple[float, float]:
+        i = max(k for k in range(len(points) - 1) if points[k][0] <= t)
+        p0, p1 = points[max(i - 1, 0)], points[i]
+        p2, p3 = points[i + 1], points[min(i + 2, len(points) - 1)]
+        u = (t - p1[0]) / (p2[0] - p1[0])
+        def cr(a, b, c, d):
+            return 0.5 * ((2 * b) + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (-a + 3 * b - 3 * c + d) * u ** 3)
+        return cr(p0[1], p1[1], p2[1], p3[1]), cr(p0[2], p1[2], p2[2], p3[2])
+    frames = []
+    steps = 80
+    for k in range(steps + 1):
+        t = k / steps
+        x, y = at(min(t, 0.9999))
+        nx, ny = at(min(t + 0.01, 0.9999))
+        tilt = max(-14, min(14, math.degrees(math.atan2(ny - y, max(nx - x, 0.5))) * 0.6))
+        frames.append(f"{t * 100:.2f}%{{transform:translate({x:.1f}px,{y:.1f}px) rotate({tilt:.1f}deg)}}")
+    return f".{name}{{animation:{name} {duration}s linear infinite}}@keyframes {name}{{{''.join(frames)}}}"
 
 
 def cloud(x: float, y: float, s: float, color: str) -> str:
@@ -171,13 +198,24 @@ def banner(dark: bool) -> str:
                 f'<circle class="twinkle" style="animation-delay:-{rnd.uniform(0, 3):.1f}s" cx="{fx:.0f}" cy="{fy:.0f}" r="3.2" fill="#F6E3A1"/></g>'
             )
     else:
-        for i in range(7):
-            px = rnd.uniform(500, 1300)
+        for i in range(9):
+            px = rnd.uniform(380, 1320)
+            duration = rnd.uniform(24, 34)
             body.append(
-                f'<g class="fall" style="animation-delay:-{rnd.uniform(0, 11):.1f}s;animation-duration:{rnd.uniform(9, 14):.1f}s">'
-                f'<ellipse cx="{px:.0f}" cy="0" rx="7" ry="4" fill="{PETALS[i % 3]}" opacity=".85"/></g>'
+                f'<g class="fall" style="animation-delay:-{rnd.uniform(0, duration):.1f}s;animation-duration:{duration:.1f}s">'
+                f'<g class="waft" style="animation-delay:-{rnd.uniform(0, 4.5):.1f}s;animation-duration:{rnd.uniform(3.5, 5.5):.1f}s">'
+                f'<g transform="translate({px:.0f} 0) scale(1.3)"><g class="tumble" style="animation-delay:-{rnd.uniform(0, 6):.1f}s">'
+                f'<path d="M0,-9 C7,-6 7,5 0,9 C-7,5 -7,-6 0,-9Z" fill="{PETALS[i % 4]}" opacity=".9"/>'
+                f'<path d="M0,-6 V6" stroke="#FFFFFF" stroke-opacity=".5" stroke-width="1.2" stroke-linecap="round"/>'
+                "</g></g></g></g>"
             )
-        body.append(f'<g class="flight"><g class="bob">{bee(1.1)}</g></g>')
+        # The bee wanders across, stopping to hover over a flower on the way.
+        body.append("<style>" + flight_css("flight", [
+            # Low under the title on the left, then up into the open sky.
+            (0.00, -90, 288), (0.14, 170, 272), (0.28, 410, 266), (0.38, 626, 246), (0.50, 640, 240),
+            (0.60, 800, 180), (0.78, 1060, 205), (1.00, 1380, 160),
+        ], 20) + "</style>")
+        body.append(f'<g class="flight"><g class="bob">{bee(1.4, "banner-bee")}</g></g>')
     ink, soft = (NIGHT_INK, NIGHT_SOFT) if dark else (INK, SOFT_INK)
     body.append(f'<text x="80" y="176" font-family="MeadowTitle,Georgia,serif" font-size="104" fill="{ink}">{TITLE}</text>')
     body.append(f'<text x="84" y="226" font-family="MeadowBody,Helvetica,sans-serif" font-size="30" fill="{soft}">{TAGLINE}</text>')
@@ -239,7 +277,7 @@ def step_ask() -> str:
     return backdrop(
         '<path d="M0,170 C60,150 160,150 220,170 V220 H0Z" fill="#9CC08E"/>'
         + flower(80, 176, 26, "#E9B949", "#5B7F55", 1.0)
-        + '<g transform="translate(138 92)"><g class="bob">' + bee(1.3) + "</g></g>"
+        + '<g transform="translate(138 92)"><g class="bob">' + bee(1.3, "step-bee") + "</g></g>"
         '<path class="pop" d="M120,48 c0,-10 14,-12 16,-2 c2,-10 16,-8 16,2 c0,10 -16,18 -16,22 c0,-4 -16,-12 -16,-22z" fill="#E8A0A6"/>',
         "Ask a Bumblebee for more time",
     )

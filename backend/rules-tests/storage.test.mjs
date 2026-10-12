@@ -15,9 +15,7 @@ before(async () => {
     firestore: { rules: readFileSync(new URL("../firestore.rules", import.meta.url), "utf8") },
     storage: { rules: readFileSync(new URL("../storage.rules", import.meta.url), "utf8") },
   });
-  await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), "users/sam/private/account"), { approverIds: ["bee"], approveeIds: ["friend"], fcmTokens: [] });
     await uploadBytes(ref(ctx.storage(), "avatars/sam"), jpeg(), image);
   });
 });
@@ -47,6 +45,9 @@ test("only images under 2 MB are accepted", async () => {
 });
 
 test("your circle can see your photo; strangers and signed-out visitors can't", async () => {
+  // Who is in your circle lives in Firestore; the Storage rules look it up.
+  await env.withSecurityRulesDisabled((ctx) =>
+    setDoc(doc(ctx.firestore(), "users/sam/private/account"), { approverIds: ["bee"], approveeIds: ["friend"], fcmTokens: [] }));
   await assertSucceeds(getBytes(ref(storageOf("bee"), "avatars/sam")));
   await assertSucceeds(getBytes(ref(storageOf("friend"), "avatars/sam")));
   await assertFails(getBytes(ref(storageOf("stranger"), "avatars/sam")));
