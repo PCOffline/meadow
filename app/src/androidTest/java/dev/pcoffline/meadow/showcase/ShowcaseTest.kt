@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -35,7 +34,6 @@ import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
 import dev.pcoffline.meadow.ui.circle.CircleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
-import dev.pcoffline.meadow.ui.components.PetalBurst
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.RequestCard
@@ -214,21 +212,6 @@ class ShowcaseTest {
         // Scroll so the theme cards fill the screen.
         compose.onNodeWithText(compose.activity.getString(R.string.dark_mode_system)).performScrollTo()
         capture("profile")
-    }
-
-    @Test
-    fun gardenMovie() {
-        var celebration by mutableIntStateOf(0)
-        compose.mainClock.autoAdvance = false
-        show {
-            WithTabs(Tab.GARDEN) { GardenContent(DemoGarden.robin, DemoGarden.garden) }
-            PetalBurst(celebration, Modifier.fillMaxSize())
-        }
-        record("garden", seconds = 7) {
-            play(2_500)
-            celebration++
-            play(4_500)
-        }
     }
 
     @Test

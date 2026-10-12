@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -155,6 +156,7 @@ class GardenJourneyTest {
 
             // Deleting the account removes it from the backend and returns to the start.
             node(R.string.settings_delete).performScrollTo().performClick()
+            node(R.string.settings_delete_button).assertIsNotEnabled() // Not until DELETE is typed.
             compose.onNode(hasSetTextAction() and hasText(text(R.string.settings_delete_confirm_hint))).performTextInput("DELETE")
             node(R.string.settings_delete_button).performClick()
             waitFor(R.string.intro_have_garden)

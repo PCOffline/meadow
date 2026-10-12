@@ -15,7 +15,7 @@ patch of time. When it's used up, the app rests until tomorrow. Want more? Ask o
 friend who has to say yes is much harder to argue with.
 
 <p align="center">
-  <img src="docs/images/garden.webp" alt="The garden: flowers bloom for each app, a petal shower celebrates a good day" width="250">
+  <img src="docs/images/screen-garden.png" alt="The garden: a flower for each app, blooming while there's time left, resting when it's used up" width="250">
   &nbsp;
   <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who said yes to 15 more minutes" width="250">
   &nbsp;
