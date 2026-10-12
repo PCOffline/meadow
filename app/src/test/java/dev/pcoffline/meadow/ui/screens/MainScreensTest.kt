@@ -2,6 +2,9 @@ package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -49,7 +52,7 @@ class MainScreensTest : ScreenTest() {
 
     @Test
     fun `the garden is accessible in every theme, by day and night`() {
-        var look by androidx.compose.runtime.mutableStateOf(GardenTheme.MEADOW to DarkMode.LIGHT)
+        var look by mutableStateOf(GardenTheme.MEADOW to DarkMode.LIGHT)
         compose.setContent {
             dev.pcoffline.meadow.ui.theme.MeadowTheme(look.first, look.second) { GardenContent(DemoGarden.robin, DemoGarden.garden) }
         }

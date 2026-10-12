@@ -7,7 +7,6 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.unit.Density
-import kotlin.math.max
 
 /**
  * The checks screen reader and switch users rely on (WCAG 2.2 AA, Android accessibility
@@ -33,8 +32,10 @@ object Accessibility {
             val disabled = SemanticsProperties.Disabled in config
             if (!disabled) {
                 val minPx = with(density) { (MIN_TOUCH_DP - 0.5f) * this.density }
-                val width = max(node.size.width.toFloat(), node.touchBoundsInRoot.width)
-                val height = max(node.size.height.toFloat(), node.touchBoundsInRoot.height)
+                // Material components draw at 40dp but reserve 48dp around themselves for touch
+                // (minimumInteractiveComponentSize); that reserved space is the layout's size.
+                val width = maxOf(node.size.width.toFloat(), node.touchBoundsInRoot.width, node.layoutInfo.width.toFloat())
+                val height = maxOf(node.size.height.toFloat(), node.touchBoundsInRoot.height, node.layoutInfo.height.toFloat())
                 if (width < minPx || height < minPx) {
                     val dp = { px: Float -> px / density.density }
                     problems += "\"$label\" is only %.0f×%.0fdp; touch targets need 48×48dp".format(dp(width), dp(height))
