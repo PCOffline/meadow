@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChatRepository
@@ -65,6 +67,9 @@ class FriendViewModel(uid: String) : ViewModel() {
     private val profile = AppGraph.social.profile(uid)
     val friend: StateFlow<UserProfile?> = profile.stateWhileVisible(this, null)
 
+    /** False until the profile has been read; then [friend] null means they've left Meadow. */
+    val loaded: StateFlow<Boolean> = profile.map { true }.stateWhileVisible(this, false)
+
     // Only listened to while the friend shares it; the rules refuse it otherwise.
     val usage: StateFlow<SharedUsage?> = profile
         .map { it?.privacy?.shareUsage == true }
@@ -83,13 +88,16 @@ fun FriendScreen(
     viewModel: FriendViewModel = viewModel(key = "friend-$uid") { FriendViewModel(uid) },
 ) {
     val friend by viewModel.friend.collectAsStateWithLifecycle()
+    val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     val usage by viewModel.usage.collectAsStateWithLifecycle()
     val limits by viewModel.limits.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         BackTopBar(friend?.displayName.orEmpty(), onBack = onBack)
         val f = friend
-        if (f == null) {
+        if (f == null && loaded) {
+            EmptyState("🍂", stringResource(R.string.friend_gone_title), stringResource(R.string.friend_gone_body))
+        } else if (f == null) {
             Loading()
         } else {
             FriendDetails(f, usage, limits, onBack, onChat = { onOpenChat(ChatRepository.chatIdFor(me.uid, f.uid)) })
@@ -99,7 +107,7 @@ fun FriendScreen(
 
 @Composable
 private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppLimit>, onBack: () -> Unit, onChat: () -> Unit) {
-    var confirmStepDown by remember { mutableStateOf(false) }
+    var confirmStepDown by rememberSaveable { mutableStateOf(false) }
     val action = rememberAction()
     val steppedDown = stringResource(R.string.friend_stepped_down)
     Column(

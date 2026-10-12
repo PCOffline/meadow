@@ -70,6 +70,8 @@
     <string name="friend_emergency_active">🚨 Emergency unlock on for %1$s</string>
     <string name="friend_emergency_used">Emergency unlocks: %1$d of %2$d used in the last 30 days</string>
     <string name="friend_checked_in">Phone last checked in %1$s</string>
+    <string name="friend_gone_title">This garden isn\'t here any more</string>
+    <string name="friend_gone_body">They may have left Meadow, or you\'re no longer in each other\'s circle.</string>
     <string name="friend_never_checked_in">Their phone hasn\'t checked in yet</string>
     <string name="friend_today">Today</string>
     <string name="friend_no_usage">Nothing shared yet today.</string>

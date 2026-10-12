@@ -41,7 +41,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
-import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.ui.components.AppIcon
@@ -51,6 +50,7 @@ import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.SleepyZs
+import dev.pcoffline.meadow.ui.components.rememberResumedNow
 import dev.pcoffline.meadow.ui.components.rememberSkyMood
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
@@ -82,7 +82,9 @@ class GardenViewModel : ViewModel() {
     ) { _, _, _, _ ->
         val usage = AppGraph.catalog.userFacing(AppGraph.engine.todayUsage())
         GardenState(
-            budgets = AppGraph.engine.budgets().sortedBy { it.remainingMs },
+            // A steady order: sorting by time left would shuffle the rows (and replay their
+            // sprouting) every time one app's remaining time passed another's.
+            budgets = AppGraph.engine.budgets().sortedBy { it.limit.appName.lowercase() },
             todayTotalMs = usage.values.sum(),
             appsUsed = usage.size,
             essentialsReady = AppGraph.protection.current().essentialsReady,
@@ -119,8 +121,13 @@ fun GardenContent(
     onOpenCircle: () -> Unit = {},
 ) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GardenHeader(profile, state, onOpenSettings, onOpenProfile) }
-        item { EmergencyBanner(Modifier.padding(horizontal = 20.dp)) }
+        item {
+            // One item, so no gap is left when there's no emergency unlock to show.
+            Column {
+                GardenHeader(profile, state, onOpenSettings, onOpenProfile)
+                EmergencyBanner(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
+            }
+        }
 
         if (!state.essentialsReady) {
             item {
@@ -184,7 +191,8 @@ fun GardenContent(
 private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSettings: () -> Unit, onOpenProfile: () -> Unit) {
     val mood = rememberSkyMood()
     val minutes by animateIntAsState((state.todayTotalMs / 60_000L).toInt(), tween(1100), label = "todayMinutes")
-    val today = remember { Days.today().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
+    val now = rememberResumedNow()
+    val today = remember(now.toLocalDate()) { now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
     Box(Modifier.fillMaxWidth().height(250.dp)) {
         SkyScene(mood, Modifier.fillMaxSize())
         Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {

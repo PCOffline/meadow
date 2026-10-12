@@ -28,8 +28,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import java.time.LocalDateTime
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,6 +113,20 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 @Immutable
 data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
 
+/**
+ * The current time, refreshed whenever the screen comes back into view, so a garden left open
+ * in the morning doesn't still say "good morning" in the evening.
+ */
+@Composable
+fun rememberResumedNow(): LocalDateTime {
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LifecycleResumeEffect(Unit) {
+        now = LocalDateTime.now()
+        onPauseOrDispose { }
+    }
+    return now
+}
+
 /** Pins the sky to an hour of the day (screenshots); null follows the clock. */
 val LocalSkyHour = androidx.compose.runtime.staticCompositionLocalOf<Int?> { null }
 
@@ -117,7 +135,7 @@ val LocalSkyHour = androidx.compose.runtime.staticCompositionLocalOf<Int?> { nul
 fun rememberSkyMood(): SkyMood {
     val dark = dev.pcoffline.meadow.ui.theme.LocalDarkTheme.current
     val pinned = LocalSkyHour.current
-    val hour = pinned ?: remember { java.time.LocalTime.now().hour }
+    val hour = pinned ?: rememberResumedNow().hour
     val greeting = when (hour) {
         in 5..11 -> R.string.greeting_morning
         in 12..16 -> R.string.greeting_afternoon
@@ -149,10 +167,12 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
     val garden = Garden.colors
     val clock = rememberClock()
     val stars = remember { List(28) { Offset(Random(it * 31).nextFloat(), Random(it * 17 + 3).nextFloat() * 0.55f) } }
+    val sky = remember(mood.top, mood.bottom) { Brush.verticalGradient(listOf(mood.top, mood.bottom)) }
     Box(modifier) {
-        Canvas(Modifier.fillMaxSize()) {
+        // Each animated layer redraws on its own, without redrawing the still hills between them.
+        Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
-            drawRect(Brush.verticalGradient(listOf(mood.top, mood.bottom)))
+            drawRect(sky)
             if (mood.night) {
                 stars.forEachIndexed { i, p ->
                     val twinkle = 0.35f + 0.65f * abs(sin(t * 0.9f + i * 1.7f))
@@ -167,7 +187,7 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
             cloud(Offset(((t * 5.5f + size.width * 0.55f) % (size.width + 240f)) - 120f, size.height * 0.32f), 0.7f, cloudAlpha)
         }
         MeadowHills(Modifier.fillMaxSize())
-        Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
             if (mood.night) {
                 repeat(6) { i ->
@@ -301,8 +321,9 @@ fun PetalBurst(trigger: Int, modifier: Modifier = Modifier) {
 @Composable
 fun SproutLoader(modifier: Modifier = Modifier, label: String? = stringResource(R.string.loading_garden), size: Dp = 64.dp) {
     val garden = Garden.colors
+    val reduced = rememberReducedMotion()
     val transition = rememberInfiniteTransition(label = "sprout")
-    val grow by transition.animateFloat(
+    val growing = transition.animateFloat(
         0f, 1f,
         infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
         label = "grow",
@@ -310,6 +331,8 @@ fun SproutLoader(modifier: Modifier = Modifier, label: String? = stringResource(
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(Modifier.size(size)) {
+                // Without animations, a still sprout with its leaves out.
+                val grow = if (reduced) 0.8f else growing.value
                 val w = this.size.width
                 val h = this.size.height
                 val stem = (grow * 1.4f).coerceAtMost(1f)
@@ -335,16 +358,19 @@ fun SproutLoader(modifier: Modifier = Modifier, label: String? = stringResource(
 /** Little "z"s drifting up from a sleeping flower. */
 @Composable
 fun SleepyZs(modifier: Modifier = Modifier) {
+    val reduced = rememberReducedMotion()
     val transition = rememberInfiniteTransition(label = "zzz")
-    val t by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "z")
+    val t = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "z")
     Box(modifier.size(36.dp, 40.dp)) {
         repeat(3) { i ->
-            val p = (t + i / 3f) % 1f
             Text(
                 "z",
                 fontSize = (10 + 4 * i).sp,
-                color = MaterialTheme.colorScheme.tertiary.copy(alpha = (1f - p) * 0.9f),
+                color = MaterialTheme.colorScheme.tertiary,
+                // Animated in the layer only, so the text itself is never recomposed.
                 modifier = Modifier.graphicsLayer {
+                    val p = if (reduced) 0.2f + i * 0.25f else (t.value + i / 3f) % 1f
+                    alpha = (1f - p) * 0.9f
                     translationX = (6 + i * 8).dp.toPx() + sin(p * 6f) * 3f
                     translationY = (1f - p) * 28.dp.toPx()
                 },

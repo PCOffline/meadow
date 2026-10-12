@@ -67,10 +67,10 @@ fun SettingsScreen(
     onOpenProfile: () -> Unit,
     onOpenLegal: (LegalDoc) -> Unit,
 ) {
-    var confirmStrictOff by remember { mutableStateOf(false) }
-    var confirmSignOut by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var showEmergency by remember { mutableStateOf(false) }
+    var confirmStrictOff by rememberSaveable { mutableStateOf(false) }
+    var confirmSignOut by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var showEmergency by rememberSaveable { mutableStateOf(false) }
     val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
     val action = rememberAction()
     val hasBees = profile.approverIds.isNotEmpty()

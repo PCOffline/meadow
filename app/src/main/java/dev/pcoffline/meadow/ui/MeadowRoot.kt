@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
@@ -35,6 +36,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -180,7 +183,11 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         }
     }
 
+    // Offered once per visit: after a rotation the restored back stack already has it.
+    var setupOffered by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        if (setupOffered) return@LaunchedEffect
+        setupOffered = true
         if (!AppGraph.protection.current().essentialsReady) nav.navigate(SetupRoute)
     }
     val link by pendingRoute.collectAsStateWithLifecycle()
@@ -202,7 +209,8 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                 if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
             },
         ) { padding ->
-            Box(Modifier.padding(padding)) {
+            // Consumed, so screens' own status bar and keyboard padding doesn't add the bars twice.
+            Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                 NavHost(
                     nav,
                     startDestination = GardenRoute,

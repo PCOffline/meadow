@@ -151,7 +151,8 @@ fun CircleContent(
         }
 
         item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
-        if (bumblebees.isEmpty() && outgoing.isEmpty()) {
+        // Judged by the profile, which is already here, so it doesn't flash while friends load.
+        if (profile.approverIds.isEmpty() && bumblebees.isEmpty() && outgoing.isEmpty()) {
             item { EmptyState("🐝", stringResource(R.string.circle_no_bees_title), stringResource(R.string.circle_no_bees_body)) }
         }
         items(bumblebees, key = { "bee-" + it.uid }) { bee ->
@@ -162,7 +163,7 @@ fun CircleContent(
         items(outgoing, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
 
         item { SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(horizontal = 20.dp)) }
-        if (lookingAfter.isEmpty()) {
+        if (profile.approveeIds.isEmpty() && lookingAfter.isEmpty()) {
             item {
                 Text(
                     stringResource(R.string.circle_looking_after_empty),
@@ -329,7 +330,7 @@ private fun OutgoingInvite(invite: Invite, modifier: Modifier) {
 @Composable
 private fun BumblebeeRow(bee: UserProfile, others: Int, modifier: Modifier, onChat: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
-    var confirm by remember { mutableStateOf(false) }
+    var confirm by rememberSaveable { mutableStateOf(false) }
     val action = rememberAction()
     val removed = stringResource(R.string.circle_bee_removed, bee.displayName)
     Column(modifier) {

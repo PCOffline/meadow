@@ -206,7 +206,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
     var weeklyOn by rememberSaveable { mutableStateOf((existing?.weeklyMinutes ?: 0) > 0) }
     var weekly by rememberSaveable { mutableIntStateOf(existing?.weeklyMinutes?.takeIf { it > 0 } ?: 180) }
     var message by rememberSaveable { mutableStateOf("") }
-    var confirmRemove by remember { mutableStateOf(false) }
+    var confirmRemove by rememberSaveable { mutableStateOf(false) }
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
     val hasBees = state.bumblebeeCount > 0

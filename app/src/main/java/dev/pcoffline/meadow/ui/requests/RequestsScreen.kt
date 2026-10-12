@@ -83,7 +83,7 @@ fun RequestsScreen(
     viewModel: RequestsViewModel = viewModel(key = "requests-${profile.uid}") { RequestsViewModel(profile.uid) },
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var asking by remember { mutableStateOf(false) }
+    var asking by rememberSaveable { mutableStateOf(false) }
     val incoming by viewModel.incoming.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoing.collectAsStateWithLifecycle()
     val hasBees = profile.approverIds.isNotEmpty()
@@ -139,7 +139,7 @@ fun RequestsScreen(
 fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modifier, compact: Boolean = false) {
     val mine = request.requesterId == myUid
     val canDecide = !mine && request.status == RequestStatus.PENDING && myUid in request.approverIds
-    var deciding by remember { mutableStateOf<Boolean?>(null) }
+    var deciding by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
     val sentYes = stringResource(R.string.request_sent_yes)
