@@ -20,3 +20,7 @@ backend/hosting/privacy.html
 backend/hosting/terms.html
 backend/hosting/licenses.html
 backend/hosting/.well-known/
+
+# Signing keys must never be committed
+*.jks
+*.keystore
