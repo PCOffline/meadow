@@ -15,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.auth.ConsentCheckbox
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
