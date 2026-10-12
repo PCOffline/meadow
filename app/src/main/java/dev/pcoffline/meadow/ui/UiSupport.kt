@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.functions.FirebaseFunctionsException
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Backend
@@ -99,7 +100,16 @@ fun Throwable.friendlyMessage(context: Context): String = when (this) {
     is Backend.CallFailed -> when {
         unreachable -> context.getString(R.string.error_offline)
         !message.isNullOrBlank() -> message.orEmpty()
-        else -> context.getString(R.string.error_generic)
+        else -> context.getString(
+            when (code) {
+                // The function isn't on the server, e.g. the app and backend disagree on its region.
+                FirebaseFunctionsException.Code.NOT_FOUND, FirebaseFunctionsException.Code.UNIMPLEMENTED -> R.string.error_server_missing
+                FirebaseFunctionsException.Code.UNAUTHENTICATED -> R.string.error_auth_recent_login
+                FirebaseFunctionsException.Code.PERMISSION_DENIED -> R.string.error_server_refused
+                FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED -> R.string.error_server_busy
+                else -> R.string.error_generic
+            },
+        )
     }
     is FirebaseNetworkException -> context.getString(R.string.error_offline)
     is FirebaseAuthException -> context.getString(

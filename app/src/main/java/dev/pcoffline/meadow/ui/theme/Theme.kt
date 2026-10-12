@@ -4,6 +4,7 @@ package dev.pcoffline.meadow.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -316,7 +317,11 @@ fun MeadowTheme(
     val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
     val garden = remember(theme, dark) { gardenColors(seed, dark) }
     CompositionLocalProvider(LocalGarden provides garden, LocalDarkTheme provides dark) {
-        MaterialTheme(colorScheme = scheme, typography = MeadowTypography, shapes = MeadowShapes, content = content)
+        MaterialTheme(colorScheme = scheme, typography = MeadowTypography, shapes = MeadowShapes) {
+            // Screens drawn straight on the background (onboarding, the rest screen) have no Surface
+            // to set a text colour, and Compose's default is black, unreadable at night.
+            CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }
 

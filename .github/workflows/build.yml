@@ -1,9 +1,18 @@
 name: Build
 
+# Pull requests are tested as they would merge; pushes only for main, so a branch with an open
+# pull request isn't built twice. Run it by hand for a branch without one.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+
+# A newer push to the same pull request makes its older run pointless. Other runs, such as every
+# push to main, get a group of their own, so none is cancelled.
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   android:
@@ -127,9 +136,10 @@ jobs:
         run: |
           npm ci && npm --prefix functions ci && npm --prefix functions run build
           nohup npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow > emulators.log 2>&1 &
+          region=$(sed -n 's/^MEADOW_REGION=//p' functions/.env)
           for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' \
-              http://127.0.0.1:5001/demo-meadow/us-central1/createProfile || true)
+              "http://127.0.0.1:5001/demo-meadow/$region/createProfile" || true)
             if [ "$code" != "000" ] && [ "$code" != "404" ]; then echo "Emulators ready ($code)"; exit 0; fi
             sleep 2
           done

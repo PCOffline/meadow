@@ -98,7 +98,8 @@ export async function consumeRates(
 
 /** Validates callable input, turning the first problem into a friendly error. */
 export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
-  const result = schema.safeParse(data ?? {});
+  // Fields without a message of their own get the generic one, not zod's technical English.
+  const result = schema.safeParse(data ?? {}, { error: () => errors.generic });
   if (!result.success) throw new HttpsError("invalid-argument", result.error.issues[0]?.message ?? errors.generic);
   return result.data;
 }
