@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package dev.pcoffline.meadow.enforcement
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -28,24 +31,28 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
-import dev.pcoffline.meadow.data.formatDuration
-import dev.pcoffline.meadow.data.formatMinutes
 import dev.pcoffline.meadow.ui.LocalSnackbar
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
@@ -55,17 +62,23 @@ import dev.pcoffline.meadow.ui.components.PetalBurst
 import dev.pcoffline.meadow.ui.components.SkyMood
 import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.SleepyZs
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
+import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
+import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
+import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import dev.pcoffline.meadow.ui.ticker
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 
 /** The calm screen shown in place of an app whose time is up. */
 class BlockActivity : ComponentActivity() {
@@ -108,49 +121,83 @@ class BlockActivity : ComponentActivity() {
             val intent = Intent(context, BlockActivity::class.java)
                 .putExtra(EXTRA_PACKAGE, packageName)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-            runCatching { context.startActivity(intent) }
+            try {
+                context.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                // Can't happen for our own activity; guarded so enforcement never crashes the service.
+            }
         }
     }
 }
 
+data class RestState(
+    val appName: String = "",
+    val budget: AppBudget? = null,
+    val signedIn: Boolean = false,
+    val hasBumblebees: Boolean = false,
+    val pendingRequest: LimitRequest? = null,
+) {
+    val unlocked: Boolean get() = budget != null && !budget.exhausted
+}
+
+class RestViewModel(private val packageName: String) : ViewModel() {
+    private val pending = AppGraph.sync.profile.flatMapLatest { state ->
+        val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
+        AppGraph.requests.outgoing(uid).map { requests ->
+            requests.firstOrNull {
+                it.type == RequestType.EXTRA_TIME && it.packageName == packageName &&
+                    it.status == RequestStatus.PENDING && it.dayKey == Days.todayKey()
+            }
+        }
+    }
+
+    val state: StateFlow<RestState> = combine(
+        AppGraph.store.grants,
+        AppGraph.store.emergency,
+        AppGraph.sync.profile,
+        pending,
+        ticker(15_000L),
+    ) { _, _, profileState, request, _ ->
+        val profile = (profileState as? ProfileState.Ready)?.profile
+        RestState(
+            appName = AppGraph.engine.limitFor(packageName)?.appName ?: AppGraph.catalog.label(packageName),
+            budget = AppGraph.engine.budget(packageName, forceRefresh = true),
+            signedIn = profile != null,
+            hasBumblebees = profile?.approverIds?.isNotEmpty() == true,
+            pendingRequest = request,
+        )
+    }.flowOn(Dispatchers.IO).stateWhileVisible(this, RestState())
+}
+
+/** A resting app gets a calm dusk sky with the moon out, whatever the hour. */
+private val RestingSky = SkyMood(
+    top = Color(0xFF3B3F63),
+    bottom = Color(0xFFB8A9C9),
+    night = true,
+    onSky = Color(0xFFF3EEE2),
+    greeting = R.string.greeting_night,
+)
+
 @Composable
 private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit) {
-    val garden = Garden.colors
+    val viewModel = viewModel(key = "rest-$pkg") { RestViewModel(pkg) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var asking by remember { mutableStateOf(false) }
     var emergency by remember { mutableStateOf(false) }
-    val grants by AppGraph.store.grants.collectAsStateWithLifecycle()
-    val activeEmergency by AppGraph.store.emergency.collectAsStateWithLifecycle()
-    val budget by produceState<AppBudget?>(null, pkg, grants, activeEmergency) {
-        while (true) {
-            value = withContext(Dispatchers.IO) { AppGraph.engine.budget(pkg, forceRefresh = true) }
-            delay(15_000L)
-        }
-    }
-    val profileState by AppGraph.sync.profile.collectAsStateWithLifecycle()
-    val profile = (profileState as? ProfileState.Ready)?.profile
-    val outgoing by remember(profile?.uid) {
-        profile?.uid?.let { AppGraph.requests.outgoing(it) } ?: emptyFlow<List<LimitRequest>>()
-    }.collectAsStateWithLifecycle(emptyList())
-    val pending = outgoing.firstOrNull {
-        it.type == RequestType.EXTRA_TIME && it.packageName == pkg &&
-            it.status == RequestStatus.PENDING && it.dayKey == Days.todayKey()
-    }
-    val appName = remember(pkg) { AppGraph.engine.limitFor(pkg)?.appName ?: AppGraph.catalog.label(pkg) }
-    val b = budget
-    val unlocked = b != null && !b.exhausted
-    // Petals when a friend's yes arrives while this screen is open.
+
+    // Petals when a Bumblebee's yes arrives while this screen is open.
     var burst by remember { mutableIntStateOf(0) }
     var wasUnlocked by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(unlocked, b != null) {
-        if (b == null) return@LaunchedEffect
-        if (wasUnlocked == false && unlocked && !b.emergency) burst++
-        wasUnlocked = unlocked
+    LaunchedEffect(state.unlocked, state.budget != null) {
+        val budget = state.budget ?: return@LaunchedEffect
+        if (wasUnlocked == false && state.unlocked && !budget.emergency) burst++
+        wasUnlocked = state.unlocked
     }
 
     CompositionLocalProvider(LocalSnackbar provides snackbar) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            SkyScene(restingSky(), Modifier.fillMaxSize())
+            SkyScene(RestingSky, Modifier.fillMaxSize())
             FallingPetals(Modifier.fillMaxSize(), count = 8)
             Column(
                 Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(28.dp),
@@ -159,66 +206,11 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
             ) {
                 AppIcon(pkg, size = 56.dp)
                 Box {
-                    BloomFlower(if (unlocked) 0.9f else 0.05f, garden.petalPink, Modifier.size(110.dp, 150.dp))
-                    if (!unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
+                    BloomFlower(if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp))
+                    if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
                 }
                 MeadowCard(Modifier.fillMaxWidth()) {
-                    Column(
-                        Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(
-                            when {
-                                unlocked && b?.emergency == true -> "Emergency unlock active 🚨"
-                                unlocked -> "Your friend said yes 🌸"
-                                else -> "$appName is resting 🌙"
-                            },
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            when {
-                                unlocked && b!!.emergency ->
-                                    "$appName is open for ${formatDuration(b.emergencyUntilMillis - System.currentTimeMillis())}. Take care of what you need to."
-                                unlocked -> "You have ${formatDuration(b!!.remainingMs)} more. Enjoy it mindfully."
-                                b != null && b.weeklyIsTighter ->
-                                    "You've used the ${formatMinutes(b.limit.weeklyMinutes)} you set aside for this week."
-                                b != null ->
-                                    "You've used the ${formatMinutes(b.limit.dailyMinutes)} you set aside today. It blooms again tomorrow."
-                                else -> "You've used the time you set aside."
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        when {
-                            unlocked -> Button(onClick = { onOpen(pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Open $appName") }
-                            pending != null -> Text(
-                                "💌 You asked for ${pending.minutes} more minutes. We'll let you know when someone answers.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                            )
-                            profile == null -> Text(
-                                "Sign in to Meadow to ask a friend for more time.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                            )
-                            profile.approverIds.isEmpty() -> Text(
-                                "Invite a Petal Pal in Meadow so you can ask a friend for more time.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                            )
-                            else -> Button(onClick = { asking = true }, modifier = Modifier.fillMaxWidth()) { Text("Ask a friend for more time") }
-                        }
-                        OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text("Go do something lovely") }
-                        if (!unlocked) {
-                            TextButton(onClick = { emergency = true }) {
-                                Text("Emergency? Unlock now", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
+                    RestCard(state, onAsk = { asking = true }, onEmergency = { emergency = true }, onOpen = { onOpen(pkg) }, onHome = onHome)
                 }
             }
             PetalBurst(burst, Modifier.fillMaxSize())
@@ -226,14 +218,51 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
         }
     }
     if (asking) AskForTimeDialog(packageName = pkg, onDismiss = { asking = false })
-    if (emergency) EmergencyDialog(packageName = pkg, appName = appName, onDismiss = { emergency = false })
+    if (emergency) EmergencyDialog(packageName = pkg, appName = state.appName, onDismiss = { emergency = false })
 }
 
-/** A resting app gets a calm dusk sky with the moon out, whatever the hour. */
-private fun restingSky() = SkyMood(
-    top = androidx.compose.ui.graphics.Color(0xFF3B3F63),
-    bottom = androidx.compose.ui.graphics.Color(0xFFB8A9C9),
-    night = true,
-    onSky = androidx.compose.ui.graphics.Color(0xFFF3EEE2),
-    greeting = "",
-)
+@Composable
+private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Unit, onOpen: () -> Unit, onHome: () -> Unit) {
+    val budget = state.budget
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            when {
+                state.unlocked && budget?.emergency == true -> stringResource(R.string.rest_title_emergency)
+                state.unlocked -> stringResource(R.string.rest_title_yes)
+                else -> stringResource(R.string.rest_title, state.appName)
+            },
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            when {
+                budget == null -> stringResource(R.string.rest_body_generic)
+                state.unlocked && budget.emergency ->
+                    stringResource(R.string.rest_body_emergency, state.appName, durationText(budget.emergencyUntilMillis - System.currentTimeMillis()))
+                state.unlocked -> stringResource(R.string.rest_body_yes, durationText(budget.remainingMs))
+                budget.weeklyIsTighter -> stringResource(R.string.rest_body_week, minutesText(budget.limit.weeklyMinutes))
+                else -> stringResource(R.string.rest_body_today, minutesText(budget.limit.dailyMinutes))
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        when {
+            state.unlocked -> Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_open, state.appName)) }
+            state.pendingRequest != null -> Note(stringResource(R.string.rest_pending, minutesText(state.pendingRequest.minutes)))
+            !state.signedIn -> Note(stringResource(R.string.rest_signed_out))
+            !state.hasBumblebees -> Note(stringResource(R.string.rest_no_bees))
+            else -> Button(onClick = onAsk, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_ask)) }
+        }
+        OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_home)) }
+        if (!state.unlocked) {
+            TextButton(onClick = onEmergency) { Text(stringResource(R.string.rest_emergency), color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+@Composable
+private fun Note(text: String) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+}

@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 
@@ -15,7 +16,7 @@ class Backend {
 
     val uid: String? get() = auth.currentUser?.uid
 
-    fun requireUid(): String = uid ?: throw IllegalStateException("Please sign in first.")
+    fun requireUid(): String = uid ?: throw FriendlyException(R.string.error_sign_in_first)
 
     fun user(uid: String) = db.collection("users").document(uid)
 
@@ -29,13 +30,16 @@ class Backend {
             val unreachable = e.code == FirebaseFunctionsException.Code.UNAVAILABLE ||
                 e.code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ||
                 e.cause is IOException
-            throw CallFailed(e.message ?: "Something went wrong (${e.code}).", unreachable, e)
+            throw CallFailed(e.message.orEmpty(), unreachable, e)
         } catch (e: IOException) {
-            throw CallFailed("Couldn't reach Meadow. Check your connection.", unreachable = true, cause = e)
+            throw CallFailed("", unreachable = true, cause = e)
         }
     }
 
-    /** A failed Cloud Function call. [unreachable] means the backend couldn't be reached at all. */
+    /**
+     * A failed Cloud Function call. Its message is the backend's friendly text (see copy.ts);
+     * [unreachable] means the backend couldn't be reached at all.
+     */
     class CallFailed(message: String, val unreachable: Boolean, cause: Throwable?) : IllegalStateException(message, cause)
 
     companion object {

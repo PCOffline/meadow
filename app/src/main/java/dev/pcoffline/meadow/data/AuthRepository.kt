@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.data
 
 import com.google.firebase.auth.EmailAuthProvider
+import dev.pcoffline.meadow.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.messaging.FirebaseMessaging
@@ -48,26 +49,28 @@ class AuthRepository(private val backend: Backend) {
      * Needed before inviting approvers, so a reinstall can't wipe your commitments.
      */
     suspend fun addEmail(email: String, password: String) {
-        val user = backend.auth.currentUser ?: throw IllegalStateException("Please sign in first.")
-        require(password.length >= 6) { "Use at least 6 characters for your password." }
+        val user = backend.auth.currentUser ?: throw FriendlyException(R.string.error_sign_in_first)
+        if (password.length < 6) throw FriendlyException(R.string.error_auth_weak_password)
         user.linkWithCredential(EmailAuthProvider.getCredential(email.trim(), password)).await()
         user.reload().await()
         _anonymous.value = false
     }
 
     suspend fun sendPasswordReset(email: String) {
+        if (email.isBlank()) throw FriendlyException(R.string.error_email_required)
         backend.auth.sendPasswordResetEmail(email.trim()).await()
     }
 
     /** Creates the Firestore profile and claims a unique friend code. */
     suspend fun createProfile(displayName: String, flower: String) {
+        if (displayName.isBlank()) throw FriendlyException(R.string.error_name_required)
         backend.call("createProfile", mapOf("displayName" to displayName.trim(), "flower" to flower))
     }
 
     suspend fun signOut() {
         val uid = backend.uid
         if (uid != null) {
-            runCatching {
+            runCatchingCancellable {
                 val token = FirebaseMessaging.getInstance().token.await()
                 backend.user(uid).update("fcmTokens", FieldValue.arrayRemove(token)).await()
             }

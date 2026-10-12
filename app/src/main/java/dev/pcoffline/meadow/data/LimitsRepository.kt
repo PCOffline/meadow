@@ -1,13 +1,14 @@
 package dev.pcoffline.meadow.data
 
 import com.google.firebase.firestore.FieldValue
+import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
 enum class ChangeOutcome { APPLIED, REQUESTED }
 
 /**
- * Tightening a limit always applies immediately. Loosening or removing one needs an approver
+ * Tightening a limit always applies immediately. Loosening or removing one needs a Bumblebee
  * to agree once you have any approvers; Firestore rules enforce the same thing server-side.
  */
 class LimitsRepository(
@@ -17,7 +18,7 @@ class LimitsRepository(
 ) {
     suspend fun save(limit: AppLimit, message: String = ""): ChangeOutcome {
         val uid = backend.requireUid()
-        require(limit.dailyMinutes > 0 || limit.weeklyMinutes > 0) { "Set a daily or weekly limit." }
+        if (limit.dailyMinutes <= 0 && limit.weeklyMinutes <= 0) throw FriendlyException(R.string.error_set_a_limit)
         val current = store.limits.value.firstOrNull { it.packageName == limit.packageName }
         if (current != null && isLooser(current, limit) && store.approverCount.value > 0) {
             requests.create(

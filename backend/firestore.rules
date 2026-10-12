@@ -70,14 +70,19 @@ service cloud.firestore {
 
       match /alerts/{alertId} {
         allow create: if signedIn() && me() == uid
-          && request.resource.data.keys().hasOnly(['kind', 'detail', 'createdAt'])
-          && request.resource.data.kind is string && request.resource.data.kind.size() <= 40
-          && request.resource.data.detail is string && request.resource.data.detail.size() <= 200;
+          && request.resource.data.keys().hasOnly(['kind', 'lost', 'createdAt'])
+          && request.resource.data.kind == 'protection_off'
+          && request.resource.data.lost is list && request.resource.data.lost.size() <= 5;
         allow read, update, delete: if false;
       }
     }
 
     match /friendCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // Invite links are created, previewed and redeemed only through Cloud Functions.
+    match /inviteLinks/{token} {
       allow read, write: if false;
     }
 

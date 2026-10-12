@@ -46,6 +46,16 @@ class LocalStore(context: Context) {
     private val _emergency = MutableStateFlow(read<Emergency>(KEY_EMERGENCY))
     val emergency: StateFlow<Emergency?> = _emergency.asStateFlow()
 
+    private val _pendingInvite = MutableStateFlow(prefs.getString(KEY_PENDING_INVITE, null))
+
+    /** An invite link opened before (or while) setting up; offered once a profile exists. */
+    val pendingInvite: StateFlow<String?> = _pendingInvite.asStateFlow()
+
+    fun setPendingInvite(token: String?) {
+        prefs.edit().putString(KEY_PENDING_INVITE, token).apply()
+        _pendingInvite.value = token
+    }
+
     var ownerUid: String?
         get() = prefs.getString(KEY_OWNER, null)
         set(value) = prefs.edit().putString(KEY_OWNER, value).apply()
@@ -114,5 +124,6 @@ class LocalStore(context: Context) {
         const val KEY_EMERGENCY = "emergency"
         const val KEY_OFFLINE_EMERGENCY = "offline_emergency_at"
         const val KEY_PENDING_EMERGENCY = "pending_emergency_v2"
+        const val KEY_PENDING_INVITE = "pending_invite"
     }
 }

@@ -55,7 +55,7 @@ class ChatRepository(private val backend: Backend) {
 
     suspend fun markRead(chatId: String) {
         val uid = backend.uid ?: return
-        runCatching { chats.document(chatId).update("lastRead.$uid", FieldValue.serverTimestamp()).await() }
+        runCatchingCancellable { chats.document(chatId).update("lastRead.$uid", FieldValue.serverTimestamp()).await() }
     }
 
     companion object {

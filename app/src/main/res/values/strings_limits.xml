@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="limit_daily">%1$s a day</string>
+    <string name="limit_weekly">%1$s a week</string>
+    <string name="limit_daily_and_weekly">%1$s a day and %2$s a week</string>
+    <string name="limit_none">No limit</string>
+
+    <string name="request_an_app">an app</string>
+    <plurals name="request_extra_time">
+        <item quantity="one">%1$d more minute on %2$s</item>
+        <item quantity="other">%1$d more minutes on %2$s</item>
+    </plurals>
+    <string name="request_change_limit">a new limit for %1$s: %2$s</string>
+    <string name="request_remove_limit">removing the limit on %1$s</string>
+    <string name="request_disable_strict_mode">turning off strict mode</string>
+
+    <!-- App picker -->
+    <string name="picker_title">Choose an app</string>
+    <string name="picker_search">Search apps</string>
+    <string name="picker_used_today">%1$s today</string>
+    <string name="picker_not_opened">Not opened today</string>
+    <string name="picker_planted">Planted</string>
+
+    <!-- Limit editor -->
+    <string name="limit_editor_new">Plant a limit</string>
+    <string name="limit_editor_existing">Tend this limit</string>
+    <string name="limit_editor_usage">%1$s today · %2$s this week</string>
+    <string name="limit_editor_daily">Daily limit</string>
+    <string name="limit_editor_weekly">Weekly limit</string>
+    <string name="limit_editor_weekly_hint">Weeks start on Monday. Whichever limit runs out first wins.</string>
+    <string name="limit_editor_less">Less time</string>
+    <string name="limit_editor_more">More time</string>
+    <string name="limit_editor_loosens_title">This loosens your limit 💌</string>
+    <string name="limit_editor_loosens_body">Your Bumblebees will be asked first. The new limit starts once one of them says yes.</string>
+    <string name="limit_editor_note">A note for them (optional)</string>
+    <string name="limit_editor_locked_hint">Once planted, loosening or removing this limit needs a yes from a Bumblebee.</string>
+    <string name="limit_editor_plant">Plant this limit</string>
+    <string name="limit_editor_ask">Ask my Bumblebees</string>
+    <string name="limit_editor_remove">Remove this limit</string>
+    <string name="limit_editor_ask_remove">Ask to remove this limit</string>
+    <string name="limit_editor_planted">Planted 🌱</string>
+    <string name="limit_editor_updated">Limit updated 🌿</string>
+    <string name="limit_editor_removed">Limit removed</string>
+    <string name="limit_editor_requested">Asked your Bumblebees 💌</string>
+    <string name="limit_remove_title">Remove the limit on %1$s?</string>
+    <string name="limit_remove_body_ask">Your Bumblebees will be asked first. The limit stays until one of them says yes.</string>
+    <string name="limit_remove_body_now">The limit will be removed straight away.</string>
+    <string name="limit_remove_ask">Ask</string>
+</resources>

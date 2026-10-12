@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.work.SyncWorker
 
 class BootReceiver : BroadcastReceiver() {
@@ -17,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
 /** Device admin only exists to make uninstalling Meadow a deliberate, visible act. */
 class MeadowDeviceAdmin : DeviceAdminReceiver() {
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence =
-        "Turning this off lets Meadow be uninstalled. Your Petal Pals will be told. 🌷"
+        context.getString(R.string.device_admin_disable_warning)
 
     override fun onDisabled(context: Context, intent: Intent) {
         AppGraph.protection.check(AppGraph.protection.current().copy(deviceAdmin = false))

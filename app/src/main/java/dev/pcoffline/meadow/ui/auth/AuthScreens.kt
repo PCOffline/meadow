@@ -64,7 +64,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.FlowerAvatars
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -105,12 +111,12 @@ fun AuthScreen() {
     }
 }
 
-private data class IntroPage(val title: String, val body: String)
+private data class IntroPage(@StringRes val title: Int, @StringRes val body: Int)
 
 private val introPages = listOf(
-    IntroPage("Plant gentle limits", "Choose how long each app may bloom every day. When its time is up, it rests until tomorrow."),
-    IntroPage("Friends hold the watering can", "Only friends you choose can give you more time or loosen a limit. No quiet overrides."),
-    IntroPage("Watch your days grow", "See your days, weeks and months take shape — and celebrate the calmer ones."),
+    IntroPage(R.string.intro_plant_title, R.string.intro_plant_body),
+    IntroPage(R.string.intro_bees_title, R.string.intro_bees_body),
+    IntroPage(R.string.intro_growth_title, R.string.intro_growth_body),
 )
 
 @Composable
@@ -123,7 +129,7 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
         FallingPetals(Modifier.fillMaxSize(), count = 10)
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Text(
-                "Meadow",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = mood.onSky,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 20.dp),
@@ -141,10 +147,10 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
                         }
                     }
                     Spacer(Modifier.height(28.dp))
-                    Text(introPages[index].title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+                    Text(stringResource(introPages[index].title), style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        introPages[index].body,
+                        stringResource(introPages[index].body),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -157,9 +163,9 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
             Button(
                 onClick = { if (last) onStart() else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } },
                 modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(54.dp),
-            ) { Text(if (last) "Let's begin 🌱" else "Next", style = MaterialTheme.typography.titleMedium) }
+            ) { Text(stringResource(if (last) R.string.intro_begin else R.string.intro_next), style = MaterialTheme.typography.titleMedium) }
             TextButton(onClick = onSignIn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp)) {
-                Text("I already have a garden")
+                Text(stringResource(R.string.intro_have_garden))
             }
         }
     }
@@ -196,7 +202,7 @@ private fun FriendsIllustration() {
     )
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 40.dp)) {
         FlowerAvatar("🌻", size = 96.dp, tint = MaterialTheme.colorScheme.primaryContainer)
-        Text("💗", fontSize = 34.sp, modifier = Modifier.padding(horizontal = 14.dp).graphicsLayer { scaleX = beat; scaleY = beat })
+        Text("🐝", fontSize = 34.sp, modifier = Modifier.padding(horizontal = 14.dp).graphicsLayer { scaleX = beat; scaleY = beat })
         FlowerAvatar("🌷", size = 96.dp, tint = MaterialTheme.colorScheme.secondaryContainer)
     }
 }
@@ -224,12 +230,12 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text("← Back") }
+        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start)) { Text(stringResource(R.string.action_back)) }
         BigFlower(flower)
-        Text("Who's tending this garden?", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.onboarding_name_title), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         OutlinedTextField(
             value = name, onValueChange = { name = it.take(30) },
-            label = { Text("Your name") }, singleLine = true,
+            label = { Text(stringResource(R.string.onboarding_name_label)) }, singleLine = true,
             shape = RoundedCornerShape(18.dp),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -239,14 +245,14 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             onClick = { action.run { AppGraph.auth.startWithoutEmail(name, flower) } },
             enabled = !action.busy && name.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(54.dp),
-        ) { Text(if (action.busy) "Planting…" else "Plant my garden 🌱", style = MaterialTheme.typography.titleMedium) }
+        ) { Text(stringResource(if (action.busy) R.string.onboarding_planting else R.string.onboarding_plant), style = MaterialTheme.typography.titleMedium) }
         Text(
-            "No email needed to start. You'll add one before inviting your first Petal Pal, so your garden can't get lost.",
+            stringResource(R.string.onboarding_no_email),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        TextButton(onClick = onSignIn) { Text("I already have a garden") }
+        TextButton(onClick = onSignIn) { Text(stringResource(R.string.intro_have_garden)) }
     }
 }
 
@@ -268,14 +274,15 @@ private fun SignInStep(onBack: () -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val action = rememberAction()
+    val resetSent = stringResource(R.string.sign_in_reset_sent)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().imePadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        TextButton(onClick = onBack) { Text("← Back") }
-        Text("Welcome back 🌼", style = MaterialTheme.typography.headlineMedium)
+        TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
+        Text(stringResource(R.string.sign_in_title), style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Sign in with the email you added to your garden.",
+            stringResource(R.string.sign_in_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -285,16 +292,13 @@ private fun SignInStep(onBack: () -> Unit) {
             onClick = { action.run { AppGraph.auth.signIn(email, password) } },
             enabled = !action.busy && email.isNotBlank() && password.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(54.dp),
-        ) { Text(if (action.busy) "One moment…" else "Come on in") }
+        ) { Text(stringResource(if (action.busy) R.string.sign_in_busy else R.string.sign_in_button)) }
         TextButton(
             onClick = {
-                action.run(successMessage = "Check your inbox for a reset link 💌") {
-                    require(email.isNotBlank()) { "Enter your email first." }
-                    AppGraph.auth.sendPasswordReset(email)
-                }
+                action.run(successMessage = resetSent) { AppGraph.auth.sendPasswordReset(email) }
             },
             modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) { Text("Forgot your password?") }
+        ) { Text(stringResource(R.string.sign_in_forgot)) }
     }
 }
 
@@ -302,14 +306,14 @@ private fun SignInStep(onBack: () -> Unit) {
 private fun EmailFields(email: String, onEmail: (String) -> Unit, password: String, onPassword: (String) -> Unit) {
     OutlinedTextField(
         value = email, onValueChange = onEmail,
-        label = { Text("Email") }, singleLine = true,
+        label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
         shape = RoundedCornerShape(18.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
         value = password, onValueChange = onPassword,
-        label = { Text("Password") }, singleLine = true,
+        label = { Text(stringResource(R.string.field_password)) }, singleLine = true,
         shape = RoundedCornerShape(18.dp),
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -319,32 +323,34 @@ private fun EmailFields(email: String, onEmail: (String) -> Unit, password: Stri
 
 /** Adds an email to a garden started without one. */
 @Composable
-fun SecureAccountCard(modifier: Modifier = Modifier, reason: String) {
+fun SecureAccountCard(@StringRes reason: Int, modifier: Modifier = Modifier) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val action = rememberAction()
+    val saved = stringResource(R.string.secure_done)
     MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
-        Text("🔐 Keep your garden safe", style = MaterialTheme.typography.titleMedium)
-        Text(reason, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+        Text(stringResource(R.string.secure_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(reason), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             EmailFields(email, { email = it }, password, { password = it })
         }
         ErrorNote(action.error, Modifier.padding(top = 8.dp))
         Button(
-            onClick = { action.run(successMessage = "Your garden is safe 🌿") { AppGraph.auth.addEmail(email, password) } },
+            onClick = { action.run(successMessage = saved) { AppGraph.auth.addEmail(email, password) } },
             enabled = !action.busy && email.isNotBlank() && password.length >= 6,
             modifier = Modifier.padding(top = 8.dp),
-        ) { Text(if (action.busy) "Saving…" else "Add email") }
+        ) { Text(stringResource(if (action.busy) R.string.secure_busy else R.string.secure_button)) }
     }
 }
 
 @Composable
 fun FlowerPicker(selected: String, onSelect: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Pick your flower", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.flower_picker_title), style = MaterialTheme.typography.labelLarge)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(FlowerAvatars) { f ->
                 val chosen = f == selected
+                val pickLabel = stringResource(R.string.flower_picker_item, f)
                 val scale by animateFloatAsState(
                     if (chosen) 1.12f else 1f,
                     spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -357,7 +363,13 @@ fun FlowerPicker(selected: String, onSelect: (String) -> Unit) {
                         .pressBounce(interaction)
                         .clip(CircleShape)
                         .background(if (chosen) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable(interactionSource = interaction, indication = null) { onSelect(f) },
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = null,
+                            onClickLabel = pickLabel,
+                            role = Role.RadioButton,
+                        ) { onSelect(f) }
+                        .semantics { selected = chosen },
                     contentAlignment = Alignment.Center,
                 ) { Text(f, fontSize = 24.sp) }
             }
@@ -377,10 +389,10 @@ fun ProfileSetupScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         BigFlower(flower)
-        Text("Almost there", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.profile_setup_title), style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(
             value = name, onValueChange = { name = it.take(30) },
-            label = { Text("Your name") }, singleLine = true,
+            label = { Text(stringResource(R.string.onboarding_name_label)) }, singleLine = true,
             shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
@@ -389,7 +401,7 @@ fun ProfileSetupScreen() {
             onClick = { action.run { AppGraph.auth.createProfile(name, flower) } },
             enabled = !action.busy && name.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(54.dp),
-        ) { Text("Continue") }
-        TextButton(onClick = { action.run { AppGraph.auth.signOut() } }) { Text("Use another account") }
+        ) { Text(stringResource(R.string.profile_setup_continue)) }
+        TextButton(onClick = { action.run { AppGraph.auth.signOut() } }) { Text(stringResource(R.string.profile_setup_other_account)) }
     }
 }

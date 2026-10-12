@@ -11,7 +11,8 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import dev.pcoffline.meadow.AppGraph
-import dev.pcoffline.meadow.data.formatDuration
+import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.notifications.Notifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,12 +30,14 @@ import kotlinx.coroutines.launch
 class GuardianService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var lastBlocked: Pair<String, Long>? = null
+    private var foreground: String? = null
+    private var probedUntil = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        val notification = AppGraph.notifier.guardianNotification("Tending your garden 🌱")
+        val notification = AppGraph.notifier.guardianNotification(getString(R.string.guardian_starting))
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         } else {
@@ -50,7 +53,12 @@ class GuardianService : Service() {
         var tick = 0
         while (scope.isActive) {
             runCatching {
-                if (!GuardianAccessibilityService.running) pollForeground()
+                if (GuardianAccessibilityService.running) {
+                    probedUntil = 0L
+                    foreground = null
+                } else {
+                    pollForeground()
+                }
                 if (tick % 12 == 0) {
                     updateSummary()
                     AppGraph.protection.check()
@@ -63,14 +71,18 @@ class GuardianService : Service() {
 
     /** Fallback enforcement through the usage log when accessibility is off. */
     private fun pollForeground() {
-        val pkg = AppGraph.tracker.currentForegroundApp() ?: return
+        val now = System.currentTimeMillis()
+        // The first probe looks back an hour; later ones only read events since the previous probe.
+        val from = if (probedUntil == 0L) now - 60 * 60_000L else probedUntil
+        foreground = AppGraph.tracker.foregroundAfter(foreground, from, now)
+        probedUntil = now
+        val pkg = foreground ?: return
         AppGraph.engine.setForeground(pkg)
         val budget = AppGraph.engine.budget(pkg) ?: return
         if (!budget.exhausted) {
             if (!budget.emergency) AppGraph.notifier.maybeWarn(budget)
             return
         }
-        val now = System.currentTimeMillis()
         val last = lastBlocked
         if (last != null && last.first == pkg && now - last.second < 4_000L) return
         lastBlocked = pkg to now
@@ -84,17 +96,16 @@ class GuardianService : Service() {
         val emergency = AppGraph.store.emergency.value
         val text = when {
             emergency?.isActive() == true ->
-                "🚨 Emergency unlock — limits paused for ${formatDuration(emergency.untilMillis - System.currentTimeMillis())}"
-            budgets.isEmpty() -> "No limits yet — plant one in Meadow 🌱"
+                getString(R.string.guardian_emergency, resources.durationText(emergency.untilMillis - System.currentTimeMillis()))
+            budgets.isEmpty() -> getString(R.string.guardian_no_limits)
             else -> {
-                val open = budgets.filter { !it.exhausted }.minByOrNull { it.remainingMs }
-                val done = budgets.count { it.exhausted }
-                buildString {
-                    if (open != null) append("${open.limit.appName}: ${formatDuration(open.remainingMs)} left")
-                    if (done > 0) {
-                        if (isNotEmpty()) append(" · ")
-                        append("$done resting until tomorrow")
-                    }
+                val open = budgets.filter { !it.exhausted && it.remainingMs != Long.MAX_VALUE }.minByOrNull { it.remainingMs }
+                val resting = budgets.count { it.exhausted }
+                val left = open?.let { getString(R.string.guardian_left, it.limit.appName, resources.durationText(it.remainingMs)) }
+                val sleeping = resting.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.guardian_resting, it, it) }
+                when {
+                    left != null && sleeping != null -> getString(R.string.guardian_joined, left, sleeping)
+                    else -> left ?: sleeping ?: getString(R.string.guardian_starting)
                 }
             }
         }

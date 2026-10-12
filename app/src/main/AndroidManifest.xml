@@ -43,6 +43,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Invite links opened from the landing page. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="meadow" android:host="invite" />
+            </intent-filter>
+            <!-- Invite links themselves (verified App Links once assetlinks.json is deployed). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${inviteHost}" android:pathPrefix="/i/" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -98,7 +112,9 @@
 
         <receiver
             android:name=".enforcement.MeadowDeviceAdmin"
+            android:description="@string/device_admin_description"
             android:exported="true"
+            android:label="@string/device_admin_label"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
                 android:name="android.app.device_admin"

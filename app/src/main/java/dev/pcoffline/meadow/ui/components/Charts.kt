@@ -5,6 +5,8 @@ package dev.pcoffline.meadow.ui.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import java.time.DayOfWeek
+import java.util.Locale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -131,7 +133,7 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
     val cells = List(firstDayOffset) { null } + values.indices.toList()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth()) {
-            listOf("M", "T", "W", "T", "F", "S", "S").forEach {
+            DayOfWeek.values().map { it.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()) }.forEach {
                 Text(
                     it, Modifier.weight(1f), textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

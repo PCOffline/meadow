@@ -4,10 +4,12 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.LruCache
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,7 +31,7 @@ class GuardianAccessibilityService : AccessibilityService() {
     private var watchJob: Job? = null
     private var currentPackage: String? = null
     private var lastStrictCheck = 0L
-    private val activityCache = HashMap<String, Boolean>()
+    private val activityCache = LruCache<String, Boolean>(256)
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -59,10 +61,15 @@ class GuardianAccessibilityService : AccessibilityService() {
         if (pkg in AppGraph.catalog.homePackages()) return true
         if (className == null) return false
         val key = "$pkg/$className"
-        return activityCache.getOrPut(key) {
-            runCatching { packageManager.getActivityInfo(ComponentName(pkg, className), PackageManager.MATCH_ALL) }
-                .isSuccess
+        activityCache.get(key)?.let { return it }
+        val isActivity = try {
+            packageManager.getActivityInfo(ComponentName(pkg, className), PackageManager.MATCH_ALL)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
         }
+        activityCache.put(key, isActivity)
+        return isActivity
     }
 
     private fun onForeground(pkg: String) {
@@ -108,10 +115,10 @@ class GuardianAccessibilityService : AccessibilityService() {
         val text = StringBuilder()
         collectText(root, text, IntArray(1) { 600 })
         val screen = text.toString().lowercase()
-        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = "meadow")) {
+        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase())) {
             performGlobalAction(GLOBAL_ACTION_BACK)
             performGlobalAction(GLOBAL_ACTION_HOME)
-            Toast.makeText(this, "Strict mode is on 🌿 Ask your Petal Pals to turn it off first.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.strict_mode_blocked, Toast.LENGTH_LONG).show()
         }
     }
 

@@ -72,23 +72,25 @@ class UsageTracker(private val context: Context) {
         return totals
     }
 
-    /** The app the event log says is currently on screen, if any. */
-    fun currentForegroundApp(): String? {
-        if (!hasPermission()) return null
-        val now = System.currentTimeMillis()
-        val events = usm.queryEvents(now - 60 * 60_000L, now) ?: return null
-        var current: String? = null
+    /**
+     * Replays events in [from, to) on top of [current] (what was on screen at [from]) and returns
+     * what is on screen at [to]. Callers poll with short windows so each check stays cheap.
+     */
+    fun foregroundAfter(current: String?, from: Long, to: Long): String? {
+        if (!hasPermission() || to <= from) return current
+        val events = usm.queryEvents(from, to) ?: return current
+        var foreground = current
         val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> current = event.packageName
+                UsageEvents.Event.ACTIVITY_RESUMED -> foreground = event.packageName
                 UsageEvents.Event.ACTIVITY_PAUSED, EVENT_ACTIVITY_STOPPED ->
-                    if (current == event.packageName) current = null
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> current = null
+                    if (foreground == event.packageName) foreground = null
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> foreground = null
             }
         }
-        return current
+        return foreground
     }
 
     /** Older days may have aged out of the event log; daily aggregates are less precise but kept longer. */

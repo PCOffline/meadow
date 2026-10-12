@@ -57,6 +57,8 @@ import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import nl.dionsegijn.konfetti.core.models.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,20 +106,25 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 }
 
 @Immutable
-data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, val greeting: String)
+data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
 
 /** The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights. */
 @Composable
 fun rememberSkyMood(): SkyMood {
     val dark = isSystemInDarkTheme()
     val hour = remember { java.time.LocalTime.now().hour }
-    val night = SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), if (hour in 5..20) "Hello" else "Hello, night owl")
+    val greeting = when (hour) {
+        in 5..11 -> R.string.greeting_morning
+        in 12..16 -> R.string.greeting_afternoon
+        in 17..21 -> R.string.greeting_evening
+        else -> R.string.greeting_night
+    }
+    val ink = Color(0xFF3E3A32)
     return when {
-        dark -> night
-        hour in 5..10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, Color(0xFF3E3A32), "Good morning")
-        hour in 11..16 -> SkyMood(Color(0xFFD9ECF2), Color(0xFFF8F4E8), false, Color(0xFF3E3A32), "Good afternoon")
-        hour in 17..20 -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, Color(0xFF3E3A32), "Good evening")
-        else -> night
+        dark || hour !in 5..20 -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
+        hour <= 10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
+        hour <= 16 -> SkyMood(Color(0xFFD9ECF2), Color(0xFFF8F4E8), false, ink, greeting)
+        else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
     }
 }
 
@@ -280,7 +287,7 @@ fun PetalBurst(trigger: Int, modifier: Modifier = Modifier) {
 
 /** A seed that sprouts, unfurls two leaves, and starts again. Used instead of a spinner. */
 @Composable
-fun SproutLoader(modifier: Modifier = Modifier, label: String? = "Gathering petals…", size: Dp = 64.dp) {
+fun SproutLoader(modifier: Modifier = Modifier, label: String? = stringResource(R.string.loading_garden), size: Dp = 64.dp) {
     val garden = Garden.colors
     val transition = rememberInfiniteTransition(label = "sprout")
     val grow by transition.animateFloat(

@@ -4,7 +4,10 @@ import { setGlobalOptions } from "firebase-functions/v2";
 initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
-export { createProfile, sendInvite, respondInvite, cancelInvite, removeApprover, stepDown } from "./social";
+export {
+  createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, respondInvite, cancelInvite,
+  removeApprover, stepDown,
+} from "./social";
 export { createRequest, decideRequest, cancelRequest } from "./requests";
 export { emergencyUnlock } from "./emergency";
 export { onChatMessage, onProtectionAlert, hourlyCare } from "./triggers";

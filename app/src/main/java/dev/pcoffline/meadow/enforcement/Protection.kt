@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import dev.pcoffline.meadow.data.LocalStore
 import dev.pcoffline.meadow.data.UsageShareRepository
+import dev.pcoffline.meadow.data.runCatchingCancellable
 import dev.pcoffline.meadow.usage.UsageTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -33,16 +34,13 @@ data class ProtectionState(
     )
 
     companion object {
-        val LABELS = mapOf(
-            "usageAccess" to "usage access",
-            "accessibility" to "the garden keeper (accessibility)",
-            "deviceAdmin" to "uninstall protection",
-        )
+        /** Protections whose loss Bumblebees hear about. Names match the backend's copy.ts. */
+        val REPORTED = listOf("usageAccess", "accessibility", "deviceAdmin")
     }
 }
 
 /**
- * Reads which protections are switched on and tells approvers when one that matters is
+ * Reads which protections are switched on and tells Bumblebees when one that matters is
  * switched off while limits are in place.
  */
 class ProtectionMonitor(
@@ -79,7 +77,7 @@ class ProtectionMonitor(
         }
     }
 
-    /** Compares with the last reported state, alerts approvers on anything switched off. */
+    /** Compares with the last reported state, alerts Bumblebees on anything switched off. */
     fun check(override: ProtectionState? = null) {
         if (!backendReady) return
         val state = override ?: current()
@@ -92,13 +90,10 @@ class ProtectionMonitor(
         if (encoded == store.lastReportedProtection) return
         store.lastReportedProtection = encoded
         scope.launch {
-            runCatching { share.heartbeat(map) }
+            runCatchingCancellable { share.heartbeat(map) }
             if (previous == null || store.limits.value.isEmpty()) return@launch
-            val lost = ProtectionState.LABELS.keys.filter { previous[it] == true && map[it] == false }
-            if (lost.isNotEmpty()) {
-                val names = lost.joinToString(" and ") { ProtectionState.LABELS.getValue(it) }
-                runCatching { share.reportAlert("protection_off", "turned off $names") }
-            }
+            val lost = ProtectionState.REPORTED.filter { previous[it] == true && map[it] == false }
+            if (lost.isNotEmpty()) runCatchingCancellable { share.reportProtectionsLost(lost) }
         }
     }
 }

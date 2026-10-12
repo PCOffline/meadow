@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Be my Bumblebee? · Meadow</title>
+  <meta property="og:title" content="Will you be my Bumblebee? 🐝">
+  <meta property="og:description" content="Help a friend look after their screen time in Meadow.">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="card">
+    <div class="flower" aria-hidden="true">🐝</div>
+    <h1>Will you be my Bumblebee?</h1>
+    <p>
+      A friend is growing calmer days with Meadow and would like you to look after their garden.
+      As their Bumblebee, you decide whenever they ask for extra time on an app.
+    </p>
+    <a id="open" class="button" href="#">Open in Meadow</a>
+    <p class="small">
+      Don't have Meadow yet? Install it, set up your garden, then tap this link again.
+      You can also paste the link into Meadow under <b>Circle → Got an invite link?</b>
+    </p>
+    <p class="small" id="expired" hidden>This link doesn't look right. Ask your friend for a new one.</p>
+  </main>
+  <script>
+    // The token is the last path segment: /i/<token>
+    const token = location.pathname.split("/").filter(Boolean).pop() || "";
+    const open = document.getElementById("open");
+    if (/^[A-Za-z0-9]{16}$/.test(token)) {
+      open.href = "meadow://invite/" + token;
+    } else {
+      open.hidden = true;
+      document.getElementById("expired").hidden = false;
+    }
+  </script>
+</body>
+</html>

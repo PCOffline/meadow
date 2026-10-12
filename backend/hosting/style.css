@@ -1,0 +1,45 @@
+:root {
+  --cream: #fbf6ec;
+  --card: #fffdf7;
+  --moss: #5b7f55;
+  --ink: #3e3a32;
+  --soft: #6f675a;
+  --petal: #e8a0a6;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --cream: #1c221e; --card: #262d28; --moss: #a8c69f; --ink: #e9e3d6; --soft: #c3bbac; }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(circle at 20% 10%, color-mix(in srgb, var(--petal) 25%, transparent), transparent 40%), var(--cream);
+  color: var(--ink);
+  font: 16px/1.5 "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border-radius: 28px;
+  padding: 32px 24px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(62, 58, 50, 0.08);
+}
+.flower { font-size: 56px; }
+h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 28px; margin: 8px 0 12px; }
+p { color: var(--soft); margin: 0 0 20px; }
+.small { font-size: 14px; }
+.button {
+  display: inline-block;
+  background: var(--moss);
+  color: var(--card);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: 999px;
+  margin-bottom: 20px;
+}

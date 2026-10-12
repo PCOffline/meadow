@@ -1,18 +1,17 @@
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { z } from "zod";
+import { chatNotes, errors, pushes } from "./copy";
 import {
-  chatIdFor, createInvite, db, ensureChat, friendCodes, invites, notify, parse, postToChat, randomCode, requireAuth,
-  userOf, users,
-} from "./shared";
+  db, ensureChat, friendCodes, inviteLinks, invites, notify, parse, postToChat, projectId, requireAuth,
+  requireEmailAccount, userOf, users, UserDoc,
+} from "./db";
+import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken } from "./format";
+import {
+  InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput, RespondInviteInput,
+  StepDownInput,
+} from "./schemas";
 
-const FLOWERS = ["🌼", "🌸", "🌻", "🌷", "🌹", "🪻", "🌺", "🍀", "🌿", "🍄"] as const;
-const id = z.string().trim().min(1).max(128);
-
-const ProfileInput = z.object({
-  displayName: z.string().trim().min(1, "Please choose a name.").max(30, "Names can be up to 30 characters."),
-  flower: z.enum(FLOWERS).catch("🌼"),
-});
+const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60_000;
 
 /** Creates the caller's profile and claims a unique friend code. Safe to call twice. */
 export const createProfile = onCall(async (req) => {
@@ -28,11 +27,10 @@ export const createProfile = onCall(async (req) => {
     }
     let code: string | null = null;
     for (let attempt = 0; attempt < 8 && !code; attempt++) {
-      const candidate = randomCode();
-      const taken = await tx.get(friendCodes().doc(candidate));
-      if (!taken.exists) code = candidate;
+      const candidate = randomFriendCode();
+      if (!(await tx.get(friendCodes().doc(candidate))).exists) code = candidate;
     }
-    if (!code) throw new HttpsError("unavailable", "Couldn't find a free friend code, please try again.");
+    if (!code) throw new HttpsError("unavailable", errors.noFriendCode);
     tx.set(friendCodes().doc(code), { uid });
     tx.set(userRef, {
       displayName,
@@ -49,141 +47,185 @@ export const createProfile = onCall(async (req) => {
   return { ok: true };
 });
 
-const InviteInput = z.object({
-  friendCode: z.string().trim().toUpperCase().min(4, "Enter your friend's code.").max(12),
+/** Makes `bee` a Bumblebee of `owner`. Runs inside a transaction; returns the chat id. */
+function joinUp(tx: Transaction, owner: { uid: string; user: UserDoc }, bee: { uid: string; user: UserDoc }): string {
+  tx.update(users().doc(owner.uid), { approverIds: FieldValue.arrayUnion(bee.uid) });
+  tx.update(users().doc(bee.uid), { approveeIds: FieldValue.arrayUnion(owner.uid) });
+  const chatId = chatIdFor(owner.uid, bee.uid);
+  ensureChat(tx, owner, bee, chatId);
+  return chatId;
+}
+
+async function announceNewBumblebee(chatId: string, owner: { uid: string; user: UserDoc }, bee: { uid: string; user: UserDoc }) {
+  await postToChat(chatId, { senderId: bee.uid, kind: "system", text: chatNotes.newBumblebee(bee.user, owner.user) });
+  await notify([owner.uid], { type: "invite_accepted", ...pushes.inviteAccepted(bee.user) });
+}
+
+/**
+ * Creates a one-time invite link: whoever opens it and says yes becomes the caller's Bumblebee.
+ * Links last a week.
+ */
+export const createInviteLink = onCall(async (req) => {
+  const uid = requireAuth(req);
+  requireEmailAccount(req);
+  const me = userOf(await users().doc(uid).get());
+  const token = randomInviteToken();
+  const expiresAt = Date.now() + INVITE_LINK_TTL_MS;
+  await inviteLinks().doc(token).set({
+    ownerUid: uid,
+    ownerName: me.displayName,
+    ownerFlower: me.flower,
+    createdAt: FieldValue.serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(expiresAt),
+    usedBy: null,
+  });
+  return { token, url: inviteUrl(projectId(), token), expiresAt };
 });
 
-/** Asks the person with this friend code to become the caller's Petal Pal. */
+type LinkStatus = "ok" | "expired" | "used" | "own" | "already";
+
+/** Tells the person who opened a link who sent it and whether they can still accept it. */
+export const previewInviteLink = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const { token } = parse(InviteTokenInput, req.data);
+  const link = await inviteLinks().doc(token).get();
+  if (!link.exists) throw new HttpsError("not-found", errors.linkGone);
+  const ownerUid = link.get("ownerUid") as string;
+  const owner = await users().doc(ownerUid).get();
+  const status: LinkStatus =
+    ownerUid === uid ? "own"
+      : link.get("usedBy") ? "used"
+        : (link.get("expiresAt") as Timestamp).toMillis() < Date.now() ? "expired"
+          : userOf(owner).approverIds.includes(uid) ? "already"
+            : "ok";
+  return { ownerName: link.get("ownerName"), ownerFlower: link.get("ownerFlower"), status };
+});
+
+/** The caller becomes the Bumblebee of whoever created the link. */
+export const acceptInviteLink = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const { token } = parse(InviteTokenInput, req.data);
+  const linkRef = inviteLinks().doc(token);
+
+  const result = await db().runTransaction(async (tx) => {
+    const link = await tx.get(linkRef);
+    if (!link.exists) throw new HttpsError("not-found", errors.linkGone);
+    const ownerUid = link.get("ownerUid") as string;
+    if (ownerUid === uid) throw new HttpsError("failed-precondition", errors.ownLink);
+    if (link.get("usedBy")) throw new HttpsError("failed-precondition", errors.linkUsed);
+    if ((link.get("expiresAt") as Timestamp).toMillis() < Date.now()) throw new HttpsError("failed-precondition", errors.linkExpired);
+    const [ownerSnap, meSnap] = await Promise.all([tx.get(users().doc(ownerUid)), tx.get(users().doc(uid))]);
+    const owner = { uid: ownerUid, user: userOf(ownerSnap) };
+    const bee = { uid, user: userOf(meSnap) };
+    if (owner.user.approverIds.includes(uid)) throw new HttpsError("already-exists", errors.alreadyTheirBumblebee(owner.user.displayName));
+    tx.update(linkRef, { usedBy: uid, usedAt: FieldValue.serverTimestamp() });
+    return { chatId: joinUp(tx, owner, bee), owner, bee };
+  });
+
+  await announceNewBumblebee(result.chatId, result.owner, result.bee);
+  return { ownerName: result.owner.user.displayName };
+});
+
+/** Asks the person with this friend code to be the caller's Bumblebee. */
 export const sendInvite = onCall(async (req) => {
   const uid = requireAuth(req);
-  // Commitments must survive a reinstall, so an account needs an email before it gets Petal Pals.
-  if (req.auth?.token.firebase?.sign_in_provider === "anonymous") {
-    throw new HttpsError("failed-precondition", "Add an email to your account first, so your garden can't be lost.");
-  }
-  const { friendCode } = parse(InviteInput, req.data);
+  requireEmailAccount(req);
+  const { friendCode } = parse(InviteByCodeInput, req.data);
 
   const codeSnap = await friendCodes().doc(friendCode).get();
-  if (!codeSnap.exists) throw new HttpsError("not-found", "No one has that code. Double-check it?");
+  if (!codeSnap.exists) throw new HttpsError("not-found", errors.codeUnknown);
   const targetUid = codeSnap.get("uid") as string;
-  if (targetUid === uid) throw new HttpsError("invalid-argument", "That's your own code 🌼");
+  if (targetUid === uid) throw new HttpsError("invalid-argument", errors.ownCode);
 
   const [meSnap, targetSnap] = await Promise.all([users().doc(uid).get(), users().doc(targetUid).get()]);
   const me = userOf(meSnap);
   const target = userOf(targetSnap);
-  if (me.approverIds.includes(targetUid)) {
-    throw new HttpsError("already-exists", `${target.displayName} is already your Petal Pal.`);
-  }
+  if (me.approverIds.includes(targetUid)) throw new HttpsError("already-exists", errors.alreadyBumblebee(target.displayName));
   const pending = await invites()
     .where("fromUid", "==", uid).where("toUid", "==", targetUid).where("status", "==", "pending").limit(1).get();
-  if (!pending.empty) throw new HttpsError("already-exists", `You've already invited ${target.displayName}.`);
+  if (!pending.empty) throw new HttpsError("already-exists", errors.alreadyInvited(target.displayName));
 
-  await createInvite(uid, me, targetUid, target);
-  return { status: "invited" };
+  const ref = invites().doc();
+  await ref.set({
+    fromUid: uid,
+    fromName: me.displayName,
+    fromFlower: me.flower,
+    toUid: targetUid,
+    toName: target.displayName,
+    status: "pending",
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  await notify([targetUid], { type: "invite", inviteId: ref.id, ...pushes.invite(me) });
+  return { ok: true };
 });
-
-const RespondInput = z.object({ inviteId: id, accept: z.boolean() });
 
 export const respondInvite = onCall(async (req) => {
   const uid = requireAuth(req);
-  const { inviteId, accept } = parse(RespondInput, req.data);
+  const { inviteId, accept } = parse(RespondInviteInput, req.data);
   const inviteRef = invites().doc(inviteId);
 
   const result = await db().runTransaction(async (tx) => {
     const invite = await tx.get(inviteRef);
-    if (!invite.exists || invite.get("toUid") !== uid) throw new HttpsError("not-found", "That invite is gone.");
-    if (invite.get("status") !== "pending") throw new HttpsError("failed-precondition", "That invite was already answered.");
-    const fromUid = invite.get("fromUid") as string;
-    const [fromSnap, meSnap] = await Promise.all([tx.get(users().doc(fromUid)), tx.get(users().doc(uid))]);
-    const from = userOf(fromSnap);
-    const me = userOf(meSnap);
+    if (!invite.exists || invite.get("toUid") !== uid) throw new HttpsError("not-found", errors.inviteGone);
+    if (invite.get("status") !== "pending") throw new HttpsError("failed-precondition", errors.inviteAnswered);
+    const ownerUid = invite.get("fromUid") as string;
+    const [ownerSnap, meSnap] = await Promise.all([tx.get(users().doc(ownerUid)), tx.get(users().doc(uid))]);
     tx.update(inviteRef, { status: accept ? "accepted" : "declined", answeredAt: FieldValue.serverTimestamp() });
     if (!accept) return null;
-    tx.update(users().doc(fromUid), { approverIds: FieldValue.arrayUnion(uid) });
-    tx.update(users().doc(uid), { approveeIds: FieldValue.arrayUnion(fromUid) });
-    const chatId = ensureChat(tx, { uid: fromUid, user: from }, { uid, user: me });
-    return { fromUid, from, me, chatId };
+    const owner = { uid: ownerUid, user: userOf(ownerSnap) };
+    const bee = { uid, user: userOf(meSnap) };
+    return { chatId: joinUp(tx, owner, bee), owner, bee };
   });
 
-  if (result) {
-    await postToChat(result.chatId, {
-      senderId: uid,
-      kind: "system",
-      text: `${result.me.flower} ${result.me.displayName} is now ${result.from.displayName}'s Petal Pal`,
-    });
-    await notify([result.fromUid], {
-      type: "invite_accepted",
-      title: `${result.me.flower} ${result.me.displayName} is your Petal Pal now`,
-      body: "Your limits are locked in. Only your Petal Pals can give you more time.",
-    });
-  }
+  if (result) await announceNewBumblebee(result.chatId, result.owner, result.bee);
   return { ok: true };
 });
 
-const CancelInviteInput = z.object({ inviteId: id });
-
 export const cancelInvite = onCall(async (req) => {
   const uid = requireAuth(req);
-  const { inviteId } = parse(CancelInviteInput, req.data);
+  const { inviteId } = parse(InviteIdInput, req.data);
   const inviteRef = invites().doc(inviteId);
   const invite = await inviteRef.get();
-  if (!invite.exists || invite.get("fromUid") !== uid) throw new HttpsError("not-found", "That invite is gone.");
+  if (!invite.exists || invite.get("fromUid") !== uid) throw new HttpsError("not-found", errors.inviteGone);
   if (invite.get("status") === "pending") await inviteRef.update({ status: "cancelled" });
   return { ok: true };
 });
 
-/** Ends a Petal Pal relationship between `owner` (whose garden it is) and `pal`, and tells everyone involved. */
-async function endPartnership(ownerUid: string, palUid: string, endedBy: "owner" | "pal"): Promise<void> {
-  const [ownerSnap, palSnap] = await Promise.all([users().doc(ownerUid).get(), users().doc(palUid).get()]);
+/** Ends a Bumblebee relationship and tells everyone involved, so nobody is dropped quietly. */
+async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "bee"): Promise<void> {
+  const [ownerSnap, beeSnap] = await Promise.all([users().doc(ownerUid).get(), users().doc(beeUid).get()]);
   const owner = userOf(ownerSnap);
-  const pal = userOf(palSnap);
-  if (!owner.approverIds.includes(palUid)) throw new HttpsError("failed-precondition", "They're not Petal Pals.");
+  const bee = userOf(beeSnap);
+  if (!owner.approverIds.includes(beeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
 
   const batch = db().batch();
-  batch.update(users().doc(ownerUid), { approverIds: FieldValue.arrayRemove(palUid) });
-  batch.update(users().doc(palUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
+  batch.update(users().doc(ownerUid), { approverIds: FieldValue.arrayRemove(beeUid) });
+  batch.update(users().doc(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
   await batch.commit();
 
-  const remaining = owner.approverIds.filter((p) => p !== palUid);
-  await postToChat(chatIdFor(ownerUid, palUid), {
-    senderId: endedBy === "owner" ? ownerUid : palUid,
-    kind: "system",
-    text: endedBy === "owner"
-      ? `${owner.displayName} removed ${pal.displayName} as a Petal Pal`
-      : `${pal.displayName} stepped down as ${owner.displayName}'s Petal Pal`,
-  });
+  const remaining = owner.approverIds.filter((id) => id !== beeUid);
+  const chatId = chatIdFor(ownerUid, beeUid);
   if (endedBy === "owner") {
-    // Everyone who looks after this garden hears about it, so a pal can't be dropped quietly.
-    await notify([palUid, ...remaining], {
-      type: "approver_left",
-      uid: ownerUid,
-      title: `${owner.flower} ${owner.displayName} removed ${pal.displayName} as a Petal Pal`,
-      body: remaining.length > 0
-        ? `${owner.displayName} has ${remaining.length} Petal Pal${remaining.length === 1 ? "" : "s"} left.`
-        : `${owner.displayName} has no Petal Pals left, so their limits are no longer locked in.`,
-    });
+    await postToChat(chatId, { senderId: ownerUid, kind: "system", text: chatNotes.removedBumblebee(owner, bee) });
+    await notify([beeUid, ...remaining], { type: "approver_left", uid: ownerUid, ...pushes.removedBumblebee(owner, bee, remaining.length) });
   } else {
-    await notify([ownerUid], {
-      type: "approver_left",
-      title: `${pal.flower} ${pal.displayName} stepped down as your Petal Pal`,
-      body: remaining.length > 0
-        ? "Your other Petal Pals are still looking after your garden."
-        : "Invite someone new so your limits stay locked in.",
-    });
+    await postToChat(chatId, { senderId: beeUid, kind: "system", text: chatNotes.steppedDown(bee, owner) });
+    await notify([ownerUid], { type: "approver_left", ...pushes.steppedDown(bee, remaining.length) });
   }
 }
 
-/** The garden owner removes one of their Petal Pals. No one else needs to agree. */
+/** The garden's owner removes one of their Bumblebees. No one else needs to agree. */
 export const removeApprover = onCall(async (req) => {
   const uid = requireAuth(req);
-  const { approverUid } = parse(z.object({ approverUid: id }), req.data);
-  await endPartnership(uid, approverUid, "owner");
+  const { approverUid } = parse(RemoveBumblebeeInput, req.data);
+  await partWays(uid, approverUid, "owner");
   return { ok: true };
 });
 
-/** A Petal Pal stops looking after someone's garden. */
+/** A Bumblebee stops looking after someone's garden. */
 export const stepDown = onCall(async (req) => {
   const uid = requireAuth(req);
-  const { approveeUid } = parse(z.object({ approveeUid: id }), req.data);
-  await endPartnership(approveeUid, uid, "pal");
+  const { approveeUid } = parse(StepDownInput, req.data);
+  await partWays(approveeUid, uid, "bee");
   return { ok: true };
 });

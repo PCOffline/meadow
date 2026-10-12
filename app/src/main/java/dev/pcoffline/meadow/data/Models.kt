@@ -11,7 +11,7 @@ data class AppLimit(
     val weeklyMinutes: Int,
 )
 
-/** Extra minutes a Petal Pal granted for a single day. */
+/** Extra minutes a Bumblebee granted for a single day. */
 @Serializable
 data class Grant(
     val id: String,
@@ -94,26 +94,11 @@ data class LimitRequest(
     val decisionNote: String?,
     val dayKey: String,
     val createdAtMillis: Long,
-) {
-    val summary: String
-        get() = when (type) {
-            RequestType.EXTRA_TIME -> "$minutes more minutes on ${appName ?: "an app"}"
-            RequestType.CHANGE_LIMIT -> "Change ${appName ?: "an app"} to ${limitText(dailyMinutes, weeklyMinutes)}"
-            RequestType.REMOVE_LIMIT -> "Remove the limit on ${appName ?: "an app"}"
-            RequestType.DISABLE_STRICT_MODE -> "Turn off strict mode"
-        }
-
-    companion object {
-        fun limitText(daily: Int, weekly: Int): String = buildList {
-            if (daily > 0) add("${formatMinutes(daily)} a day")
-            if (weekly > 0) add("${formatMinutes(weekly)} a week")
-        }.ifEmpty { listOf("no limit") }.joinToString(" · ")
-    }
-}
+)
 
 enum class InviteStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }
 
-/** An invitation from [fromUid] asking [toUid] to become their Petal Pal. */
+/** An invitation from [fromUid] asking [toUid] to become their Bumblebee. */
 data class Invite(
     val id: String,
     val fromUid: String,
@@ -124,6 +109,13 @@ data class Invite(
     val status: InviteStatus,
     val createdAtMillis: Long,
 )
+
+/** A one-time link that makes whoever accepts it the creator's Bumblebee. */
+data class InviteLink(val token: String, val url: String, val expiresAtMillis: Long)
+
+enum class InviteLinkStatus { OK, EXPIRED, USED, OWN, ALREADY }
+
+data class InviteLinkPreview(val ownerName: String, val ownerFlower: String, val status: InviteLinkStatus)
 
 data class Chat(
     val id: String,
@@ -154,7 +146,7 @@ data class ChatMessage(
     val pending: Boolean,
 )
 
-/** Per-app usage of a person for one day, as uploaded for their Petal Pals. */
+/** Per-app usage of a person for one day, as uploaded for their Bumblebees. */
 data class SharedUsage(
     val dayKey: String,
     val totalMinutes: Int,
@@ -167,19 +159,6 @@ data class SharedAppUsage(
     val minutes: Int,
     val limitMinutes: Int,
 )
-
-fun formatMinutes(minutes: Int): String = when {
-    minutes <= 0 -> "0m"
-    minutes < 60 -> "${minutes}m"
-    minutes % 60 == 0 -> "${minutes / 60}h"
-    else -> "${minutes / 60}h ${minutes % 60}m"
-}
-
-fun formatDuration(millis: Long): String {
-    val totalMinutes = (millis / 60_000L).toInt()
-    if (totalMinutes == 0 && millis > 0) return "<1m"
-    return formatMinutes(totalMinutes)
-}
 
 /** Flowers people can pick as their avatar. */
 val FlowerAvatars = listOf("🌼", "🌸", "🌻", "🌷", "🌹", "🪻", "🌺", "🍀", "🌿", "🍄")

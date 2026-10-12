@@ -29,7 +29,37 @@ class SocialRepository(
         invites.whereEqualTo("fromUid", uid).whereEqualTo("status", "pending").observe()
             .map { snapshot -> snapshot.documents.map { it.toInvite() }.sortedByDescending { it.createdAtMillis } }
 
-    /** Asks the person with [friendCode] to become my Petal Pal. */
+    /** Creates a one-time link; whoever accepts it becomes my Bumblebee. */
+    suspend fun createInviteLink(): InviteLink {
+        val result = backend.call("createInviteLink")
+        return InviteLink(
+            token = result["token"] as String,
+            url = result["url"] as String,
+            expiresAtMillis = (result["expiresAt"] as Number).toLong(),
+        )
+    }
+
+    suspend fun previewInviteLink(token: String): InviteLinkPreview {
+        val result = backend.call("previewInviteLink", mapOf("token" to token))
+        return InviteLinkPreview(
+            ownerName = result["ownerName"] as? String ?: "",
+            ownerFlower = result["ownerFlower"] as? String ?: "🌼",
+            status = when (result["status"]) {
+                "expired" -> InviteLinkStatus.EXPIRED
+                "used" -> InviteLinkStatus.USED
+                "own" -> InviteLinkStatus.OWN
+                "already" -> InviteLinkStatus.ALREADY
+                else -> InviteLinkStatus.OK
+            },
+        )
+    }
+
+    /** Becomes the Bumblebee of whoever created the link. */
+    suspend fun acceptInviteLink(token: String) {
+        backend.call("acceptInviteLink", mapOf("token" to token))
+    }
+
+    /** Asks the person with [friendCode] to be my Bumblebee. */
     suspend fun invite(friendCode: String) {
         backend.call("sendInvite", mapOf("friendCode" to friendCode.trim().uppercase()))
     }
@@ -42,12 +72,12 @@ class SocialRepository(
         backend.call("cancelInvite", mapOf("inviteId" to inviteId))
     }
 
-    /** I stop being [approveeUid]'s Petal Pal. They are notified. */
+    /** I stop being [approveeUid]'s Bumblebee. They are notified. */
     suspend fun stepDown(approveeUid: String) {
         backend.call("stepDown", mapOf("approveeUid" to approveeUid))
     }
 
-    /** Removes one of my Petal Pals straight away. They, and my other pals, are notified. */
+    /** Removes one of my Bumblebees straight away. They, and my other pals, are notified. */
     suspend fun removeApprover(approverUid: String) {
         backend.call("removeApprover", mapOf("approverUid" to approverUid))
     }
@@ -57,7 +87,7 @@ class SocialRepository(
         backend.user(uid).update(mapOf("displayName" to displayName.trim(), "flower" to flower)).await()
     }
 
-    /** Turning strict mode on is instant; turning it off needs a Petal Pal's yes once you have any. */
+    /** Turning strict mode on is instant; turning it off needs a Bumblebee's yes once you have any. */
     suspend fun setStrictMode(enabled: Boolean, message: String = ""): ChangeOutcome {
         val uid = backend.requireUid()
         if (!enabled && store.approverCount.value > 0) {

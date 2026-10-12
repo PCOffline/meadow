@@ -1,8 +1,7 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package dev.pcoffline.meadow.ui.home
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,110 +25,123 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.UserProfile
-import dev.pcoffline.meadow.data.formatDuration
 import dev.pcoffline.meadow.enforcement.AppBudget
-import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.SkyScene
 import dev.pcoffline.meadow.ui.components.SleepyZs
 import dev.pcoffline.meadow.ui.components.rememberSkyMood
-import dev.pcoffline.meadow.data.formatMinutes
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.tween
-import dev.pcoffline.meadow.ui.components.SectionTitle
+import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
-import dev.pcoffline.meadow.ui.switchTab
+import dev.pcoffline.meadow.ui.minutesText
+import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.ticker
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
-private data class GardenState(
+data class GardenState(
     val budgets: List<AppBudget> = emptyList(),
     val todayTotalMs: Long = 0L,
     val appsUsed: Int = 0,
-    val protection: ProtectionState? = null,
+    val essentialsReady: Boolean = true,
     val loaded: Boolean = false,
 )
 
+class GardenViewModel : ViewModel() {
+    val state: StateFlow<GardenState> = combine(
+        AppGraph.store.limits,
+        AppGraph.store.grants,
+        AppGraph.store.emergency,
+        ticker(30_000L),
+    ) { _, _, _, _ ->
+        val usage = AppGraph.catalog.userFacing(AppGraph.engine.todayUsage())
+        GardenState(
+            budgets = AppGraph.engine.budgets().sortedBy { it.remainingMs },
+            todayTotalMs = usage.values.sum(),
+            appsUsed = usage.size,
+            essentialsReady = AppGraph.protection.current().essentialsReady,
+            loaded = true,
+        )
+    }.flowOn(Dispatchers.IO).stateWhileVisible(this, GardenState())
+}
+
 @Composable
-fun GardenScreen(profile: UserProfile, nav: NavController) {
-    val limits by AppGraph.store.limits.collectAsStateWithLifecycle()
-    val grants by AppGraph.store.grants.collectAsStateWithLifecycle()
-    val emergency by AppGraph.store.emergency.collectAsStateWithLifecycle()
-    val state by produceState(GardenState(), limits, grants, emergency) {
-        while (true) {
-            value = withContext(Dispatchers.IO) {
-                val usage = AppGraph.catalog.userFacing(AppGraph.engine.todayUsage())
-                GardenState(
-                    budgets = AppGraph.engine.budgets().sortedBy { it.remainingMs },
-                    todayTotalMs = usage.values.sum(),
-                    appsUsed = usage.size,
-                    protection = AppGraph.protection.current(),
-                    loaded = true,
-                )
-            }
-            delay(30_000L)
-        }
-    }
+fun GardenScreen(
+    profile: UserProfile,
+    onOpenSettings: () -> Unit,
+    onOpenSetup: () -> Unit,
+    onPlantLimit: () -> Unit,
+    onOpenLimit: (String) -> Unit,
+    onOpenCircle: () -> Unit,
+    viewModel: GardenViewModel = viewModel { GardenViewModel() },
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GardenHeader(profile, state, onSettings = { nav.navigate("settings") }) }
+        item { GardenHeader(profile, state, onOpenSettings) }
         item { EmergencyBanner(Modifier.padding(horizontal = 20.dp)) }
 
-        if (state.protection?.essentialsReady == false) {
+        if (!state.essentialsReady) {
             item {
                 Notice(
                     emoji = "🍂",
-                    text = "Meadow can't guard your limits until usage access and the garden keeper are on.",
-                    action = "Finish setup",
-                ) { nav.navigate("setup") }
+                    text = stringResource(R.string.garden_notice_setup),
+                    action = stringResource(R.string.garden_notice_setup_action),
+                    onClick = onOpenSetup,
+                )
             }
         }
         if (profile.approverIds.isEmpty()) {
             item {
                 Notice(
-                    emoji = "💌",
-                    text = "Your limits aren't locked in yet. Invite a friend as your Petal Pal — after that, " +
-                        "only they can give you more time.",
-                    action = "Invite a Petal Pal",
-                ) { nav.switchTab("circle") }
+                    emoji = "🐝",
+                    text = stringResource(R.string.garden_notice_no_bees),
+                    action = stringResource(R.string.garden_notice_no_bees_action),
+                    onClick = onOpenCircle,
+                )
             }
         }
 
         item {
-            SectionTitle("Your garden", Modifier.padding(horizontal = 20.dp)) {
-                TextButton(onClick = { nav.navigate("pick-app") }) { Text("+ Plant a limit") }
+            SectionTitle(stringResource(R.string.garden_title), Modifier.padding(horizontal = 20.dp)) {
+                TextButton(onClick = onPlantLimit) { Text(stringResource(R.string.garden_plant)) }
             }
         }
 
         if (state.loaded && state.budgets.isEmpty()) {
             item {
-                MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = { nav.navigate("pick-app") }) {
+                MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onPlantLimit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         BloomFlower(0.2f, Garden.colors.petalPink, Modifier.size(56.dp, 84.dp), sway = false)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("Plant your first limit", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.garden_empty_title), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "Pick an app and choose how long it may bloom each day.",
+                                stringResource(R.string.garden_empty_body),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -143,7 +154,7 @@ fun GardenScreen(profile: UserProfile, nav: NavController) {
         items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
             Row(Modifier.animateItem().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { budget ->
-                    FlowerTile(budget, Modifier.weight(1f)) { nav.navigate("limit/${budget.limit.packageName}") }
+                    FlowerTile(budget, Modifier.weight(1f)) { onOpenLimit(budget.limit.packageName) }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -153,33 +164,36 @@ fun GardenScreen(profile: UserProfile, nav: NavController) {
 }
 
 @Composable
-private fun GardenHeader(profile: UserProfile, state: GardenState, onSettings: () -> Unit) {
+private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSettings: () -> Unit) {
     val mood = rememberSkyMood()
     val minutes by animateIntAsState((state.todayTotalMs / 60_000L).toInt(), tween(1100), label = "todayMinutes")
+    val today = remember { Days.today().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)) }
     Box(Modifier.fillMaxWidth().height(250.dp)) {
         SkyScene(mood, Modifier.fillMaxSize())
         Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
+                    Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky.copy(alpha = 0.75f))
                     Text(
-                        Days.today().format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = mood.onSky.copy(alpha = 0.75f),
+                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.flower),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = mood.onSky,
                     )
-                    Text("${mood.greeting}, ${profile.displayName} ${profile.flower}", style = MaterialTheme.typography.headlineSmall, color = mood.onSky)
                 }
-                IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = mood.onSky) }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.action_settings), tint = mood.onSky)
+                }
             }
             Spacer(Modifier.height(18.dp))
-            Text("Screen time today", style = MaterialTheme.typography.labelLarge, color = mood.onSky.copy(alpha = 0.75f))
+            Text(stringResource(R.string.garden_screen_time_today), style = MaterialTheme.typography.labelLarge, color = mood.onSky.copy(alpha = 0.75f))
             Text(
-                formatMinutes(minutes),
+                minutesText(minutes),
                 style = MaterialTheme.typography.displaySmall.copy(fontSize = 46.sp),
                 fontWeight = FontWeight.SemiBold,
                 color = mood.onSky,
             )
             Text(
-                if (state.appsUsed == 1) "across 1 app" else "across ${state.appsUsed} apps",
+                pluralStringResource(R.plurals.garden_across_apps, state.appsUsed, state.appsUsed),
                 style = MaterialTheme.typography.bodyMedium,
                 color = mood.onSky.copy(alpha = 0.75f),
             )
@@ -207,11 +221,14 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Uni
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
         )
-        val period = if (budget.weeklyIsTighter) "this week" else "today"
         Text(
-            if (budget.emergency) "Paused for an emergency 🚨"
-            else if (budget.exhausted) "Resting until ${if (budget.weeklyIsTighter) "next week" else "tomorrow"} 🌙"
-            else "${formatDuration(budget.remainingMs)} left $period",
+            when {
+                budget.emergency -> stringResource(R.string.garden_tile_emergency)
+                budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)
+                budget.exhausted -> stringResource(R.string.garden_tile_resting_today)
+                budget.weeklyIsTighter -> stringResource(R.string.garden_tile_left_week, durationText(budget.remainingMs))
+                else -> stringResource(R.string.garden_tile_left_today, durationText(budget.remainingMs))
+            },
             style = MaterialTheme.typography.bodySmall,
             color = if (budget.exhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
@@ -219,7 +236,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Uni
         )
         if (budget.bonusTodayMinutes > 0) {
             Text(
-                "+${budget.bonusTodayMinutes}m gifted today 🌸",
+                stringResource(R.string.garden_tile_extra, minutesText(budget.bonusTodayMinutes)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.fillMaxWidth(),

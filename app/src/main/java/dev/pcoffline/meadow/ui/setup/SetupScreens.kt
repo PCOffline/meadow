@@ -41,7 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.BloomFlower
@@ -75,13 +78,13 @@ fun SetupScreen(onDone: () -> Unit) {
             .count { it }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Prepare the soil 🌱", style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium)
                 Text(
-                    "A few permissions let Meadow keep your promises for you. Your flower blooms as you go.",
+                    stringResource(R.string.setup_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text("$done of 6 ready", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.setup_progress, done, 6), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 GrowthBar(done / 6f, color = Garden.colors.leaf)
             }
             Spacer(Modifier.width(12.dp))
@@ -89,22 +92,20 @@ fun SetupScreen(onDone: () -> Unit) {
         }
         SetupStep(
             emoji = "📊",
-            title = "Usage access",
-            body = "Lets Meadow measure how long each app is open. Required.",
+            title = R.string.setup_usage_title,
+            body = R.string.setup_usage_body,
             done = state.usageAccess,
         ) { context.openSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS) }
         SetupStep(
             emoji = "🌿",
-            title = "Garden keeper",
-            body = "An accessibility service that notices which app is on screen and gently closes it when its time is up. " +
-                "It never reads what you type and nothing on your screen leaves your phone. Required.\n\n" +
-                "If the switch is greyed out: open Meadow's App info → ⋮ → \"Allow restricted settings\", then try again.",
+            title = R.string.setup_keeper_title,
+            body = R.string.setup_keeper_body,
             done = state.accessibility,
         ) { context.openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS) }
         SetupStep(
             emoji = "🔔",
-            title = "Notifications",
-            body = "Reminders before time runs out, answers from friends, and messages.",
+            title = R.string.setup_notifications_title,
+            body = R.string.setup_notifications_body,
             done = state.notifications,
         ) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -115,14 +116,14 @@ fun SetupScreen(onDone: () -> Unit) {
         }
         SetupStep(
             emoji = "🪟",
-            title = "Show over other apps",
-            body = "A backup so the rest screen can still appear if the garden keeper is ever paused.",
+            title = R.string.setup_overlay_title,
+            body = R.string.setup_overlay_body,
             done = state.overlay,
         ) { context.openSettings(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, withPackageUri = true) }
         SetupStep(
             emoji = "🛡️",
-            title = "Uninstall protection",
-            body = "Makes uninstalling Meadow a deliberate step. If it's ever turned off, your Petal Pals hear about it.",
+            title = R.string.setup_admin_title,
+            body = R.string.setup_admin_body,
             done = state.deviceAdmin,
         ) {
             context.startActivity(
@@ -130,14 +131,14 @@ fun SetupScreen(onDone: () -> Unit) {
                     .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, AppGraph.protection.adminComponent())
                     .putExtra(
                         DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                        "Keeps Meadow from being removed on a whim. Your Petal Pals are told if this is switched off.",
+                        context.getString(R.string.setup_admin_explanation),
                     ),
             )
         }
         SetupStep(
             emoji = "🔋",
-            title = "Run in the background",
-            body = "Stops the battery saver from putting the garden keeper to sleep.",
+            title = R.string.setup_battery_title,
+            body = R.string.setup_battery_body,
             done = state.batteryUnrestricted,
         ) {
             @Suppress("BatteryLife")
@@ -148,29 +149,29 @@ fun SetupScreen(onDone: () -> Unit) {
             onClick = onDone,
             enabled = state.essentialsReady,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) { Text(if (state.essentialsReady) "Into the garden 🌼" else "Usage access and garden keeper are needed") }
+        ) { Text(stringResource(if (state.essentialsReady) R.string.setup_done else R.string.setup_needs_essentials)) }
         TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("I'll do this later")
+            Text(stringResource(R.string.setup_later))
         }
     }
 }
 
 @Composable
-private fun SetupStep(emoji: String, title: String, body: String, done: Boolean, onClick: () -> Unit) {
+private fun SetupStep(emoji: String, @StringRes title: Int, @StringRes body: Int, done: Boolean, onClick: () -> Unit) {
     MeadowCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.Top) {
             Text(emoji, fontSize = 26.sp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     AnimatedVisibility(done, enter = scaleIn(spring(dampingRatio = 0.4f)) + fadeIn()) {
-                        Pill("Done ✓", MaterialTheme.colorScheme.primaryContainer)
+                        Pill(stringResource(R.string.setup_step_done), MaterialTheme.colorScheme.primaryContainer)
                     }
                 }
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!done) {
-                    FilledTonalButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text("Allow") }
+                    FilledTonalButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text(stringResource(R.string.setup_step_allow)) }
                 }
             }
         }
@@ -195,12 +196,10 @@ fun BackendMissingScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("🌱", fontSize = 56.sp)
-        Text("The garden needs its soil", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.backend_missing_title), style = MaterialTheme.typography.headlineSmall)
         MeadowCard(Modifier.fillMaxWidth(), tint = Garden.colors.cardTint) {
             Text(
-                "This build of Meadow isn't connected to a backend yet. Add your Firebase project's " +
-                    "google-services.json to the app/ folder and deploy the backend in /backend, then rebuild. " +
-                    "The README walks through it step by step.",
+                stringResource(R.string.backend_missing_body),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

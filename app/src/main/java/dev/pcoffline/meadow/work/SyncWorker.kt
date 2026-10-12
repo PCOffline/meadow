@@ -12,6 +12,7 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.SharedAppUsage
 import dev.pcoffline.meadow.data.SharedUsage
+import dev.pcoffline.meadow.data.runCatchingCancellable
 import dev.pcoffline.meadow.enforcement.GuardianService
 import java.util.concurrent.TimeUnit
 
@@ -23,7 +24,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         GuardianService.start(applicationContext)
         if (!AppGraph.backendReady || AppGraph.backend.uid == null) return Result.success()
-        return runCatching {
+        return runCatchingCancellable {
             AppGraph.emergency.flushPending()
             AppGraph.share.upload(todaySummary())
             AppGraph.share.heartbeat(AppGraph.protection.current().asMap())

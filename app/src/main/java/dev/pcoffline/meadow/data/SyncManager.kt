@@ -75,7 +75,7 @@ class SyncManager(
             if (!tokenRegistered && !doc.metadata.isFromCache) {
                 tokenRegistered = true
                 scope.launch { registerPushToken(uid) }
-                scope.launch { runCatching { AppGraph.emergency.flushPending() } }
+                scope.launch { runCatchingCancellable { AppGraph.emergency.flushPending() } }
             }
         }
     }
@@ -100,7 +100,7 @@ class SyncManager(
     }
 
     private suspend fun registerPushToken(uid: String) {
-        runCatching {
+        runCatchingCancellable {
             val token = FirebaseMessaging.getInstance().token.await()
             saveToken(uid, token)
         }.onFailure { Log.w("MeadowSync", "Could not register push token", it) }
@@ -108,7 +108,7 @@ class SyncManager(
 
     fun onNewToken(token: String) {
         val uid = backend.uid ?: return
-        scope.launch { runCatching { saveToken(uid, token) } }
+        scope.launch { runCatchingCancellable { saveToken(uid, token) } }
     }
 
     private suspend fun saveToken(uid: String, token: String) {

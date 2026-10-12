@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
-/** Shares a daily usage summary so approvers can see how their friend is doing. */
+/** Shares a daily usage summary so Bumblebees can see how their friend is doing. */
 class UsageShareRepository(private val backend: Backend) {
 
     suspend fun upload(usage: SharedUsage) {
@@ -37,11 +37,11 @@ class UsageShareRepository(private val backend: Backend) {
         ).await()
     }
 
-    /** Raises an alert that the backend forwards to every approver. */
-    suspend fun reportAlert(kind: String, detail: String) {
+    /** Tells the backend which protections were switched off; it lets every Bumblebee know. */
+    suspend fun reportProtectionsLost(keys: List<String>) {
         val uid = backend.uid ?: return
         backend.user(uid).collection("alerts").add(
-            mapOf("kind" to kind, "detail" to detail, "createdAt" to FieldValue.serverTimestamp()),
+            mapOf("kind" to "protection_off", "lost" to keys, "createdAt" to FieldValue.serverTimestamp()),
         ).await()
     }
 

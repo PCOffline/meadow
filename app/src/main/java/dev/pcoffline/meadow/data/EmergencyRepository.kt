@@ -4,12 +4,13 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.google.firebase.firestore.FieldValue
+import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Emergency unlocks lift limits right away, without waiting for an approver. They're rationed
- * (three per 30 days, counted by the backend) and approvers hear about each one with its reason.
+ * (three per 30 days, counted by the backend) and Bumblebees hear about each one with its reason.
  * Without a connection, one unlock per 30 days can be taken offline; it's reported once back online.
  */
 class EmergencyRepository(
@@ -23,8 +24,8 @@ class EmergencyRepository(
         now - store.lastOfflineEmergencyMillis > Emergency.WINDOW_MS
 
     suspend fun unlock(minutes: Int, reason: String, packageName: String?, appName: String?): Result {
-        require(minutes in Emergency.MINUTE_OPTIONS) { "Pick 15, 30 or 60 minutes." }
-        require(reason.trim().length >= 10) { "Please say briefly what the emergency is." }
+        if (minutes !in Emergency.MINUTE_OPTIONS) throw FriendlyException(R.string.error_emergency_minutes)
+        if (reason.trim().length < MIN_REASON_LENGTH) throw FriendlyException(R.string.error_emergency_reason)
         if (backend.uid != null && isOnline()) {
             try {
                 val response = backend.call(
@@ -42,9 +43,7 @@ class EmergencyRepository(
     }
 
     private fun unlockOffline(minutes: Int, reason: String, packageName: String?, appName: String?): Result {
-        check(canUnlockOffline()) {
-            "You can't reach Meadow right now, and your one offline emergency unlock for this month is used up."
-        }
+        if (!canUnlockOffline()) throw FriendlyException(R.string.error_emergency_offline_used)
         val now = System.currentTimeMillis()
         val until = now + minutes * 60_000L
         store.lastOfflineEmergencyMillis = now
@@ -86,6 +85,10 @@ class EmergencyRepository(
         }
         val uid = backend.uid ?: return
         withTimeoutOrNull(8_000L) { backend.user(uid).update("emergencyUntil", FieldValue.serverTimestamp()).await() }
+    }
+
+    companion object {
+        const val MIN_REASON_LENGTH = 10
     }
 
     private fun isOnline(): Boolean {

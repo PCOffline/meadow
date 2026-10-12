@@ -7,10 +7,21 @@ plugins {
 
 // The Firebase config is per-developer and never committed. Without it the app
 // still builds and shows a "connect your backend" screen at launch.
-val hasFirebaseConfig = file("google-services.json").exists()
+val firebaseConfig = file("google-services.json")
+val hasFirebaseConfig = firebaseConfig.exists()
 if (hasFirebaseConfig) {
     apply(plugin = libs.plugins.google.services.get().pluginId)
 }
+
+// Invite links are served by Firebase Hosting at https://<project-id>.web.app/i/<token>.
+val firebaseProjectId: String? = if (hasFirebaseConfig) {
+    @Suppress("UNCHECKED_CAST")
+    val json = groovy.json.JsonSlurper().parse(firebaseConfig) as Map<String, Any?>
+    (json["project_info"] as? Map<String, Any?>)?.get("project_id") as? String
+} else {
+    null
+}
+val inviteHost = firebaseProjectId?.let { "$it.web.app" } ?: "invites.meadow.invalid"
 
 android {
     namespace = "dev.pcoffline.meadow"
@@ -23,6 +34,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
+        manifestPlaceholders["inviteHost"] = inviteHost
     }
 
     buildTypes {
