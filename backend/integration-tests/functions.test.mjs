@@ -27,7 +27,14 @@ after(async () => {
 });
 
 /** Reads and writes with security rules off, like the Admin SDK would. */
-const admin = (fn) => env.withSecurityRulesDisabled((ctx) => fn(ctx.firestore()));
+async function admin(fn) {
+  // withSecurityRulesDisabled resolves to nothing, so the result is carried out by hand.
+  let result;
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    result = await fn(ctx.firestore());
+  });
+  return result;
+}
 const read = (path) => admin(async (db) => (await getDoc(doc(db, path))).data());
 
 /** A signed-in person with their own app instance, able to call functions. */
