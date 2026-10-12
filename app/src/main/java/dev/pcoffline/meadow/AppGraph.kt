@@ -2,6 +2,11 @@ package dev.pcoffline.meadow
 
 import android.app.Application
 import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.storage.FirebaseStorage
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.ChatRepository
@@ -56,6 +61,27 @@ object AppGraph {
 
     fun init(application: Application) {
         app = application
-        backendReady = BuildConfig.HAS_FIREBASE_CONFIG && FirebaseApp.getApps(application).isNotEmpty()
+        val emulatorHost = BuildConfig.EMULATOR_HOST
+        if (emulatorHost.isNotEmpty()) useEmulators(application, emulatorHost)
+        backendReady = (BuildConfig.HAS_FIREBASE_CONFIG || emulatorHost.isNotEmpty()) && FirebaseApp.getApps(application).isNotEmpty()
+    }
+
+    /** Points Firebase at the local emulators, for end-to-end tests. Never set in release builds. */
+    private fun useEmulators(application: Application, host: String) {
+        if (FirebaseApp.getApps(application).isEmpty()) {
+            FirebaseApp.initializeApp(
+                application,
+                FirebaseOptions.Builder()
+                    .setProjectId("demo-meadow")
+                    .setApplicationId("1:1234567890:android:0000000000000000")
+                    .setApiKey("demo-api-key")
+                    .setStorageBucket("demo-meadow.appspot.com")
+                    .build(),
+            )
+        }
+        FirebaseAuth.getInstance().useEmulator(host, 9099)
+        FirebaseFirestore.getInstance().useEmulator(host, 8080)
+        FirebaseFunctions.getInstance(Backend.FUNCTIONS_REGION).useEmulator(host, 5001)
+        FirebaseStorage.getInstance().useEmulator(host, 9199)
     }
 }

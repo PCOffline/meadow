@@ -75,3 +75,79 @@ jobs:
       - run: npm ci
       - name: Security rules tests (Firestore emulator)
         run: npm run test:rules
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            backend/functions/package-lock.json
+      - run: npm ci && npm --prefix functions ci
+      - name: Cloud Functions integration tests (Auth, Firestore, Functions, Storage emulators)
+        run: npm run test:integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            backend/functions/package-lock.json
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Start the Firebase emulators
+        working-directory: backend
+        run: |
+          npm ci && npm --prefix functions ci && npm --prefix functions run build
+          nohup npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow > emulators.log 2>&1 &
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' \
+              http://127.0.0.1:5001/demo-meadow/us-central1/createProfile || true)
+            if [ "$code" != "000" ] && [ "$code" != "404" ]; then echo "Emulators ready ($code)"; exit 0; fi
+            sleep 2
+          done
+          cat emulators.log
+          exit 1
+      - name: Build the test app
+        run: ./gradlew assembleDebug assembleDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
+      - name: End-to-end tests (Android emulator against Firebase emulators)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-reports
+          path: |
+            app/build/reports/androidTests/
+            backend/emulators.log
+          if-no-files-found: ignore

@@ -45,6 +45,8 @@ android {
         versionCode = appVersionCode
         versionName = appVersion
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
         buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/time-limit-app"}\"")
         manifestPlaceholders["inviteHost"] = inviteHost
     }
@@ -61,7 +63,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // -Pmeadow.emulatorHost=10.0.2.2 points debug builds at the Firebase emulators (end-to-end tests).
+            buildConfigField("String", "EMULATOR_HOST", "\"${findProperty("meadow.emulatorHost") ?: ""}\"")
+        }
         release {
+            buildConfigField("String", "EMULATOR_HOST", "\"\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -77,6 +84,13 @@ android {
     }
     // The privacy notice, terms and licences live in /legal, shared with the hosted web pages.
     sourceSets["main"].assets.srcDir("../legal")
+
+    testOptions {
+        // Robolectric tests see the merged resources and assets (strings, the legal documents).
+        unitTests.isIncludeAndroidResources = true
+        // Each end-to-end test starts from a freshly cleared app.
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+    }
 
     buildFeatures {
         compose = true
@@ -102,6 +116,20 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestUtil(libs.androidx.test.orchestrator)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)

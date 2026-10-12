@@ -2,7 +2,8 @@
   "name": "meadow-backend",
   "private": true,
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --project demo-meadow \"node --test rules-tests/*.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-meadow \"node --test rules-tests/*.test.mjs\"",
+    "test:integration": "npm --prefix functions run build && firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",

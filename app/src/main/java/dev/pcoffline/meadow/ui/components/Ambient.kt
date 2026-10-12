@@ -30,7 +30,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameMillis
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -89,8 +89,9 @@ fun rememberClock(): State<Float> {
     val reduced = rememberReducedMotion()
     return produceState(0f, reduced) {
         if (reduced) return@produceState
-        val start = withFrameMillis { it }
-        while (true) withFrameMillis { value = (it - start) / 1000f }
+        // The "infinite" variant lets tests and accessibility tools pause ambient motion.
+        val start = withInfiniteAnimationFrameMillis { it }
+        while (true) withInfiniteAnimationFrameMillis { value = (it - start) / 1000f }
     }
 }
 

@@ -16,6 +16,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.annotation.StringRes
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
@@ -119,16 +120,38 @@ private val Seeds = mapOf(
 private val Ink = Color(0xFF3E3A32)
 private val NightInk = Color(0xFFE9E3D6)
 
+/** WCAG contrast ratio between two colours (1 to 21). */
+internal fun contrast(a: Color, b: Color): Float {
+    val (light, dark) = a.luminance().let { la -> b.luminance().let { lb -> if (la > lb) la to lb else lb to la } }
+    return (light + 0.05f) / (dark + 0.05f)
+}
+
+/** Darkens [color] only as much as needed to be readable (WCAG AA) on every one of [backgrounds]. */
+internal fun readable(color: Color, vararg backgrounds: Color, min: Float = 4.5f): Color {
+    var t = 0f
+    while (t <= 1f) {
+        val candidate = lerp(color, Color.Black, t)
+        if (backgrounds.all { contrast(candidate, it) >= min }) return candidate
+        t += 0.02f
+    }
+    return Color.Black
+}
+
+/** The Material colour scheme for a theme; internal so tests can check every one stays readable. */
+internal fun colorSchemeFor(theme: GardenTheme, dark: Boolean): androidx.compose.material3.ColorScheme =
+    Seeds.getValue(theme).let { if (dark) darkScheme(it) else lightScheme(it) }
+
 private fun lightScheme(s: Seed) = lightColorScheme(
-    primary = s.primary,
+    // Seeds are picked for charm; text and buttons are nudged darker where needed to stay readable.
+    primary = readable(s.primary, Color.White, s.background),
     onPrimary = Color.White,
     primaryContainer = lerp(s.primary, Color.White, 0.78f),
     onPrimaryContainer = lerp(s.primary, Color.Black, 0.6f),
-    secondary = s.secondary,
+    secondary = readable(s.secondary, Color.White, s.background),
     onSecondary = Color.White,
     secondaryContainer = lerp(s.secondary, Color.White, 0.8f),
     onSecondaryContainer = lerp(s.secondary, Color.Black, 0.6f),
-    tertiary = s.tertiary,
+    tertiary = readable(s.tertiary, Color.White, s.background),
     onTertiary = Color.White,
     tertiaryContainer = lerp(s.tertiary, Color.White, 0.8f),
     onTertiaryContainer = lerp(s.tertiary, Color.Black, 0.6f),
@@ -145,7 +168,7 @@ private fun lightScheme(s: Seed) = lightColorScheme(
     surfaceContainerHighest = lerp(s.background, Color(0xFFE0D6C4), 0.55f),
     outline = lerp(Color(0xFFB8AE9C), s.primary, 0.15f),
     outlineVariant = lerp(Color(0xFFDDD3C1), s.primary, 0.1f),
-    error = Color(0xFFC0634A),
+    error = readable(Color(0xFFC0634A), Color.White, s.background),
     onError = Color.White,
     errorContainer = Color(0xFFF7DCD3),
     onErrorContainer = Color(0xFF4D1A0E),
@@ -287,7 +310,7 @@ fun MeadowTheme(
         DarkMode.DARK -> true
     }
     val seed = Seeds.getValue(theme)
-    val scheme = remember(theme, dark) { if (dark) darkScheme(seed) else lightScheme(seed) }
+    val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
     val garden = remember(theme, dark) { gardenColors(seed, dark) }
     CompositionLocalProvider(LocalGarden provides garden, LocalDarkTheme provides dark) {
         MaterialTheme(colorScheme = scheme, typography = MeadowTypography, shapes = MeadowShapes, content = content)
