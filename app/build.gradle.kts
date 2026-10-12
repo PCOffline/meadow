@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -83,8 +82,9 @@ android {
     // The privacy notice, terms and licences live in /legal, shared with the hosted web pages.
     sourceSets["main"].assets.srcDir("../legal")
     // Sample data and helpers used by both JVM (Robolectric) and on-device tests.
-    sourceSets["test"].java.srcDir("src/sharedTest/java")
-    sourceSets["androidTest"].java.srcDir("src/sharedTest/java")
+    // Kotlin sources, so they're added as Kotlin source dirs (AGP's built-in Kotlin).
+    sourceSets["test"].kotlin.srcDir("src/sharedTest/java")
+    sourceSets["androidTest"].kotlin.srcDir("src/sharedTest/java")
 
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
@@ -104,12 +104,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
