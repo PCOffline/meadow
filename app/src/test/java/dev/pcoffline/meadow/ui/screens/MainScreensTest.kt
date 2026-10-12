@@ -164,7 +164,8 @@ class MainScreensTest : ScreenTest() {
     fun `a closed chat says so and can't be written to`() {
         show { ChatContent(DemoGarden.robin, chat = null, messages = emptyList()) }
         node(R.string.chat_closed_title).assertExists()
-        compose.onNode(hasSetTextAction()).assertIsNotEnabled()
+        // A disabled field has no text-input action, so find it by its placeholder.
+        compose.onNode(hasText(text(R.string.chat_placeholder))).assertIsNotEnabled()
         assertAccessible()
     }
 

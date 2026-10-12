@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -97,7 +98,7 @@ class OtherScreensTest : ScreenTest() {
         assertAccessible()
         compose.onAllNodesWithText(text(R.string.setup_step_allow)).onFirst().performClick()
         node(R.string.disclosure_title).assertExists()
-        node(R.string.disclosure_usage).assertExists()
+        compose.onNodeWithText("Meadow will read your phone", substring = true).assertExists()
         node(R.string.disclosure_not_now).performClick()
         node(R.string.disclosure_title).assertDoesNotExist()
     }
@@ -113,14 +114,13 @@ class OtherScreensTest : ScreenTest() {
         node(R.string.legal_terms).performScrollTo().performClick()
         assertEquals(listOf(LegalDoc.PRIVACY, LegalDoc.TERMS), opened)
 
-        node(R.string.settings_delete).performScrollTo().performClick()
-        val confirm = node(R.string.settings_delete_button)
-        confirm.assertIsNotEnabled()
-        compose.onNode(hasSetTextAction() and hasText(text(R.string.settings_delete_confirm_hint))).performTextInput("delete")
-        confirm.assertIsEnabled()
-        node(R.string.settings_delete_keep).performClick()
-        confirm.assertDoesNotExist()
         assertAccessible()
+
+        // Deleting needs typing DELETE first (typed for real in the end-to-end test).
+        node(R.string.settings_delete).performScrollTo().performClick()
+        node(R.string.settings_delete_button).assertIsNotEnabled()
+        node(R.string.settings_delete_keep).performClick()
+        node(R.string.settings_delete_button).assertDoesNotExist()
     }
 
     @Test
