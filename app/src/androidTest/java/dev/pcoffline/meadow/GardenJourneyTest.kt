@@ -86,10 +86,12 @@ class GardenJourneyTest {
         }
     }
 
-    private fun waitForBackend(timeout: Long = 20_000, check: () -> Boolean) {
+    private fun waitForBackend(path: String, timeout: Long = 20_000, check: (JSONObject) -> Boolean) {
         val end = System.currentTimeMillis() + timeout
-        while (!runCatching(check).getOrDefault(false)) {
-            if (System.currentTimeMillis() > end) throw AssertionError("Backend never reached the expected state")
+        while (!runCatching { check(backendDoc(path)!!) }.getOrDefault(false)) {
+            if (System.currentTimeMillis() > end) {
+                throw AssertionError("$path never changed. Now: ${runCatching { backendDoc(path) }.getOrNull()}. On screen: ${screenText()}")
+            }
             Thread.sleep(250)
         }
     }
@@ -122,6 +124,8 @@ class GardenJourneyTest {
             compose.onNode(hasSetTextAction() and hasText(text(R.string.profile_bio))).performTextInput("Growing calmer days")
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.profile_saved)
+            // Let the snackbar go, so it can't sit over the next screen's controls.
+            compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.profile_saved)).fetchSemanticsNodes().isEmpty() }
             assertEquals("Growing calmer days", backendDoc("users/$uid")!!.getJSONObject("bio").getString("stringValue"))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
@@ -129,8 +133,8 @@ class GardenJourneyTest {
             compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
             val shareUsage = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage)))
             shareUsage.performScrollTo().assertIsOn().performClick()
-            waitForBackend {
-                backendDoc("users/$uid")!!.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
+            waitForBackend("users/$uid") { doc ->
+                doc.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
                     .getJSONObject("shareUsage").getBoolean("booleanValue").not()
             }
 
