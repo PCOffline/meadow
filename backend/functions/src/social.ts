@@ -2,16 +2,22 @@ import { FieldValue, Timestamp, Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
 import {
-  accountRef, db, ensureChat, friendCodes, inviteLinks, invites, loadPerson, notify, parse, Person, postToChat,
-  projectId, requireAuth, requireEmailAccount, users,
+  accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, Person,
+  postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken } from "./format";
 import {
-  InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput, RespondInviteInput,
-  StepDownInput,
+  CancelRemovalInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
+  RespondInviteInput, StepDownInput,
 } from "./schemas";
 
 const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60_000;
+/** Removing a Bumblebee waits a day, so a weak moment can't undo every commitment at once. */
+export const REMOVAL_DELAY_MS = 24 * 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+/** Invites by code and invite links together. */
+const INVITES_PER_DAY = 20;
+const REMOVALS_PER_DAY = 10;
 
 /** Creates the caller's profile and claims a unique friend code. Safe to call twice. */
 export const createProfile = onCall(async (req) => {
@@ -32,25 +38,26 @@ export const createProfile = onCall(async (req) => {
     }
     if (!code) throw new HttpsError("unavailable", errors.noFriendCode);
     tx.set(friendCodes().doc(code), { uid });
+    // The public profile is only a name card; everything else is owner-only.
     tx.set(userRef, {
       displayName,
       flower,
       avatarColor: "leaf",
       photoUrl: null,
       bio: "",
-      friendCode: code,
-      strictMode: false,
-      protection: {},
-      privacy: { shareUsage: true, shareProtection: true },
-      staleNotified: false,
       createdAt: FieldValue.serverTimestamp(),
     });
     tx.set(accountRef(uid), {
       approverIds: [],
       approveeIds: [],
       fcmTokens: [],
+      friendCode: code,
+      strictMode: false,
+      privacy: { shareUsage: true },
+      pendingRemovals: {},
       ...(termsVersion ? { acceptedTerms: { version: termsVersion, at: FieldValue.serverTimestamp() } } : {}),
     });
+    tx.set(heartbeats().doc(uid), { at: FieldValue.serverTimestamp(), staleNotified: false });
   });
   return { ok: true };
 });
@@ -76,16 +83,20 @@ async function announceNewBumblebee(chatId: string, owner: Person, bee: Person) 
 export const createInviteLink = onCall(async (req) => {
   const uid = requireAuth(req);
   requireEmailAccount(req);
-  const me = await loadPerson(uid);
   const token = randomInviteToken();
   const expiresAt = Date.now() + INVITE_LINK_TTL_MS;
-  await inviteLinks().doc(token).set({
-    ownerUid: uid,
-    ownerName: me.profile.displayName,
-    ownerFlower: me.profile.flower,
-    createdAt: FieldValue.serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(expiresAt),
-    usedBy: null,
+  await db().runTransaction(async (tx) => {
+    const me = await loadPerson(uid, tx);
+    const commitRate = await consumeRate(tx, uid, "invite", INVITES_PER_DAY, DAY_MS);
+    commitRate();
+    tx.set(inviteLinks().doc(token), {
+      ownerUid: uid,
+      ownerName: me.profile.displayName,
+      ownerFlower: me.profile.flower,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(expiresAt),
+      usedBy: null,
+    });
   });
   return { token, url: inviteUrl(projectId(), token), expiresAt };
 });
@@ -145,23 +156,28 @@ export const sendInvite = onCall(async (req) => {
   const targetUid = codeSnap.get("uid") as string;
   if (targetUid === uid) throw new HttpsError("invalid-argument", errors.ownCode);
 
-  const [me, target] = await Promise.all([loadPerson(uid), loadPerson(targetUid)]);
-  if (me.account.approverIds.includes(targetUid)) {
-    throw new HttpsError("already-exists", errors.alreadyBumblebee(target.profile.displayName));
-  }
-  const pending = await invites()
-    .where("fromUid", "==", uid).where("toUid", "==", targetUid).where("status", "==", "pending").limit(1).get();
-  if (!pending.empty) throw new HttpsError("already-exists", errors.alreadyInvited(target.profile.displayName));
-
   const ref = invites().doc();
-  await ref.set({
-    fromUid: uid,
-    fromName: me.profile.displayName,
-    fromFlower: me.profile.flower,
-    toUid: targetUid,
-    toName: target.profile.displayName,
-    status: "pending",
-    createdAt: FieldValue.serverTimestamp(),
+  const me = await db().runTransaction(async (tx) => {
+    const [me, target] = await Promise.all([loadPerson(uid, tx), loadPerson(targetUid, tx)]);
+    if (me.account.approverIds.includes(targetUid)) {
+      throw new HttpsError("already-exists", errors.alreadyBumblebee(target.profile.displayName));
+    }
+    const commitRate = await consumeRate(tx, uid, "invite", INVITES_PER_DAY, DAY_MS);
+    // Checked in the same transaction as the rate counter, so a double tap invites once.
+    const pending = await tx.get(invites()
+      .where("fromUid", "==", uid).where("toUid", "==", targetUid).where("status", "==", "pending").limit(1));
+    if (!pending.empty) throw new HttpsError("already-exists", errors.alreadyInvited(target.profile.displayName));
+    commitRate();
+    tx.set(ref, {
+      fromUid: uid,
+      fromName: me.profile.displayName,
+      fromFlower: me.profile.flower,
+      toUid: targetUid,
+      toName: target.profile.displayName,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return me;
   });
   await notify([targetUid], { type: "invite", inviteId: ref.id, ...pushes.invite(me.profile) });
   return { ok: true };
@@ -203,13 +219,17 @@ export const cancelInvite = onCall(async (req) => {
  * Ends a Bumblebee relationship. Only the person on the other side is told: who looks after
  * whom is nobody else's business.
  */
-async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "bee"): Promise<void> {
+export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "bee"): Promise<void> {
   const [owner, bee] = await Promise.all([loadPerson(ownerUid), loadPerson(beeUid)]);
   if (!owner.account.approverIds.includes(beeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
 
   const batch = db().batch();
-  batch.update(accountRef(ownerUid), { approverIds: FieldValue.arrayRemove(beeUid) });
+  batch.update(accountRef(ownerUid), {
+    approverIds: FieldValue.arrayRemove(beeUid),
+    [`pendingRemovals.${beeUid}`]: FieldValue.delete(),
+  });
   batch.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
+  batch.delete(removals().doc(removalId(ownerUid, beeUid)));
   await batch.commit();
 
   const chatId = chatIdFor(ownerUid, beeUid);
@@ -223,13 +243,68 @@ async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "be
   }
 }
 
-/** The garden's owner removes one of their Bumblebees. No one else needs to agree, or is told. */
+export const removalId = (ownerUid: string, beeUid: string) => `${ownerUid}_${beeUid}`;
+
+/**
+ * The garden's owner removes one of their Bumblebees. It takes effect after a day, and only
+ * that Bumblebee is told, straight away, so they can check in meanwhile. No one else needs to
+ * agree or is told.
+ */
 export const removeApprover = onCall(async (req) => {
   const uid = requireAuth(req);
   const { approverUid } = parse(RemoveBumblebeeInput, req.data);
-  await partWays(uid, approverUid, "owner");
+  const effectiveAt = Date.now() + REMOVAL_DELAY_MS;
+  const { owner, bee } = await db().runTransaction(async (tx) => {
+    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx)]);
+    if (!owner.account.approverIds.includes(approverUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
+    const existing = await tx.get(removals().doc(removalId(uid, approverUid)));
+    if (existing.exists) throw new HttpsError("already-exists", errors.removalPending);
+    const commitRate = await consumeRate(tx, uid, "removal", REMOVALS_PER_DAY, DAY_MS);
+    commitRate();
+    tx.set(removals().doc(removalId(uid, approverUid)), {
+      ownerUid: uid, beeUid: approverUid, effectiveAt: Timestamp.fromMillis(effectiveAt),
+    });
+    tx.update(accountRef(uid), { [`pendingRemovals.${approverUid}`]: Timestamp.fromMillis(effectiveAt) });
+    return { owner, bee };
+  });
+  await postToChat(chatIdFor(uid, approverUid), { senderId: uid, kind: "system", text: chatNotes.removalScheduled(owner.profile, bee.profile) });
+  await notify([approverUid], { type: "approver_leaving", uid, ...pushes.removalScheduled(owner.profile) });
+  return { effectiveAt };
+});
+
+/** Keeps a Bumblebee whose removal is still waiting. */
+export const cancelRemoval = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const { approverUid } = parse(CancelRemovalInput, req.data);
+  const { owner, bee } = await db().runTransaction(async (tx) => {
+    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx)]);
+    const ref = removals().doc(removalId(uid, approverUid));
+    if (!(await tx.get(ref)).exists) throw new HttpsError("failed-precondition", errors.noRemoval);
+    tx.delete(ref);
+    tx.update(accountRef(uid), { [`pendingRemovals.${approverUid}`]: FieldValue.delete() });
+    return { owner, bee };
+  });
+  await postToChat(chatIdFor(uid, approverUid), { senderId: uid, kind: "system", text: chatNotes.removalCancelled(owner.profile, bee.profile) });
+  await notify([approverUid], { type: "approver_kept", uid, ...pushes.removalCancelled(owner.profile) });
   return { ok: true };
 });
+
+/** Ends the removals whose day has passed. Called by the hourly housekeeping. */
+export async function finishDueRemovals(now: number): Promise<number> {
+  const due = await removals().where("effectiveAt", "<=", Timestamp.fromMillis(now)).limit(200).get();
+  for (const doc of due.docs) {
+    const ownerUid = doc.get("ownerUid") as string;
+    const beeUid = doc.get("beeUid") as string;
+    try {
+      await partWays(ownerUid, beeUid, "owner");
+    } catch {
+      // Already parted another way (stepped down, account deleted): just tidy up.
+      await doc.ref.delete();
+      await accountRef(ownerUid).update({ [`pendingRemovals.${beeUid}`]: FieldValue.delete() }).catch(() => undefined);
+    }
+  }
+  return due.size;
+}
 
 /** A Bumblebee stops looking after someone's garden. */
 export const stepDown = onCall(async (req) => {

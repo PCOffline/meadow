@@ -14,6 +14,9 @@ test("describes limits", () => {
   assert.equal(limitText(0, 300), "5h a week");
   assert.equal(limitText(30, 300), "30m a day and 5h a week");
   assert.equal(limitText(0, 0), "no limit");
+  const evenings = Object.fromEntries(["1", "2", "3", "4", "5", "6", "7"].map((d) => [d, [{ from: 600, to: 1320 }]]));
+  assert.equal(limitText(60, 0, evenings), "1h a day and only 10:00–22:00");
+  assert.equal(limitText(30, 300, { "6": [] }), "30m a day, 5h a week and only at set hours");
 });
 
 test("summarizes each kind of request", () => {

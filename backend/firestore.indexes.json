@@ -4,14 +4,6 @@
       "collectionGroup": "requests",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "approverIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "requesterId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
@@ -33,11 +25,11 @@
       ]
     },
     {
-      "collectionGroup": "users",
+      "collectionGroup": "heartbeats",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "staleNotified", "order": "ASCENDING" },
-        { "fieldPath": "lastHeartbeat", "order": "ASCENDING" }
+        { "fieldPath": "at", "order": "ASCENDING" }
       ]
     }
   ],

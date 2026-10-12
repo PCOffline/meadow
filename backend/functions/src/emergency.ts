@@ -2,6 +2,9 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, emergencyHeadline, emergencyScope, errors, pushes } from "./copy";
 import { accountOf, accountRef, db, notify, parse, postToChat, profileOf, requireAuth, users } from "./db";
+
+// Emergency state lives in the owner-only account document; the record of each unlock in
+// users/{uid}/emergencies, which Bumblebees may read since they're told about every unlock.
 import { chatIdFor } from "./format";
 import { EmergencyInput } from "./schemas";
 
@@ -37,14 +40,15 @@ export const emergencyUnlock = onCall(async (req) => {
   // An offline unlock that was ended early on the phone must not come back to life here.
   const endedAt = offline && input.endedAt != null ? Math.max(startedAt, input.endedAt) : Infinity;
   const userRef = users().doc(uid);
+  const stateRef = accountRef(uid);
   // A retried report (the reply was lost) reuses its id, so it's recorded and announced once.
   const emergencyRef = input.reportId ? userRef.collection("emergencies").doc(input.reportId) : userRef.collection("emergencies").doc();
 
   const outcome = await db().runTransaction(async (tx) => {
-    const [snap, accountSnap, existing] = await Promise.all([tx.get(userRef), tx.get(accountRef(uid)), tx.get(emergencyRef)]);
+    const [profileSnap, snap, existing] = await Promise.all([tx.get(userRef), tx.get(stateRef), tx.get(emergencyRef)]);
     const currentUntil = (snap.get("emergencyUntil") as Timestamp | undefined)?.toMillis() ?? 0;
     if (existing.exists) return { duplicate: true as const, until: currentUntil };
-    const user = { ...profileOf(snap), approverIds: accountOf(accountSnap).approverIds };
+    const user = { ...profileOf(profileSnap), approverIds: accountOf(snap).approverIds };
     const uses = recentUses(snap.get("emergencyUses"), now);
     const overAllowance = uses.length >= EMERGENCY_ALLOWANCE;
     if (overAllowance && !offline) throw new HttpsError("resource-exhausted", errors.emergencyUsedUp(EMERGENCY_ALLOWANCE));
@@ -52,7 +56,7 @@ export const emergencyUnlock = onCall(async (req) => {
     const lastOffline = (snap.get("offlineEmergencyAt") as Timestamp | undefined)?.toMillis() ?? 0;
     const honoured = !offline || now - lastOffline > EMERGENCY_WINDOW_MS;
     const until = honoured ? Math.min(startedAt + minutes * 60_000, endedAt) : Math.min(now, endedAt);
-    tx.update(userRef, {
+    tx.update(stateRef, {
       emergencyUses: [...uses, startedAt].map((ms) => Timestamp.fromMillis(ms)),
       emergencyUntil: Timestamp.fromMillis(honoured ? Math.max(until, currentUntil) : currentUntil),
       emergencyPackage: honoured ? packageName : (snap.get("emergencyPackage") ?? null),

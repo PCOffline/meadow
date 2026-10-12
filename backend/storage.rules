@@ -8,6 +8,12 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/users/$(uid)/private/account).data;
     }
 
+    // Data exports: written by the backend, read and then deleted by their owner only.
+    match /exports/{uid}/{file} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if false;
+    }
+
     match /avatars/{uid} {
       allow read: if request.auth != null
         && (request.auth.uid == uid

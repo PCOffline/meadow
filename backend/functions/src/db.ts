@@ -13,18 +13,28 @@ export const inviteLinks = () => db().collection("inviteLinks");
 export const requests = () => db().collection("requests");
 export const chats = () => db().collection("chats");
 export const friendCodes = () => db().collection("friendCodes");
-/** Owner-only document holding who looks after whom, and push tokens. */
+/** Server-only: when each phone last checked in, so quiet ones can be noticed. */
+export const heartbeats = () => db().collection("heartbeats");
+/** Server-only: Bumblebee removals waiting out their cool-off. */
+export const removals = () => db().collection("removals");
+/** Server-only: per-person counters behind the rate limits. */
+export const rateLimits = () => db().collection("rateLimits");
+/**
+ * Owner-only document: who looks after whom, push tokens, strict mode, emergency state and
+ * other settings. Nothing in it is ever shown to anyone else.
+ */
 export const accountRef = (uid: string) => users().doc(uid).collection("private").doc("account");
+/** A Bumblebee's own copy of a request sent to them, without the other Bumblebees on it. */
+export const inboxRef = (beeUid: string, requestId: string) => users().doc(beeUid).collection("inbox").doc(requestId);
 
 export const isEmulator = () => process.env.FUNCTIONS_EMULATOR === "true";
 
-/** What other people in someone's circle may see. */
+/** The name card: all that the people in someone's circle may see of them. */
 export interface Profile {
   displayName: string;
   flower: string;
   avatarColor: string;
   photoUrl: string | null;
-  strictMode: boolean;
 }
 
 /**
@@ -56,6 +66,23 @@ export function requireEmailAccount(req: CallableRequest<unknown>): void {
   }
 }
 
+/**
+ * Counts one use of `key` for `uid` inside a transaction, refusing once `max` uses fall in the
+ * current window. Reading the counter also serialises a person's concurrent calls, so duplicate
+ * checks made in the same transaction can't be raced by a double tap.
+ */
+export async function consumeRate(tx: Transaction, uid: string, key: string, max: number, windowMs: number): Promise<() => void> {
+  const ref = rateLimits().doc(uid);
+  const snap = await tx.get(ref);
+  const now = Date.now();
+  const entry = snap.get(key) as { count?: number; since?: number } | undefined;
+  const fresh = !entry || typeof entry.since !== "number" || now - entry.since >= windowMs;
+  const count = fresh ? 0 : (entry?.count ?? 0);
+  if (count >= max) throw new HttpsError("resource-exhausted", errors.slowDown);
+  // Returned rather than written here, because a transaction must do all its reads first.
+  return () => tx.set(ref, { [key]: { count: count + 1, since: fresh ? now : entry!.since } }, { merge: true });
+}
+
 /** Validates callable input, turning the first problem into a friendly error. */
 export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
   const result = schema.safeParse(data ?? {});
@@ -73,7 +100,6 @@ export function profileOf(snap: DocumentSnapshot): Profile {
     flower: typeof d.flower === "string" ? d.flower : "🌼",
     avatarColor: typeof d.avatarColor === "string" ? d.avatarColor : "leaf",
     photoUrl: typeof d.photoUrl === "string" ? d.photoUrl : null,
-    strictMode: d.strictMode === true,
   };
 }
 
