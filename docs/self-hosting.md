@@ -44,7 +44,8 @@ You need:
 
 - A Google account and a way to pay (for the Blaze plan; you won't be charged at low usage).
 - **Node.js 24** with npm. Check with `node --version`.
-- **Java 21** to build the app and run the Firebase emulators. Android Studio includes one.
+- **Java 21 or newer** to build the app and run the Firebase emulators; CI uses 25. The one
+  bundled with Android Studio works.
 - **git**, and a GitHub account if you want automatic builds and releases.
 - The **Firebase CLI**: `npm install -g firebase-tools`, then `firebase login`.
 
@@ -317,7 +318,7 @@ Deploy the backend **before** releasing an app that depends on it. Finally, tag 
 ## Developing against the emulators
 
 You can run the whole backend on your computer without touching your project. This needs
-Java 21 and Node 24.
+Java 21 or newer and Node 24.
 
 ```bash
 cd backend

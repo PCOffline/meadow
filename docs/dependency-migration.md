@@ -12,7 +12,7 @@ Latest stable versions as of 12 October 2026.
 
 | What | Was | Now | Notes |
 |---|---|---|---|
-| Java (build, tests, emulators) | 17 (app jobs), 21 (emulator jobs), 24 in `mise.toml` | 25 LTS if CI passes on it, else 21 LTS | Gradle 8.14 tops out at Java 24, so 25 needs Gradle 9.1+. AGP and Robolectric don't state a maximum; CI decides. Java 24 is out of support since 2025-09 |
+| Java (build, tests, emulators) | 17 (app jobs), 21 (emulator jobs), 24 in `mise.toml` | 25 LTS on CI and in `mise.toml`; 21 is the minimum | Gradle 8.14 tops out at Java 24, so 25 needs Gradle 9.1+. AGP and Robolectric don't state a maximum; every CI job passes on 25. 21 stays supported because Android Studio bundles it. Java 24 is out of support since 2025-09 |
 | Java bytecode target | 17 | 17 | Android 14 (API 34) supports Java 17 at most; 21 brings nothing on ART |
 | Node (CI, local, Cloud Functions) | 22 | 24 LTS | `firebase@13` and `@firebase/rules-unit-testing@6` need Node ≥ 24.12. Cloud Functions has Node 24 as GA until 2028-04. Node 26 becomes LTS on 2026-10-28, but firebase-tools 15.33 can't deploy it and Cloud Functions only has it in preview |
 | Gradle | 8.14.3 | 9.8.1 | Needed for AGP 9.4 and Java 25 |
@@ -83,7 +83,7 @@ neither existed (Firebase JS SDK's Node 24 requirement, Robolectric's SDK and JD
 - KGP 2.4.21 is tested up to Gradle 9.7 and AGP 9.3.1. Newer versions are allowed but may warn.
 - R8 with AGP 9.4 and Kotlin module names: if the release build fails, set the Kotlin module
   name explicitly.
-- AGP and Robolectric on Java 25 aren't officially confirmed (step 4 tests it).
+- AGP and Robolectric on Java 25 aren't officially confirmed; CI covers both.
 - Material 3 1.4 and Compose 1.9+ semantics changes can affect screenshot and accessibility
   tests.
 
