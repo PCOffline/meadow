@@ -35,8 +35,8 @@ class ThemeContrastTest {
     @Test
     fun `readable only darkens as much as it must`() {
         val cream = Color(0xFFFBF6EC)
-        assertEquals(Color(0xFF3E3A32), readable(Color(0xFF3E3A32), cream))
-        val nudged = readable(Color(0xFFE9B949), cream)
+        assertEquals(Color(0xFF3E3A32), readable(Color(0xFF3E3A32), listOf(cream)))
+        val nudged = readable(Color(0xFFE9B949), listOf(cream))
         assertTrue(contrast(nudged, cream) >= 4.5f)
         assertTrue(contrast(nudged, cream) < 5.2f)
     }

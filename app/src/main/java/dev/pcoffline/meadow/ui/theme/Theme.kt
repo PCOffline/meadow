@@ -127,7 +127,7 @@ internal fun contrast(a: Color, b: Color): Float {
 }
 
 /** Darkens [color] only as much as needed to be readable (WCAG AA) on every one of [backgrounds]. */
-internal fun readable(color: Color, vararg backgrounds: Color, min: Float = 4.5f): Color {
+internal fun readable(color: Color, backgrounds: List<Color>, min: Float = 4.5f): Color {
     var t = 0f
     while (t <= 1f) {
         val candidate = lerp(color, Color.Black, t)
@@ -143,15 +143,15 @@ internal fun colorSchemeFor(theme: GardenTheme, dark: Boolean): androidx.compose
 
 private fun lightScheme(s: Seed) = lightColorScheme(
     // Seeds are picked for charm; text and buttons are nudged darker where needed to stay readable.
-    primary = readable(s.primary, Color.White, s.background),
+    primary = readable(s.primary, listOf(Color.White, s.background)),
     onPrimary = Color.White,
     primaryContainer = lerp(s.primary, Color.White, 0.78f),
     onPrimaryContainer = lerp(s.primary, Color.Black, 0.6f),
-    secondary = readable(s.secondary, Color.White, s.background),
+    secondary = readable(s.secondary, listOf(Color.White, s.background)),
     onSecondary = Color.White,
     secondaryContainer = lerp(s.secondary, Color.White, 0.8f),
     onSecondaryContainer = lerp(s.secondary, Color.Black, 0.6f),
-    tertiary = readable(s.tertiary, Color.White, s.background),
+    tertiary = readable(s.tertiary, listOf(Color.White, s.background)),
     onTertiary = Color.White,
     tertiaryContainer = lerp(s.tertiary, Color.White, 0.8f),
     onTertiaryContainer = lerp(s.tertiary, Color.Black, 0.6f),
@@ -168,7 +168,7 @@ private fun lightScheme(s: Seed) = lightColorScheme(
     surfaceContainerHighest = lerp(s.background, Color(0xFFE0D6C4), 0.55f),
     outline = lerp(Color(0xFFB8AE9C), s.primary, 0.15f),
     outlineVariant = lerp(Color(0xFFDDD3C1), s.primary, 0.1f),
-    error = readable(Color(0xFFC0634A), Color.White, s.background),
+    error = readable(Color(0xFFC0634A), listOf(Color.White, s.background)),
     onError = Color.White,
     errorContainer = Color(0xFFF7DCD3),
     onErrorContainer = Color(0xFF4D1A0E),
