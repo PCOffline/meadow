@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTextApi::class)
+
 package dev.pcoffline.meadow.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,11 +14,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.pcoffline.meadow.R
 
 /** Garden palette beyond Material's roles: petals, leaves and soil for drawings and charts. */
 @Immutable
@@ -131,8 +137,25 @@ private val DarkScheme = darkColorScheme(
     onErrorContainer = Color(0xFFF7DCD3),
 )
 
-private val Display = FontFamily.Serif
-private val Body = FontFamily.SansSerif
+private fun fraunces(weight: Int) = Font(
+    R.font.fraunces,
+    FontWeight(weight),
+    variationSettings = FontVariation.Settings(
+        FontVariation.weight(weight),
+        // Fraunces' "soft" axis rounds every terminal, which suits the garden.
+        FontVariation.Setting("SOFT", 100f),
+        FontVariation.Setting("WONK", 1f),
+    ),
+)
+
+private fun nunito(weight: Int) = Font(
+    R.font.nunito,
+    FontWeight(weight),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
+)
+
+private val Display = FontFamily(fraunces(400), fraunces(600), fraunces(700))
+private val Body = FontFamily(nunito(400), nunito(500), nunito(600), nunito(700), nunito(800))
 
 private val MeadowTypography = Typography(
     displaySmall = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp),

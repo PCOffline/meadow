@@ -52,6 +52,10 @@ export const createProfile = onCall(async (req) => {
  */
 export const sendInvite = onCall(async (req) => {
   const uid = requireAuth(req);
+  // Commitments must survive a reinstall, so an account needs an email before it gets approvers.
+  if (req.auth?.token.firebase?.sign_in_provider === "anonymous") {
+    throw new HttpsError("failed-precondition", "Add an email to your account first, so your garden can't be lost.");
+  }
   const data = input(req);
   const code = text(data.friendCode, 12).toUpperCase();
   const message = text(data.message, 280);

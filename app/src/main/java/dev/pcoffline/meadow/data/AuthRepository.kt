@@ -1,18 +1,30 @@
 package dev.pcoffline.meadow.data
 
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 
 class AuthRepository(private val backend: Backend) {
 
+    private val _anonymous = MutableStateFlow(false)
+
+    /** True while the account has no email attached (started with "no registration"). */
+    val anonymous: StateFlow<Boolean> = _anonymous.asStateFlow()
+
     val uid: Flow<String?> = callbackFlow {
-        val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser?.uid) }
+        val listener = FirebaseAuth.AuthStateListener {
+            _anonymous.value = it.currentUser?.isAnonymous == true
+            trySend(it.currentUser?.uid)
+        }
         backend.auth.addAuthStateListener(listener)
         awaitClose { backend.auth.removeAuthStateListener(listener) }
     }.distinctUntilChanged()
@@ -23,6 +35,24 @@ class AuthRepository(private val backend: Backend) {
 
     suspend fun signUp(email: String, password: String) {
         backend.auth.createUserWithEmailAndPassword(email.trim(), password).await()
+    }
+
+    /** Starts without an email: an anonymous account plus a profile. */
+    suspend fun startWithoutEmail(displayName: String, flower: String) {
+        if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
+        createProfile(displayName, flower)
+    }
+
+    /**
+     * Attaches an email and password to an account started without one, keeping all its data.
+     * Needed before inviting approvers, so a reinstall can't wipe your commitments.
+     */
+    suspend fun addEmail(email: String, password: String) {
+        val user = backend.auth.currentUser ?: throw IllegalStateException("Please sign in first.")
+        require(password.length >= 6) { "Use at least 6 characters for your password." }
+        user.linkWithCredential(EmailAuthProvider.getCredential(email.trim(), password)).await()
+        user.reload().await()
+        _anonymous.value = false
     }
 
     suspend fun sendPasswordReset(email: String) {

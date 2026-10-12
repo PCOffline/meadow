@@ -49,7 +49,14 @@ import dev.pcoffline.meadow.data.formatMinutes
 import dev.pcoffline.meadow.ui.LocalSnackbar
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
-import dev.pcoffline.meadow.ui.components.MeadowHills
+import dev.pcoffline.meadow.ui.components.FallingPetals
+import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.components.PetalBurst
+import dev.pcoffline.meadow.ui.components.SkyMood
+import dev.pcoffline.meadow.ui.components.SkyScene
+import dev.pcoffline.meadow.ui.components.SleepyZs
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
 import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -132,71 +139,101 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
     val appName = remember(pkg) { AppGraph.engine.limitFor(pkg)?.appName ?: AppGraph.catalog.label(pkg) }
     val b = budget
     val unlocked = b != null && !b.exhausted
+    // Petals when a friend's yes arrives while this screen is open.
+    var burst by remember { mutableIntStateOf(0) }
+    var wasUnlocked by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(unlocked, b != null) {
+        if (b == null) return@LaunchedEffect
+        if (wasUnlocked == false && unlocked && !b.emergency) burst++
+        wasUnlocked = unlocked
+    }
 
     CompositionLocalProvider(LocalSnackbar provides snackbar) {
-        Box(Modifier.fillMaxSize().background(garden.sky)) {
-            MeadowHills(Modifier.fillMaxWidth().height(260.dp).align(Alignment.BottomCenter))
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            SkyScene(restingSky(), Modifier.fillMaxSize())
+            FallingPetals(Modifier.fillMaxSize(), count = 8)
             Column(
                 Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
             ) {
                 AppIcon(pkg, size = 56.dp)
-                BloomFlower(if (unlocked) 0.9f else 0.05f, garden.petalPink, Modifier.size(110.dp, 150.dp))
-                Text(
-                    when {
-                        unlocked && b?.emergency == true -> "Emergency unlock active 🚨"
-                        unlocked -> "Your friend said yes 🌸"
-                        else -> "$appName is resting 🌙"
-                    },
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    when {
-                        unlocked && b!!.emergency ->
-                            "$appName is open for ${formatDuration(b.emergencyUntilMillis - System.currentTimeMillis())}. Take care of what you need to."
-                        unlocked -> "You have ${formatDuration(b!!.remainingMs)} more. Enjoy it mindfully."
-                        b != null && b.weeklyIsTighter ->
-                            "You've used the ${formatMinutes(b.limit.weeklyMinutes)} you set aside for this week."
-                        b != null ->
-                            "You've used the ${formatMinutes(b.limit.dailyMinutes)} you set aside today. It blooms again tomorrow."
-                        else -> "You've used the time you set aside."
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                when {
-                    unlocked -> Button(onClick = { onOpen(pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Open $appName") }
-                    pending != null -> Text(
-                        "💌 You asked for ${pending.minutes} more minutes. We'll let you know when someone answers.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    profile == null -> Text(
-                        "Sign in to Meadow to ask a friend for more time.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    profile.approverIds.isEmpty() -> Text(
-                        "Invite an approver in Meadow so you can ask a friend for more time.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                    )
-                    else -> Button(onClick = { asking = true }, modifier = Modifier.fillMaxWidth()) { Text("Ask a friend for more time") }
+                Box {
+                    BloomFlower(if (unlocked) 0.9f else 0.05f, garden.petalPink, Modifier.size(110.dp, 150.dp))
+                    if (!unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
                 }
-                OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text("Go do something lovely") }
-                if (!unlocked) {
-                    TextButton(onClick = { emergency = true }) {
-                        Text("Emergency? Unlock now", color = MaterialTheme.colorScheme.error)
+                MeadowCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            when {
+                                unlocked && b?.emergency == true -> "Emergency unlock active 🚨"
+                                unlocked -> "Your friend said yes 🌸"
+                                else -> "$appName is resting 🌙"
+                            },
+                            style = MaterialTheme.typography.headlineMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            when {
+                                unlocked && b!!.emergency ->
+                                    "$appName is open for ${formatDuration(b.emergencyUntilMillis - System.currentTimeMillis())}. Take care of what you need to."
+                                unlocked -> "You have ${formatDuration(b!!.remainingMs)} more. Enjoy it mindfully."
+                                b != null && b.weeklyIsTighter ->
+                                    "You've used the ${formatMinutes(b.limit.weeklyMinutes)} you set aside for this week."
+                                b != null ->
+                                    "You've used the ${formatMinutes(b.limit.dailyMinutes)} you set aside today. It blooms again tomorrow."
+                                else -> "You've used the time you set aside."
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        when {
+                            unlocked -> Button(onClick = { onOpen(pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Open $appName") }
+                            pending != null -> Text(
+                                "💌 You asked for ${pending.minutes} more minutes. We'll let you know when someone answers.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                            profile == null -> Text(
+                                "Sign in to Meadow to ask a friend for more time.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                            profile.approverIds.isEmpty() -> Text(
+                                "Invite an approver in Meadow so you can ask a friend for more time.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                            else -> Button(onClick = { asking = true }, modifier = Modifier.fillMaxWidth()) { Text("Ask a friend for more time") }
+                        }
+                        OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text("Go do something lovely") }
+                        if (!unlocked) {
+                            TextButton(onClick = { emergency = true }) {
+                                Text("Emergency? Unlock now", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
             }
+            PetalBurst(burst, Modifier.fillMaxSize())
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
     if (asking) AskForTimeDialog(packageName = pkg, onDismiss = { asking = false })
     if (emergency) EmergencyDialog(packageName = pkg, appName = appName, onDismiss = { emergency = false })
 }
+
+/** A resting app gets a calm dusk sky with the moon out, whatever the hour. */
+private fun restingSky() = SkyMood(
+    top = androidx.compose.ui.graphics.Color(0xFF3B3F63),
+    bottom = androidx.compose.ui.graphics.Color(0xFFB8A9C9),
+    night = true,
+    onSky = androidx.compose.ui.graphics.Color(0xFFF3EEE2),
+    greeting = "",
+)

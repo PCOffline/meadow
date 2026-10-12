@@ -15,6 +15,9 @@ import kotlinx.coroutines.launch
 
 val LocalSnackbar = staticCompositionLocalOf { SnackbarHostState() }
 
+/** Plays a shower of petals (and a little haptic tap) for happy moments. */
+val LocalCelebrate = staticCompositionLocalOf<() -> Unit> { {} }
+
 /** Runs one user action at a time, exposing whether it is busy and what went wrong. */
 class ActionState(private val scope: CoroutineScope, private val snackbar: SnackbarHostState) {
     var busy by mutableStateOf(false)
@@ -57,14 +60,4 @@ fun relativeTime(millis: Long): String {
     val now = System.currentTimeMillis()
     if (now - millis < 60_000L) return "just now"
     return DateUtils.getRelativeTimeSpanString(millis, now, DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString()
-}
-
-fun greeting(): String {
-    val hour = java.time.LocalTime.now().hour
-    return when (hour) {
-        in 5..11 -> "Good morning"
-        in 12..16 -> "Good afternoon"
-        in 17..21 -> "Good evening"
-        else -> "Hello, night owl"
-    }
 }

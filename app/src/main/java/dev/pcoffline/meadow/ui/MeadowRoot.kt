@@ -1,6 +1,21 @@
 package dev.pcoffline.meadow.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import dev.pcoffline.meadow.ui.components.PetalBurst
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
@@ -86,6 +101,14 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
     val currentRoute = backStack?.destination?.route
     val showBar = Tab.entries.any { it.route == currentRoute }
     val badges = rememberBadges(profile.uid)
+    var celebration by remember { mutableIntStateOf(0) }
+    val haptics = LocalHapticFeedback.current
+    val celebrate = remember {
+        {
+            celebration++
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
     LaunchedEffect(Unit) {
         if (!AppGraph.protection.current().essentialsReady) nav.navigate("setup")
     }
@@ -97,7 +120,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         nav.navigate(target) { launchSingleTop = true }
     }
 
-    CompositionLocalProvider(LocalSnackbar provides snackbar) {
+    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalCelebrate provides celebrate) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
@@ -111,12 +134,22 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                                 Tab.CHATS -> badges.chats
                                 else -> 0
                             }
+                            val selected = currentRoute == tab.route
+                            val iconScale by animateFloatAsState(
+                                if (selected) 1.18f else 1f,
+                                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                                label = "tabIcon",
+                            )
                             NavigationBarItem(
-                                selected = currentRoute == tab.route,
+                                selected = selected,
                                 onClick = { nav.switchTab(tab.route) },
                                 icon = {
                                     BadgedBox(badge = { if (count > 0) Badge { Text(count.toString()) } }) {
-                                        Icon(tab.icon, contentDescription = tab.label)
+                                        Icon(
+                                            tab.icon,
+                                            contentDescription = tab.label,
+                                            modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                                        )
                                     }
                                 },
                                 label = { Text(tab.label) },
@@ -130,7 +163,14 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
             },
         ) { padding ->
             Box(Modifier.padding(padding)) {
-                NavHost(nav, startDestination = Tab.GARDEN.route) {
+                NavHost(
+                    nav,
+                    startDestination = Tab.GARDEN.route,
+                    enterTransition = { fadeIn(tween(260)) + slideInVertically(tween(320)) { it / 28 } },
+                    exitTransition = { fadeOut(tween(180)) },
+                    popEnterTransition = { fadeIn(tween(260)) },
+                    popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
+                ) {
                     composable("setup") { SetupScreen(onDone = { nav.popBackStack() }) }
                     composable(Tab.GARDEN.route) { GardenScreen(profile, nav) }
                     composable(Tab.STATS.route) { dev.pcoffline.meadow.ui.stats.StatsScreen(nav) }
@@ -158,6 +198,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                         FriendScreen(profile, entry.arguments?.getString("uid").orEmpty(), nav)
                     }
                 }
+                PetalBurst(celebration, Modifier.fillMaxSize())
             }
         }
     }

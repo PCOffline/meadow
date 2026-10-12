@@ -36,6 +36,8 @@ import dev.pcoffline.meadow.data.ChangeOutcome
 import dev.pcoffline.meadow.data.Emergency
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.FlowerPicker
+import dev.pcoffline.meadow.ui.auth.SecureAccountCard
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
@@ -50,6 +52,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
     var confirmStrictOff by remember { mutableStateOf(false) }
     var confirmSignOut by remember { mutableStateOf(false) }
     var showEmergency by remember { mutableStateOf(false) }
+    val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
     val action = rememberAction()
 
     Column(Modifier.fillMaxSize()) {
@@ -94,6 +97,12 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
                 }
             }
 
+            if (anonymous) {
+                SecureAccountCard(
+                    reason = "Your garden isn't linked to an email yet. Add one so you can sign in on a new phone " +
+                        "and invite approvers.",
+                )
+            }
             EmergencyBanner()
             MeadowCard(Modifier.fillMaxWidth()) {
                 Text("Emergency unlock", style = MaterialTheme.typography.titleMedium)
@@ -174,9 +183,16 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
             title = { Text("Sign out?") },
-            text = { Text("Your limits keep working on this phone while you're signed out, but you won't be able to ask for more time.") },
+            text = {
+                Text(
+                    if (anonymous) "Your garden has no email yet, so signing out would lose it for good. Add an email above first."
+                    else "Your limits keep working on this phone while you're signed out, but you won't be able to ask for more time.",
+                )
+            },
             confirmButton = {
-                TextButton(onClick = { confirmSignOut = false; action.run { AppGraph.auth.signOut() } }) { Text("Sign out") }
+                if (!anonymous) {
+                    TextButton(onClick = { confirmSignOut = false; action.run { AppGraph.auth.signOut() } }) { Text("Sign out") }
+                }
             },
             dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Stay") } },
         )

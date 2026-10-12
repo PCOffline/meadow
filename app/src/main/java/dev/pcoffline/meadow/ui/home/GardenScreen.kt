@@ -47,10 +47,14 @@ import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowCard
-import dev.pcoffline.meadow.ui.components.MeadowHills
+import dev.pcoffline.meadow.ui.components.SkyScene
+import dev.pcoffline.meadow.ui.components.SleepyZs
+import dev.pcoffline.meadow.ui.components.rememberSkyMood
+import dev.pcoffline.meadow.data.formatMinutes
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
-import dev.pcoffline.meadow.ui.greeting
 import dev.pcoffline.meadow.ui.switchTab
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.Dispatchers
@@ -137,7 +141,7 @@ fun GardenScreen(profile: UserProfile, nav: NavController) {
         }
 
         items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
-            Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.animateItem().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { budget ->
                     FlowerTile(budget, Modifier.weight(1f)) { nav.navigate("limit/${budget.limit.packageName}") }
                 }
@@ -150,32 +154,34 @@ fun GardenScreen(profile: UserProfile, nav: NavController) {
 
 @Composable
 private fun GardenHeader(profile: UserProfile, state: GardenState, onSettings: () -> Unit) {
-    val garden = Garden.colors
-    Box(Modifier.fillMaxWidth().height(230.dp).background(garden.sky)) {
-        MeadowHills(Modifier.fillMaxSize())
+    val mood = rememberSkyMood()
+    val minutes by animateIntAsState((state.todayTotalMs / 60_000L).toInt(), tween(1100), label = "todayMinutes")
+    Box(Modifier.fillMaxWidth().height(250.dp)) {
+        SkyScene(mood, Modifier.fillMaxSize())
         Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         Days.today().format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = mood.onSky.copy(alpha = 0.75f),
                     )
-                    Text("${greeting()}, ${profile.displayName} ${profile.flower}", style = MaterialTheme.typography.headlineSmall)
+                    Text("${mood.greeting}, ${profile.displayName} ${profile.flower}", style = MaterialTheme.typography.headlineSmall, color = mood.onSky)
                 }
-                IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Settings") }
+                IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = mood.onSky) }
             }
             Spacer(Modifier.height(18.dp))
-            Text("Screen time today", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Screen time today", style = MaterialTheme.typography.labelLarge, color = mood.onSky.copy(alpha = 0.75f))
             Text(
-                formatDuration(state.todayTotalMs),
-                style = MaterialTheme.typography.displaySmall.copy(fontSize = 44.sp),
+                formatMinutes(minutes),
+                style = MaterialTheme.typography.displaySmall.copy(fontSize = 46.sp),
                 fontWeight = FontWeight.SemiBold,
+                color = mood.onSky,
             )
             Text(
                 if (state.appsUsed == 1) "across 1 app" else "across ${state.appsUsed} apps",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mood.onSky.copy(alpha = 0.75f),
             )
         }
     }
@@ -191,6 +197,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Uni
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp))
             AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
+            if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
         }
         Text(
             budget.limit.appName,

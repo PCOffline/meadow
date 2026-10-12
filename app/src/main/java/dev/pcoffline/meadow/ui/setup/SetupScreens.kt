@@ -44,6 +44,13 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.components.BloomFlower
+import dev.pcoffline.meadow.ui.components.GrowthBar
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.layout.size
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.theme.Garden
 
@@ -64,12 +71,22 @@ fun SetupScreen(onDone: () -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Prepare the soil 🌱", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "Meadow needs a few permissions to keep your promises for you. Each one only takes a tap.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val done = listOf(state.usageAccess, state.accessibility, state.notifications, state.overlay, state.deviceAdmin, state.batteryUnrestricted)
+            .count { it }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Prepare the soil 🌱", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "A few permissions let Meadow keep your promises for you. Your flower blooms as you go.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text("$done of 6 ready", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                GrowthBar(done / 6f, color = Garden.colors.leaf)
+            }
+            Spacer(Modifier.width(12.dp))
+            BloomFlower(0.1f + 0.9f * done / 6f, Garden.colors.petalPink, Modifier.size(76.dp, 116.dp), petals = 7)
+        }
         SetupStep(
             emoji = "📊",
             title = "Usage access",
@@ -147,7 +164,9 @@ private fun SetupStep(emoji: String, title: String, body: String, done: Boolean,
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    if (done) Pill("Done ✓", MaterialTheme.colorScheme.primaryContainer)
+                    AnimatedVisibility(done, enter = scaleIn(spring(dampingRatio = 0.4f)) + fadeIn()) {
+                        Pill("Done ✓", MaterialTheme.colorScheme.primaryContainer)
+                    }
                 }
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!done) {

@@ -2,7 +2,14 @@
 
 package dev.pcoffline.meadow.ui.stats
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -103,7 +110,16 @@ fun StatsScreen(nav: NavController) {
                 action = { Button(onClick = { nav.navigate("setup") }) { Text("Turn it on") } },
             )
         } else {
-            PeriodContent(period, offset, onOffset = { offset = it })
+            AnimatedContent(
+                targetState = period to offset,
+                transitionSpec = {
+                    val forward = targetState.first.ordinal > initialState.first.ordinal ||
+                        (targetState.first == initialState.first && targetState.second > initialState.second)
+                    (slideInHorizontally(tween(320)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(320)))
+                        .togetherWith(fadeOut(tween(180)))
+                },
+                label = "period",
+            ) { (p, o) -> PeriodContent(p, o, onOffset = { offset = it }) }
         }
     }
 }
@@ -128,7 +144,9 @@ private fun PeriodContent(period: Period, offset: Int, onOffset: (Int) -> Unit) 
                 item { EmptyState("🌾", "A quiet stretch", "No app time recorded for this period.") }
             }
             val max = s.apps.firstOrNull()?.second ?: 1L
-            items(s.apps.take(25), key = { it.first }) { (pkg, ms) -> AppRow(pkg, ms, max, s.totalMs) }
+            items(s.apps.take(25), key = { it.first }) { (pkg, ms) ->
+                Box(Modifier.animateItem()) { AppRow(pkg, ms, max, s.totalMs) }
+            }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }

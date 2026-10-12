@@ -104,7 +104,7 @@ fun ChatListScreen(profile: UserProfile, nav: NavController) {
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.clickable { nav.navigate("chat/${chat.id}") }.padding(horizontal = 8.dp),
+                    modifier = Modifier.animateItem().clickable { nav.navigate("chat/${chat.id}") }.padding(horizontal = 8.dp),
                 )
             }
         }
@@ -138,10 +138,12 @@ fun ChatScreen(profile: UserProfile, chatId: String, nav: NavController) {
                 }
             }
             items(messages, key = { it.id }) { message ->
+                Box(Modifier.animateItem()) {
                 when (message.kind) {
                     MessageKind.REQUEST -> message.requestId?.let { RequestMessage(it, profile.uid) }
                     MessageKind.SYSTEM -> SystemMessage(message)
                     MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
+                }
                 }
             }
         }

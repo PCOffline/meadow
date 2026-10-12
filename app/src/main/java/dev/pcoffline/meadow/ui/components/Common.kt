@@ -2,7 +2,16 @@
 
 package dev.pcoffline.meadow.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -53,7 +62,14 @@ fun MeadowCard(
     val shape = RoundedCornerShape(24.dp)
     val border = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
     if (onClick != null) {
-        Card(onClick = onClick, modifier = modifier.then(border), shape = shape, colors = colors) {
+        val interaction = remember { MutableInteractionSource() }
+        Card(
+            onClick = onClick,
+            modifier = modifier.pressBounce(interaction).then(border),
+            shape = shape,
+            colors = colors,
+            interactionSource = interaction,
+        ) {
             Column(Modifier.padding(18.dp), content = content)
         }
     } else {
@@ -83,7 +99,11 @@ fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(emoji, fontSize = 44.sp)
+        val transition = rememberInfiniteTransition(label = "float")
+        val bob by transition.animateFloat(
+            -4f, 4f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "bob",
+        )
+        Text(emoji, fontSize = 44.sp, modifier = Modifier.graphicsLayer { translationY = bob.dp.toPx() })
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text(
             body,
@@ -99,11 +119,7 @@ fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = 
 }
 
 @Composable
-fun Loading(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
+fun Loading(modifier: Modifier = Modifier) = SproutLoader(modifier)
 
 @Composable
 fun FlowerAvatar(flower: String, modifier: Modifier = Modifier, size: Dp = 44.dp, tint: Color = MaterialTheme.colorScheme.primaryContainer) {

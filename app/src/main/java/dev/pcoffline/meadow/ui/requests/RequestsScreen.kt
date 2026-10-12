@@ -57,6 +57,7 @@ import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
+import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.switchTab
@@ -104,7 +105,7 @@ fun RequestsScreen(profile: UserProfile, nav: NavController) {
                     }
                 }
                 items(list.orEmpty(), key = { it.id }) { request ->
-                    RequestCard(request, myUid = profile.uid, modifier = Modifier.padding(horizontal = 20.dp))
+                    RequestCard(request, myUid = profile.uid, modifier = Modifier.animateItem().padding(horizontal = 20.dp))
                 }
                 item { Spacer(Modifier.height(88.dp)) }
             }
@@ -128,6 +129,7 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
     val canDecide = !mine && request.status == RequestStatus.PENDING && myUid in request.approverIds
     var deciding by remember { mutableStateOf<Boolean?>(null) }
     val action = rememberAction()
+    val celebrate = LocalCelebrate.current
 
     MeadowCard(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -190,7 +192,10 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
     deciding?.let { approve ->
         DecideDialog(request, approve, onDismiss = { deciding = null }) { note, minutes ->
             deciding = null
-            action.run(successMessage = if (approve) "Sent your yes 🌸" else "Answered gently 🍃") {
+            action.run(
+                successMessage = if (approve) "Sent your yes 🌸" else "Answered gently 🍃",
+                onSuccess = { if (approve) celebrate() },
+            ) {
                 AppGraph.requests.decide(request.id, approve, note, minutes)
             }
         }

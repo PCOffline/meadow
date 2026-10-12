@@ -70,6 +70,7 @@ import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
+import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.Dispatchers
@@ -148,6 +149,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
     var message by rememberSaveable { mutableStateOf("") }
     var confirmRemove by remember { mutableStateOf(false) }
     val action = rememberAction()
+    val celebrate = LocalCelebrate.current
 
     val proposed = AppLimit(packageName, appName, if (dailyOn) daily else 0, if (weeklyOn) weekly else 0)
     val needsApproval = existing != null && approverCount > 0 && LimitsRepository.isLooser(existing, proposed)
@@ -220,6 +222,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
                 onClick = {
                     action.run {
                         val outcome = AppGraph.limits.save(proposed, message)
+                        if (outcome == ChangeOutcome.APPLIED) celebrate()
                         action.toast(
                             if (outcome == ChangeOutcome.REQUESTED) "Request sent to your approvers 💌"
                             else if (existing == null) "Planted 🌱" else "Limit updated 🌿",

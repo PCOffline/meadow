@@ -38,8 +38,15 @@ your approvers, and they say yes or no from their own phone.
 - **Statistics:** day / week / month views, per-app breakdown, daily average, comparison with the
   previous period, monthly heatmap. Finished days are cached so monthly history survives the
   system's short usage-log retention.
-- **Look & feel:** cream, moss and petal palette with hand-drawn flowers whose bloom shows how much
-  time is left; light and dark ("night garden") themes.
+- **No registration to start.** A name and a flower are enough (anonymous Firebase account).
+  An email is required only before inviting your first approver, so commitments survive a
+  reinstall — and the backend refuses invites from email-less accounts.
+- **Look & feel:** cream, moss and petal palette; Fraunces (soft) and Nunito fonts; hand-drawn
+  flowers that sprout in and bloom or wilt with the time left; a living sky header that follows
+  the clock (peach mornings, starry nights, drifting clouds, a butterfly by day, fireflies by night);
+  sleepy "z"s over resting apps; petal showers when a limit is planted or a friend says yes;
+  bouncy cards and tabs, animated onboarding and screen transitions; light and dark themes.
+  All motion stops when system animations are turned off.
 
 ## Project layout
 
@@ -63,7 +70,7 @@ You need a Firebase project on the **Blaze** plan (Cloud Functions and scheduled
 normal personal usage stays within the free tier).
 
 1. **Create the Firebase project** at <https://console.firebase.google.com>.
-   - Authentication → Sign-in method → enable **Email/Password**.
+   - Authentication → Sign-in method → enable **Email/Password** and **Anonymous**.
    - Firestore Database → create (production mode).
    - Cloud Messaging is enabled by default.
 2. **Deploy the backend**
@@ -94,14 +101,14 @@ functions on every push. To get a connected APK from CI, add a repository secret
 
 ## First run
 
-1. Create an account, pick a name and a flower.
+1. Swipe through the intro, pick a name and a flower — no email needed yet.
 2. Grant **usage access** and turn on the **Meadow garden keeper** accessibility service (both
    required), plus notifications, display-over-apps, uninstall protection and unrestricted
    battery (recommended).
    - Android 13+ blocks accessibility for sideloaded apps until you open Meadow's
      *App info → ⋮ → Allow restricted settings*.
 3. Plant limits on the Garden tab.
-4. Circle tab → enter your friend's code under *Invite someone to be your approver*; they accept
+4. Circle tab → add an email to your garden, then enter your friend's code under *Invite someone to be your approver*; they accept
    in their Circle tab. From then on, extra time and loosening need their yes.
 
 ## How enforcement works
@@ -138,3 +145,8 @@ requests/{id}               requesterId, type, approverIds[], status, …
 chats/{uidA_uidB}           participants[], names{}, flowers{}, lastMessage, lastRead{}
   messages/{id}             senderId, kind (text|request|system), text, requestId
 ```
+
+## Credits
+
+Fonts: [Fraunces](https://github.com/undercasetype/Fraunces) and [Nunito](https://github.com/googlefonts/nunito),
+both under the SIL Open Font License (see `app/src/main/assets/licenses/`).

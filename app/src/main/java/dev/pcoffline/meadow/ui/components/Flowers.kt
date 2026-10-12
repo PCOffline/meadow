@@ -1,6 +1,12 @@
 package dev.pcoffline.meadow.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -36,10 +42,17 @@ fun BloomFlower(
     modifier: Modifier = Modifier,
     petals: Int = 6,
     sway: Boolean = true,
+    growIn: Boolean = true,
 ) {
     val garden = Garden.colors
+    val reduced = rememberReducedMotion()
     val animatedBloom by animateFloatAsState(bloom.coerceIn(0f, 1f), tween(900), label = "bloom")
-    val angle = if (sway) {
+    // Sprouts up from the soil the first time it appears.
+    val grow = remember { Animatable(if (growIn && !reduced) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        grow.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessVeryLow))
+    }
+    val angle = if (sway && !reduced) {
         val transition = rememberInfiniteTransition(label = "sway")
         transition.animateFloat(
             initialValue = -2.5f,
@@ -59,6 +72,7 @@ fun BloomFlower(
         // Soil mound.
         drawOval(garden.soil.copy(alpha = 0.55f), topLeft = Offset(w * 0.22f, h * 0.89f), size = Size(w * 0.56f, h * 0.09f))
 
+        scale(grow.value, grow.value, pivot = base) {
         rotate(angle * (0.4f + animatedBloom), pivot = base) {
             val stem = Path().apply {
                 moveTo(base.x, base.y)
@@ -68,6 +82,7 @@ fun BloomFlower(
             leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f))
             leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f))
             flowerHead(head, w * 0.13f + w * 0.11f * animatedBloom, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), animatedBloom, garden.petalHoney)
+        }
         }
         if (animatedBloom < 0.15f) {
             // A couple of fallen petals.

@@ -69,6 +69,8 @@ import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.limits.BackTopBar
+import dev.pcoffline.meadow.ui.LocalCelebrate
+import dev.pcoffline.meadow.ui.auth.SecureAccountCard
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -98,7 +100,31 @@ fun CircleScreen(profile: UserProfile, nav: NavController) {
                 )
             }
         }
-        item { InviteCard(profile) }
+        item {
+            val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
+            if (anonymous) {
+                Column(Modifier.padding(horizontal = 20.dp)) {
+                    MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.primaryContainer) {
+                        Text("Your friend code", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            profile.friendCode,
+                            style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Monospace, letterSpacing = 4.sp),
+                        )
+                        Text(
+                            "Friends can invite you as their approver with this code.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    SecureAccountCard(
+                        reason = "Before inviting an approver, add an email. That way your limits and friends come back " +
+                            "if you change phones — and can't be wiped by reinstalling.",
+                    )
+                }
+            } else {
+                InviteCard(profile)
+            }
+        }
 
         if (incoming.isNotEmpty()) {
             item { SectionTitle("Asking for your help", Modifier.padding(horizontal = 20.dp)) }
@@ -190,6 +216,7 @@ private fun InviteCard(profile: UserProfile) {
 @Composable
 private fun IncomingInvite(invite: Invite) {
     val action = rememberAction()
+    val celebrate = LocalCelebrate.current
     MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             FlowerAvatar(invite.fromFlower)
@@ -205,7 +232,11 @@ private fun IncomingInvite(invite: Invite) {
         ErrorNote(action.error, Modifier.padding(top = 8.dp))
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { action.run(successMessage = "You're now ${invite.fromName}'s approver 🌻") { AppGraph.social.respond(invite.id, true) } },
+                onClick = {
+                    action.run(successMessage = "You're now ${invite.fromName}'s approver 🌻", onSuccess = celebrate) {
+                        AppGraph.social.respond(invite.id, true)
+                    }
+                },
                 enabled = !action.busy, modifier = Modifier.weight(1f),
             ) { Text("Accept") }
             OutlinedButton(
