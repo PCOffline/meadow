@@ -73,8 +73,10 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
-      - name: Security rules tests (Firestore emulator)
+      - name: Security rules tests (Firestore and Storage emulators)
         run: npm run test:rules
+      - name: Hosted legal pages
+        run: npm run test:hosting
 
   integration:
     runs-on: ubuntu-latest
