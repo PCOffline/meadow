@@ -40,9 +40,10 @@ export const errors = {
   badDate: "That date doesn't look right.",
   unknownRequest: "That kind of request isn't supported.",
   tooManyRequests: "You have lots of requests waiting already. Give your Bumblebees a moment. 🌿",
-  duplicateRequest: "You've already asked for this. It's waiting for an answer.",
+  duplicateRequest: "You've already asked about this app. Wait for an answer, or cancel it first.",
   requestGone: "That request isn't around anymore.",
   requestAnswered: "That request was already answered.",
+  requestExpired: "That request expired. If they still need it, they can ask again.",
   ownRequest: "You can't answer your own request. 🌱",
   notYourRequest: "Only their Bumblebees can answer this.",
   noLongerBumblebee: "You're no longer their Bumblebee.",
@@ -66,7 +67,8 @@ export const chatNotes = {
     `${owner.displayName} is ending ${bee.displayName}'s time as their Bumblebee. It takes effect in 24 hours`,
   removalCancelled: (owner: Person, bee: Person) => `${owner.displayName} is keeping ${bee.displayName} as their Bumblebee 🐝`,
   steppedDown: (bee: Person, owner: Person) => `${bee.displayName} stepped down as ${owner.displayName}'s Bumblebee`,
-  request: (owner: Person, summary: string) => `💌 ${owner.displayName} asks for ${summary}`,
+  request: (owner: Person, summary: string, usage: string | null) =>
+    `💌 ${owner.displayName} asks for ${summary}${usage ? `. ${usage}` : ""}`,
   yes: (bee: Person, summary: string) => `🌸 ${bee.displayName} said yes to ${summary}`,
   notToday: (bee: Person, summary: string) => `🍃 ${bee.displayName} said not today to ${summary}`,
   emergency: (headline: string, scope: string, reason: string) => `${headline}. Lifted ${scope}. Reason: “${reason}”`,
@@ -102,9 +104,9 @@ export const pushes = {
       ? "Your other Bumblebees are still looking after your garden."
       : "Invite a new Bumblebee so your limits stay locked in.",
   }),
-  request: (owner: Person, summary: string, message: string) => ({
+  request: (owner: Person, summary: string, message: string, usage: string | null) => ({
     title: `${owner.flower} ${owner.displayName} asks for ${summary}`,
-    body: message ? `“${message}”` : "Tap to answer, or say yes right from here.",
+    body: [usage, message ? `“${message}”` : "Tap to answer, or say yes right from here."].filter(Boolean).join(" "),
   }),
   decided: (bee: Person, approved: boolean, summary: string, note: string) => ({
     title: approved ? `🌸 ${bee.displayName} said yes!` : `🍃 ${bee.displayName} said not today`,

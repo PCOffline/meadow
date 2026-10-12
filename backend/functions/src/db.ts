@@ -1,5 +1,5 @@
 /** Firestore and FCM plumbing shared by every function. */
-import { getFirestore, FieldValue, DocumentSnapshot, DocumentReference, SetOptions, DocumentData, Transaction } from "firebase-admin/firestore";
+import { getFirestore, FieldPath, FieldValue, DocumentSnapshot, DocumentReference, SetOptions, DocumentData, Transaction } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
@@ -72,15 +72,28 @@ export function requireEmailAccount(req: CallableRequest<unknown>): void {
  * checks made in the same transaction can't be raced by a double tap.
  */
 export async function consumeRate(tx: Transaction, uid: string, key: string, max: number, windowMs: number): Promise<() => void> {
+  return consumeRates(tx, uid, [{ key, max, windowMs }]);
+}
+
+/** [consumeRate] for several counters at once, written together. */
+export async function consumeRates(
+  tx: Transaction,
+  uid: string,
+  limits: { key: string; max: number; windowMs: number }[],
+): Promise<() => void> {
   const ref = rateLimits().doc(uid);
   const snap = await tx.get(ref);
   const now = Date.now();
-  const entry = snap.get(key) as { count?: number; since?: number } | undefined;
-  const fresh = !entry || typeof entry.since !== "number" || now - entry.since >= windowMs;
-  const count = fresh ? 0 : (entry?.count ?? 0);
-  if (count >= max) throw new HttpsError("resource-exhausted", errors.slowDown);
+  const next: Record<string, { count: number; since: number }> = {};
+  for (const { key, max, windowMs } of limits) {
+    const entry = snap.get(new FieldPath(key)) as { count?: number; since?: number } | undefined;
+    const fresh = !entry || typeof entry.since !== "number" || now - entry.since >= windowMs;
+    const count = fresh ? 0 : (entry?.count ?? 0);
+    if (count >= max) throw new HttpsError("resource-exhausted", errors.slowDown);
+    next[key] = { count: count + 1, since: fresh ? now : entry!.since! };
+  }
   // Returned rather than written here, because a transaction must do all its reads first.
-  return () => tx.set(ref, { [key]: { count: count + 1, since: fresh ? now : entry!.since } }, { merge: true });
+  return () => tx.set(ref, next, { merge: true });
 }
 
 /** Validates callable input, turning the first problem into a friendly error. */

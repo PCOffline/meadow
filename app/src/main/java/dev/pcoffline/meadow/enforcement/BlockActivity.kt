@@ -171,7 +171,8 @@ class RestViewModel(private val packageName: String) : ViewModel() {
             budget = AppGraph.engine.budget(packageName, forceRefresh = true),
             signedIn = profile != null,
             hasBumblebees = profile?.approverIds?.isNotEmpty() == true,
-            pendingRequest = request,
+            // Unanswered requests expire; the ticker notices before the backend settles it.
+            pendingRequest = request?.takeIf { RequestStatus.effective(it.status, it.createdAtMillis) == RequestStatus.PENDING },
         )
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, RestState())
 }

@@ -56,4 +56,15 @@ class ModelsTest {
         assertNull(Days.parse("not a date"))
         assertEquals(java.time.DayOfWeek.MONDAY, Days.weekStart(today).dayOfWeek)
     }
+
+    @Test
+    fun `unanswered requests count as expired after half an hour`() {
+        val now = 10_000_000_000L
+        val minute = 60_000L
+        assertEquals(RequestStatus.PENDING, RequestStatus.effective(RequestStatus.PENDING, now - 29 * minute, now))
+        assertEquals(RequestStatus.EXPIRED, RequestStatus.effective(RequestStatus.PENDING, now - 30 * minute, now))
+        assertEquals(RequestStatus.APPROVED, RequestStatus.effective(RequestStatus.APPROVED, now - 60 * minute, now))
+        // Still being written: the server time isn't known yet.
+        assertEquals(RequestStatus.PENDING, RequestStatus.effective(RequestStatus.PENDING, 0L, now))
+    }
 }

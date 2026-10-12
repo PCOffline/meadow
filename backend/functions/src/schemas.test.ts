@@ -48,6 +48,17 @@ test("a request can name the Bumblebees to ask, and a new limit can be only hour
   assert.ok(!CreateRequestInput.safeParse({ type: "change_limit", packageName: "a.b", dailyMinutes: 30, weeklyMinutes: 0, schedule: { "9": [] }, dayKey }).success);
 });
 
+test("a request can say how the day stands", () => {
+  const dayKey = "2026-10-12";
+  const ask = { type: "extra_time", packageName: "a.b", minutes: 15, dayKey };
+  const parsed = CreateRequestInput.parse({ ...ask, usedMinutes: 45, allowedMinutes: 60 });
+  assert.equal(parsed.usedMinutes, 45);
+  assert.equal(parsed.allowedMinutes, 60);
+  assert.ok(CreateRequestInput.safeParse(ask).success, "older phones don't send it");
+  assert.ok(!CreateRequestInput.safeParse({ ...ask, usedMinutes: -1 }).success);
+  assert.ok(!CreateRequestInput.safeParse({ ...ask, usedMinutes: 2000 }).success);
+});
+
 test("decisions accept an optional smaller amount", () => {
   assert.equal(DecideRequestInput.parse({ requestId: "r1", approve: true }).note, "");
   assert.equal(DecideRequestInput.parse({ requestId: "r1", approve: true, minutes: null }).minutes, null);

@@ -41,6 +41,9 @@ data class AppBudget(
     private val limitRemainingMs: Long =
         listOfNotNull(dailyRemainingMs, weeklyRemainingMs).minOrNull()?.coerceAtLeast(0) ?: Long.MAX_VALUE
 
+    /** All the time today allows, spent or not; null when only the hours limit the app. */
+    val allowedTodayMs: Long? = if (limitRemainingMs == Long.MAX_VALUE) null else usedTodayMs + limitRemainingMs
+
     /**
      * Time left before the app rests: the tighter limit, or the end of the allowed hours. Extra
      * time granted today can also be spent outside them.

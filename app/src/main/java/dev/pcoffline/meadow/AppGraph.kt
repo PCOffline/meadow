@@ -10,6 +10,7 @@ import com.google.firebase.storage.FirebaseStorage
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.DayUsage
 import dev.pcoffline.meadow.data.EmergencyRepository
 import dev.pcoffline.meadow.data.LimitsRepository
 import dev.pcoffline.meadow.data.LocalStore
@@ -18,6 +19,7 @@ import dev.pcoffline.meadow.data.RequestRepository
 import dev.pcoffline.meadow.data.SocialRepository
 import dev.pcoffline.meadow.data.SyncManager
 import dev.pcoffline.meadow.data.UsageShareRepository
+import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.enforcement.LimitEngine
 import dev.pcoffline.meadow.enforcement.ProtectionMonitor
 import dev.pcoffline.meadow.notifications.Notifier
@@ -44,7 +46,16 @@ object AppGraph {
     val backend by lazy { Backend() }
     val auth by lazy { AuthRepository(backend, store) }
     val sync by lazy { SyncManager(backend, auth, store, scope) }
-    val requests by lazy { RequestRepository(backend) }
+    val requests by lazy {
+        RequestRepository(backend) { pkg ->
+            engine.budget(pkg, forceRefresh = true)?.let { b ->
+                DayUsage(
+                    usedMinutes = (b.usedTodayMs / AppBudget.MINUTE).toInt().coerceIn(0, 1440),
+                    allowedMinutes = b.allowedTodayMs?.let { (it / AppBudget.MINUTE).toInt().coerceIn(0, 10080) },
+                )
+            }
+        }
+    }
     val limits by lazy { LimitsRepository(backend, store, requests) }
     val social by lazy { SocialRepository(backend) { protection.current().strictReady } }
     val chats by lazy { ChatRepository(backend) }

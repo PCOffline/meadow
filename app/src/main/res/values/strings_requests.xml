@@ -45,6 +45,8 @@
     <string name="ask_who">Ask</string>
     <string name="ask_who_private">Each Bumblebee sees only your request, not who else you asked.</string>
     <string name="request_answered_by_other">Another Bumblebee answered</string>
+    <string name="request_usage">Used %1$s of %2$s today</string>
+    <string name="request_usage_no_allowance">Used %1$s today</string>
     <string name="request_you_said_yes">You said yes</string>
     <string name="request_you_said_no">You said not today</string>
 

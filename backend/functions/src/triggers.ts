@@ -3,11 +3,11 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
-import { accountOf, accountRef, chats, db, heartbeats, inboxRef, loadPerson, notify, profileOf, requests, users } from "./db";
+import { accountOf, accountRef, chats, db, heartbeats, loadPerson, notify, profileOf, users } from "./db";
+import { expireStaleRequests } from "./requests";
 import { finishDueRemovals } from "./social";
 
 const ALERT_COOLDOWN_MS = 2 * 60_000;
-const REQUEST_TTL_MS = 24 * 60 * 60_000;
 const STALE_HEARTBEAT_MS = 6 * 60 * 60_000;
 
 /** Pushes new chat messages to the other person. */
@@ -101,27 +101,16 @@ export async function migrateProfiles(limit = 200): Promise<number> {
   return legacy.size;
 }
 
-/** Hourly housekeeping: expire old requests, finish Bumblebee removals, notice quiet phones. */
+/** Requests are short-lived: settle unanswered ones soon after they expire. */
+export const expireRequests = onSchedule("every 5 minutes", async () => {
+  const expired = await expireStaleRequests(Date.now());
+  if (expired > 0) logger.info("Expired requests", { expired });
+});
+
+/** Hourly housekeeping: finish Bumblebee removals, notice quiet phones. */
 export const hourlyCare = onSchedule("every 60 minutes", async () => {
   const now = Date.now();
   const migrated = await migrateProfiles();
-
-  const expired = await requests()
-    .where("status", "==", "pending")
-    .where("createdAt", "<", Timestamp.fromMillis(now - REQUEST_TTL_MS))
-    .limit(400)
-    .get();
-  if (!expired.empty) {
-    const writer = db().bulkWriter();
-    for (const d of expired.docs) {
-      void writer.update(d.ref, { status: "expired" }).catch(() => undefined);
-      for (const beeUid of (d.get("approverIds") as string[] | undefined) ?? []) {
-        // Requests from before inboxes have no copies; those updates just fail quietly.
-        void writer.update(inboxRef(beeUid, d.id), { status: "expired", answeredByMe: false }).catch(() => undefined);
-      }
-    }
-    await writer.close();
-  }
 
   const removed = await finishDueRemovals(now);
 
@@ -144,5 +133,5 @@ export const hourlyCare = onSchedule("every 60 minutes", async () => {
     back.docs.forEach((d) => batch.update(d.ref, { staleNotified: false }));
     await batch.commit();
   }
-  logger.info("Hourly care done", { migrated, expired: expired.size, removed, quiet: quiet.size, recovered: back.size });
+  logger.info("Hourly care done", { migrated, removed, quiet: quiet.size, recovered: back.size });
 });

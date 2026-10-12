@@ -115,6 +115,13 @@ enum class RequestStatus(val wire: String) {
 
     companion object {
         fun fromWire(value: String?) = entries.firstOrNull { it.wire == value } ?: PENDING
+
+        /** Unanswered requests expire after this long; must match REQUEST_TTL_MS in requests.ts. */
+        const val TTL_MS = 30 * 60_000L
+
+        /** A pending request past its time counts as expired, even before the backend settles it. */
+        fun effective(status: RequestStatus, createdAtMillis: Long, now: Long = System.currentTimeMillis()) =
+            if (status == PENDING && createdAtMillis > 0L && now - createdAtMillis >= TTL_MS) EXPIRED else status
     }
 }
 
@@ -146,6 +153,9 @@ data class LimitRequest(
     val myDecision: String? = null,
     val grantedMinutes: Int = 0,
     val decidedAtMillis: Long = 0L,
+    /** Minutes spent on the app that day when asking, and minutes the day allowed in all. */
+    val usedMinutes: Int? = null,
+    val allowedMinutes: Int? = null,
 )
 
 enum class InviteStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }

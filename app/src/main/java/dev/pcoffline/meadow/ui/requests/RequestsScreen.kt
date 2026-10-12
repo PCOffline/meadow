@@ -173,6 +173,9 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
             }
             StatusPill(request.status)
         }
+        usageText(request)?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+        }
         if (request.message.isNotBlank()) {
             Text(stringResource(R.string.quoted, request.message), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         }
@@ -237,6 +240,15 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
     }
 }
 
+/** How the day stood when they asked: "Used 45m of 1h today". */
+@Composable
+private fun usageText(request: LimitRequest): String? {
+    val used = request.usedMinutes ?: return null
+    val allowed = request.allowedMinutes?.takeIf { it > 0 }
+    return if (allowed != null) stringResource(R.string.request_usage, minutesText(used), minutesText(allowed))
+    else stringResource(R.string.request_usage_no_allowance, minutesText(used))
+}
+
 @Composable
 private fun StatusPill(status: RequestStatus) {
     val scheme = MaterialTheme.colorScheme
@@ -265,6 +277,7 @@ private fun DecideDialog(request: LimitRequest, approve: Boolean, onDismiss: () 
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(requestSummary(request).replaceFirstChar { it.uppercase() })
+                usageText(request)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 if (approve && extraTime) {
                     Text(stringResource(R.string.request_decide_less), style = MaterialTheme.typography.bodySmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

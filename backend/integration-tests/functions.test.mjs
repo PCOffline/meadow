@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { initializeApp, deleteApp } from "firebase/app";
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInAnonymously, signInWithEmailAndPassword } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
-import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, where } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
 import { getBytes, ref as storageRef } from "firebase/storage";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 
@@ -423,6 +423,53 @@ describe("requests", () => {
     const { sam } = await gardenWithLimit();
     await rejects(sam.call("createRequest", { type: "extra_time", packageName: "com.other", minutes: 5, dayKey: today() }), "failed-precondition");
     await rejects(sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 999, dayKey: today() }), "invalid-argument");
+  });
+
+  test("a request says how the day stands", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", {
+      type: "extra_time", packageName: "com.insta", minutes: 15, dayKey: today(), usedMinutes: 45, allowedMinutes: 60,
+    });
+    const copy = await read(`users/${bee.uid}/inbox/${requestId}`);
+    assert.equal(copy.usedMinutes, 45);
+    assert.equal(copy.allowedMinutes, 60);
+    assert.equal(copy.minutes, 15);
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.body, /Used 45m of 1h today/);
+  });
+
+  test("one open request per app, whatever kind", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.tok`), {
+      packageName: "com.tok", appName: "TikTok", dailyMinutes: 30, weeklyMinutes: 0,
+    }));
+    const { requestId } = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    await rejects(sam.call("createRequest", { type: "remove_limit", packageName: "com.insta", dayKey: today() }), "already-exists");
+    // Other apps can still be asked about.
+    await sam.call("createRequest", { type: "extra_time", packageName: "com.tok", minutes: 5, dayKey: today() });
+    await bee.call("decideRequest", { requestId, approve: false });
+    await sam.call("createRequest", { type: "remove_limit", packageName: "com.insta", dayKey: today() });
+  });
+
+  test("asking about the same app over and over is slowed down", async () => {
+    const { sam } = await gardenWithLimit();
+    const ask = () => sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    for (let i = 0; i < 3; i++) await sam.call("cancelRequest", await ask());
+    await rejects(ask(), "resource-exhausted");
+  });
+
+  test("requests expire after half an hour, for the asker and every Bumblebee", async () => {
+    const { sam, bee, other } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    await admin((db) => updateDoc(doc(db, `requests/${requestId}`), { createdAt: Timestamp.fromMillis(Date.now() - 31 * 60_000) }));
+    // An expired request doesn't block a new one for the same app.
+    const fresh = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    await rejects(bee.call("decideRequest", { requestId, approve: true }), "failed-precondition");
+    assert.equal((await read(`requests/${requestId}`)).status, "expired");
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).status, "expired");
+    assert.equal((await read(`users/${other.uid}/inbox/${requestId}`)).status, "expired");
+    assert.equal(await read(`users/${sam.uid}/grants/${requestId}`), undefined);
+    await bee.call("decideRequest", { requestId: fresh.requestId, approve: true });
   });
 
   test("the asker can cancel, and a cancelled request can't be answered", async () => {

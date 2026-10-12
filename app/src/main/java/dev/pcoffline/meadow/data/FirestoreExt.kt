@@ -128,7 +128,7 @@ fun DocumentSnapshot.toRequest() = LimitRequest(
     dailyMinutes = int("dailyMinutes"),
     weeklyMinutes = int("weeklyMinutes"),
     message = getString("message") ?: "",
-    status = RequestStatus.fromWire(getString("status")),
+    status = RequestStatus.effective(RequestStatus.fromWire(getString("status")), millis("createdAt")),
     approverIds = stringList("approverIds"),
     decidedByName = getString("decidedByName"),
     decisionNote = getString("decisionNote"),
@@ -139,6 +139,8 @@ fun DocumentSnapshot.toRequest() = LimitRequest(
     myDecision = getString("myDecision"),
     grantedMinutes = int("grantedMinutes"),
     decidedAtMillis = millis("decidedAt"),
+    usedMinutes = getLong("usedMinutes")?.toInt(),
+    allowedMinutes = getLong("allowedMinutes")?.toInt(),
 )
 
 fun DocumentSnapshot.toInvite() = Invite(

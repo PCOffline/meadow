@@ -1,14 +1,19 @@
-import { DocumentData, DocumentReference, FieldValue, Transaction, UpdateData } from "firebase-admin/firestore";
+import { DocumentData, DocumentReference, FieldValue, Timestamp, Transaction, UpdateData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
 import { chatNotes, errors, pushes } from "./copy";
-import { consumeRate, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
-import { chatIdFor, RequestType, summarize } from "./format";
+import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
+import { chatIdFor, formatMinutes, RequestType, summarize } from "./format";
 import { isScheduleStricter, normalize, Schedule } from "./schedule";
 import { CreateRequestInput, DecideRequestInput, RequestIdInput, SaveLimitInput } from "./schemas";
 
 const MAX_PENDING = 10;
 const REQUESTS_PER_HOUR = 10;
+/** Asking about the same app again and again: at most this many an hour, whatever the answers. */
+const REQUESTS_PER_APP_PER_HOUR = 3;
 const HOUR_MS = 60 * 60_000;
+/** An unanswered request stops counting after this long: the moment it was about has passed. */
+export const REQUEST_TTL_MS = 30 * 60_000;
 
 export type RequestStatus = "pending" | "approved" | "denied" | "cancelled" | "expired";
 
@@ -31,6 +36,19 @@ export interface RequestDoc {
   status: RequestStatus;
   approverIds: string[];
   dayKey: string;
+  /** Time already spent on the app today, and how much today allows, as the phone saw it. */
+  usedMinutes: number | null;
+  allowedMinutes: number | null;
+}
+
+/** Whether a pending request has outlived [REQUEST_TTL_MS]. One still being written isn't. */
+export function isStale(createdAt: Timestamp | undefined | null, now: number): boolean {
+  return createdAt != null && now - createdAt.toMillis() >= REQUEST_TTL_MS;
+}
+
+/** The rate-limit key for requests about one app. Field paths can't hold dots. */
+export function appRateKey(packageName: string | null): string {
+  return `request:${(packageName ?? "none").replace(/[^A-Za-z0-9_]/g, "_")}`;
 }
 
 /** The phone's local date is within a day of the server's UTC date, whatever its time zone. */
@@ -65,6 +83,8 @@ function inboxCopy(id: string, r: RequestDoc, requesterFlower: string) {
     message: r.message,
     status: r.status,
     dayKey: r.dayKey,
+    usedMinutes: r.usedMinutes,
+    allowedMinutes: r.allowedMinutes,
     myDecision: null,
     createdAt: FieldValue.serverTimestamp(),
   };
@@ -112,13 +132,19 @@ export const createRequest = onCall(async (call) => {
     const me = await loadPerson(uid, tx);
     if (me.account.approverIds.length === 0) throw new HttpsError("failed-precondition", errors.noBumblebees);
     const approverIds = pickApprovers(me.account.approverIds, input.approverIds);
-    const commitRate = await consumeRate(tx, uid, "request", REQUESTS_PER_HOUR, HOUR_MS);
+    const commitRate = await consumeRates(tx, uid, [
+      { key: "request", max: REQUESTS_PER_HOUR, windowMs: HOUR_MS },
+      { key: appRateKey(input.packageName), max: REQUESTS_PER_APP_PER_HOUR, windowMs: HOUR_MS },
+    ]);
     const limit = await tx.get(users().doc(uid).collection("limits").doc(input.packageName));
     if (!limit.exists) throw new HttpsError("failed-precondition", errors.noLimit);
     // Read in the same transaction as the rate counter, so a double tap can't slip in twice.
-    const pending = await tx.get(requests().where("requesterId", "==", uid).where("status", "==", "pending"));
-    if (pending.size >= MAX_PENDING) throw new HttpsError("resource-exhausted", errors.tooManyRequests);
-    if (pending.docs.some((d) => d.get("type") === input.type && (d.get("packageName") ?? null) === input.packageName)) {
+    const now = Date.now();
+    const pending = (await tx.get(requests().where("requesterId", "==", uid).where("status", "==", "pending")))
+      .docs.filter((d) => !isStale(d.get("createdAt"), now));
+    if (pending.length >= MAX_PENDING) throw new HttpsError("resource-exhausted", errors.tooManyRequests);
+    // One open question per app at a time, whatever kind.
+    if (pending.some((d) => (d.get("packageName") ?? null) === input.packageName)) {
       throw new HttpsError("already-exists", errors.duplicateRequest);
     }
 
@@ -136,6 +162,8 @@ export const createRequest = onCall(async (call) => {
       status: "pending",
       approverIds,
       dayKey: input.dayKey,
+      usedMinutes: input.usedMinutes ?? null,
+      allowedMinutes: input.allowedMinutes ?? null,
     };
     commitRate();
     tx.set(ref, { ...doc, createdAt: FieldValue.serverTimestamp() });
@@ -146,12 +174,46 @@ export const createRequest = onCall(async (call) => {
   const summary = summarize(doc);
   await Promise.all(
     doc.approverIds.map((beeUid) =>
-      postToChat(chatIdFor(uid, beeUid), { senderId: uid, kind: "request", text: chatNotes.request(me.profile, summary), requestId: ref.id }),
+      postToChat(chatIdFor(uid, beeUid), { senderId: uid, kind: "request", text: chatNotes.request(me.profile, summary, usageLine(doc)), requestId: ref.id }),
     ),
   );
-  await notify(doc.approverIds, { type: "request_new", requestId: ref.id, ...pushes.request(me.profile, summary, doc.message) });
+  await notify(doc.approverIds, {
+    type: "request_new",
+    requestId: ref.id,
+    ...pushes.request(me.profile, summary, doc.message, usageLine(doc)),
+  });
   return { requestId: ref.id };
 });
+
+/** "Used 45m of 1h today", for the Bumblebee deciding. Null when the phone didn't say. */
+export function usageLine(r: Pick<RequestDoc, "usedMinutes" | "allowedMinutes">): string | null {
+  if (r.usedMinutes == null) return null;
+  return r.allowedMinutes != null && r.allowedMinutes > 0
+    ? `Used ${formatMinutes(r.usedMinutes)} of ${formatMinutes(r.allowedMinutes)} today.`
+    : `Used ${formatMinutes(r.usedMinutes)} today.`;
+}
+
+/**
+ * Settles pending requests that outlived [REQUEST_TTL_MS], for the asker and every Bumblebee.
+ * Decisions on them are refused anyway; this keeps everyone's lists honest.
+ */
+export async function expireStaleRequests(now: number): Promise<number> {
+  const stale = await requests()
+    .where("status", "==", "pending")
+    .where("createdAt", "<", Timestamp.fromMillis(now - REQUEST_TTL_MS))
+    .limit(400)
+    .get();
+  for (const d of stale.docs) {
+    await db().runTransaction(async (tx) => {
+      const snap = await tx.get(d.ref);
+      if (snap.get("status") !== "pending") return;
+      const inboxes = await existingInboxes(tx, d.id, (snap.get("approverIds") as string[] | undefined) ?? []);
+      tx.update(d.ref, { status: "expired", decidedAt: FieldValue.serverTimestamp() });
+      updateInboxes(tx, d.id, inboxes, "expired");
+    }).catch((e) => logger.warn("Could not expire request", { id: d.id, error: String(e) }));
+  }
+  return stale.size;
+}
 
 /** Applies an approved request. Runs inside the decision transaction. */
 function applyApproval(tx: Transaction, requestId: string, r: RequestDoc, deciderUid: string, grantedMinutes: number): void {
@@ -195,17 +257,24 @@ export const decideRequest = onCall(async (call) => {
   const { requestId, approve, note, minutes } = parse(DecideRequestInput, call.data);
   const requestRef = requests().doc(requestId);
 
-  const { r, decider } = await db().runTransaction(async (tx) => {
+  const result = await db().runTransaction(async (tx) => {
     const snap = await tx.get(requestRef);
     if (!snap.exists) throw new HttpsError("not-found", errors.requestGone);
     const r = snap.data() as RequestDoc;
-    if (r.status !== "pending") throw new HttpsError("failed-precondition", errors.requestAnswered);
     if (r.requesterId === uid) throw new HttpsError("permission-denied", errors.ownRequest);
     if (!r.approverIds.includes(uid)) throw new HttpsError("permission-denied", errors.notYourRequest);
+    // The first answer settles it for everyone asked.
+    if (r.status !== "pending") throw new HttpsError("failed-precondition", errors.requestAnswered);
 
     const [requester, deciderPerson, inboxes] = await Promise.all([
       loadPerson(r.requesterId, tx), loadPerson(uid, tx), existingInboxes(tx, requestId, r.approverIds),
     ]);
+    // Too late to answer: settle it as expired now rather than waiting for the sweep.
+    if (isStale(snap.get("createdAt"), Date.now())) {
+      tx.update(requestRef, { status: "expired", decidedAt: FieldValue.serverTimestamp() });
+      updateInboxes(tx, requestId, inboxes, "expired");
+      return null;
+    }
     // Bumblebees who were removed or stepped down since the request was made can't answer it.
     if (!requester.account.approverIds.includes(uid)) throw new HttpsError("permission-denied", errors.noLongerBumblebee);
     const decider = deciderPerson.profile;
@@ -224,6 +293,8 @@ export const decideRequest = onCall(async (call) => {
     updateInboxes(tx, requestId, inboxes, status, { uid, approve, grantedMinutes: approve ? granted : 0 });
     return { r: { ...r, minutes: granted }, decider };
   });
+  if (!result) throw new HttpsError("failed-precondition", errors.requestExpired);
+  const { r, decider } = result;
 
   const summary = summarize(r);
   await postToChat(chatIdFor(uid, r.requesterId), {

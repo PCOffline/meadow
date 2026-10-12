@@ -1,10 +1,19 @@
 package dev.pcoffline.meadow.data
 
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
-class RequestRepository(private val backend: Backend) {
+/** Minutes spent on an app today, and minutes today allows in all (null when only hours limit it). */
+data class DayUsage(val usedMinutes: Int, val allowedMinutes: Int?)
+
+class RequestRepository(
+    private val backend: Backend,
+    /** How the day stands for an app, sent along so Bumblebees can decide. */
+    private val usage: (packageName: String) -> DayUsage? = { null },
+) {
     private val requests get() = backend.db.collection("requests")
 
     /**
@@ -46,6 +55,7 @@ class RequestRepository(private val backend: Backend) {
         /** Which Bumblebees to ask; null asks all of them. */
         approverIds: List<String>? = null,
     ): String {
+        val day = packageName?.let { pkg -> withContext(Dispatchers.IO) { runCatching { usage(pkg) }.getOrNull() } }
         val result = backend.call(
             "createRequest",
             mapOf(
@@ -59,6 +69,8 @@ class RequestRepository(private val backend: Backend) {
                 "dayKey" to Days.todayKey(),
                 "schedule" to schedule?.toFirestore(),
                 "approverIds" to approverIds,
+                "usedMinutes" to day?.usedMinutes,
+                "allowedMinutes" to day?.allowedMinutes,
             ),
         )
         return result["requestId"] as? String ?: ""

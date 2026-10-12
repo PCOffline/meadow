@@ -20,6 +20,14 @@ class AppBudgetTest {
     ) = AppBudget(AppLimit("app", "App", daily, weekly), usedToday, usedWeek, bonusToday, bonusWeek, emergencyUntil)
 
     @Test
+    fun `today's allowance includes extra time and follows the tighter limit`() {
+        assertEquals(45 * minute, budget(usedToday = 10 * minute, bonusToday = 15).allowedTodayMs)
+        // Weekly only: what today allows is what's spent plus what's left this week.
+        assertEquals(50 * minute, budget(daily = 0, weekly = 120, usedToday = 20 * minute, usedWeek = 90 * minute).allowedTodayMs)
+        assertEquals(null, budget(daily = 0, weekly = 0).allowedTodayMs)
+    }
+
+    @Test
     fun `remaining time counts down from the daily limit`() {
         val b = budget(usedToday = 10 * minute)
         assertEquals(20 * minute, b.remainingMs)

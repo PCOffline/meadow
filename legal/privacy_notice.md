@@ -12,7 +12,9 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 
 - **Your detailed screen time.** Meadow reads Android's usage log to measure how long each app is open. The full history (up to 120 days) stays on your phone.
 - **What's on screen.** The garden keeper (an accessibility service) notices which app is in front so it can close apps whose time is up. In strict mode it also reads the words on a few system settings screens, to stop Meadow being switched off. This happens on your phone only. Meadow never reads what you type, and never stores or sends what's on your screen.
+- **Notifications from resting apps.** With notification access, Meadow hides notifications from apps whose time is up and pauses their media. It only looks at which app posted them, and never stores or sends their content.
 - **Your list of installed apps,** used to let you pick apps to limit.
+- **Your settings and protection status:** whether strict mode is on, which permissions Meadow has, and battery settings. Nobody else can see them.
 
 ## What Meadow stores online, and why
 
@@ -20,10 +22,10 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 |---|---|
 | Your name, picture (emoji or photo), short bio and friend code | So your Bumblebees know who you are |
 | Your email address, if you add one, and how you sign in (password or emailed link) | To sign you in and recover your garden |
-| Your limits (app name and minutes) | So they can't be loosened without a Bumblebee's yes |
-| Requests for extra time, answers, and chat messages | So you and your Bumblebees can talk and decide |
+| Your limits (app name, minutes and allowed hours) | So they can't be loosened without a Bumblebee's yes |
+| Requests, answers, and chat messages. A request includes how long you've used that app today and how much today allows | So you and your Bumblebees can talk and decide |
 | Today's screen time summary (top apps and minutes) | So your Bumblebees can see how you're doing. **Optional** |
-| Which protections are on, and when your phone last checked in | So your Bumblebees know if Meadow has been switched off. **Optional** |
+| When your phone last checked in | So Meadow can tell your Bumblebees, without details, if it may have stopped working. Only Meadow's servers read it |
 | Emergency unlocks: when, how long and your reason | So emergency unlocks stay rare and honest |
 | Notification tokens, theme and appearance choices | To send you notifications and keep your settings |
 
@@ -31,8 +33,11 @@ We don't sell your data, show ads, or use analytics or tracking tools.
 
 ## Who can see what
 
-- **Your Bumblebees** can see your name, picture, bio, limits, requests, emergency unlocks, and, if you allow it, your daily screen time and protection status.
+- **Your Bumblebees** can see your name, picture, bio, limits, the requests you send them, emergency unlocks, and, if you allow it, your daily screen time. If Meadow may have stopped working on your phone, they're told that, but not why.
+- **Each Bumblebee** only sees the requests sent to them. They don't learn who else was asked, or who answered.
 - **Nobody** can see who your other Bumblebees are, or whose garden you look after. Adding or removing a Bumblebee is your own business; only the person affected is told.
+- **Nobody** sees your settings, strict mode or protection status.
+- **Anything you share yourself,** such as your stats or a commitment, goes only where you send it.
 - **People you chat with** see the messages in that chat.
 
 ## Where your data is kept
@@ -49,7 +54,7 @@ We keep your data until you delete it or your account. Turning off screen-time s
 
 ## Your choices and rights
 
-- **See and download your data:** Settings → Download my data.
+- **See and download your data:** Settings → Download my data. The file is written to your private storage space, downloaded to your phone and then deleted from our systems.
 - **Correct it:** edit your profile at any time.
 - **Limit sharing:** Settings → Privacy.
 - **Delete everything:** Settings → Delete my account.
