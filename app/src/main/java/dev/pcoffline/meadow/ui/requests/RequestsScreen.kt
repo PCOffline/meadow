@@ -2,6 +2,10 @@
 
 package dev.pcoffline.meadow.ui.requests
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,10 +84,11 @@ class RequestsViewModel(uid: String) : ViewModel() {
 fun RequestsScreen(
     profile: UserProfile,
     onOpenCircle: () -> Unit,
+    onOpenBeeStats: () -> Unit = {},
     viewModel: RequestsViewModel = viewModel(key = "requests-${profile.uid}") { RequestsViewModel(profile.uid) },
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var asking by remember { mutableStateOf(false) }
+    var asking by rememberSaveable { mutableStateOf(false) }
     val incoming by viewModel.incoming.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoing.collectAsStateWithLifecycle()
     val hasBees = profile.approverIds.isNotEmpty()
@@ -109,6 +114,13 @@ fun RequestsScreen(
             val list = if (tab == 0) incoming else outgoing
             LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Spacer(Modifier.height(4.dp)) }
+                if (tab == 0 && profile.approveeIds.isNotEmpty()) {
+                    item {
+                        TextButton(onClick = onOpenBeeStats, modifier = Modifier.padding(horizontal = 12.dp)) {
+                            Text(stringResource(R.string.bee_stats_open))
+                        }
+                    }
+                }
                 if (list != null && list.isEmpty()) {
                     item {
                         if (tab == 0) {
@@ -138,8 +150,9 @@ fun RequestsScreen(
 @Composable
 fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modifier, compact: Boolean = false) {
     val mine = request.requesterId == myUid
-    val canDecide = !mine && request.status == RequestStatus.PENDING && myUid in request.approverIds
-    var deciding by remember { mutableStateOf<Boolean?>(null) }
+    // A Bumblebee's own copy: theirs to answer while it's waiting.
+    val canDecide = !mine && request.status == RequestStatus.PENDING
+    var deciding by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
     val sentYes = stringResource(R.string.request_sent_yes)
@@ -160,6 +173,9 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
             }
             StatusPill(request.status)
         }
+        usageText(request)?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+        }
         if (request.message.isNotBlank()) {
             Text(stringResource(R.string.quoted, request.message), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         }
@@ -172,11 +188,23 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
             )
         }
         val decider = request.decidedByName
-        if (request.status != RequestStatus.PENDING && decider != null) {
-            val note = request.decisionNote?.takeIf { it.isNotBlank() }
-            val answer = stringResource(if (request.status == RequestStatus.APPROVED) R.string.request_decided_yes else R.string.request_decided_no, decider)
+        val answered = request.status == RequestStatus.APPROVED || request.status == RequestStatus.DENIED
+        val outcome = when {
+            !answered -> null
+            mine && decider != null -> {
+                val note = request.decisionNote?.takeIf { it.isNotBlank() }
+                val answer = stringResource(if (request.status == RequestStatus.APPROVED) R.string.request_decided_yes else R.string.request_decided_no, decider)
+                if (note != null) stringResource(R.string.request_decided_with_note, answer, note) else answer
+            }
+            mine -> null
+            // Who else answered stays private; only that someone did.
+            request.myDecision == null -> stringResource(R.string.request_answered_by_other)
+            request.myDecision == "yes" -> stringResource(R.string.request_you_said_yes)
+            else -> stringResource(R.string.request_you_said_no)
+        }
+        if (outcome != null) {
             Text(
-                if (note != null) stringResource(R.string.request_decided_with_note, answer, note) else answer,
+                outcome,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -212,6 +240,15 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
     }
 }
 
+/** How the day stood when they asked: "Used 45m of 1h today". */
+@Composable
+private fun usageText(request: LimitRequest): String? {
+    val used = request.usedMinutes ?: return null
+    val allowed = request.allowedMinutes?.takeIf { it > 0 }
+    return if (allowed != null) stringResource(R.string.request_usage, minutesText(used), minutesText(allowed))
+    else stringResource(R.string.request_usage_no_allowance, minutesText(used))
+}
+
 @Composable
 private fun StatusPill(status: RequestStatus) {
     val scheme = MaterialTheme.colorScheme
@@ -240,6 +277,7 @@ private fun DecideDialog(request: LimitRequest, approve: Boolean, onDismiss: () 
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(requestSummary(request).replaceFirstChar { it.uppercase() })
+                usageText(request)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 if (approve && extraTime) {
                     Text(stringResource(R.string.request_decide_less), style = MaterialTheme.typography.bodySmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -252,6 +290,7 @@ private fun DecideDialog(request: LimitRequest, approve: Boolean, onDismiss: () 
                     value = note,
                     onValueChange = { note = it.take(200) },
                     label = { Text(stringResource(R.string.request_decide_note)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -272,20 +311,22 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
     var selected by rememberSaveable { mutableStateOf(packageName ?: limits.firstOrNull()?.packageName) }
     var minutes by rememberSaveable { mutableIntStateOf(15) }
     var message by rememberSaveable { mutableStateOf("") }
+    val picks = rememberBeePicks()
     val action = rememberAction()
-    val limit: AppLimit? = limits.firstOrNull { it.packageName == selected }
+    // Limits may arrive after the dialog opens, so fall back to the first one once they do.
+    val limit: AppLimit? = limits.firstOrNull { it.packageName == selected } ?: limits.firstOrNull().takeIf { packageName == null }
     val asked = stringResource(R.string.ask_sent)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.ask_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (packageName == null) {
                     if (limits.isEmpty()) Text(stringResource(R.string.ask_no_limits))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         limits.forEach {
-                            FilterChip(selected = selected == it.packageName, onClick = { selected = it.packageName }, label = { Text(it.appName) })
+                            FilterChip(selected = limit?.packageName == it.packageName, onClick = { selected = it.packageName }, label = { Text(it.appName) })
                         }
                     }
                 }
@@ -299,8 +340,10 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
                     value = message,
                     onValueChange = { message = it.take(280) },
                     label = { Text(stringResource(R.string.ask_why)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                BumblebeePicker(picks)
                 ErrorNote(action.error)
             }
         },
@@ -316,6 +359,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
                             packageName = l.packageName,
                             appName = l.appName,
                             minutes = minutes,
+                            approverIds = BeePicks.commit(picks.value),
                         )
                     }
                 },

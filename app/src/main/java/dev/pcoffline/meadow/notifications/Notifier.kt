@@ -52,7 +52,14 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             .setContentIntent(openApp(null, 0))
             .build()
 
-    fun updateGuardian(text: String) = post(GUARDIAN_ID, guardianNotification(text))
+    private var guardianText: String? = null
+
+    /** Updates the ongoing notification, only when its text actually changes. */
+    fun updateGuardian(text: String) {
+        if (text == guardianText) return
+        guardianText = text
+        post(GUARDIAN_ID, guardianNotification(text))
+    }
 
     /** Gentle reminders at five minutes and one minute left, once each per day. */
     fun maybeWarn(budget: AppBudget) {
@@ -64,22 +71,29 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             else -> return
         }
         val today = Days.todayKey()
-        val key = "${budget.limit.packageName}|$today|$threshold"
+        // Extra time from a Bumblebee changes the allowance, and earns its own reminders.
+        val key = "${budget.limit.packageName}|$today|$threshold|${budget.dailyAllowedMs}/${budget.weeklyAllowedMs}"
         val warned = store.warnedKeys
         if (key in warned) return
         store.warnedKeys = warned.filter { it.contains("|$today|") }.toSet() + key
         val app = budget.limit.appName
-        val body = if (budget.weeklyIsTighter) R.string.notify_warning_body_week else R.string.notify_warning_body_today
-        post(
-            budget.limit.packageName.hashCode(),
-            NotificationCompat.Builder(context, CH_WARNINGS)
-                .setSmallIcon(R.drawable.ic_flower)
-                .setContentTitle(context.getString(R.string.notify_warning_title, res.durationText(remaining), app))
-                .setContentText(context.getString(body, app))
-                .setAutoCancel(true)
-                .setTimeoutAfter(remaining + 60_000L)
-                .build(),
-        )
+        val body = when {
+            budget.untilScheduleChangeMs != null && budget.untilScheduleChangeMs <= remaining -> R.string.notify_warning_body_hours
+            budget.weeklyIsTighter -> R.string.notify_warning_body_week
+            else -> R.string.notify_warning_body_today
+        }
+        val pkg = budget.limit.packageName
+        val builder = NotificationCompat.Builder(context, CH_WARNINGS)
+            .setSmallIcon(R.drawable.ic_flower)
+            .setContentTitle(context.getString(R.string.notify_warning_title, res.durationText(remaining), app))
+            .setContentText(context.getString(body, app))
+            .setAutoCancel(true)
+            .setTimeoutAfter(remaining + 60_000L)
+        // Asking early, before the time runs out.
+        if (store.approverCount.value > 0) {
+            builder.addAction(0, context.getString(R.string.notify_warning_ask), openApp(DeepLinks.ask(pkg), ("ask$pkg").hashCode()))
+        }
+        post(pkg.hashCode(), builder.build())
     }
 
     /** Shown when an app can't be closed on screen (no overlay permission): tap to see the rest screen. */
@@ -93,6 +107,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
                 .setSmallIcon(R.drawable.ic_flower)
                 .setContentTitle(context.getString(R.string.notify_time_up_title, budget.limit.appName))
                 .setContentText(context.getString(R.string.notify_time_up_body))
+                .setOnlyAlertOnce(true)
                 .setContentIntent(
                     PendingIntent.getActivity(
                         context, budget.limit.packageName.hashCode(), intent,
@@ -115,7 +130,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             "request_new" -> CH_REQUESTS to DeepLinks.requests()
             "request_decided" -> CH_DECISIONS to DeepLinks.requests()
             "chat" -> CH_CHAT to data["chatId"]?.let(DeepLinks::chat)
-            "invite", "invite_accepted", "approver_left" -> CH_SOCIAL to DeepLinks.circle()
+            "invite", "invite_accepted", "approver_left", "approver_leaving", "approver_kept" -> CH_SOCIAL to DeepLinks.circle()
             "alert", "emergency" -> CH_ALERTS to (friend ?: DeepLinks.circle())
             else -> CH_SOCIAL to null
         }

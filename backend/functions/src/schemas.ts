@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { errors } from "./copy";
 import { INVITE_TOKEN_LENGTH } from "./format";
+import { ScheduleSchema } from "./schedule";
 
 /** Must match FlowerAvatars in the app's Models.kt. */
 export const FLOWERS = [
@@ -31,22 +32,36 @@ export const RespondInviteInput = z.object({ inviteId: id, accept: z.boolean() }
 export const InviteIdInput = z.object({ inviteId: id });
 export const InviteTokenInput = z.object({ token: inviteToken });
 export const RemoveBumblebeeInput = z.object({ approverUid: id });
+export const CancelRemovalInput = z.object({ approverUid: id });
 export const StepDownInput = z.object({ approveeUid: id });
 
+const schedule = ScheduleSchema.nullish();
+/** The Bumblebees to ask; all of them when left out. */
+const askWho = z.array(id).min(1, errors.pickABumblebee).max(20).nullish();
+/** How the day stands, as the phone sees it: time spent on the app and time today allows. */
+const usage = {
+  usedMinutes: z.number().int().min(0).max(1440).nullish(),
+  allowedMinutes: z.number().int().min(0).max(10080).nullish(),
+};
+const limitShape = {
+  packageName,
+  appName,
+  dailyMinutes: z.number().int().min(0).max(1440),
+  weeklyMinutes: z.number().int().min(0).max(10080),
+  schedule,
+};
+const hasALimit = (r: { dailyMinutes: number; weeklyMinutes: number; schedule?: unknown }) =>
+  r.dailyMinutes > 0 || r.weeklyMinutes > 0 || r.schedule != null;
+
 export const CreateRequestInput = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("extra_time"), packageName, appName, minutes: z.number().int().min(1).max(240), message: note, dayKey }),
-  z.object({
-    type: z.literal("change_limit"),
-    packageName,
-    appName,
-    dailyMinutes: z.number().int().min(0).max(1440),
-    weeklyMinutes: z.number().int().min(0).max(10080),
-    message: note,
-    dayKey,
-  }).refine((r) => r.dailyMinutes > 0 || r.weeklyMinutes > 0, errors.setALimit),
-  z.object({ type: z.literal("remove_limit"), packageName, appName, message: note, dayKey }),
-  z.object({ type: z.literal("disable_strict_mode"), message: note, dayKey }),
+  z.object({ type: z.literal("extra_time"), packageName, appName, minutes: z.number().int().min(1).max(240), message: note, dayKey, approverIds: askWho, ...usage }),
+  z.object({ type: z.literal("change_limit"), ...limitShape, message: note, dayKey, approverIds: askWho, ...usage })
+    .refine(hasALimit, errors.setALimit),
+  z.object({ type: z.literal("remove_limit"), packageName, appName, message: note, dayKey, approverIds: askWho, ...usage }),
 ], { error: errors.unknownRequest });
+
+/** A limit saved through the backend: a schedule change while someone has Bumblebees. */
+export const SaveLimitInput = z.object(limitShape).refine(hasALimit, errors.setALimit);
 
 export const DecideRequestInput = z.object({
   requestId: id,
@@ -64,4 +79,5 @@ export const EmergencyInput = z.object({
   // Set only when reporting an unlock the phone already took while offline.
   startedAt: z.number().int().positive().nullish(),
   endedAt: z.number().int().positive().nullish(),
+  reportId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/).nullish(),
 });

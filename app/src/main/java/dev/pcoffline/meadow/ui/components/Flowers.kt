@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.animation.core.RepeatMode
@@ -52,17 +53,22 @@ fun BloomFlower(
     LaunchedEffect(Unit) {
         grow.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessVeryLow))
     }
-    val angle = if (sway && !reduced) {
+    // Read only while drawing, so the sway redraws the flower without recomposing it.
+    val swayAngle: State<Float>? = if (sway && !reduced) {
         val transition = rememberInfiniteTransition(label = "sway")
         transition.animateFloat(
             initialValue = -2.5f,
             targetValue = 2.5f,
             animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse),
             label = "swayAngle",
-        ).value
-    } else 0f
+        )
+    } else null
+    // Reused every frame instead of allocating new paths.
+    val stem = remember { Path() }
+    val leafPath = remember { Path() }
 
     Canvas(modifier) {
+        val angle = swayAngle?.value ?: 0f
         val wilt = 1f - animatedBloom
         val w = size.width
         val h = size.height
@@ -74,13 +80,12 @@ fun BloomFlower(
 
         scale(grow.value, grow.value, pivot = base) {
         rotate(angle * (0.4f + animatedBloom), pivot = base) {
-            val stem = Path().apply {
-                moveTo(base.x, base.y)
-                quadraticTo(w / 2f - w * 0.06f, h * 0.62f, head.x, head.y)
-            }
+            stem.reset()
+            stem.moveTo(base.x, base.y)
+            stem.quadraticTo(w / 2f - w * 0.06f, h * 0.62f, head.x, head.y)
             drawPath(stem, lerp(garden.stem, garden.wilted, wilt * 0.7f), style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
-            leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f))
-            leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f))
+            leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
+            leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
             flowerHead(head, w * 0.13f + w * 0.11f * animatedBloom, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), animatedBloom, garden.petalHoney)
         }
         }
@@ -93,14 +98,13 @@ fun BloomFlower(
     }
 }
 
-private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Color) {
+private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Color, path: Path = Path()) {
     rotate(degrees, pivot = at) {
-        val path = Path().apply {
-            moveTo(at.x, at.y)
-            quadraticTo(at.x + length * 0.5f, at.y - length * 0.35f, at.x + length, at.y)
-            quadraticTo(at.x + length * 0.5f, at.y + length * 0.35f, at.x, at.y)
-            close()
-        }
+        path.reset()
+        path.moveTo(at.x, at.y)
+        path.quadraticTo(at.x + length * 0.5f, at.y - length * 0.35f, at.x + length, at.y)
+        path.quadraticTo(at.x + length * 0.5f, at.y + length * 0.35f, at.x, at.y)
+        path.close()
         drawPath(path, color)
     }
 }

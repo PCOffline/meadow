@@ -31,7 +31,32 @@ test("requests are checked per type", () => {
   assert.equal(firstError(CreateRequestInput.safeParse({ type: "add_approver", dayKey })), "That kind of request isn't supported.");
   assert.equal(firstError(CreateRequestInput.safeParse({ type: "remove_limit", packageName: "a.b", dayKey: "today" })), "That date doesn't look right.");
   // Extra fields from older clients are ignored rather than rejected.
-  assert.ok(CreateRequestInput.safeParse({ type: "disable_strict_mode", dayKey, packageName: null, minutes: 0 }).success);
+  assert.ok(CreateRequestInput.safeParse({ type: "remove_limit", dayKey, packageName: "a.b", minutes: 0 }).success);
+  // Strict mode turns off without asking now.
+  assert.ok(!CreateRequestInput.safeParse({ type: "disable_strict_mode", dayKey }).success);
+});
+
+test("a request can name the Bumblebees to ask, and a new limit can be only hours", () => {
+  const dayKey = "2026-10-12";
+  assert.ok(CreateRequestInput.safeParse({ type: "extra_time", packageName: "a.b", minutes: 5, dayKey, approverIds: ["bee"] }).success);
+  assert.equal(
+    firstError(CreateRequestInput.safeParse({ type: "extra_time", packageName: "a.b", minutes: 5, dayKey, approverIds: [] })),
+    "Pick at least one Bumblebee to ask.",
+  );
+  const evenings = { "1": [{ from: 600, to: 1320 }] };
+  assert.ok(CreateRequestInput.safeParse({ type: "change_limit", packageName: "a.b", dailyMinutes: 0, weeklyMinutes: 0, schedule: evenings, dayKey }).success);
+  assert.ok(!CreateRequestInput.safeParse({ type: "change_limit", packageName: "a.b", dailyMinutes: 30, weeklyMinutes: 0, schedule: { "9": [] }, dayKey }).success);
+});
+
+test("a request can say how the day stands", () => {
+  const dayKey = "2026-10-12";
+  const ask = { type: "extra_time", packageName: "a.b", minutes: 15, dayKey };
+  const parsed = CreateRequestInput.parse({ ...ask, usedMinutes: 45, allowedMinutes: 60 });
+  assert.equal(parsed.usedMinutes, 45);
+  assert.equal(parsed.allowedMinutes, 60);
+  assert.ok(CreateRequestInput.safeParse(ask).success, "older phones don't send it");
+  assert.ok(!CreateRequestInput.safeParse({ ...ask, usedMinutes: -1 }).success);
+  assert.ok(!CreateRequestInput.safeParse({ ...ask, usedMinutes: 2000 }).success);
 });
 
 test("decisions accept an optional smaller amount", () => {

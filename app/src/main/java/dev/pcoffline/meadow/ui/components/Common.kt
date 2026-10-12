@@ -44,7 +44,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -111,11 +110,10 @@ fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val transition = rememberInfiniteTransition(label = "float")
-        val bob by transition.animateFloat(
+        val bob = if (rememberReducedMotion()) null else rememberInfiniteTransition(label = "float").animateFloat(
             -4f, 4f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "bob",
         )
-        Text(emoji, fontSize = 44.sp, modifier = Modifier.graphicsLayer { translationY = bob.dp.toPx() })
+        Text(emoji, fontSize = 44.sp, modifier = Modifier.graphicsLayer { translationY = (bob?.value ?: 0f).dp.toPx() })
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.asHeading())
         Text(
             body,
@@ -164,8 +162,8 @@ fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp
 
 @Composable
 fun AppIcon(packageName: String, modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    val icon by produceState<ImageBitmap?>(null, packageName) {
-        value = withContext(Dispatchers.IO) { AppGraph.catalog.icon(packageName) }
+    val icon by produceState(AppGraph.catalog.cachedIcon(packageName), packageName) {
+        if (value == null) value = withContext(Dispatchers.IO) { AppGraph.catalog.icon(packageName) }
     }
     val bitmap = icon
     if (bitmap != null) {

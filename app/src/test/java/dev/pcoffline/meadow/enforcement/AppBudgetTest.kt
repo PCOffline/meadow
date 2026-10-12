@@ -20,6 +20,14 @@ class AppBudgetTest {
     ) = AppBudget(AppLimit("app", "App", daily, weekly), usedToday, usedWeek, bonusToday, bonusWeek, emergencyUntil)
 
     @Test
+    fun `today's allowance includes extra time and follows the tighter limit`() {
+        assertEquals(45 * minute, budget(usedToday = 10 * minute, bonusToday = 15).allowedTodayMs)
+        // Weekly only: what today allows is what's spent plus what's left this week.
+        assertEquals(50 * minute, budget(daily = 0, weekly = 120, usedToday = 20 * minute, usedWeek = 90 * minute).allowedTodayMs)
+        assertEquals(null, budget(daily = 0, weekly = 0).allowedTodayMs)
+    }
+
+    @Test
     fun `remaining time counts down from the daily limit`() {
         val b = budget(usedToday = 10 * minute)
         assertEquals(20 * minute, b.remainingMs)
@@ -68,5 +76,30 @@ class AppBudgetTest {
     fun `used fraction is capped at one`() {
         assertEquals(0.5f, budget(usedToday = 15 * minute).usedFraction, 0.001f)
         assertEquals(1f, budget(usedToday = 90 * minute).usedFraction, 0.001f)
+    }
+
+    @Test
+    fun `outside its hours an app rests even with time left`() {
+        val b = AppBudget(AppLimit("app", "App", 30, 0), 0, 0, 0, 0, outsideHours = true, untilScheduleChangeMs = 60 * minute)
+        assertEquals(0L, b.remainingMs)
+        assertTrue(b.exhausted)
+        assertTrue(b.restingByHours)
+    }
+
+    @Test
+    fun `the end of the allowed hours counts down like a limit`() {
+        val b = AppBudget(AppLimit("app", "App", 30, 0), 10 * minute, 10 * minute, 0, 0, untilScheduleChangeMs = 5 * minute)
+        assertEquals(5 * minute, b.remainingMs)
+        assertFalse(b.restingByHours)
+    }
+
+    @Test
+    fun `extra time from a Bumblebee can be used outside the hours`() {
+        val b = AppBudget(
+            AppLimit("app", "App", 30, 0), 0, 0, 15, 15,
+            outsideHours = true, untilScheduleChangeMs = 60 * minute, outsideHoursAllowanceMs = 15 * minute,
+        )
+        assertEquals(15 * minute, b.remainingMs)
+        assertFalse(b.exhausted)
     }
 }

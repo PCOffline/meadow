@@ -1,17 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emergencyHeadline, emergencyScope, protectionNames, pushes } from "./copy";
+import { emergencyHeadline, emergencyScope, pushes } from "./copy";
 
 const sam = { displayName: "Sam", flower: "🌻" };
 
-test("lists switched-off protections naturally", () => {
-  assert.equal(protectionNames(["usageAccess"]), "usage access");
-  assert.equal(protectionNames(["usageAccess", "accessibility"]), "usage access and the garden keeper");
-  assert.equal(
-    protectionNames(["usageAccess", "accessibility", "deviceAdmin"]),
-    "usage access, the garden keeper and uninstall protection",
-  );
-  assert.equal(protectionNames(["unknown"]), "a protection");
+test("alerts never say which protection or setting changed", () => {
+  for (const push of [pushes.protectionOff(sam), pushes.quietPhone(sam)]) {
+    assert.doesNotMatch(push.title + push.body, /strict|battery|keeper|usage access|uninstall|accessibility/i);
+  }
 });
 
 test("emergency notes say what happened", () => {
@@ -24,7 +20,7 @@ test("emergency notes say what happened", () => {
 test("notifications use the Bumblebee wording", () => {
   const all = [
     pushes.invite(sam), pushes.inviteAccepted(sam), pushes.steppedDown(sam, 0), pushes.removedBumblebee(sam),
-    pushes.gardenClosed(sam), pushes.bumblebeeLeftMeadow(sam),
+    pushes.gardenClosed(sam), pushes.bumblebeeLeftMeadow(sam), pushes.removalScheduled(sam), pushes.removalCancelled(sam),
   ];
   for (const push of all) {
     assert.match(push.title + push.body, /Bumblebee|Meadow/);

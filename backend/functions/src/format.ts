@@ -1,5 +1,7 @@
 import { randomInt } from "node:crypto";
+import { describeSchedule, Schedule } from "./schedule";
 
+/** "disable_strict_mode" only appears on old requests: strict mode now turns off without asking. */
 export type RequestType = "extra_time" | "change_limit" | "remove_limit" | "disable_strict_mode";
 
 /** The parts of a request needed to describe it in words. */
@@ -9,6 +11,7 @@ export interface RequestSummary {
   minutes: number;
   dailyMinutes: number;
   weeklyMinutes: number;
+  schedule?: Schedule | null;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -40,11 +43,13 @@ export function formatMinutes(minutes: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-export function limitText(daily: number, weekly: number): string {
+export function limitText(daily: number, weekly: number, schedule?: Schedule | null): string {
   const parts: string[] = [];
   if (daily > 0) parts.push(`${formatMinutes(daily)} a day`);
   if (weekly > 0) parts.push(`${formatMinutes(weekly)} a week`);
-  return parts.length ? parts.join(" and ") : "no limit";
+  const hours = describeSchedule(schedule);
+  if (hours) parts.push(hours);
+  return parts.length ? parts.join(", ").replace(/, ([^,]*)$/, " and $1") : "no limit";
 }
 
 /** Lower-case phrase describing what was asked, e.g. "15 more minutes on Instagram". */
@@ -54,7 +59,7 @@ export function summarize(r: RequestSummary): string {
     case "extra_time":
       return `${r.minutes} more minutes on ${app}`;
     case "change_limit":
-      return `a new limit for ${app}: ${limitText(r.dailyMinutes, r.weeklyMinutes)}`;
+      return `a new limit for ${app}: ${limitText(r.dailyMinutes, r.weeklyMinutes, r.schedule)}`;
     case "remove_limit":
       return `removing the limit on ${app}`;
     case "disable_strict_mode":

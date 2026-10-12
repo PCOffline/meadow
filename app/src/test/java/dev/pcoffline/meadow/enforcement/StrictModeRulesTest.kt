@@ -20,6 +20,13 @@ class StrictModeRulesTest {
     }
 
     @Test
+    fun `works in the phone's language, using Settings' own words`() {
+        val spanish = listOf("forzar detención", "desinstalar")
+        assertTrue(StrictModeRules.shouldBlock("com.android.settings", "meadow\nforzar detención", "meadow", spanish))
+        assertFalse(StrictModeRules.shouldBlock("com.android.settings", "instagram\nforzar detención", "meadow", spanish))
+    }
+
+    @Test
     fun `leaves other settings alone`() {
         assertFalse(blocks("com.android.settings", "Instagram\nForce stop\nUninstall"))
         assertFalse(blocks("com.android.settings", "Apps\nMeadow\nInstagram"))

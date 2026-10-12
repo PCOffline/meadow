@@ -15,12 +15,15 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.FriendlyException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -51,17 +54,48 @@ class Updater(private val context: Context) {
 
     val currentVersion: String get() = BuildConfig.VERSION_NAME
 
-    /** Asks GitHub for the latest release. Returns the update, or null if Meadow is current. */
+    /**
+     * Asks GitHub for the latest release. Returns the update, or null if Meadow is current.
+     * While an update is already downloading or installing, that one is returned untouched.
+     */
     suspend fun check(): AvailableUpdate? {
+        when (val current = state.value) {
+            is UpdateState.Downloading -> return current.update
+            is UpdateState.Installing -> return current.update
+            else -> Unit
+        }
         _state.value = UpdateState.Checking
         return try {
             val update = withContext(Dispatchers.IO) { fetchLatest() }
             _state.value = update?.let { UpdateState.Available(it) } ?: UpdateState.UpToDate
             update
+        } catch (e: CancellationException) {
+            _state.value = UpdateState.Idle
+            throw e
         } catch (e: IOException) {
             _state.value = UpdateState.Failed(context.getString(R.string.error_offline), null)
             null
+        } catch (e: Exception) {
+            _state.value = UpdateState.Failed(context.getString(R.string.update_failed_check), null)
+            null
         }
+    }
+
+    /** Checks in the background, so leaving the screen doesn't leave the check hanging. */
+    fun checkInBackground() {
+        AppGraph.scope.launch { check() }
+    }
+
+    private var installJob: Job? = null
+
+    /**
+     * Downloads and installs in the background: leaving the screen doesn't stop it, and a second
+     * tap while one is running does nothing.
+     */
+    @Synchronized
+    fun startInstall(update: AvailableUpdate) {
+        if (installJob?.isActive == true) return
+        installJob = AppGraph.scope.launch { install(update) }
     }
 
     /** True when Android lets Meadow install updates; otherwise send people to [installPermissionIntent]. */
@@ -71,7 +105,7 @@ class Updater(private val context: Context) {
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
 
     /** Downloads, verifies and hands the update to Android's installer, which asks to confirm. */
-    suspend fun install(update: AvailableUpdate) {
+    private suspend fun install(update: AvailableUpdate) {
         try {
             val apk = withContext(Dispatchers.IO) { download(update) }
             withContext(Dispatchers.IO) { verify(apk, update) }
@@ -79,8 +113,14 @@ class Updater(private val context: Context) {
             withContext(Dispatchers.IO) { commit(apk) }
         } catch (e: FriendlyException) {
             _state.value = UpdateState.Failed(context.getString(e.messageRes, *e.formatArgs), update)
+        } catch (e: CancellationException) {
+            _state.value = UpdateState.Available(update)
+            throw e
         } catch (e: IOException) {
             _state.value = UpdateState.Failed(context.getString(R.string.error_offline), update)
+        } catch (e: Exception) {
+            // The installer refused (permission revoked meanwhile, storage full, ...).
+            _state.value = UpdateState.Failed(context.getString(R.string.update_failed_install), update)
         }
     }
 

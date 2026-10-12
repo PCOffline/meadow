@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
@@ -35,6 +36,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -92,10 +95,16 @@ import dev.pcoffline.meadow.ui.navigation.RequestsRoute
 import dev.pcoffline.meadow.ui.navigation.SettingsRoute
 import dev.pcoffline.meadow.ui.navigation.SetupRoute
 import dev.pcoffline.meadow.ui.navigation.StatsRoute
+import dev.pcoffline.meadow.ui.navigation.TroubleshootRoute
+import dev.pcoffline.meadow.ui.navigation.BeeStatsRoute
 import dev.pcoffline.meadow.ui.requests.RequestsScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.BackendMissingScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
+import dev.pcoffline.meadow.ui.setup.StrictGate
+import dev.pcoffline.meadow.ui.setup.TroubleshootScreen
+import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
+import dev.pcoffline.meadow.ui.requests.BeeStatsScreen
 import dev.pcoffline.meadow.ui.stats.StatsScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -180,12 +189,23 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         }
     }
 
+    // Offered once per visit: after a rotation the restored back stack already has it.
+    var setupOffered by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        if (setupOffered) return@LaunchedEffect
+        setupOffered = true
         if (!AppGraph.protection.current().essentialsReady) nav.navigate(SetupRoute)
     }
+    var askFor by rememberSaveable { mutableStateOf<String?>(null) }
     val link by pendingRoute.collectAsStateWithLifecycle()
     LaunchedEffect(link) {
-        val target = link?.let(DeepLinks::toRoute) ?: return@LaunchedEffect
+        val l = link ?: return@LaunchedEffect
+        DeepLinks.askFor(l)?.let {
+            pendingRoute.value = null
+            askFor = it
+            return@LaunchedEffect
+        }
+        val target = DeepLinks.toRoute(l) ?: return@LaunchedEffect
         pendingRoute.value = null
         nav.navigate(target) { launchSingleTop = true }
     }
@@ -202,7 +222,8 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                 if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
             },
         ) { padding ->
-            Box(Modifier.padding(padding)) {
+            // Consumed, so screens' own status bar and keyboard padding doesn't add the bars twice.
+            Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                 NavHost(
                     nav,
                     startDestination = GardenRoute,
@@ -211,7 +232,13 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                     popEnterTransition = { fadeIn(tween(260)) },
                     popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
                 ) {
-                    composable<SetupRoute> { SetupScreen(onDone = { nav.popBackStack() }) }
+                    composable<SetupRoute> {
+                        SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
+                    }
+                    composable<TroubleshootRoute> {
+                        TroubleshootScreen(onBack = { nav.popBackStack() }, onOpenSetup = { nav.navigate(SetupRoute) })
+                    }
+                    composable<BeeStatsRoute> { BeeStatsScreen(profile, onBack = { nav.popBackStack() }) }
                     composable<GardenRoute> {
                         GardenScreen(
                             profile = profile,
@@ -221,10 +248,13 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             onPlantLimit = { nav.navigate(PickAppRoute) },
                             onOpenLimit = { nav.navigate(LimitRoute(it)) },
                             onOpenCircle = { nav.switchTab(CircleRoute) },
+                            onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
                         )
                     }
                     composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }) }
-                    composable<RequestsRoute> { RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }) }
+                    composable<RequestsRoute> {
+                        RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
+                    }
                     composable<CircleRoute> {
                         CircleScreen(
                             profile = profile,
@@ -240,6 +270,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             onOpenSetup = { nav.navigate(SetupRoute) },
                             onOpenProfile = { nav.navigate(ProfileRoute) },
                             onOpenLegal = { nav.navigate(LegalRoute(it.name)) },
+                            onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
                         )
                     }
                     composable<ProfileRoute> { ProfileScreen(profile, onBack = { nav.popBackStack() }) }
@@ -270,6 +301,8 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                 PetalBurst(celebration, Modifier.fillMaxSize())
             }
         }
+        askFor?.let { AskForTimeDialog(packageName = it, onDismiss = { askFor = null }) }
+        StrictGate(profile.strictMode, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
         if (accountConfirmed && acceptedTerms < LegalDoc.CURRENT_VERSION) {
             TermsUpdateDialog(onAccept = { scope.launch { AppGraph.profiles.acceptTerms(LegalDoc.CURRENT_VERSION) } })
         }

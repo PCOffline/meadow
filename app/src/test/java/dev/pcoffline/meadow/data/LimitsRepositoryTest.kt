@@ -28,4 +28,12 @@ class LimitsRepositoryTest {
         assertFalse(LimitsRepository.isLooser(limit(30, 0), limit(30, 300)))
         assertFalse(LimitsRepository.isLooser(limit(0, 300), limit(60, 300)))
     }
+
+    @Test
+    fun `fewer allowed hours are stricter, more are looser`() {
+        val office = Schedule.everyDay(TimeWindow(10 * 60, 16 * 60))
+        assertFalse(LimitsRepository.isLooser(limit(30, 0), limit(30, 0).copy(schedule = office)))
+        assertTrue(LimitsRepository.isLooser(limit(30, 0).copy(schedule = office), limit(30, 0)))
+        assertTrue(LimitsRepository.isLooser(limit(30, 0).copy(schedule = office), limit(30, 0).copy(schedule = Schedule.everyDay(TimeWindow(9 * 60, 16 * 60)))))
+    }
 }

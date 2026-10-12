@@ -5,7 +5,13 @@ import { getStorage } from "firebase-admin/storage";
 import { onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
-import { accountRef, chats, db, friendCodes, inviteLinks, invites, loadPerson, notify, requests, requireAuth, users } from "./db";
+import {
+  accountRef, chats, consumeRate, db, friendCodes, heartbeats, inboxRef, inviteLinks, invites, loadPerson, notify, rateLimits,
+  removals, requests, requireAuth, users,
+} from "./db";
+
+const EXPORTS_PER_DAY = 5;
+export const exportPath = (uid: string, at: number) => `exports/${uid}/meadow-${at}.json`;
 
 /** Converts Firestore values (timestamps, nested maps) into plain JSON. */
 function plain(value: unknown): unknown {
@@ -20,9 +26,14 @@ function plain(value: unknown): unknown {
 const docs = async (query: FirebaseFirestore.Query) =>
   (await query.get()).docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
 
-/** Everything Meadow stores about the caller, as one JSON document. */
-export const exportMyData = onCall({ timeoutSeconds: 120 }, async (req) => {
+/**
+ * Everything Meadow stores about the caller, as one JSON file in their private Storage folder.
+ * A file rather than a reply, so a long history can't outgrow the response size limit. The
+ * app downloads it and then deletes it.
+ */
+export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async (req) => {
   const uid = requireAuth(req);
+  await db().runTransaction(async (tx) => (await consumeRate(tx, uid, "export", EXPORTS_PER_DAY, 24 * 60 * 60_000))());
   const userRef = users().doc(uid);
   const [profile, account] = await Promise.all([userRef.get(), accountRef(uid).get()]);
   const { fcmTokens: _tokens, ...accountData } = account.data() ?? {};
@@ -34,7 +45,7 @@ export const exportMyData = onCall({ timeoutSeconds: 120 }, async (req) => {
       messages: await docs(chat.ref.collection("messages").orderBy("createdAt")),
     })),
   );
-  return {
+  const data = {
     exportedAt: new Date().toISOString(),
     profile: plain(profile.data() ?? {}),
     account: plain(accountData),
@@ -43,10 +54,15 @@ export const exportMyData = onCall({ timeoutSeconds: 120 }, async (req) => {
     sharedUsage: await docs(userRef.collection("usage")),
     emergencyUnlocks: await docs(userRef.collection("emergencies")),
     requestsYouMade: await docs(requests().where("requesterId", "==", uid)),
+    requestsYouWereAsked: await docs(userRef.collection("inbox")),
     invitesYouSent: await docs(invites().where("fromUid", "==", uid)),
     invitesYouGot: await docs(invites().where("toUid", "==", uid)),
     conversations,
   };
+  const path = exportPath(uid, Date.now());
+  const json = JSON.stringify(data, null, 2);
+  await getStorage().bucket().file(path).save(json, { contentType: "application/json", resumable: false });
+  return { path, bytes: Buffer.byteLength(json) };
 });
 
 /**
@@ -58,32 +74,55 @@ export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
   const me = await loadPerson(uid).catch(() => null);
   const userRef = users().doc(uid);
 
+  // Links first, so nobody can join up with this account while it's being taken apart.
+  const cleanup = db().bulkWriter();
+  cleanup.onWriteError((error) => {
+    // A document someone else removed meanwhile is already as clean as it gets.
+    if (error.code === 5 /* NOT_FOUND */) return false;
+    return error.failedAttempts < 3;
+  });
+  for (const query of [
+    inviteLinks().where("ownerUid", "==", uid),
+    inviteLinks().where("usedBy", "==", uid),
+    removals().where("ownerUid", "==", uid),
+    removals().where("beeUid", "==", uid),
+  ]) {
+    (await query.get()).docs.forEach((d) => void cleanup.delete(d.ref).catch(() => undefined));
+  }
+  await cleanup.flush();
+
   if (me) {
-    const batch = db().batch();
     for (const beeUid of me.account.approverIds) {
-      batch.set(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(uid) }, { merge: true });
+      void cleanup.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(uid) }).catch(() => undefined);
     }
     for (const ownerUid of me.account.approveeIds) {
-      batch.set(accountRef(ownerUid), { approverIds: FieldValue.arrayRemove(uid) }, { merge: true });
+      void cleanup.update(accountRef(ownerUid), {
+        approverIds: FieldValue.arrayRemove(uid),
+        [`pendingRemovals.${uid}`]: FieldValue.delete(),
+      }).catch(() => undefined);
     }
-    await batch.commit();
+    await cleanup.flush();
     await notify(me.account.approverIds, { type: "approver_left", ...pushes.gardenClosed(me.profile) });
     await notify(me.account.approveeIds, { type: "approver_left", ...pushes.bumblebeeLeftMeadow(me.profile) });
   }
 
   const pendingAsBee = await requests().where("approverIds", "array-contains", uid).get();
-  const cleanup = db().bulkWriter();
-  pendingAsBee.docs.forEach((d) => cleanup.update(d.ref, { approverIds: FieldValue.arrayRemove(uid) }));
-  for (const query of [
-    requests().where("requesterId", "==", uid),
-    invites().where("fromUid", "==", uid),
-    invites().where("toUid", "==", uid),
-    inviteLinks().where("ownerUid", "==", uid),
-  ]) {
-    (await query.get()).docs.forEach((d) => cleanup.delete(d.ref));
+  pendingAsBee.docs.forEach((d) => void cleanup.update(d.ref, { approverIds: FieldValue.arrayRemove(uid) }).catch(() => undefined));
+  // Their own requests, and every Bumblebee's copy of them.
+  for (const d of (await requests().where("requesterId", "==", uid).get()).docs) {
+    for (const beeUid of (d.get("approverIds") as string[] | undefined) ?? []) {
+      void cleanup.delete(inboxRef(beeUid, d.id)).catch(() => undefined);
+    }
+    void cleanup.delete(d.ref).catch(() => undefined);
   }
-  const code = (await userRef.get()).get("friendCode");
-  if (typeof code === "string" && code) cleanup.delete(friendCodes().doc(code));
+  for (const query of [invites().where("fromUid", "==", uid), invites().where("toUid", "==", uid)]) {
+    (await query.get()).docs.forEach((d) => void cleanup.delete(d.ref).catch(() => undefined));
+  }
+  // The friend code lives on the account now, or on the profile for one not yet migrated.
+  const code = (await accountRef(uid).get()).get("friendCode") ?? (await userRef.get()).get("friendCode");
+  if (typeof code === "string" && code) void cleanup.delete(friendCodes().doc(code)).catch(() => undefined);
+  void cleanup.delete(heartbeats().doc(uid)).catch(() => undefined);
+  void cleanup.delete(rateLimits().doc(uid)).catch(() => undefined);
   await cleanup.close();
 
   for (const chat of (await chats().where("participants", "array-contains", uid).get()).docs) {
@@ -92,6 +131,8 @@ export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
   await db().recursiveDelete(userRef);
   await getStorage().bucket().file(`avatars/${uid}`).delete({ ignoreNotFound: true })
     .catch((e) => logger.warn("Avatar delete failed", { uid, error: String(e) }));
+  await getStorage().bucket().deleteFiles({ prefix: `exports/${uid}/` })
+    .catch((e) => logger.warn("Export delete failed", { uid, error: String(e) }));
   await getAuth().deleteUser(uid).catch((e) => logger.warn("Auth delete failed", { uid, error: String(e) }));
   return { ok: true };
 });

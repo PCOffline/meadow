@@ -36,4 +36,7 @@
     <string name="guardian_emergency">🚨 Emergency unlock: limits paused for %1$s</string>
     <string name="strict_mode_blocked">Strict mode is on. Ask a Bumblebee to turn it off first. 🌿</string>
     <string name="device_admin_disable_warning">Turning this off lets Meadow be uninstalled. Your Bumblebees will be told.</string>
+
+    <string name="notify_warning_ask">Ask for more</string>
+    <string name="notify_warning_body_hours">%1$s\'s allowed hours end soon.</string>
 </resources>

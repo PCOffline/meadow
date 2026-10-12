@@ -58,3 +58,13 @@ test("nothing outside avatars is reachable", async () => {
   await assertFails(uploadBytes(ref(storageOf("sam"), "other/sam"), jpeg(), image));
   await assertFails(getBytes(ref(storageOf("sam"), "other/thing")));
 });
+
+test("data exports are read and deleted only by their owner, and only the backend writes them", async () => {
+  await env.withSecurityRulesDisabled((ctx) =>
+    uploadBytes(ref(ctx.storage(), "exports/sam/meadow-1.json"), new TextEncoder().encode("{}"), { contentType: "application/json" }));
+  await assertSucceeds(getBytes(ref(storageOf("sam"), "exports/sam/meadow-1.json")));
+  await assertFails(getBytes(ref(storageOf("bee"), "exports/sam/meadow-1.json")));
+  await assertFails(uploadBytes(ref(storageOf("sam"), "exports/sam/fake.json"), jpeg(), image));
+  await assertFails(deleteObject(ref(storageOf("bee"), "exports/sam/meadow-1.json")));
+  await assertSucceeds(deleteObject(ref(storageOf("sam"), "exports/sam/meadow-1.json")));
+});

@@ -1,20 +1,29 @@
 package dev.pcoffline.meadow.data
 
+import android.util.Log
+import dev.pcoffline.meadow.R
+import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
 
 class SocialRepository(
     private val backend: Backend,
-    private val store: LocalStore,
-    private val requests: RequestRepository,
+    /** Whether Android lets Meadow run unrestricted and reach notifications, as strict mode needs. */
+    private val strictReady: () -> Boolean = { true },
 ) {
     private val invites get() = backend.db.collection("invites")
 
+    /** Someone's name card; null if it's gone or can't be read, so lists built from several still show the rest. */
     fun profile(uid: String): Flow<UserProfile?> =
-        backend.user(uid).observe().map { if (it.exists()) it.toProfile() else null }
+        backend.user(uid).snapshots()
+            .map { if (it.exists()) it.toProfile() else null }
+            .catch {
+                Log.w("MeadowSocial", "Profile listener failed", it)
+                emit(null)
+            }
 
     fun profiles(uids: List<String>): Flow<List<UserProfile>> {
         if (uids.isEmpty()) return flowOf(emptyList())
@@ -77,19 +86,31 @@ class SocialRepository(
         backend.call("stepDown", mapOf("approveeUid" to approveeUid))
     }
 
-    /** Removes one of my Bumblebees straight away. They, and my other pals, are notified. */
-    suspend fun removeApprover(approverUid: String) {
-        backend.call("removeApprover", mapOf("approverUid" to approverUid))
+    /**
+     * Removes one of my Bumblebees after a day's wait, so it can't be a way around a "no". Only
+     * they are told, straight away. Returns when it takes effect.
+     */
+    suspend fun removeApprover(approverUid: String): Long {
+        val result = backend.call("removeApprover", mapOf("approverUid" to approverUid))
+        return (result["effectiveAt"] as? Number)?.toLong() ?: (System.currentTimeMillis() + REMOVAL_DELAY_MS)
     }
 
-    /** Turning strict mode on is instant; turning it off needs a Bumblebee's yes once you have any. */
-    suspend fun setStrictMode(enabled: Boolean, message: String = ""): ChangeOutcome {
+    /** Keeps a Bumblebee whose removal is still waiting. */
+    suspend fun cancelRemoval(approverUid: String) {
+        backend.call("cancelRemoval", mapOf("approverUid" to approverUid))
+    }
+
+    /**
+     * Strict mode is the person's own business: it turns on and off straight away, and nobody
+     * else is told. It needs Meadow to be safe from battery savers and able to reach notifications.
+     */
+    suspend fun setStrictMode(enabled: Boolean) {
+        if (enabled && !strictReady()) throw FriendlyException(R.string.error_strict_needs_setup)
         val uid = backend.requireUid()
-        if (!enabled && store.approverCount.value > 0) {
-            requests.create(type = RequestType.DISABLE_STRICT_MODE, message = message)
-            return ChangeOutcome.REQUESTED
-        }
-        backend.user(uid).update("strictMode", enabled).await()
-        return ChangeOutcome.APPLIED
+        backend.account(uid).update("strictMode", enabled).awaitWrite()
+    }
+
+    companion object {
+        const val REMOVAL_DELAY_MS = 24 * 60 * 60_000L
     }
 }

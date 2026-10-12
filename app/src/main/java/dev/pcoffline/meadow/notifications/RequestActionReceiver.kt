@@ -82,6 +82,6 @@ class AnswerRequestWorker(context: Context, params: WorkerParameters) : Coroutin
     }
 
     private companion object {
-        const val ANSWER_NOTIFICATION_ID = 2
+        const val ANSWER_NOTIFICATION_ID = 3
     }
 }

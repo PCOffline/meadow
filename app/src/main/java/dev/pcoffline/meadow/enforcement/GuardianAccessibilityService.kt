@@ -4,9 +4,11 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import android.util.LruCache
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
@@ -22,16 +24,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Watches which app is on screen. When a limited app has no time left it is sent home and the
- * block screen appears. In strict mode it also keeps the settings pages that could switch
- * Meadow off out of reach.
+ * Watches which apps are on screen, including split-screen halves and picture-in-picture. When
+ * a limited app has no time left its window is closed, the block screen appears, its
+ * notifications and media stop and its process is ended once in the background. In strict mode
+ * it also keeps the settings pages that could switch Meadow off out of reach.
  */
 class GuardianAccessibilityService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var watchJob: Job? = null
     @Volatile private var currentPackage: String? = null
     private var lastStrictCheck = 0L
     private val activityCache = LruCache<String, Boolean>(256)
+
+    /** Limited apps on screen besides the main one: the other split-screen half, a floating window. */
+    @Volatile private var sidePackages: Set<String> = emptySet()
+
+    /** The app shown in picture-in-picture, taken to be the limited app left just before it appeared. */
+    @Volatile private var pipPackage: String? = null
+    private var lastLimitedLeft: String? = null
+    private val watchers = HashMap<String, Job>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -41,6 +51,10 @@ class GuardianAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            scanWindows()
+            return
+        }
         val pkg = event.packageName?.toString() ?: return
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
@@ -74,18 +88,55 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     private fun onForeground(pkg: String) {
         if (pkg == currentPackage) return
+        currentPackage?.takeIf { AppGraph.engine.limitFor(it) != null }?.let { lastLimitedLeft = it }
         currentPackage = pkg
         AppGraph.engine.setForeground(pkg)
-        watchJob?.cancel()
-        if (pkg == packageName) return
-        if (AppGraph.engine.limitFor(pkg) == null) return
-        watchJob = scope.launch { watch(pkg) }
+        // Picture-in-picture often starts just as its app is left.
+        scanWindows()
     }
 
-    /** Re-checks the open app's budget, sleeping until it might run out. */
+    private fun onScreen(pkg: String) = pkg == currentPackage || pkg in sidePackages || pkg == pipPackage
+
+    /** Finds limited apps in other windows: split screen and picture-in-picture. */
+    private fun scanWindows() {
+        val all = runCatching { windows }.getOrNull() ?: return
+        var pip = false
+        val side = HashSet<String>()
+        for (w in all) {
+            if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
+            if (w.isInPictureInPictureMode) {
+                pip = true
+                continue
+            }
+            val pkg = runCatching { w.root?.packageName?.toString() }.getOrNull() ?: continue
+            if (pkg != currentPackage && pkg != packageName && AppGraph.engine.limitFor(pkg) != null) side += pkg
+        }
+        pipPackage = if (!pip) null else pipPackage ?: lastLimitedLeft?.takeIf { it != currentPackage }
+        sidePackages = side
+        updateWatchers()
+    }
+
+    /** One watcher per limited app on screen; watchers of apps no longer shown stop. */
+    @Synchronized
+    private fun updateWatchers() {
+        val shown = (sidePackages + listOfNotNull(currentPackage, pipPackage))
+            .filter { it != packageName && AppGraph.engine.limitFor(it) != null }
+            .toSet()
+        watchers.entries.removeAll { (pkg, job) -> (pkg !in shown || !job.isActive).also { gone -> if (gone) job.cancel() } }
+        for (pkg in shown) if (pkg !in watchers) watchers[pkg] = scope.launch { watch(pkg) }
+    }
+
+    /** Re-checks an open app's budget, sleeping until it might run out. */
     private suspend fun watch(pkg: String) {
         var first = true
-        while (currentCoroutineContext().isActive && currentPackage == pkg) {
+        val power = getSystemService(PowerManager::class.java)
+        while (currentCoroutineContext().isActive && onScreen(pkg)) {
+            // The screen went off on this app: nothing is being used until it's back on.
+            if (!power.isInteractive) {
+                delay(15_000L)
+                first = true
+                continue
+            }
             val budget = AppGraph.engine.budget(pkg, forceRefresh = first) ?: return
             first = false
             if (budget.exhausted) {
@@ -102,9 +153,27 @@ class GuardianAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** Closes the app wherever it shows, then stops what it left running. */
     private fun block(pkg: String) {
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        if (pkg == pipPackage) {
+            dismissPictureInPicture()
+            pipPackage = null
+        } else {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
         BlockActivity.launch(this, pkg)
+        MeadowNotificationListener.rest(this, pkg)
+        scope.launch {
+            // Only a process in the background can be ended; give it a moment to get there.
+            delay(STOP_AFTER_MS)
+            if (!onScreen(pkg)) MeadowNotificationListener.stopInBackground(this@GuardianAccessibilityService, pkg)
+        }
+    }
+
+    private fun dismissPictureInPicture() {
+        val window = runCatching { windows }.getOrNull()?.firstOrNull { it.isInPictureInPictureMode } ?: return
+        val dismissed = runCatching { window.root?.performAction(AccessibilityNodeInfo.ACTION_DISMISS) == true }.getOrDefault(false)
+        if (!dismissed) performGlobalAction(GLOBAL_ACTION_HOME)
     }
 
     private fun checkStrict(pkg: String, force: Boolean) {
@@ -115,10 +184,20 @@ class GuardianAccessibilityService : AccessibilityService() {
         val text = StringBuilder()
         collectText(root, text, IntArray(1) { 600 })
         val screen = text.toString().lowercase()
-        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase())) {
+        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase(), localWords = settingsWords)) {
             performGlobalAction(GLOBAL_ACTION_BACK)
             performGlobalAction(GLOBAL_ACTION_HOME)
             Toast.makeText(this, R.string.strict_mode_blocked, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Settings' own words for "Force stop", "Uninstall" and so on, in the phone's language. */
+    private val settingsWords: List<String> by lazy {
+        val res = runCatching { packageManager.getResourcesForApplication(SETTINGS) }.getOrNull() ?: return@lazy emptyList()
+        SETTINGS_STRINGS.mapNotNull { name ->
+            @Suppress("DiscouragedApi") // Another app's resources can only be found by name.
+            val id = res.getIdentifier(name, "string", SETTINGS)
+            if (id == 0) null else runCatching { res.getString(id).lowercase().trim() }.getOrNull()?.takeIf { it.length > 2 }
         }
     }
 
@@ -148,6 +227,10 @@ class GuardianAccessibilityService : AccessibilityService() {
         @Volatile var running = false
             private set
 
+        private const val SETTINGS = "com.android.settings"
+        private const val STOP_AFTER_MS = 1_500L
+        private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")
+
         val GUARDED_SYSTEM_PACKAGES = setOf(
             "com.android.settings",
             "com.samsung.android.settings",
@@ -169,9 +252,10 @@ object StrictModeRules {
     )
     private val clockKeywords = listOf("set time", "set date", "automatic date", "use network-provided time")
 
-    fun shouldBlock(pkg: String, screenText: String, appLabel: String): Boolean {
+    /** [localWords] are the same dangers in the phone's language, read from the Settings app. */
+    fun shouldBlock(pkg: String, screenText: String, appLabel: String, localWords: List<String> = emptyList()): Boolean {
         if (clockKeywords.any { it in screenText } && pkg.contains("settings")) return true
         if (appLabel !in screenText) return false
-        return dangerousNearApp.any { it in screenText }
+        return dangerousNearApp.any { it in screenText } || localWords.any { it in screenText }
     }
 }

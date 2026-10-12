@@ -60,7 +60,7 @@ import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.theme.Garden
 
 @Composable
-fun SetupScreen(onDone: () -> Unit) {
+fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
     val context = LocalContext.current
     var state by remember { mutableStateOf(AppGraph.protection.current()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -78,8 +78,12 @@ fun SetupScreen(onDone: () -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val done = listOf(state.usageAccess, state.accessibility, state.notifications, state.overlay, state.deviceAdmin, state.batteryUnrestricted)
-            .count { it }
+        val steps = listOf(
+            state.usageAccess, state.accessibility, state.notificationListener, state.notifications,
+            state.overlay, state.deviceAdmin, state.batteryUnrestricted,
+        )
+        val done = steps.count { it }
+        val total = steps.size
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading())
@@ -88,11 +92,11 @@ fun SetupScreen(onDone: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(stringResource(R.string.setup_progress, done, 6), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                GrowthBar(done / 6f, color = Garden.colors.leaf)
+                Text(stringResource(R.string.setup_progress, done, total), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                GrowthBar(done / total.toFloat(), color = Garden.colors.leaf)
             }
             Spacer(Modifier.width(12.dp))
-            BloomFlower(0.1f + 0.9f * done / 6f, Garden.colors.petalPink, Modifier.size(76.dp, 116.dp), petals = 7)
+            BloomFlower(0.1f + 0.9f * done / total, Garden.colors.petalPink, Modifier.size(76.dp, 116.dp), petals = 7)
         }
         SetupStep(
             emoji = "📊",
@@ -106,6 +110,12 @@ fun SetupScreen(onDone: () -> Unit) {
             body = R.string.setup_keeper_body,
             done = state.accessibility,
         ) { disclosure = Disclosure.KEEPER }
+        SetupStep(
+            emoji = "🔕",
+            title = R.string.setup_listener_title,
+            body = R.string.setup_listener_body,
+            done = state.notificationListener,
+        ) { disclosure = Disclosure.LISTENER }
         SetupStep(
             emoji = "🔔",
             title = R.string.setup_notifications_title,
@@ -148,6 +158,9 @@ fun SetupScreen(onDone: () -> Unit) {
             @Suppress("BatteryLife")
             context.openSettings(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, withPackageUri = true)
         }
+        TextButton(onClick = onTroubleshoot, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text(stringResource(R.string.trouble_open_from_setup))
+        }
         Spacer(Modifier.height(8.dp))
         Button(
             onClick = onDone,
@@ -177,6 +190,7 @@ fun SetupScreen(onDone: () -> Unit) {
 private enum class Disclosure(@StringRes val body: Int, val settingsAction: String) {
     USAGE(R.string.disclosure_usage, Settings.ACTION_USAGE_ACCESS_SETTINGS),
     KEEPER(R.string.disclosure_keeper, Settings.ACTION_ACCESSIBILITY_SETTINGS),
+    LISTENER(R.string.disclosure_listener, Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
 }
 
 @Composable

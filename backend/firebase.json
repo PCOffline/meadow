@@ -14,7 +14,7 @@
         "**/*.test.*"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run build"
+        "node \"$PROJECT_DIR/build-functions.cjs\""
       ]
     }
   ],

@@ -3,14 +3,16 @@ rules_version = '2';
 // Everything that changes who looks after whom, or that loosens a commitment, goes through
 // Cloud Functions (which bypass these rules). Phones may only make things stricter.
 //
-// Who looks after whom lives in users/{uid}/private/account, readable only by its owner:
-// managing your Bumblebees is your own business. Rules still read it via get().
+// The public profile is only a name card (name, flower, colour, photo, bio), readable by the
+// person, their Bumblebees and the people they look after. Everything else about a person
+// (who looks after them, strict mode, emergency state, settings) lives in
+// users/{uid}/private/account, readable only by its owner. Rules still read it via get().
+// Nobody ever learns who else looks after the same person.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
-    function profile(uid) { return get(/databases/$(database)/documents/users/$(uid)).data; }
     function account(uid) { return get(/databases/$(database)/documents/users/$(uid)/private/account).data; }
     function isApproverOf(uid) { return me() in account(uid).approverIds; }
     function isApproveeOf(uid) { return me() in account(uid).approveeIds; }
@@ -23,7 +25,18 @@ service cloud.firestore {
         && isString(d.appName, 100)
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
         && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
-        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0);
+        && (!('schedule' in d) || d.schedule == null || validSchedule(d.schedule))
+        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0 || d.get('schedule', null) != null);
+    }
+
+    // Allowed hours per weekday ("1" = Monday). The windows themselves are checked when they
+    // matter: phones enforce them, and the backend compares them before tightening.
+    function validSchedule(s) {
+      return s is map && s.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7']);
+    }
+
+    function sameSchedule(old, next) {
+      return old.get('schedule', null) == next.get('schedule', null);
     }
 
     // 0 means "no limit" for that period, so going from 0 to anything is stricter.
@@ -37,55 +50,64 @@ service cloud.firestore {
         && (!('flower' in changed()) || isString(d.flower, 16))
         && (!('avatarColor' in changed()) || isString(d.avatarColor, 20))
         && (!('photoUrl' in changed()) || d.photoUrl == null || isString(d.photoUrl, 1000))
-        && (!('bio' in changed()) || isString(d.bio, 80))
-        && (!('privacy' in changed()) || (d.privacy.keys().hasOnly(['shareUsage', 'shareProtection'])
-              && d.privacy.shareUsage is bool && d.privacy.shareProtection is bool));
+        && (!('bio' in changed()) || isString(d.bio, 80));
     }
 
     match /users/{uid} {
-      // You, your Bumblebees, and the people you look after.
+      // The name card: you, your Bumblebees, and the people you look after.
       allow read: if signedIn() && (me() == uid || isApproverOf(uid) || isApproveeOf(uid));
       allow create, delete: if false;
       allow update: if signedIn() && me() == uid
-        && changed().hasOnly(['displayName', 'flower', 'avatarColor', 'photoUrl', 'bio', 'privacy',
-                              'lastHeartbeat', 'protection', 'strictMode', 'emergencyUntil'])
-        && validProfileEdit(request.resource.data)
-        // Strict mode can always be switched on, but only switched off without Bumblebees.
-        && (!('strictMode' in changed()) || request.resource.data.strictMode == true || hasNoApprovers(uid))
-        // An emergency unlock can only be ended early from the phone, never started or extended.
-        && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time);
+        && changed().hasOnly(['displayName', 'flower', 'avatarColor', 'photoUrl', 'bio'])
+        && validProfileEdit(request.resource.data);
 
+      // Owner-only. Strict mode is the person's own business: on and off without asking anyone.
       match /private/{docId} {
         allow read: if signedIn() && me() == uid;
         allow update: if signedIn() && me() == uid && docId == 'account'
-          && changed().hasOnly(['fcmTokens', 'theme', 'darkMode', 'acceptedTerms'])
+          && changed().hasOnly(['fcmTokens', 'theme', 'darkMode', 'acceptedTerms', 'strictMode', 'privacy', 'emergencyUntil'])
           && (!('acceptedTerms' in changed())
               || (request.resource.data.acceptedTerms.keys().hasOnly(['version', 'at'])
                   && request.resource.data.acceptedTerms.version is int
                   && request.resource.data.acceptedTerms.at == request.time))
           && (!('fcmTokens' in changed()) || request.resource.data.fcmTokens.size() <= 10)
           && (!('theme' in changed()) || isString(request.resource.data.theme, 20))
-          && (!('darkMode' in changed()) || isString(request.resource.data.darkMode, 10));
+          && (!('darkMode' in changed()) || isString(request.resource.data.darkMode, 10))
+          && (!('strictMode' in changed()) || request.resource.data.strictMode is bool)
+          && (!('privacy' in changed()) || (request.resource.data.privacy.keys().hasOnly(['shareUsage'])
+              && request.resource.data.privacy.shareUsage is bool))
+          // An emergency unlock can only be ended early from the phone, never started or extended.
+          && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time);
         allow create, delete: if false;
+      }
+
+      // A Bumblebee's own copies of the requests sent to them. Only the backend writes them.
+      match /inbox/{requestId} {
+        allow read: if signedIn() && me() == uid;
+        allow write: if false;
       }
 
       match /limits/{pkg} {
         allow read: if signedIn() && (me() == uid || isApproverOf(uid));
         allow create: if signedIn() && me() == uid && validLimit(request.resource.data, pkg);
+        // Allowed hours can't be compared here, so with Bumblebees they change through the
+        // backend's saveLimit, which checks they only got stricter.
         allow update: if signedIn() && me() == uid && validLimit(request.resource.data, pkg)
-          && (hasNoApprovers(uid) || isStricter(resource.data, request.resource.data));
+          && (hasNoApprovers(uid)
+              || (isStricter(resource.data, request.resource.data) && sameSchedule(resource.data, request.resource.data)));
         allow delete: if signedIn() && me() == uid && hasNoApprovers(uid);
       }
 
+      // Owner-only: a grant names the Bumblebee who gave it.
       match /grants/{grantId} {
-        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow read: if signedIn() && me() == uid;
         allow write: if false;
       }
 
       // Daily usage is shared with Bumblebees only while the owner allows it.
       match /usage/{day} {
         allow read: if signedIn() && (me() == uid
-          || (isApproverOf(uid) && profile(uid).get('privacy', {}).get('shareUsage', true) == true));
+          || (isApproverOf(uid) && account(uid).get('privacy', {}).get('shareUsage', true) == true));
         allow write: if signedIn() && me() == uid;
       }
 
@@ -94,16 +116,37 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // "Meadow may not be protecting me": no detail about which setting changed.
       match /alerts/{alertId} {
         allow create: if signedIn() && me() == uid
-          && request.resource.data.keys().hasOnly(['kind', 'lost', 'createdAt'])
-          && request.resource.data.kind == 'protection_off'
-          && request.resource.data.lost is list && request.resource.data.lost.size() <= 5;
+          && request.resource.data.keys().hasOnly(['kind', 'createdAt'])
+          && request.resource.data.kind == 'protection_off';
         allow read, update, delete: if false;
       }
     }
 
     match /friendCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // When each phone last checked in. Phones only move their own clock forward to "now"; the
+    // backend alone reads it and decides when a quiet phone is worth a vague alert.
+    match /heartbeats/{uid} {
+      allow read, delete: if false;
+      allow create: if signedIn() && me() == uid
+        && request.resource.data.keys().hasOnly(['at', 'staleNotified'])
+        && request.resource.data.at == request.time
+        && request.resource.data.staleNotified == false;
+      allow update: if signedIn() && me() == uid
+        && changed().hasOnly(['at'])
+        && request.resource.data.at == request.time;
+    }
+
+    match /removals/{id} {
+      allow read, write: if false;
+    }
+
+    match /rateLimits/{uid} {
       allow read, write: if false;
     }
 
@@ -117,8 +160,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Only the asker reads a request (it lists every Bumblebee asked); Bumblebees read their
+    // own inbox copy instead.
     match /requests/{requestId} {
-      allow read: if signedIn() && (resource.data.requesterId == me() || me() in resource.data.approverIds);
+      allow read: if signedIn() && resource.data.requesterId == me();
       allow write: if false;
     }
 
@@ -129,9 +174,16 @@ service cloud.firestore {
 
       allow read: if signedIn() && me() in resource.data.participants;
       allow create, delete: if false;
+      // Each person updates only their own side: the summary of a message they just sent, and
+      // when they last read the chat.
       allow update: if signedIn() && me() in resource.data.participants
         && changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastRead'])
-        && (!('lastSenderId' in changed()) || request.resource.data.lastSenderId == me());
+        && (!changed().hasAny(['lastMessage', 'lastMessageAt', 'lastSenderId'])
+            || (request.resource.data.lastSenderId == me()
+                && request.resource.data.lastMessageAt == request.time
+                && isString(request.resource.data.lastMessage, 140)))
+        && (!('lastRead' in changed())
+            || request.resource.data.lastRead.diff(resource.data.get('lastRead', {})).affectedKeys().hasOnly([me()]));
 
       match /messages/{messageId} {
         allow read: if participant();
@@ -139,6 +191,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
           && request.resource.data.senderId == me()
           && request.resource.data.kind == 'text'
+          && request.resource.data.createdAt == request.time
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;

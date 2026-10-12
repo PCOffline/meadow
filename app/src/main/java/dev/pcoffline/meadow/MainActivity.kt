@@ -32,6 +32,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handle(intent: Intent?) {
         intent ?: return
+        // Reopened from recents: Android hands back the intent that first opened the app, whose
+        // link or notification was already used.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRoute.value = it }
         val data = intent.data ?: return
         // Passwordless sign-in links finish in a dialog over whatever screen is showing.

@@ -30,6 +30,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -90,16 +94,30 @@ fun StalkBarChart(
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-            labels.forEachIndexed { i, label ->
-                Text(
-                    if (i % showEveryNthLabel == 0) label else "",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (i == highlightIndex) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                )
+        // Each label is centred under its bar but may be wider than it, so "15" isn't cut to "1".
+        Layout(
+            content = {
+                labels.forEachIndexed { i, label ->
+                    if (i % showEveryNthLabel == 0) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (i == highlightIndex) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        ) { measurables, constraints ->
+            val width = constraints.maxWidth
+            val slot = width.toFloat() / labels.size.coerceAtLeast(1)
+            val placeables = measurables.map { it.measure(Constraints(maxWidth = width)) }
+            layout(width, placeables.maxOfOrNull { it.height } ?: 0) {
+                placeables.forEachIndexed { k, p ->
+                    val center = slot * (k * showEveryNthLabel + 0.5f)
+                    p.placeRelative((center - p.width / 2f).toInt().coerceIn(0, (width - p.width).coerceAtLeast(0)), 0)
+                }
             }
         }
     }
@@ -132,8 +150,8 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
     val cells = List(firstDayOffset) { null } + values.indices.toList()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(Modifier.fillMaxWidth()) {
-            DayOfWeek.values().map { it.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()) }.forEach {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault()) }.forEach {
                 Text(
                     it, Modifier.weight(1f), textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -147,18 +165,17 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
                     Box(Modifier.weight(1f).height(34.dp), contentAlignment = Alignment.Center) {
                         if (index != null) {
                             val intensity = values[index] / max
+                            val fill = if (values[index] <= 0f) MaterialTheme.colorScheme.surfaceVariant
+                            else garden.leafDark.copy(alpha = 0.18f + 0.72f * intensity).compositeOver(MaterialTheme.colorScheme.surface)
                             Box(
-                                Modifier.fillMaxWidth().fillMaxHeight().clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (values[index] <= 0f) MaterialTheme.colorScheme.surfaceVariant
-                                        else garden.leafDark.copy(alpha = 0.18f + 0.72f * intensity),
-                                    ),
+                                Modifier.fillMaxWidth().fillMaxHeight().clip(RoundedCornerShape(10.dp)).background(fill),
                                 contentAlignment = Alignment.Center,
                             ) {
+                                // Judged from the actual square, since the dark theme's green is light.
                                 Text(
                                     labels[index],
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (intensity > 0.55f) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    color = if (fill.luminance() > 0.4f) Color(0xFF1A1C18) else Color.White,
                                 )
                             }
                         }

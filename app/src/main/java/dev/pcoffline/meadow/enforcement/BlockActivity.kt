@@ -11,13 +11,17 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +71,7 @@ import dev.pcoffline.meadow.ui.components.SleepyZs
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
 import dev.pcoffline.meadow.ui.minutesText
+import dev.pcoffline.meadow.ui.opensAtText
 import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -165,7 +171,8 @@ class RestViewModel(private val packageName: String) : ViewModel() {
             budget = AppGraph.engine.budget(packageName, forceRefresh = true),
             signedIn = profile != null,
             hasBumblebees = profile?.approverIds?.isNotEmpty() == true,
-            pendingRequest = request,
+            // Unanswered requests expire; the ticker notices before the backend settles it.
+            pendingRequest = request?.takeIf { RequestStatus.effective(it.status, it.createdAtMillis) == RequestStatus.PENDING },
         )
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, RestState())
 }
@@ -190,8 +197,8 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
 @Composable
 internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {}, onOpen: (String) -> Unit = {}) {
     val snackbar = remember { SnackbarHostState() }
-    var asking by remember { mutableStateOf(false) }
-    var emergency by remember { mutableStateOf(false) }
+    var asking by rememberSaveable { mutableStateOf(false) }
+    var emergency by rememberSaveable { mutableStateOf(false) }
 
     // Petals when a Bumblebee's yes arrives while this screen is open.
     var burst by remember { mutableIntStateOf(0) }
@@ -206,18 +213,22 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             SkyScene(RestingSky, Modifier.fillMaxSize())
             FallingPetals(Modifier.fillMaxSize(), count = 8)
-            Column(
-                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-            ) {
-                AppIcon(pkg, size = 56.dp)
-                Box {
-                    BloomFlower(if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp))
-                    if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
-                }
-                MeadowCard(Modifier.fillMaxWidth()) {
-                    RestCard(state, onAsk = { asking = true }, onEmergency = { emergency = true }, onOpen = { onOpen(pkg) }, onHome = onHome)
+            // Centred when it fits; scrolls in landscape or with large text, so every button stays reachable.
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight)
+                        .statusBarsPadding().navigationBarsPadding().padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                ) {
+                    AppIcon(pkg, size = 56.dp)
+                    Box {
+                        BloomFlower(if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp))
+                        if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
+                    }
+                    MeadowCard(Modifier.fillMaxWidth()) {
+                        RestCard(state, onAsk = { asking = true }, onEmergency = { emergency = true }, onOpen = { onOpen(pkg) }, onHome = onHome)
+                    }
                 }
             }
             PetalBurst(burst, Modifier.fillMaxSize())
@@ -248,6 +259,9 @@ private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Uni
                 state.unlocked && budget.emergency ->
                     stringResource(R.string.rest_body_emergency, state.appName, durationText(budget.emergencyUntilMillis - System.currentTimeMillis()))
                 state.unlocked -> stringResource(R.string.rest_body_yes, durationText(budget.remainingMs))
+                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                    ?.let { stringResource(R.string.rest_body_hours, state.appName, opensAtText(it)) }
+                    ?: stringResource(R.string.rest_body_hours_closed, state.appName)
                 budget.weeklyIsTighter -> stringResource(R.string.rest_body_week, minutesText(budget.limit.weeklyMinutes))
                 else -> stringResource(R.string.rest_body_today, minutesText(budget.limit.dailyMinutes))
             },

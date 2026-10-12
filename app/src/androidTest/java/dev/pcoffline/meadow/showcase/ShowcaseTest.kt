@@ -193,7 +193,7 @@ class ShowcaseTest {
     @Test
     fun chat() {
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, requestCard = {
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, requestCard = { _, _ ->
                 RequestCard(DemoGarden.request, DemoGarden.robin.uid, Modifier.padding(horizontal = 12.dp), compact = true)
             })
         }

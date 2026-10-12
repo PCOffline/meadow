@@ -4,9 +4,12 @@ import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.Grant
 import dev.pcoffline.meadow.data.LocalStore
+import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.usage.AppCatalog
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
+import java.time.ZonedDateTime
 
 /** Where one limited app stands right now. */
 data class AppBudget(
@@ -17,6 +20,12 @@ data class AppBudget(
     val bonusWeekMinutes: Int,
     /** An emergency unlock covering this app ends at this time; 0 when none is active. */
     val emergencyUntilMillis: Long = 0L,
+    /** Outside the allowed hours right now. */
+    val outsideHours: Boolean = false,
+    /** Until the allowed hours end (or, outside them, start); null without a schedule. */
+    val untilScheduleChangeMs: Long? = null,
+    /** Extra time granted today that is still left for use outside the allowed hours. */
+    val outsideHoursAllowanceMs: Long = 0L,
 ) {
     val emergency: Boolean get() = emergencyUntilMillis > System.currentTimeMillis()
 
@@ -29,7 +38,24 @@ data class AppBudget(
     val weeklyRemainingMs: Long? = weeklyAllowedMs?.let { it - usedWeekMs }
 
     /** Time left before the tighter of the two limits is reached. */
-    val remainingMs: Long = listOfNotNull(dailyRemainingMs, weeklyRemainingMs).minOrNull()?.coerceAtLeast(0) ?: Long.MAX_VALUE
+    private val limitRemainingMs: Long =
+        listOfNotNull(dailyRemainingMs, weeklyRemainingMs).minOrNull()?.coerceAtLeast(0) ?: Long.MAX_VALUE
+
+    /** All the time today allows, spent or not; null when only the hours limit the app. */
+    val allowedTodayMs: Long? = if (limitRemainingMs == Long.MAX_VALUE) null else usedTodayMs + limitRemainingMs
+
+    /**
+     * Time left before the app rests: the tighter limit, or the end of the allowed hours. Extra
+     * time granted today can also be spent outside them.
+     */
+    val remainingMs: Long = when {
+        outsideHours -> minOf(limitRemainingMs, outsideHoursAllowanceMs.coerceAtLeast(0))
+        untilScheduleChangeMs != null -> minOf(limitRemainingMs, untilScheduleChangeMs + outsideHoursAllowanceMs.coerceAtLeast(0))
+        else -> limitRemainingMs
+    }
+
+    /** Resting because of the hours, not because the time ran out. */
+    val restingByHours: Boolean get() = outsideHours && limitRemainingMs > 0 && remainingMs <= 0
 
     val exhausted: Boolean get() = remainingMs <= 0 && !emergency
 
@@ -76,21 +102,22 @@ class LimitEngine(
         foregroundSince = System.currentTimeMillis()
     }
 
-    /** Phone and emergency apps are never limited, whatever is stored. */
+    /** Phone and emergency apps, launchers and the system UI are never limited, whatever is stored. */
     fun limitFor(packageName: String): AppLimit? {
-        if (packageName in catalog.essentialPackages()) return null
+        if (!limitable(packageName)) return null
         return store.limits.value.firstOrNull { it.packageName == packageName }
     }
+
+    private fun limitable(packageName: String): Boolean =
+        packageName !in catalog.essentialPackages() && packageName !in catalog.homePackages()
 
     fun budget(packageName: String, forceRefresh: Boolean = false): AppBudget? {
         val limit = limitFor(packageName) ?: return null
         return computeBudgets(listOf(limit), forceRefresh).firstOrNull()
     }
 
-    fun budgets(forceRefresh: Boolean = false): List<AppBudget> {
-        val essentials = catalog.essentialPackages()
-        return computeBudgets(store.limits.value.filter { it.packageName !in essentials }, forceRefresh)
-    }
+    fun budgets(forceRefresh: Boolean = false): List<AppBudget> =
+        computeBudgets(store.limits.value.filter { limitable(it.packageName) }, forceRefresh)
 
     /** Today's usage per app, measured fresh enough for display. */
     @Synchronized
@@ -122,21 +149,58 @@ class LimitEngine(
         }
         val extra = foregroundExtra()
         val emergency = store.emergency.value
+        val now = ZonedDateTime.now()
         return limits.map { limit ->
             val pkg = limit.packageName
             val usedToday = (todayUsage[pkg] ?: 0L) + if (pkg == foregroundPackage) extra else 0L
+            val bonusToday = grants.bonus(pkg) { it == key }
+            val schedule = limit.schedule
+            val outside = schedule != null && !schedule.allows(now)
             AppBudget(
                 limit = limit,
                 usedTodayMs = usedToday,
                 usedWeekMs = (earlierThisWeek[pkg] ?: 0L) + usedToday,
-                bonusTodayMinutes = grants.bonus(pkg) { it == key },
+                bonusTodayMinutes = bonusToday,
                 bonusWeekMinutes = grants.bonus(pkg) { dayKey ->
                     Days.parse(dayKey)?.let { Days.isSameWeek(it, today) } == true
                 },
                 emergencyUntilMillis = emergency?.takeIf { it.covers(pkg) }?.untilMillis ?: 0L,
+                outsideHours = outside,
+                untilScheduleChangeMs = schedule?.let { it.untilChange(now)?.toMillis() ?: Long.MAX_VALUE / 2 },
+                outsideHoursAllowanceMs = if (schedule == null || bonusToday == 0) 0L else {
+                    val outsideUsed = usedToday - insideHoursToday(schedule)[pkg].orZero() -
+                        if (pkg == foregroundPackage && !outside) extra else 0L
+                    bonusToday * AppBudget.MINUTE - outsideUsed.coerceAtLeast(0L)
+                },
             )
         }
     }
+
+    private var insideHours: Map<List<TimeWindow>, Map<String, Long>> = emptyMap()
+    private var insideHoursMeasuredAt = 0L
+
+    /** Today's usage inside the allowed hours, measured with usage and cached alongside it. */
+    private fun insideHoursToday(schedule: Schedule): Map<String, Long> {
+        if (insideHoursMeasuredAt != measuredAt) {
+            insideHours = emptyMap()
+            insideHoursMeasuredAt = measuredAt
+        }
+        val today = Days.today()
+        val windows = schedule.windowsOn(today.dayOfWeek.value)
+        return insideHours[windows] ?: run {
+            val start = Days.startMillis(today)
+            val totals = HashMap<String, Long>()
+            for (w in windows) {
+                val from = start + w.from * AppBudget.MINUTE
+                if (from >= measuredAt) continue
+                tracker.usageBetween(from, minOf(start + w.to * AppBudget.MINUTE, measuredAt))
+                    .forEach { (p, ms) -> totals[p] = totals[p].orZero() + ms }
+            }
+            totals.also { insideHours = insideHours + (windows to it) }
+        }
+    }
+
+    private fun Long?.orZero() = this ?: 0L
 
     private fun refresh(force: Boolean) {
         val now = System.currentTimeMillis()

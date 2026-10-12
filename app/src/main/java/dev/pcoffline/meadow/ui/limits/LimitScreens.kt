@@ -2,6 +2,8 @@
 
 package dev.pcoffline.meadow.ui.limits
 
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -72,6 +74,15 @@ import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.durationText
+import dev.pcoffline.meadow.ui.limitText
+import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.TimeWindow
+import dev.pcoffline.meadow.ui.components.ShareDialog
+import dev.pcoffline.meadow.ui.requests.BeePicks
+import dev.pcoffline.meadow.ui.requests.BumblebeePicker
+import dev.pcoffline.meadow.ui.requests.rememberBeePicks
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.serialization.json.Json
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
@@ -205,13 +216,24 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
     var daily by rememberSaveable { mutableIntStateOf(existing?.dailyMinutes?.takeIf { it > 0 } ?: 30) }
     var weeklyOn by rememberSaveable { mutableStateOf((existing?.weeklyMinutes ?: 0) > 0) }
     var weekly by rememberSaveable { mutableIntStateOf(existing?.weeklyMinutes?.takeIf { it > 0 } ?: 180) }
+    var hoursOn by rememberSaveable { mutableStateOf(existing?.schedule != null) }
+    // Kept as JSON so it survives rotation.
+    var scheduleJson by rememberSaveable {
+        mutableStateOf(ScheduleJson.encodeToString(Schedule.serializer(), existing?.schedule ?: Schedule.everyDay(TimeWindow(0, 22 * 60))))
+    }
+    val schedule = ScheduleJson.decodeFromString(Schedule.serializer(), scheduleJson)
     var message by rememberSaveable { mutableStateOf("") }
-    var confirmRemove by remember { mutableStateOf(false) }
+    var confirmRemove by rememberSaveable { mutableStateOf(false) }
+    var sharing by rememberSaveable { mutableStateOf(false) }
+    val picks = rememberBeePicks()
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
     val hasBees = state.bumblebeeCount > 0
 
-    val proposed = AppLimit(packageName, state.appName, if (dailyOn) daily else 0, if (weeklyOn) weekly else 0)
+    val proposed = AppLimit(
+        packageName, state.appName, if (dailyOn) daily else 0, if (weeklyOn) weekly else 0,
+        schedule = if (hoursOn) schedule else null,
+    )
     val needsApproval = existing != null && hasBees && LimitsRepository.isLooser(existing, proposed)
     val planted = stringResource(R.string.limit_editor_planted)
     val updated = stringResource(R.string.limit_editor_updated)
@@ -257,6 +279,18 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        MeadowCard(Modifier.fillMaxWidth()) {
+            ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn) { hoursOn = it }
+            Text(
+                stringResource(R.string.limit_editor_hours_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (hoursOn) {
+                Spacer(Modifier.height(8.dp))
+                ScheduleEditor(schedule) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
+            }
+        }
 
         if (needsApproval) {
             MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
@@ -265,8 +299,10 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
                 OutlinedTextField(
                     value = message, onValueChange = { message = it.take(280) },
                     label = { Text(stringResource(R.string.limit_editor_note)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
+                BumblebeePicker(picks, Modifier.padding(top = 8.dp))
             }
         } else if (existing == null && hasBees) {
             Text(
@@ -280,7 +316,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
         Button(
             onClick = {
                 action.run(onSuccess = onDone) {
-                    val outcome = AppGraph.limits.save(proposed, message)
+                    val outcome = AppGraph.limits.save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
                     if (outcome == ChangeOutcome.APPLIED) celebrate()
                     action.toast(
                         when {
@@ -291,7 +327,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
                     )
                 }
             },
-            enabled = !action.busy && (dailyOn || weeklyOn) && proposed != existing,
+            enabled = !action.busy && (dailyOn || weeklyOn || hoursOn) && proposed != existing,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text(
@@ -308,6 +344,9 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
             OutlinedButton(onClick = { confirmRemove = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
+            TextButton(onClick = { sharing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(stringResource(R.string.limit_editor_share))
+            }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -316,12 +355,17 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
             title = { Text(stringResource(R.string.limit_remove_title, existing.appName)) },
-            text = { Text(stringResource(if (hasBees) R.string.limit_remove_body_ask else R.string.limit_remove_body_now)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(if (hasBees) R.string.limit_remove_body_ask else R.string.limit_remove_body_now))
+                    if (hasBees) BumblebeePicker(picks)
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmRemove = false
                     action.run(onSuccess = onDone) {
-                        val outcome = AppGraph.limits.remove(existing, message)
+                        val outcome = AppGraph.limits.remove(existing, message, if (hasBees) BeePicks.commit(picks.value) else null)
                         action.toast(if (outcome == ChangeOutcome.REQUESTED) requested else removed)
                     }
                 }) { Text(stringResource(if (hasBees) R.string.limit_remove_ask else R.string.action_remove)) }
@@ -329,7 +373,15 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
             dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.action_keep)) } },
         )
     }
+    if (sharing && existing != null) {
+        val text = LocalContext.current.resources.let { res ->
+            res.getString(R.string.share_limit, existing.appName, res.limitText(existing.dailyMinutes, existing.weeklyMinutes, existing.schedule))
+        }
+        ShareDialog(text, onDismiss = { sharing = false })
+    }
 }
+
+private val ScheduleJson = Json { ignoreUnknownKeys = true }
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {

@@ -16,7 +16,7 @@ data class InstalledApp(val packageName: String, val label: String)
 /** Knows which apps are launchable, their names and icons. */
 class AppCatalog(private val context: Context) {
     private val pm: PackageManager = context.packageManager
-    private val labelCache = HashMap<String, String>()
+    private val labelCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val iconCache = LruCache<String, ImageBitmap>(120)
 
     @Volatile private var launchableCache: Set<String>? = null
@@ -28,7 +28,7 @@ class AppCatalog(private val context: Context) {
         return pm.queryIntentActivities(intent, 0)
             .map { it.activityInfo.packageName }
             .distinct()
-            .filter { it != context.packageName && it !in essentialPackages() }
+            .filter { it != context.packageName && it !in essentialPackages() && it !in homePackages() }
             .map { InstalledApp(it, label(it)) }
             .sortedBy { it.label.lowercase() }
     }
@@ -62,13 +62,17 @@ class AppCatalog(private val context: Context) {
             .getOrDefault(packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() })
     }
 
+    /** An icon already drawn, so a list can show it at once instead of flashing a placeholder. */
+    fun cachedIcon(packageName: String): ImageBitmap? = iconCache.get(packageName)
+
     fun icon(packageName: String): ImageBitmap? {
         iconCache.get(packageName)?.let { return it }
         val drawable = runCatching { pm.getApplicationIcon(packageName) }.getOrNull() ?: return null
-        val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null) {
+        // Drawn at the largest size shown (56dp), so icons stay sharp without holding huge bitmaps.
+        val size = (ICON_DP * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+        val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null && drawable.bitmap.width <= size) {
             drawable.bitmap
         } else {
-            val size = 96
             Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
                 val canvas = Canvas(it)
                 drawable.setBounds(0, 0, size, size)
@@ -78,6 +82,7 @@ class AppCatalog(private val context: Context) {
         return bitmap.asImageBitmap().also { iconCache.put(packageName, it) }
     }
 
+    /** Forgets cached app lists; called when apps are installed or removed. */
     fun invalidate() {
         launchableCache = null
         homeCache = null
@@ -85,6 +90,7 @@ class AppCatalog(private val context: Context) {
     }
 
     private companion object {
+        const val ICON_DP = 56
         val ALWAYS_ALLOWED = setOf(
             "com.android.phone",
             "com.android.server.telecom",

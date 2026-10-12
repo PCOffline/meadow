@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-meadow \"node --test --test-concurrency=1 rules-tests/*.test.mjs\"",
-    "test:integration": "npm --prefix functions run build && firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
+    "test:integration": "node build-functions.cjs && firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
     "test:hosting": "node --test hosting-tests/*.test.mjs"
   },
   "devDependencies": {

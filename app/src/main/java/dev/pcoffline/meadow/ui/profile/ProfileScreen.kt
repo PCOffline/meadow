@@ -2,6 +2,9 @@
 
 package dev.pcoffline.meadow.ui.profile
 
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -114,6 +117,7 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
                     onValueChange = { name = it.take(30) },
                     label = { Text(stringResource(R.string.onboarding_name_label)) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -121,6 +125,7 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
                     onValueChange = { bio = it.take(ProfileRepository.BIO_MAX) },
                     label = { Text(stringResource(R.string.profile_bio)) },
                     placeholder = { Text(stringResource(R.string.profile_bio_placeholder)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                     supportingText = { Text("${bio.length}/${ProfileRepository.BIO_MAX}") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),

@@ -4,15 +4,12 @@
     <string name="settings_saved">Saved 🌼</string>
     <string name="settings_secure_reason">Your garden isn\'t linked to an email yet. Add one so you can sign in on a new phone and invite Bumblebees.</string>
     <string name="settings_strict_title">Strict mode</string>
-    <string name="settings_strict_body">Keeps Meadow\'s own settings, uninstalling and the clock out of reach, so limits can\'t be switched off in a weak moment. Turning it off needs a Bumblebee\'s yes.</string>
+    <string name="settings_strict_body">Keeps Meadow\'s own settings, uninstalling and the clock out of reach, so limits can\'t be switched off in a weak moment. It turns on and off straight away, and it\'s only between you and your phone.</string>
     <string name="settings_strict_on">Strict mode on 🌿</string>
     <string name="settings_strict_off_title">Turn off strict mode?</string>
-    <string name="settings_strict_off_ask">Your Bumblebees will be asked first.</string>
-    <string name="settings_strict_off_now">Strict mode will turn off straight away.</string>
-    <string name="settings_strict_off_ask_button">Ask</string>
+    <string name="settings_strict_off_now">Strict mode turns off straight away. Nobody is told.</string>
     <string name="settings_strict_off_button">Turn off</string>
     <string name="settings_strict_keep">Keep it on</string>
-    <string name="settings_strict_asked">Asked your Bumblebees 💌</string>
     <string name="settings_strict_off_done">Strict mode off</string>
     <plurals name="settings_emergency_body">
         <item quantity="one">Lifts limits for up to an hour without waiting for a Bumblebee. You get %1$d every 30 days, and your Bumblebees are told each time, with your reason. Calls and emergency apps are never limited.</item>
@@ -21,16 +18,14 @@
     <string name="settings_emergency_left">%1$d of %2$d left</string>
     <string name="settings_emergency_button">Use an emergency unlock</string>
     <string name="settings_protections_title">Protections</string>
-    <string name="settings_protections_body">Check usage access, the garden keeper, uninstall protection and notifications.</string>
+    <string name="settings_protections_body">Check usage access, the garden keeper, notification access, uninstall protection and battery.</string>
     <string name="settings_protections_button">Review protections</string>
     <string name="settings_promises_title">How Meadow keeps its promises</string>
-    <string name="settings_promises_body">• Tightening a limit applies straight away.\n• Loosening or removing one, or turning off strict mode, needs a Bumblebee\'s yes.\n• You can add or remove Bumblebees any time. Only the Bumblebee affected is told.\n• When an app\'s time is up, it rests until tomorrow, unless a Bumblebee gives you extra time.\n• In a real emergency, you can lift limits yourself for up to an hour, a few times a month. Your Bumblebees are told.\n• If a protection is turned off or your phone goes quiet, your Bumblebees are told.\n• Limits keep working on this phone even offline or signed out.</string>
+    <string name="settings_promises_body">• Tightening a limit applies straight away.\n• Loosening or removing one needs a yes from a Bumblebee you choose to ask.\n• Removing a Bumblebee takes 24 hours, so it can\'t be a way around a \"not today\". Only they are told.\n• When an app\'s time is up, or it\'s outside its hours, it rests: its windows, floating players and notifications close too.\n• You can ask for more time before it runs out.\n• In a real emergency, you can lift limits yourself for up to an hour, a few times a month. Your Bumblebees are told.\n• If Meadow may have stopped looking after your garden, your Bumblebees are told only that, never which setting.\n• Limits keep working on this phone even offline or signed out.</string>
     <string name="settings_privacy_title">Privacy</string>
-    <string name="settings_privacy_body">Choose what your Bumblebees can see. They can see these choices, too.</string>
+    <string name="settings_privacy_body">Choose what your Bumblebees can see. Your settings, strict mode and protections are never shared.</string>
     <string name="settings_share_usage">Share today\'s screen time</string>
     <string name="settings_share_usage_body">Your total and top apps for today. Your history never leaves this phone.</string>
-    <string name="settings_share_protection">Tell them when a protection is off</string>
-    <string name="settings_share_protection_body">Lets your Bumblebees know if the garden keeper, usage access or uninstall protection is turned off.</string>
     <string name="settings_privacy_saved">Privacy choices saved 🔒</string>
 
     <string name="settings_updates_title">Updates</string>
@@ -64,4 +59,15 @@
     <string name="settings_sign_out_body">Your limits keep working on this phone while you\'re signed out, but you won\'t be able to ask for extra time.</string>
     <string name="settings_sign_out_anonymous">Your garden has no email yet, so signing out would lose it for good. Add an email first.</string>
     <string name="settings_sign_out_stay">Stay</string>
+
+    <string name="share_title">Share</string>
+    <string name="share_elsewhere">Share to another app</string>
+    <string name="share_to_circle">Or send it to</string>
+    <string name="share_send">Send</string>
+    <string name="share_sent">Shared 🌼</string>
+    <string name="share_period_day">today</string>
+    <string name="share_period_week">this week</string>
+    <string name="share_period_month">this month</string>
+    <string name="share_stats">My screen time %1$s: %2$s. Most used: %3$s. 🌼 Meadow</string>
+    <string name="share_limit">I\'ve committed to %2$s on %1$s with Meadow 🌼</string>
 </resources>

@@ -136,7 +136,7 @@ class MainScreensTest : ScreenTest() {
 
     @Test
     fun `a garden without an email is asked to add one before inviting`() {
-        show { CircleContent(DemoGarden.robin, emptyList(), emptyList(), emptyList(), emptyList(), anonymous = true) }
+        show { CircleContent(DemoGarden.robin.copy(approverIds = emptyList(), approveeIds = emptyList()), emptyList(), emptyList(), emptyList(), emptyList(), anonymous = true) }
         node(R.string.secure_title).assertExists()
         assertTrue(compose.onAllNodesWithText(text(R.string.invite_title)).fetchSemanticsNodes().isEmpty())
         node(R.string.circle_no_bees_title).assertExists()
@@ -147,7 +147,7 @@ class MainScreensTest : ScreenTest() {
     fun `chat shows the conversation and sends what you type`() {
         val sent = mutableListOf<String>()
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { sent += it }, requestCard = { Text("Request $it") })
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { sent += it }, requestCard = { id, _ -> Text("Request $id") })
         }
         compose.onNodeWithText("Thank you! 💛").assertExists()
         compose.onNodeWithText("Request r1").assertExists()

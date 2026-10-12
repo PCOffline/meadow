@@ -26,6 +26,8 @@ class UsageHistory(
         val key = Days.key(date)
         if (date.isBefore(today)) cache[key]?.let { return it }
         if (date.isAfter(today)) return emptyMap()
+        // A finished day is stored for good, so judge it against the apps installed now.
+        if (date.isBefore(today)) refreshCatalog()
         val raw = tracker.usageBetween(Days.startMillis(date), Days.endMillis(date))
         val usage = catalog.userFacing(raw)
         if (date.isBefore(today) && usage.isNotEmpty()) {
@@ -36,6 +38,13 @@ class UsageHistory(
         return usage
     }
 
+    /** Usage on [date] during its first [elapsedMs], to compare with the same stretch of today. */
+    @Synchronized
+    fun partialDay(date: LocalDate, elapsedMs: Long): Map<String, Long> {
+        val start = Days.startMillis(date)
+        return catalog.userFacing(tracker.usageBetween(start, minOf(start + elapsedMs, Days.endMillis(date))))
+    }
+
     fun range(from: LocalDate, to: LocalDate): List<Pair<LocalDate, Map<String, Long>>> {
         val days = mutableListOf<Pair<LocalDate, Map<String, Long>>>()
         var d = from
@@ -44,6 +53,16 @@ class UsageHistory(
             d = d.plusDays(1)
         }
         return days
+    }
+
+    // Looking up installed apps is slow, so a month of uncached days checks once, not thirty times.
+    private var catalogCheckedAt = 0L
+
+    private fun refreshCatalog() {
+        val now = System.currentTimeMillis()
+        if (now - catalogCheckedAt < CATALOG_FRESH_MS) return
+        catalog.invalidate()
+        catalogCheckedAt = now
     }
 
     private fun prune(today: LocalDate) {
@@ -61,5 +80,6 @@ class UsageHistory(
 
     private companion object {
         const val KEEP_DAYS = 120L
+        const val CATALOG_FRESH_MS = 60_000L
     }
 }

@@ -17,8 +17,9 @@ import dev.pcoffline.meadow.enforcement.GuardianService
 import java.util.concurrent.TimeUnit
 
 /**
- * Every 15 minutes: restarts the guardian if it was killed, shares today's usage with
- * approvers and sends a heartbeat so they notice if Meadow goes quiet.
+ * Every 15 minutes: restarts the guardian if it was killed and shares today's usage with
+ * approvers. About once an hour it also sends a heartbeat so they notice if Meadow goes quiet
+ * (Bumblebees are told after six quiet hours; protection changes are sent straight away).
  */
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -28,13 +29,18 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             AppGraph.emergency.flushPending()
             val privacy = AppGraph.store.privacy.value
             if (privacy.shareUsage) AppGraph.share.upload(todaySummary())
-            AppGraph.share.heartbeat(if (privacy.shareProtection) AppGraph.protection.current().asMap() else emptyMap())
+            val now = System.currentTimeMillis()
+            if (now - AppGraph.store.lastHeartbeatMillis >= HEARTBEAT_EVERY_MS) {
+                AppGraph.share.heartbeat()
+                AppGraph.store.lastHeartbeatMillis = now
+            }
             AppGraph.protection.check()
         }.fold(onSuccess = { Result.success() }, onFailure = { Result.retry() })
     }
 
     companion object {
         private const val NAME = "meadow-sync"
+        private const val HEARTBEAT_EVERY_MS = 55 * 60_000L
 
         fun todaySummary(): SharedUsage {
             val usage = AppGraph.engine.todayUsage(forceRefresh = true)

@@ -20,4 +20,9 @@
     <string name="garden_tile_resting_week">Resting until next week 🌙</string>
     <string name="garden_tile_emergency">Paused for an emergency 🚨</string>
     <string name="garden_tile_extra">+%1$s extra today 🌸</string>
+
+    <string name="garden_notice_battery">Android may put Meadow to sleep to save battery, and limits would stop working.</string>
+    <string name="garden_tile_ask">Ask for more</string>
+    <string name="garden_tile_resting_until">Resting until %1$s</string>
+    <string name="garden_tile_resting_hours">Resting outside its hours</string>
 </resources>

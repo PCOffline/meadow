@@ -11,8 +11,8 @@ class ModelsTest {
 
     private fun profile(uses: List<Long>) = UserProfile(
         uid = "me", displayName = "Sam", avatar = Avatar.Default, bio = "", friendCode = "ABC234",
-        approverIds = emptyList(), approveeIds = emptyList(), privacy = Privacy(), strictMode = false, protection = emptyMap(),
-        lastHeartbeatMillis = null, emergencyUntilMillis = 0L, emergencyPackage = null, emergencyUsesMillis = uses,
+        approverIds = emptyList(), approveeIds = emptyList(), privacy = Privacy(), strictMode = false,
+        emergencyUntilMillis = 0L, emergencyPackage = null, emergencyUsesMillis = uses,
     )
 
     @Test
@@ -55,5 +55,16 @@ class ModelsTest {
         assertEquals(today, Days.parse(Days.key(today)))
         assertNull(Days.parse("not a date"))
         assertEquals(java.time.DayOfWeek.MONDAY, Days.weekStart(today).dayOfWeek)
+    }
+
+    @Test
+    fun `unanswered requests count as expired after half an hour`() {
+        val now = 10_000_000_000L
+        val minute = 60_000L
+        assertEquals(RequestStatus.PENDING, RequestStatus.effective(RequestStatus.PENDING, now - 29 * minute, now))
+        assertEquals(RequestStatus.EXPIRED, RequestStatus.effective(RequestStatus.PENDING, now - 30 * minute, now))
+        assertEquals(RequestStatus.APPROVED, RequestStatus.effective(RequestStatus.APPROVED, now - 60 * minute, now))
+        // Still being written: the server time isn't known yet.
+        assertEquals(RequestStatus.PENDING, RequestStatus.effective(RequestStatus.PENDING, 0L, now))
     }
 }

@@ -6,9 +6,9 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
 export {
   createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, respondInvite, cancelInvite,
-  removeApprover, stepDown,
+  removeApprover, cancelRemoval, stepDown,
 } from "./social";
-export { createRequest, decideRequest, cancelRequest } from "./requests";
+export { createRequest, decideRequest, cancelRequest, saveLimit } from "./requests";
 export { emergencyUnlock } from "./emergency";
 export { exportMyData, deleteAccount } from "./account";
-export { onChatMessage, onProtectionAlert, onProfileUpdated, hourlyCare } from "./triggers";
+export { onChatMessage, onProtectionAlert, onProfileUpdated, hourlyCare, expireRequests } from "./triggers";

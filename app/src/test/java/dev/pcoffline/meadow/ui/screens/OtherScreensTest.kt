@@ -98,7 +98,7 @@ class OtherScreensTest : ScreenTest() {
         compose.onAllNodesWithText(text(R.string.setup_step_allow)).onFirst().performClick()
         node(R.string.disclosure_title).assertExists()
         // Which step comes first depends on what this device already allows.
-        val explained = listOf(R.string.disclosure_usage, R.string.disclosure_keeper)
+        val explained = listOf(R.string.disclosure_usage, R.string.disclosure_keeper, R.string.disclosure_listener)
             .sumOf { compose.onAllNodesWithText(text(it)).fetchSemanticsNodes().size }
         assertEquals(1, explained)
         node(R.string.disclosure_not_now).performClick()
@@ -108,10 +108,9 @@ class OtherScreensTest : ScreenTest() {
     @Test
     fun `settings show privacy choices, legal documents and a careful delete`() {
         val opened = mutableListOf<LegalDoc>()
-        val shy = DemoGarden.robin.copy(privacy = Privacy(shareUsage = false, shareProtection = true))
+        val shy = DemoGarden.robin.copy(privacy = Privacy(shareUsage = false))
         show { SettingsScreen(shy, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = { opened += it }) }
         compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage))).performScrollTo().assertIsOff()
-        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_protection))).assertIsOn()
         node(R.string.legal_privacy).performScrollTo().performClick()
         node(R.string.legal_terms).performScrollTo().performClick()
         assertEquals(listOf(LegalDoc.PRIVACY, LegalDoc.TERMS), opened)

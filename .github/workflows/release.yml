@@ -51,7 +51,8 @@ jobs:
           MEADOW_KEYSTORE_PASSWORD: ${{ secrets.MEADOW_KEYSTORE_PASSWORD }}
           MEADOW_KEY_ALIAS: ${{ secrets.MEADOW_KEY_ALIAS }}
           MEADOW_KEY_PASSWORD: ${{ secrets.MEADOW_KEY_PASSWORD }}
-        run: ./gradlew testReleaseUnitTest assembleRelease -Pmeadow.version="$VERSION" --stacktrace
+        # Copies built from a fork look for updates on that fork's releases.
+        run: ./gradlew testReleaseUnitTest assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}

@@ -16,10 +16,13 @@ import kotlinx.serialization.Serializable
 @Serializable data class FriendRoute(val uid: String)
 @Serializable data object ProfileRoute
 @Serializable data class LegalRoute(val doc: String)
+@Serializable data object TroubleshootRoute
+@Serializable data object BeeStatsRoute
 
 /**
  * Where a notification asks to go. Notifications carry a small string so they stay valid
- * across app versions: "requests", "circle", "settings", "chat/<id>" or "friend/<uid>".
+ * across app versions: "requests", "circle", "settings", "troubleshoot", "chat/<id>",
+ * "friend/<uid>" or "ask/<package>" (asks for more time on that app).
  */
 object DeepLinks {
     fun requests() = "requests"
@@ -27,11 +30,17 @@ object DeepLinks {
     fun settings() = "settings"
     fun chat(chatId: String) = "chat/$chatId"
     fun friend(uid: String) = "friend/$uid"
+    fun troubleshoot() = "troubleshoot"
+    fun ask(packageName: String) = "ask/$packageName"
+
+    /** The app an "ask for more time" link is for, or null for any other link. */
+    fun askFor(link: String): String? = link.takeIf { it.startsWith("ask/") }?.removePrefix("ask/")?.takeIf { it.isNotBlank() }
 
     fun toRoute(link: String): Any? = when {
         link == "requests" -> RequestsRoute
         link == "circle" -> CircleRoute
         link == "settings" -> SettingsRoute
+        link == "troubleshoot" -> TroubleshootRoute
         link.startsWith("chat/") -> link.removePrefix("chat/").takeIf { it.isNotBlank() }?.let(::ChatRoute)
         link.startsWith("friend/") -> link.removePrefix("friend/").takeIf { it.isNotBlank() }?.let(::FriendRoute)
         else -> null

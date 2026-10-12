@@ -40,10 +40,10 @@ export const errors = {
   badDate: "That date doesn't look right.",
   unknownRequest: "That kind of request isn't supported.",
   tooManyRequests: "You have lots of requests waiting already. Give your Bumblebees a moment. 🌿",
-  duplicateRequest: "You've already asked for this. It's waiting for an answer.",
-  strictAlreadyOff: "Strict mode is already off.",
+  duplicateRequest: "You've already asked about this app. Wait for an answer, or cancel it first.",
   requestGone: "That request isn't around anymore.",
   requestAnswered: "That request was already answered.",
+  requestExpired: "That request expired. If they still need it, they can ask again.",
   ownRequest: "You can't answer your own request. 🌱",
   notYourRequest: "Only their Bumblebees can answer this.",
   noLongerBumblebee: "You're no longer their Bumblebee.",
@@ -52,13 +52,23 @@ export const errors = {
   emergencyUsedUp: (allowance: number) =>
     `You've used all ${allowance} emergency unlocks for the last 30 days. Ask a Bumblebee for extra time instead.`,
   emergencyActive: "An emergency unlock is already on.",
+  slowDown: "That's a lot in a short time. Please wait a little and try again. 🌿",
+  pickABumblebee: "Pick at least one Bumblebee to ask.",
+  notYourBumblebees: "You can only ask your own Bumblebees.",
+  removalPending: "That Bumblebee is already leaving.",
+  noRemoval: "That Bumblebee isn't leaving.",
+  needsAYes: "That would loosen the limit, so it needs a Bumblebee's yes.",
 };
 
 export const chatNotes = {
   newBumblebee: (bee: Person, owner: Person) => `${bee.flower} ${bee.displayName} is now ${owner.displayName}'s Bumblebee`,
   removedBumblebee: (owner: Person, bee: Person) => `${owner.displayName} ended ${bee.displayName}'s time as their Bumblebee`,
+  removalScheduled: (owner: Person, bee: Person) =>
+    `${owner.displayName} is ending ${bee.displayName}'s time as their Bumblebee. It takes effect in 24 hours`,
+  removalCancelled: (owner: Person, bee: Person) => `${owner.displayName} is keeping ${bee.displayName} as their Bumblebee 🐝`,
   steppedDown: (bee: Person, owner: Person) => `${bee.displayName} stepped down as ${owner.displayName}'s Bumblebee`,
-  request: (owner: Person, summary: string) => `💌 ${owner.displayName} asks for ${summary}`,
+  request: (owner: Person, summary: string, usage: string | null) =>
+    `💌 ${owner.displayName} asks for ${summary}${usage ? `. ${usage}` : ""}`,
   yes: (bee: Person, summary: string) => `🌸 ${bee.displayName} said yes to ${summary}`,
   notToday: (bee: Person, summary: string) => `🍃 ${bee.displayName} said not today to ${summary}`,
   emergency: (headline: string, scope: string, reason: string) => `${headline}. Lifted ${scope}. Reason: “${reason}”`,
@@ -79,23 +89,36 @@ export const pushes = {
     title: `${owner.flower} ${owner.displayName} doesn't need you as their Bumblebee anymore`,
     body: "Their requests won't come to you anymore. Thanks for looking after their garden. 🌼",
   }),
+  /** Gives the Bumblebee the cool-off day to check in. */
+  removalScheduled: (owner: Person) => ({
+    title: `${owner.flower} ${owner.displayName} is ending your time as their Bumblebee`,
+    body: "It takes effect in 24 hours. Until then their requests still come to you. Maybe check in with them?",
+  }),
+  removalCancelled: (owner: Person) => ({
+    title: `${owner.flower} ${owner.displayName} changed their mind`,
+    body: "You're still their Bumblebee. 🐝",
+  }),
   steppedDown: (bee: Person, remaining: number) => ({
     title: `${bee.flower} ${bee.displayName} stepped down as your Bumblebee`,
     body: remaining > 0
       ? "Your other Bumblebees are still looking after your garden."
       : "Invite a new Bumblebee so your limits stay locked in.",
   }),
-  request: (owner: Person, summary: string, message: string) => ({
+  request: (owner: Person, summary: string, message: string, usage: string | null) => ({
     title: `${owner.flower} ${owner.displayName} asks for ${summary}`,
-    body: message ? `“${message}”` : "Tap to answer, or say yes right from here.",
+    body: [usage, message ? `“${message}”` : "Tap to answer, or say yes right from here."].filter(Boolean).join(" "),
   }),
   decided: (bee: Person, approved: boolean, summary: string, note: string) => ({
     title: approved ? `🌸 ${bee.displayName} said yes!` : `🍃 ${bee.displayName} said not today`,
     body: note ? `${capitalize(summary)}. “${note}”` : `${capitalize(summary)}.`,
   }),
   chat: (sender: Person, text: string) => ({ title: `${sender.flower} ${sender.displayName}`, body: text }),
-  protectionOff: (owner: Person, lost: string[]) => ({
-    title: `⚠️ ${owner.displayName} turned off ${protectionNames(lost)}`,
+  /**
+   * Deliberately vague: which protection, strict mode and battery settings are the person's own
+   * business. Bumblebees only learn that Meadow may not be working.
+   */
+  protectionOff: (owner: Person) => ({
+    title: `⚠️ Meadow may not be looking after ${owner.displayName}'s garden`,
     body: "Their limits may not be working right now. Maybe check in with them?",
   }),
   gardenClosed: (owner: Person) => ({
@@ -107,28 +130,14 @@ export const pushes = {
     body: "They're no longer one of your Bumblebees. You can invite someone new from Circle.",
   }),
   quietPhone: (owner: Person) => ({
-    title: `🌙 ${owner.displayName}'s phone has gone quiet`,
-    body: "Meadow hasn't heard from it in over 6 hours. It may be off, or Meadow may have been removed.",
+    title: `⚠️ Meadow may not be looking after ${owner.displayName}'s garden`,
+    body: "Meadow hasn't heard from their phone in a while. Maybe check in with them?",
   }),
   emergency: (headline: string, scope: string, reason: string) => ({
     title: headline,
     body: `Lifted ${scope}. “${reason}”`,
   }),
 };
-
-const PROTECTION_NAMES: Record<string, string> = {
-  usageAccess: "usage access",
-  accessibility: "the garden keeper",
-  deviceAdmin: "uninstall protection",
-};
-
-/** "usage access and the garden keeper" */
-export function protectionNames(keys: string[]): string {
-  const names = keys.map((k) => PROTECTION_NAMES[k]).filter((n): n is string => !!n);
-  if (names.length === 0) return "a protection";
-  if (names.length === 1) return names[0];
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
 
 export function emergencyHeadline(owner: Person, offline: boolean, overAllowance: boolean): string {
   const extra = [offline ? "while offline" : null, overAllowance ? "beyond their monthly allowance" : null]

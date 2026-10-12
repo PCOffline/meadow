@@ -33,7 +33,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -127,8 +131,12 @@ fun ChatListScreen(
     }
 }
 
+/** A chat once loaded; [chat] is null when it's closed (the friendship ended). */
+data class LoadedChat(val chat: Chat?)
+
 class ChatViewModel(private val chatId: String) : ViewModel() {
-    val chat: StateFlow<Chat?> = AppGraph.chats.chat(chatId).stateWhileVisible(this, null)
+    /** Null until the chat has loaded, so loading isn't mistaken for a closed chat. */
+    val chat: StateFlow<LoadedChat?> = AppGraph.chats.chat(chatId).map { LoadedChat(it) }.stateWhileVisible(this, null)
     val messages: StateFlow<List<ChatMessage>> = AppGraph.chats.messages(chatId).stateWhileVisible(this, emptyList())
 
     fun send(text: String) {
@@ -147,43 +155,56 @@ fun ChatScreen(
     onBack: () -> Unit,
     viewModel: ChatViewModel = viewModel(key = "chat-$chatId") { ChatViewModel(chatId) },
 ) {
-    val chat by viewModel.chat.collectAsStateWithLifecycle()
+    val loaded by viewModel.chat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     LaunchedEffect(messages.size) { viewModel.markRead() }
-    ChatContent(profile, chat, messages, onSend = viewModel::send, onBack = onBack)
+    ChatContent(profile, loaded?.chat, messages, loading = loaded == null, onSend = viewModel::send, onBack = onBack)
 }
 
 /**
  * A conversation, drawn from plain state (also used for previews and screenshots).
- * [requestCard] shows a request message; by default it follows the live request.
+ * [requestCard] shows a request message (with whether you asked it); by default it follows the
+ * live request.
  */
 @Composable
 fun ChatContent(
     profile: UserProfile,
     chat: Chat?,
     messages: List<ChatMessage>,
+    loading: Boolean = false,
     onSend: (String) -> Unit = {},
     onBack: () -> Unit = {},
-    requestCard: @Composable (requestId: String) -> Unit = { RequestMessage(it, profile.uid) },
+    requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    // Opens at the latest message straight away. Later ones scroll into view only if you're
+    // already at the bottom or sent it yourself, so reading back isn't interrupted.
+    var opened by remember { mutableStateOf(false) }
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+        if (messages.isEmpty()) return@LaunchedEffect
+        val last = messages.size - 1 + if (chat == null && !loading) 1 else 0
+        if (!opened) {
+            listState.scrollToItem(last)
+            opened = true
+            return@LaunchedEffect
+        }
+        val seen = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: last
+        if (seen >= last - 2 || messages.last().senderId == profile.uid) listState.animateScrollToItem(last)
     }
 
     Column(Modifier.fillMaxSize().imePadding()) {
         val title = chat?.otherName(profile.uid).orEmpty()
         BackTopBar(title, onBack = onBack)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (chat == null) {
+            if (chat == null && !loading) {
                 item { EmptyState("🕊️", stringResource(R.string.chat_closed_title), stringResource(R.string.chat_closed_body)) }
             }
             items(messages, key = { it.id }) { message ->
                 Box(Modifier.animateItem()) {
                     when (message.kind) {
-                        MessageKind.REQUEST -> message.requestId?.let { requestCard(it) }
+                        MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
                         MessageKind.SYSTEM -> SystemMessage(message)
                         MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
                     }
@@ -198,7 +219,8 @@ fun ChatContent(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 4,
-                enabled = chat != null,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                enabled = chat != null || loading,
             )
             Spacer(Modifier.width(8.dp))
             FilledIconButton(
@@ -250,13 +272,15 @@ private fun SystemMessage(message: ChatMessage) {
     )
 }
 
-class RequestMessageViewModel(requestId: String) : ViewModel() {
-    val request: StateFlow<LimitRequest?> = AppGraph.requests.observe(requestId).stateWhileVisible(this, null)
+class RequestMessageViewModel(requestId: String, myUid: String, mine: Boolean) : ViewModel() {
+    val request: StateFlow<LimitRequest?> =
+        (if (mine) AppGraph.requests.observe(requestId) else AppGraph.requests.observeInbox(myUid, requestId))
+            .stateWhileVisible(this, null)
 }
 
 @Composable
-private fun RequestMessage(requestId: String, myUid: String) {
-    val viewModel = viewModel(key = "request-$requestId") { RequestMessageViewModel(requestId) }
+private fun RequestMessage(requestId: String, myUid: String, mine: Boolean) {
+    val viewModel = viewModel(key = "request-$requestId") { RequestMessageViewModel(requestId, myUid, mine) }
     val request by viewModel.request.collectAsStateWithLifecycle()
     request?.let { RequestCard(it, myUid, modifier = Modifier.padding(horizontal = 12.dp), compact = true) }
 }

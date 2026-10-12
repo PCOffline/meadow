@@ -6,6 +6,7 @@ import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.navigation.FriendRoute
 import dev.pcoffline.meadow.ui.navigation.RequestsRoute
 import dev.pcoffline.meadow.ui.navigation.SettingsRoute
+import dev.pcoffline.meadow.ui.navigation.TroubleshootRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -26,5 +27,13 @@ class DeepLinksTest {
         assertNull(DeepLinks.toRoute("chat/"))
         assertNull(DeepLinks.toRoute("friend/"))
         assertNull(DeepLinks.toRoute(""))
+    }
+
+    @Test
+    fun `ask links name the app to ask about`() {
+        assertEquals("com.app", DeepLinks.askFor(DeepLinks.ask("com.app")))
+        assertNull(DeepLinks.askFor("ask/"))
+        assertNull(DeepLinks.askFor(DeepLinks.requests()))
+        assertEquals(TroubleshootRoute, DeepLinks.toRoute(DeepLinks.troubleshoot()))
     }
 }

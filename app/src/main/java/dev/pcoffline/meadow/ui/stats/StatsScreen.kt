@@ -34,6 +34,12 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.Share
+import dev.pcoffline.meadow.ui.components.ShareDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -131,7 +137,20 @@ class StatsViewModel : ViewModel() {
         val perApp = HashMap<String, Long>()
         days.forEach { (_, apps) -> apps.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0L) + ms } }
         val previousFrom = if (sel.period == Period.MONTH) from.minusMonths(1) else from.minusDays(ChronoUnit.DAYS.between(from, to) + 1)
-        val previous = history.range(previousFrom, from.minusDays(1)).sumOf { (_, apps) -> apps.values.sum() }
+        val previousTo = from.minusDays(1)
+        val previous = if (sel.offset == 0) {
+            // The current period is still running, so compare it with the same stretch of the last one.
+            val fullDays = ChronoUnit.DAYS.between(from, today)
+            val partial = previousFrom.plusDays(fullDays)
+            if (partial.isAfter(previousTo)) {
+                history.range(previousFrom, previousTo).sumOf { (_, apps) -> apps.values.sum() }
+            } else {
+                history.range(previousFrom, partial.minusDays(1)).sumOf { (_, apps) -> apps.values.sum() } +
+                    history.partialDay(partial, System.currentTimeMillis() - Days.startMillis(today)).values.sum()
+            }
+        } else {
+            history.range(previousFrom, previousTo).sumOf { (_, apps) -> apps.values.sum() }
+        }
         return PeriodStats(
             selection = sel,
             from = from,
@@ -154,12 +173,21 @@ fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel {
 /** The statistics, drawn from plain state (also used for previews and screenshots). */
 @Composable
 fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: (Int) -> Unit = {}, onOpenSetup: () -> Unit = {}) {
+    var sharing by rememberSaveable { mutableStateOf(false) }
+    val res = LocalContext.current.resources
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Text(
-            stringResource(R.string.stats_title),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.asHeading().padding(start = 20.dp, top = 16.dp, end = 20.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 8.dp)) {
+            Text(
+                stringResource(R.string.stats_title),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.asHeading().weight(1f),
+            )
+            if (state.stats != null && state.stats.totalMs > 0) {
+                IconButton(onClick = { sharing = true }) {
+                    Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.share_title))
+                }
+            }
+        }
         Text(
             stringResource(R.string.stats_subtitle),
             style = MaterialTheme.typography.bodyMedium,
@@ -177,6 +205,7 @@ fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: 
                 }
             }
         }
+        if (sharing) state.stats?.let { ShareDialog(statsShareText(res, it), onDismiss = { sharing = false }) }
         if (!state.hasPermission) {
             EmptyState(
                 "📊",
@@ -227,7 +256,10 @@ private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
         }
         Period.WEEK -> if (selection.offset == 0) stringResource(R.string.stats_this_week)
         else stringResource(R.string.stats_range, stats.from.format(medium), stats.to.format(medium))
-        Period.MONTH -> stats.from.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.getDefault()))
+        // The locale decides the order and form, e.g. "October 2026" or "2026年10月".
+        Period.MONTH -> Locale.getDefault().let { locale ->
+            stats.from.format(DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "LLLLyyyy"), locale))
+        }
     }
 }
 
@@ -279,9 +311,9 @@ private fun Summary(s: PeriodStats) {
             val change = ((s.totalMs - s.previousTotalMs) * 100 / s.previousTotalMs).toInt()
             val previous = stringResource(
                 when (s.selection.period) {
-                    Period.DAY -> R.string.stats_previous_day
-                    Period.WEEK -> R.string.stats_previous_week
-                    Period.MONTH -> R.string.stats_previous_month
+                    Period.DAY -> if (s.selection.offset == 0) R.string.stats_so_far_day else R.string.stats_previous_day
+                    Period.WEEK -> if (s.selection.offset == 0) R.string.stats_so_far_week else R.string.stats_previous_week
+                    Period.MONTH -> if (s.selection.offset == 0) R.string.stats_so_far_month else R.string.stats_previous_month
                 },
             )
             Spacer(Modifier.height(8.dp))
@@ -359,4 +391,17 @@ private fun AppRow(app: AppTime, max: Long, total: Long, modifier: Modifier) {
             }
         }
     }
+}
+
+/** Totals and top apps only; the rest of the history never leaves the phone unless shared here. */
+private fun statsShareText(res: android.content.res.Resources, stats: PeriodStats): String {
+    val period = res.getString(
+        when (stats.selection.period) {
+            Period.DAY -> R.string.share_period_day
+            Period.WEEK -> R.string.share_period_week
+            Period.MONTH -> R.string.share_period_month
+        },
+    )
+    val top = stats.apps.take(3).joinToString(", ") { "${it.label} ${res.durationText(it.ms)}" }
+    return res.getString(R.string.share_stats, period, res.durationText(stats.totalMs), top)
 }

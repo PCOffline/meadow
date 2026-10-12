@@ -20,9 +20,14 @@ data class ProtectionState(
     val overlay: Boolean,
     val deviceAdmin: Boolean,
     val batteryUnrestricted: Boolean,
+    /** Lets Keeper hide notifications and stop media of resting apps. */
+    val notificationListener: Boolean = true,
 ) {
     /** The pieces without which limits cannot be enforced at all. */
-    val essentialsReady: Boolean get() = usageAccess && accessibility
+    val essentialsReady: Boolean get() = usageAccess && accessibility && notificationListener
+
+    /** Strict mode can't be left half-working: Android must not put Meadow to sleep, and Keeper must reach notifications. */
+    val strictReady: Boolean get() = batteryUnrestricted && notificationListener
 
     fun asMap(): Map<String, Boolean> = mapOf(
         "usageAccess" to usageAccess,
@@ -31,17 +36,19 @@ data class ProtectionState(
         "overlay" to overlay,
         "deviceAdmin" to deviceAdmin,
         "batteryUnrestricted" to batteryUnrestricted,
+        "notificationListener" to notificationListener,
     )
 
     companion object {
-        /** Protections whose loss Bumblebees hear about. Names match the backend's copy.ts. */
-        val REPORTED = listOf("usageAccess", "accessibility", "deviceAdmin")
+        /** Protections whose loss Bumblebees hear about, without hearing which one. */
+        val REPORTED = listOf("usageAccess", "accessibility", "deviceAdmin", "notificationListener")
     }
 }
 
 /**
- * Reads which protections are switched on and tells Bumblebees when one that matters is
- * switched off while limits are in place.
+ * Reads which protections are switched on and, when one that matters is switched off while
+ * limits are in place, tells Bumblebees only that Meadow may not be looking after the garden.
+ * What is switched on never leaves the phone.
  */
 class ProtectionMonitor(
     private val context: Context,
@@ -59,7 +66,11 @@ class ProtectionMonitor(
         deviceAdmin = isDeviceAdminActive(),
         batteryUnrestricted = context.getSystemService(PowerManager::class.java)
             .isIgnoringBatteryOptimizations(context.packageName),
+        notificationListener = isNotificationListenerEnabled(),
     )
+
+    fun isNotificationListenerEnabled(): Boolean =
+        context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context)
 
     fun adminComponent() = ComponentName(context, MeadowDeviceAdmin::class.java)
 
@@ -77,10 +88,9 @@ class ProtectionMonitor(
         }
     }
 
-    /** Compares with the last reported state, alerts Bumblebees on anything switched off. */
+    /** Compares with the last seen state, alerts Bumblebees on anything switched off. */
     fun check(override: ProtectionState? = null) {
-        // Protection status is only shared, and alerts only sent, while the person allows it.
-        if (!backendReady || !store.privacy.value.shareProtection) return
+        if (!backendReady) return
         val state = override ?: current()
         val map = state.asMap()
         val previous = store.lastReportedProtection
@@ -90,11 +100,8 @@ class ProtectionMonitor(
         val encoded = map.entries.joinToString(",") { "${it.key}=${if (it.value) 1 else 0}" }
         if (encoded == store.lastReportedProtection) return
         store.lastReportedProtection = encoded
-        scope.launch {
-            runCatchingCancellable { share.heartbeat(map) }
-            if (previous == null || store.limits.value.isEmpty()) return@launch
-            val lost = ProtectionState.REPORTED.filter { previous[it] == true && map[it] == false }
-            if (lost.isNotEmpty()) runCatchingCancellable { share.reportProtectionsLost(lost) }
-        }
+        if (previous == null || store.limits.value.isEmpty() || store.approverCount.value == 0) return
+        val lost = ProtectionState.REPORTED.any { previous[it] == true && map[it] == false }
+        if (lost) scope.launch { runCatchingCancellable { share.reportProtectionLost() } }
     }
 }

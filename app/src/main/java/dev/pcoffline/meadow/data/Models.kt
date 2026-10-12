@@ -2,13 +2,17 @@ package dev.pcoffline.meadow.data
 
 import kotlinx.serialization.Serializable
 
-/** A committed limit for one app. A value of 0 means "no limit" for that period. */
+/**
+ * A committed limit for one app. A value of 0 means "no limit" for that period; a null
+ * [schedule] means the app may be used at any hour.
+ */
 @Serializable
 data class AppLimit(
     val packageName: String,
     val appName: String,
     val dailyMinutes: Int,
     val weeklyMinutes: Int,
+    val schedule: Schedule? = null,
 )
 
 /** Extra minutes a Bumblebee granted for a single day. */
@@ -27,40 +31,47 @@ data class Avatar(val emoji: String, val color: String, val photoUrl: String?) {
     }
 }
 
-/** What someone shares with their Bumblebees. */
-data class Privacy(val shareUsage: Boolean = true, val shareProtection: Boolean = true)
+/** What someone shares with their Bumblebees. Protections and strict mode are never shared. */
+data class Privacy(val shareUsage: Boolean = true)
 
 /**
- * Owner-only: who looks after whom, and app preferences that follow the person between phones.
+ * Owner-only: who looks after whom, settings and status that follow the person between phones.
  * Nobody else can read it.
  */
 data class Account(
     val approverIds: List<String> = emptyList(),
     val approveeIds: List<String> = emptyList(),
+    /** Bumblebees being removed, with when it takes effect. */
+    val pendingRemovals: Map<String, Long> = emptyMap(),
+    val friendCode: String = "",
+    val strictMode: Boolean = false,
+    val privacy: Privacy = Privacy(),
+    val emergencyUntilMillis: Long = 0L,
+    val emergencyPackage: String? = null,
+    val emergencyUsesMillis: List<Long> = emptyList(),
     val theme: String? = null,
     val darkMode: String? = null,
     val acceptedTermsVersion: Int = 0,
 )
 
 /**
- * A person's profile. [approverIds] and [approveeIds] are only known for your own profile;
- * for anyone else they are empty, because those lists are private.
+ * A person. Everyone in a circle sees only the name card ([displayName], [avatar], [bio]); the
+ * rest is only known for your own profile, and empty or default for anyone else's.
  */
 data class UserProfile(
     val uid: String,
     val displayName: String,
     val avatar: Avatar,
     val bio: String,
-    val friendCode: String,
-    val approverIds: List<String>,
-    val approveeIds: List<String>,
-    val privacy: Privacy,
-    val strictMode: Boolean,
-    val protection: Map<String, Boolean>,
-    val lastHeartbeatMillis: Long?,
-    val emergencyUntilMillis: Long,
-    val emergencyPackage: String?,
-    val emergencyUsesMillis: List<Long>,
+    val friendCode: String = "",
+    val approverIds: List<String> = emptyList(),
+    val approveeIds: List<String> = emptyList(),
+    val pendingRemovals: Map<String, Long> = emptyMap(),
+    val privacy: Privacy = Privacy(),
+    val strictMode: Boolean = false,
+    val emergencyUntilMillis: Long = 0L,
+    val emergencyPackage: String? = null,
+    val emergencyUsesMillis: List<Long> = emptyList(),
 ) {
     /** Emergency unlocks still available in the rolling 30-day window. */
     val emergenciesLeft: Int
@@ -90,6 +101,8 @@ enum class RequestType(val wire: String) {
     EXTRA_TIME("extra_time"),
     CHANGE_LIMIT("change_limit"),
     REMOVE_LIMIT("remove_limit"),
+
+    /** Only on old requests: strict mode now turns off without asking. */
     DISABLE_STRICT_MODE("disable_strict_mode");
 
     companion object {
@@ -102,9 +115,21 @@ enum class RequestStatus(val wire: String) {
 
     companion object {
         fun fromWire(value: String?) = entries.firstOrNull { it.wire == value } ?: PENDING
+
+        /** Unanswered requests expire after this long; must match REQUEST_TTL_MS in requests.ts. */
+        const val TTL_MS = 30 * 60_000L
+
+        /** A pending request past its time counts as expired, even before the backend settles it. */
+        fun effective(status: RequestStatus, createdAtMillis: Long, now: Long = System.currentTimeMillis()) =
+            if (status == PENDING && createdAtMillis > 0L && now - createdAtMillis >= TTL_MS) EXPIRED else status
     }
 }
 
+/**
+ * A request, as its asker sees it ([approverIds] lists everyone asked) or as one Bumblebee sees
+ * their own copy (no [approverIds]; [myDecision] is their own answer, and an answer from someone
+ * else only shows as answered).
+ */
 data class LimitRequest(
     val id: String,
     val requesterId: String,
@@ -122,6 +147,15 @@ data class LimitRequest(
     val decisionNote: String?,
     val dayKey: String,
     val createdAtMillis: Long,
+    val schedule: Schedule? = null,
+    val requesterFlower: String = "🌼",
+    /** "yes" or "no" when this Bumblebee answered it themselves. */
+    val myDecision: String? = null,
+    val grantedMinutes: Int = 0,
+    val decidedAtMillis: Long = 0L,
+    /** Minutes spent on the app that day when asking, and minutes the day allowed in all. */
+    val usedMinutes: Int? = null,
+    val allowedMinutes: Int? = null,
 )
 
 enum class InviteStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }

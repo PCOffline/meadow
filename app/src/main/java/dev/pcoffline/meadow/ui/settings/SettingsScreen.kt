@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.data.ChangeOutcome
 import dev.pcoffline.meadow.data.Emergency
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.SecureAccountCard
@@ -59,7 +57,6 @@ import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.update.UpdateState
-import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -68,17 +65,17 @@ fun SettingsScreen(
     onOpenSetup: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenLegal: (LegalDoc) -> Unit,
+    onOpenTroubleshoot: () -> Unit = {},
 ) {
-    var confirmStrictOff by remember { mutableStateOf(false) }
-    var confirmSignOut by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var showEmergency by remember { mutableStateOf(false) }
+    var confirmStrictOff by rememberSaveable { mutableStateOf(false) }
+    var strictNeedsSetup by rememberSaveable { mutableStateOf(false) }
+    var confirmSignOut by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var showEmergency by rememberSaveable { mutableStateOf(false) }
     val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
     val action = rememberAction()
-    val hasBees = profile.approverIds.isNotEmpty()
     val strictOn = stringResource(R.string.settings_strict_on)
     val strictOff = stringResource(R.string.settings_strict_off_done)
-    val asked = stringResource(R.string.settings_strict_asked)
 
     Column(Modifier.fillMaxSize()) {
         BackTopBar(stringResource(R.string.action_settings), onBack = onBack)
@@ -95,8 +92,13 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_strict_title),
                     body = stringResource(R.string.settings_strict_body),
                     checked = profile.strictMode,
+                    enabled = !action.busy,
                     onChange = { on ->
-                        if (on) action.run(successMessage = strictOn) { AppGraph.social.setStrictMode(true) } else confirmStrictOff = true
+                        when {
+                            !on -> confirmStrictOff = true
+                            !AppGraph.protection.current().strictReady -> strictNeedsSetup = true
+                            else -> action.run(successMessage = strictOn) { AppGraph.social.setStrictMode(true) }
+                        }
                     },
                 )
             }
@@ -129,8 +131,9 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedButton(onClick = onOpenSetup, modifier = Modifier.padding(top = 8.dp)) {
-                    Text(stringResource(R.string.settings_protections_button))
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onOpenSetup) { Text(stringResource(R.string.settings_protections_button)) }
+                    TextButton(onClick = onOpenTroubleshoot) { Text(stringResource(R.string.trouble_button)) }
                 }
             }
 
@@ -157,17 +160,28 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmStrictOff = false },
             title = { Text(stringResource(R.string.settings_strict_off_title)) },
-            text = { Text(stringResource(if (hasBees) R.string.settings_strict_off_ask else R.string.settings_strict_off_now)) },
+            text = { Text(stringResource(R.string.settings_strict_off_now)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmStrictOff = false
-                    action.run {
-                        val outcome = AppGraph.social.setStrictMode(false)
-                        action.toast(if (outcome == ChangeOutcome.REQUESTED) asked else strictOff)
-                    }
-                }) { Text(stringResource(if (hasBees) R.string.settings_strict_off_ask_button else R.string.settings_strict_off_button)) }
+                    action.run(successMessage = strictOff) { AppGraph.social.setStrictMode(false) }
+                }) { Text(stringResource(R.string.settings_strict_off_button)) }
             },
             dismissButton = { TextButton(onClick = { confirmStrictOff = false }) { Text(stringResource(R.string.settings_strict_keep)) } },
+        )
+    }
+    if (strictNeedsSetup) {
+        AlertDialog(
+            onDismissRequest = { strictNeedsSetup = false },
+            title = { Text(stringResource(R.string.strict_needs_title)) },
+            text = { Text(stringResource(R.string.strict_needs_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    strictNeedsSetup = false
+                    onOpenSetup()
+                }) { Text(stringResource(R.string.settings_protections_button)) }
+            },
+            dismissButton = { TextButton(onClick = { strictNeedsSetup = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     if (confirmSignOut) {
@@ -238,14 +252,6 @@ private fun PrivacyCard(profile: UserProfile) {
             enabled = !action.busy,
             onChange = { on -> action.run(successMessage = saved) { AppGraph.profiles.setPrivacy(privacy.copy(shareUsage = on)) } },
         )
-        Spacer(Modifier.height(8.dp))
-        SwitchRow(
-            title = stringResource(R.string.settings_share_protection),
-            body = stringResource(R.string.settings_share_protection_body),
-            checked = privacy.shareProtection,
-            enabled = !action.busy,
-            onChange = { on -> action.run(successMessage = saved) { AppGraph.profiles.setPrivacy(privacy.copy(shareProtection = on)) } },
-        )
         ErrorNote(action.error)
     }
 }
@@ -256,7 +262,6 @@ private fun UpdatesCard() {
     val updater = AppGraph.updater
     val state by updater.state.collectAsStateWithLifecycle()
     val auto by AppGraph.store.autoUpdate.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     var needsPermission by remember { mutableStateOf(false) }
 
     MeadowCard(Modifier.fillMaxWidth()) {
@@ -301,7 +306,7 @@ private fun UpdatesCard() {
                     }) { Text(stringResource(R.string.settings_updates_allow_button)) }
                 }
                 Button(onClick = {
-                    if (updater.canInstall()) scope.launch { updater.install(s.update) } else needsPermission = true
+                    if (updater.canInstall()) updater.startInstall(s.update) else needsPermission = true
                 }) { Text(stringResource(R.string.settings_updates_install)) }
             }
             is UpdateState.Downloading -> {
@@ -313,7 +318,7 @@ private fun UpdatesCard() {
         }
         val busy = state is UpdateState.Checking || state is UpdateState.Downloading || state is UpdateState.Installing
         if (state !is UpdateState.Available) {
-            OutlinedButton(onClick = { scope.launch { updater.check() } }, enabled = !busy, modifier = Modifier.padding(top = 4.dp)) {
+            OutlinedButton(onClick = { updater.checkInBackground() }, enabled = !busy, modifier = Modifier.padding(top = 4.dp)) {
                 Text(stringResource(R.string.settings_updates_check))
             }
         }

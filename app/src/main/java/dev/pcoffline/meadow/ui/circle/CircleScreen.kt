@@ -68,9 +68,9 @@ import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
-import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.relativeTime
+import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -80,7 +80,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 
-private const val STALE_HEARTBEAT_MS = 6 * 60 * 60_000L
 
 class CircleViewModel(uid: String) : ViewModel() {
     private val profile = AppGraph.sync.profile.mapNotNull { (it as? ProfileState.Ready)?.profile }
@@ -151,18 +150,19 @@ fun CircleContent(
         }
 
         item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
-        if (bumblebees.isEmpty() && outgoing.isEmpty()) {
+        // Judged by the profile, which is already here, so it doesn't flash while friends load.
+        if (profile.approverIds.isEmpty() && bumblebees.isEmpty() && outgoing.isEmpty()) {
             item { EmptyState("🐝", stringResource(R.string.circle_no_bees_title), stringResource(R.string.circle_no_bees_body)) }
         }
         items(bumblebees, key = { "bee-" + it.uid }) { bee ->
-            BumblebeeRow(bee, others = bumblebees.size - 1, modifier = Modifier.animateItem()) {
+            BumblebeeRow(bee, leavingAt = profile.pendingRemovals[bee.uid], modifier = Modifier.animateItem()) {
                 onOpenChat(ChatRepository.chatIdFor(profile.uid, bee.uid))
             }
         }
         items(outgoing, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
 
         item { SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(horizontal = 20.dp)) }
-        if (lookingAfter.isEmpty()) {
+        if (profile.approveeIds.isEmpty() && lookingAfter.isEmpty()) {
             item {
                 Text(
                     stringResource(R.string.circle_looking_after_empty),
@@ -327,25 +327,38 @@ private fun OutgoingInvite(invite: Invite, modifier: Modifier) {
 }
 
 @Composable
-private fun BumblebeeRow(bee: UserProfile, others: Int, modifier: Modifier, onChat: () -> Unit) {
+private fun BumblebeeRow(bee: UserProfile, leavingAt: Long?, modifier: Modifier, onChat: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
-    var confirm by remember { mutableStateOf(false) }
+    var confirm by rememberSaveable { mutableStateOf(false) }
     val action = rememberAction()
-    val removed = stringResource(R.string.circle_bee_removed, bee.displayName)
+    val removing = stringResource(R.string.circle_bee_removing, bee.displayName)
+    val kept = stringResource(R.string.circle_bee_kept, bee.displayName)
     Column(modifier) {
         Row(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             PersonAvatar(bee.avatar)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(bee.displayName, style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.circle_bee_role), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    leavingAt?.let { stringResource(R.string.circle_bee_leaving, durationText(it - System.currentTimeMillis())) }
+                        ?: stringResource(R.string.circle_bee_role),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (leavingAt != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (leavingAt != null) {
+                TextButton(onClick = { action.run(successMessage = kept) { AppGraph.social.cancelRemoval(bee.uid) } }, enabled = !action.busy) {
+                    Text(stringResource(R.string.circle_bee_keep))
+                }
             }
             IconButton(onClick = onChat) {
                 Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, bee.displayName))
             }
             IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.action_remove)) }, onClick = { menu = false; confirm = true })
+                if (leavingAt == null) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.action_remove)) }, onClick = { menu = false; confirm = true })
+                }
             }
         }
         ErrorNote(action.error, Modifier.padding(horizontal = 20.dp))
@@ -354,16 +367,11 @@ private fun BumblebeeRow(bee: UserProfile, others: Int, modifier: Modifier, onCh
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text(stringResource(R.string.circle_remove_title, bee.displayName)) },
-            text = {
-                Text(
-                    if (others > 0) stringResource(R.string.circle_remove_body_others, bee.displayName)
-                    else stringResource(R.string.circle_remove_body_last, bee.displayName),
-                )
-            },
+            text = { Text(stringResource(R.string.circle_remove_body_delayed, bee.displayName)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirm = false
-                    action.run(successMessage = removed) { AppGraph.social.removeApprover(bee.uid) }
+                    action.run(successMessage = removing) { AppGraph.social.removeApprover(bee.uid) }
                 }) { Text(stringResource(R.string.action_remove)) }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.action_keep)) } },
@@ -373,8 +381,7 @@ private fun BumblebeeRow(bee: UserProfile, others: Int, modifier: Modifier, onCh
 
 @Composable
 private fun GardenRow(friend: UserProfile, modifier: Modifier, onClick: () -> Unit) {
-    val stale = friend.lastHeartbeatMillis?.let { System.currentTimeMillis() - it > STALE_HEARTBEAT_MS } ?: false
-    val unprotected = friend.protection["accessibility"] == false || friend.protection["usageAccess"] == false
+    // Only the name card: how their phone is set up is theirs to know.
     MeadowCard(modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonAvatar(friend.avatar)
@@ -382,16 +389,11 @@ private fun GardenRow(friend: UserProfile, modifier: Modifier, onClick: () -> Un
             Column(Modifier.weight(1f)) {
                 Text(friend.displayName, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    friend.lastHeartbeatMillis?.let { stringResource(R.string.circle_last_seen, relativeTime(it)) }
-                        ?: stringResource(R.string.circle_not_seen),
+                    friend.bio.ifBlank { stringResource(R.string.circle_garden_role) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
                 )
-            }
-            when {
-                unprotected -> Pill(stringResource(R.string.circle_status_unprotected), MaterialTheme.colorScheme.errorContainer)
-                stale -> Pill(stringResource(R.string.circle_status_quiet), MaterialTheme.colorScheme.tertiaryContainer)
-                else -> Pill(stringResource(R.string.circle_status_blooming), MaterialTheme.colorScheme.primaryContainer)
             }
         }
     }
