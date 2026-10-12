@@ -3,8 +3,6 @@ package dev.pcoffline.meadow.data
 import com.google.firebase.auth.ActionCodeSettings
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.EmailAuthProvider
-import com.google.firebase.auth.GoogleAuthProvider
-import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import com.google.firebase.auth.FirebaseAuth
@@ -76,14 +74,6 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         _anonymous.value = false
     }
 
-    /**
-     * Signs in with a Google ID token. A garden started without an email keeps everything:
-     * the Google account is attached to it instead of starting a new one.
-     */
-    suspend fun continueWithGoogle(idToken: String) {
-        signInOrAttach(GoogleAuthProvider.getCredential(idToken, null))
-    }
-
     /** Emails a one-time sign-in link: no password needed. */
     suspend fun sendSignInLink(email: String) {
         val address = email.trim()
@@ -117,7 +107,10 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
     /** The email a link was sent to from this phone, if any. */
     val linkEmail: String? get() = store.pendingLinkEmail
 
-    /** Uses a sign-in link. [email] must be the address it was sent to. */
+    /**
+     * Uses a sign-in link. [email] must be the address it was sent to. A garden started without
+     * an email keeps everything: the address is attached to it instead of starting a new one.
+     */
     suspend fun finishSignInLink(link: String, email: String) {
         signInOrAttach(EmailAuthProvider.getCredentialWithLink(email.trim(), link))
         store.pendingLinkEmail = null
@@ -158,7 +151,5 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
             }
         }
         backend.auth.signOut()
-        // Forget the Google account choice too, so the next sign-in can pick another.
-        runCatchingCancellable { GoogleSignIn.forget(AppGraph.app) }
     }
 }

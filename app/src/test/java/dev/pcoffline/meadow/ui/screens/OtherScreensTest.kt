@@ -60,10 +60,9 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `returning gardeners can use Google, an emailed link, or a password`() {
+    fun `returning gardeners can use an emailed link or a password`() {
         show { AuthScreen() }
         node(R.string.intro_have_garden).performClick()
-        node(R.string.auth_google).assertIsEnabled()
         val link = node(R.string.auth_email_link)
         link.assertIsNotEnabled()
         compose.onNode(hasSetTextAction() and hasText(text(R.string.field_email))).performTextInput("robin@example.com")
@@ -82,10 +81,9 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `a garden without an email can be kept with Google, a link or a password`() {
+    fun `a garden without an email can be kept with a link or a password`() {
         show { dev.pcoffline.meadow.ui.auth.SecureAccountCard(R.string.settings_secure_reason) }
         node(R.string.secure_title).assertExists()
-        node(R.string.auth_google).assertExists()
         node(R.string.auth_email_link).assertExists()
         node(R.string.auth_password_instead).performClick()
         node(R.string.secure_button).assertExists()

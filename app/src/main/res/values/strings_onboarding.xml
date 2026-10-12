@@ -22,8 +22,6 @@
     <string name="sign_in_busy">Signing in…</string>
     <string name="sign_in_forgot">Forgot your password?</string>
     <string name="sign_in_reset_sent">Check your inbox for a reset link 💌</string>
-    <string name="auth_google">Continue with Google</string>
-    <string name="auth_or">or</string>
     <string name="auth_email_link">Email me a sign-in link</string>
     <string name="auth_email_link_sent">Check your inbox at %1$s and tap the link to sign in 💌</string>
     <string name="auth_password_instead">Use a password instead</string>

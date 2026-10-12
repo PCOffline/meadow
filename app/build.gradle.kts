@@ -154,9 +154,6 @@ dependencies {
     implementation(libs.firebase.functions)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
-    implementation(libs.androidx.credentials)
-    implementation(libs.androidx.credentials.play.services)
-    implementation(libs.googleid)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)
 

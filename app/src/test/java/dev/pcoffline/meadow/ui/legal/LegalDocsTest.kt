@@ -61,7 +61,7 @@ class LegalDocsTest {
     @Test
     fun `the privacy notice covers what the app actually does`() {
         val notice = read(LegalDoc.PRIVACY).lowercase()
-        listOf("bumblebee", "usage", "accessibility", "github", "delete", "download", "firebase", "photo", "children", "google", "sign-in link")
+        listOf("bumblebee", "usage", "accessibility", "github", "delete", "download", "firebase", "photo", "children", "sign-in link")
             .forEach { assertTrue("The privacy notice should mention \"$it\"", it in notice) }
     }
 

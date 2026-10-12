@@ -52,14 +52,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import dev.pcoffline.meadow.data.GoogleSignIn
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.AlertDialog
-import androidx.compose.foundation.Image
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -332,8 +326,8 @@ private fun SignInStep(onBack: () -> Unit) {
 }
 
 /**
- * The ways into a garden: Google, a link emailed to you (no password), or a password. Used to
- * sign in, and to keep a garden started without an email: then they attach to that garden.
+ * The ways into a garden: a link emailed to you (no password), or a password. Used to sign in,
+ * and to keep a garden started without an email: then they attach to that garden.
  */
 @Composable
 private fun SignInOptions(
@@ -342,7 +336,6 @@ private fun SignInOptions(
     offerPasswordReset: Boolean,
     onPassword: suspend (email: String, password: String) -> Unit,
 ) {
-    val context = LocalContext.current
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var usePassword by rememberSaveable { mutableStateOf(false) }
@@ -351,25 +344,6 @@ private fun SignInOptions(
     val resetSent = stringResource(R.string.sign_in_reset_sent)
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedButton(
-            onClick = { action.run { AppGraph.auth.continueWithGoogle(GoogleSignIn.idToken(context)) } },
-            enabled = !action.busy,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) {
-            Image(painterResource(R.drawable.ic_google), contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text(stringResource(R.string.auth_google))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            HorizontalDivider(Modifier.weight(1f))
-            Text(
-                stringResource(R.string.auth_or),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-            HorizontalDivider(Modifier.weight(1f))
-        }
         OutlinedTextField(
             value = email, onValueChange = { email = it; sentTo = null },
             label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
@@ -414,7 +388,7 @@ private fun SignInOptions(
     }
 }
 
-/** Keeps a garden started without an email: attaches Google, an email link or a password to it. */
+/** Keeps a garden started without an email: attaches an email link or a password to it. */
 @Composable
 fun SecureAccountCard(@StringRes reason: Int, modifier: Modifier = Modifier) {
     MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {

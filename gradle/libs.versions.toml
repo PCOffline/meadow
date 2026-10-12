@@ -16,8 +16,6 @@ junit = "4.13.2"
 coil = "3.2.0"
 robolectric = "4.14.1"
 markdownRenderer = "0.34.0"
-credentials = "1.5.0"
-googleId = "1.1.1"
 jetbrainsMarkdown = "0.7.3"
 androidxTestCore = "1.6.1"
 androidxTestExt = "1.2.1"
@@ -58,9 +56,6 @@ androidx-test-orchestrator = { group = "androidx.test", name = "orchestrator", v
 compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
-androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
-googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleId" }
 markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 jetbrains-markdown = { group = "org.jetbrains", name = "markdown", version.ref = "jetbrainsMarkdown" }
 konfetti-compose = { group = "nl.dionsegijn", name = "konfetti-compose", version.ref = "konfetti" }
