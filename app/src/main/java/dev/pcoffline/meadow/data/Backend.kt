@@ -24,6 +24,12 @@ class Backend {
     /** Owner-only document: who looks after whom, push tokens and preferences. */
     fun account(uid: String) = user(uid).collection("private").document("account")
 
+    /** Write-only: when this phone last checked in. Nobody can read it but the backend. */
+    fun heartbeat(uid: String) = db.collection("heartbeats").document(uid)
+
+    /** One Bumblebee's own copies of the requests sent to them. */
+    fun inbox(uid: String) = user(uid).collection("inbox")
+
     /**
      * Calls an HTTPS callable Cloud Function, turning its error into a readable message.
      * [timeoutSeconds] must cover the function's own timeout, or a slow call looks like being offline.

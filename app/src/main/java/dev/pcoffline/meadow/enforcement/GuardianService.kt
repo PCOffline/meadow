@@ -70,6 +70,8 @@ class GuardianService : Service() {
                 if (tick % 12 == 0) {
                     updateSummary()
                     AppGraph.protection.check()
+                    // Apps that started resting since (their hours ended) go quiet too.
+                    MeadowNotificationListener.sweepAll()
                 }
             }.onFailure { Log.w(TAG, "Guardian tick failed", it) }
             tick++
@@ -99,6 +101,7 @@ class GuardianService : Service() {
         if (last != null && last.first == pkg && now - last.second < if (canShow) 4_000L else 60_000L) return
         lastBlocked = pkg to now
         if (canShow) BlockActivity.launch(this, pkg) else AppGraph.notifier.timeUp(budget)
+        MeadowNotificationListener.rest(this, pkg)
     }
 
     private fun updateSummary() {

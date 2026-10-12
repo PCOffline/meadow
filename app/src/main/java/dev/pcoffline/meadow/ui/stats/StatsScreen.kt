@@ -34,6 +34,12 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.Share
+import dev.pcoffline.meadow.ui.components.ShareDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -167,12 +173,21 @@ fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel {
 /** The statistics, drawn from plain state (also used for previews and screenshots). */
 @Composable
 fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: (Int) -> Unit = {}, onOpenSetup: () -> Unit = {}) {
+    var sharing by rememberSaveable { mutableStateOf(false) }
+    val res = LocalContext.current.resources
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Text(
-            stringResource(R.string.stats_title),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.asHeading().padding(start = 20.dp, top = 16.dp, end = 20.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 8.dp)) {
+            Text(
+                stringResource(R.string.stats_title),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.asHeading().weight(1f),
+            )
+            if (state.stats != null && state.stats.totalMs > 0) {
+                IconButton(onClick = { sharing = true }) {
+                    Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.share_title))
+                }
+            }
+        }
         Text(
             stringResource(R.string.stats_subtitle),
             style = MaterialTheme.typography.bodyMedium,
@@ -190,6 +205,7 @@ fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: 
                 }
             }
         }
+        if (sharing) state.stats?.let { ShareDialog(statsShareText(res, it), onDismiss = { sharing = false }) }
         if (!state.hasPermission) {
             EmptyState(
                 "📊",
@@ -375,4 +391,17 @@ private fun AppRow(app: AppTime, max: Long, total: Long, modifier: Modifier) {
             }
         }
     }
+}
+
+/** Totals and top apps only; the rest of the history never leaves the phone unless shared here. */
+private fun statsShareText(res: android.content.res.Resources, stats: PeriodStats): String {
+    val period = res.getString(
+        when (stats.selection.period) {
+            Period.DAY -> R.string.share_period_day
+            Period.WEEK -> R.string.share_period_week
+            Period.MONTH -> R.string.share_period_month
+        },
+    )
+    val top = stats.apps.take(3).joinToString(", ") { "${it.label} ${res.durationText(it.ms)}" }
+    return res.getString(R.string.share_stats, period, res.durationText(stats.totalMs), top)
 }

@@ -71,6 +71,7 @@ import dev.pcoffline.meadow.ui.components.SleepyZs
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
 import dev.pcoffline.meadow.ui.minutesText
+import dev.pcoffline.meadow.ui.opensAtText
 import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -257,6 +258,9 @@ private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Uni
                 state.unlocked && budget.emergency ->
                     stringResource(R.string.rest_body_emergency, state.appName, durationText(budget.emergencyUntilMillis - System.currentTimeMillis()))
                 state.unlocked -> stringResource(R.string.rest_body_yes, durationText(budget.remainingMs))
+                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                    ?.let { stringResource(R.string.rest_body_hours, state.appName, opensAtText(it)) }
+                    ?: stringResource(R.string.rest_body_hours_closed, state.appName)
                 budget.weeklyIsTighter -> stringResource(R.string.rest_body_week, minutesText(budget.limit.weeklyMinutes))
                 else -> stringResource(R.string.rest_body_today, minutesText(budget.limit.dailyMinutes))
             },

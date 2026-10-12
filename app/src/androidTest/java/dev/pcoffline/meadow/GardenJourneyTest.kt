@@ -142,7 +142,8 @@ class GardenJourneyTest {
             compose.assertAccessible(compose.density)
             val shareUsage = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage)))
             shareUsage.performScrollTo().assertIsOn().performClick()
-            waitForBackend("users/$uid") { doc ->
+            // Privacy choices are owner-only, so they live on the private account.
+            waitForBackend("users/$uid/private/account") { doc ->
                 doc.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
                     .getJSONObject("shareUsage").getBoolean("booleanValue").not()
             }

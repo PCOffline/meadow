@@ -57,33 +57,45 @@ fun DocumentSnapshot.toAvatar() = Avatar(
     photoUrl = getString("photoUrl"),
 )
 
-/** Someone's public profile. Pass [account] for your own profile to fill in the private lists. */
-fun DocumentSnapshot.toProfile(account: Account? = null) = UserProfile(
-    uid = id,
-    displayName = getString("displayName") ?: "Friend",
-    avatar = toAvatar(),
-    bio = getString("bio").orEmpty(),
-    friendCode = getString("friendCode") ?: "",
-    approverIds = account?.approverIds.orEmpty(),
-    approveeIds = account?.approveeIds.orEmpty(),
-    privacy = Privacy(
-        shareUsage = getBoolean("privacy.shareUsage") ?: true,
-        shareProtection = getBoolean("privacy.shareProtection") ?: true,
-    ),
-    strictMode = getBoolean("strictMode") ?: false,
-    protection = (get("protection") as? Map<*, *>)?.entries
-        ?.mapNotNull { (k, v) -> if (k is String && v is Boolean) k to v else null }
-        ?.toMap() ?: emptyMap(),
-    lastHeartbeatMillis = getTimestamp("lastHeartbeat")?.toDate()?.time,
-    emergencyUntilMillis = getTimestamp("emergencyUntil")?.toDate()?.time ?: 0L,
-    emergencyPackage = getString("emergencyPackage"),
-    emergencyUsesMillis = (get("emergencyUses") as? List<*>)?.filterIsInstance<Timestamp>()?.map { it.toDate().time }
-        ?: emptyList(),
-)
+/**
+ * Someone's name card. Pass [account] (your own account doc) for your own profile: private
+ * settings and status live there. Profiles not yet migrated still carry them, so fall back.
+ */
+fun DocumentSnapshot.toProfile(account: DocumentSnapshot? = null): UserProfile {
+    val acc = account?.takeIf { it.exists() }?.toAccount()
+    val own = account != null
+    fun <T> pick(field: String, read: DocumentSnapshot.(String) -> T?): T? =
+        account?.takeIf { it.exists() && it.contains(field) }?.read(field) ?: if (own) read(field) else null
+    return UserProfile(
+        uid = id,
+        displayName = getString("displayName") ?: "Friend",
+        avatar = toAvatar(),
+        bio = getString("bio").orEmpty(),
+        friendCode = pick("friendCode") { getString(it) }.orEmpty(),
+        approverIds = acc?.approverIds.orEmpty(),
+        approveeIds = acc?.approveeIds.orEmpty(),
+        pendingRemovals = acc?.pendingRemovals.orEmpty(),
+        privacy = Privacy(shareUsage = pick("privacy") { getBoolean("privacy.shareUsage") } ?: true),
+        strictMode = pick("strictMode") { getBoolean(it) } ?: false,
+        emergencyUntilMillis = pick("emergencyUntil") { getTimestamp(it)?.toDate()?.time } ?: 0L,
+        emergencyPackage = pick("emergencyPackage") { getString(it) },
+        emergencyUsesMillis = pick("emergencyUses") { timestampList(it) }.orEmpty(),
+    )
+}
+
+fun DocumentSnapshot.timestampList(field: String): List<Long> =
+    (get(field) as? List<*>)?.filterIsInstance<Timestamp>()?.map { it.toDate().time } ?: emptyList()
 
 fun DocumentSnapshot.toAccount() = Account(
     approverIds = stringList("approverIds"),
     approveeIds = stringList("approveeIds"),
+    pendingRemovals = timestampMap("pendingRemovals"),
+    friendCode = getString("friendCode").orEmpty(),
+    strictMode = getBoolean("strictMode") ?: false,
+    privacy = Privacy(shareUsage = getBoolean("privacy.shareUsage") ?: true),
+    emergencyUntilMillis = getTimestamp("emergencyUntil")?.toDate()?.time ?: 0L,
+    emergencyPackage = getString("emergencyPackage"),
+    emergencyUsesMillis = timestampList("emergencyUses"),
     theme = getString("theme"),
     darkMode = getString("darkMode"),
     acceptedTermsVersion = (getLong("acceptedTerms.version") ?: 0L).toInt(),
@@ -94,6 +106,7 @@ fun DocumentSnapshot.toLimit() = AppLimit(
     appName = getString("appName") ?: id,
     dailyMinutes = int("dailyMinutes"),
     weeklyMinutes = int("weeklyMinutes"),
+    schedule = Schedule.fromFirestore(get("schedule")),
 )
 
 fun DocumentSnapshot.toGrant() = Grant(
@@ -103,8 +116,9 @@ fun DocumentSnapshot.toGrant() = Grant(
     dayKey = getString("dayKey") ?: "",
 )
 
+/** A request doc (as its asker) or an inbox copy (as one Bumblebee), keyed by the request's id. */
 fun DocumentSnapshot.toRequest() = LimitRequest(
-    id = id,
+    id = getString("requestId") ?: id,
     requesterId = getString("requesterId") ?: "",
     requesterName = getString("requesterName") ?: "Friend",
     type = RequestType.fromWire(getString("type")),
@@ -120,6 +134,11 @@ fun DocumentSnapshot.toRequest() = LimitRequest(
     decisionNote = getString("decisionNote"),
     dayKey = getString("dayKey") ?: "",
     createdAtMillis = millis("createdAt"),
+    schedule = Schedule.fromFirestore(get("schedule")),
+    requesterFlower = getString("requesterFlower") ?: "🌼",
+    myDecision = getString("myDecision"),
+    grantedMinutes = int("grantedMinutes"),
+    decidedAtMillis = millis("decidedAt"),
 )
 
 fun DocumentSnapshot.toInvite() = Invite(

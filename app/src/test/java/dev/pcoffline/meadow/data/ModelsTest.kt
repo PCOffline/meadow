@@ -11,8 +11,8 @@ class ModelsTest {
 
     private fun profile(uses: List<Long>) = UserProfile(
         uid = "me", displayName = "Sam", avatar = Avatar.Default, bio = "", friendCode = "ABC234",
-        approverIds = emptyList(), approveeIds = emptyList(), privacy = Privacy(), strictMode = false, protection = emptyMap(),
-        lastHeartbeatMillis = null, emergencyUntilMillis = 0L, emergencyPackage = null, emergencyUsesMillis = uses,
+        approverIds = emptyList(), approveeIds = emptyList(), privacy = Privacy(), strictMode = false,
+        emergencyUntilMillis = 0L, emergencyPackage = null, emergencyUsesMillis = uses,
     )
 
     @Test

@@ -58,6 +58,11 @@ import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.ticker
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
+import dev.pcoffline.meadow.ui.opensAtText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -70,6 +75,8 @@ data class GardenState(
     val todayTotalMs: Long = 0L,
     val appsUsed: Int = 0,
     val essentialsReady: Boolean = true,
+    /** Android may put Meadow to sleep to save battery. */
+    val batteryRestricted: Boolean = false,
     val loaded: Boolean = false,
 )
 
@@ -81,13 +88,15 @@ class GardenViewModel : ViewModel() {
         ticker(30_000L),
     ) { _, _, _, _ ->
         val usage = AppGraph.catalog.userFacing(AppGraph.engine.todayUsage())
+        val protection = AppGraph.protection.current()
         GardenState(
             // A steady order: sorting by time left would shuffle the rows (and replay their
             // sprouting) every time one app's remaining time passed another's.
             budgets = AppGraph.engine.budgets().sortedBy { it.limit.appName.lowercase() },
             todayTotalMs = usage.values.sum(),
             appsUsed = usage.size,
-            essentialsReady = AppGraph.protection.current().essentialsReady,
+            essentialsReady = protection.essentialsReady,
+            batteryRestricted = !protection.batteryUnrestricted,
             loaded = true,
         )
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, GardenState())
@@ -102,10 +111,17 @@ fun GardenScreen(
     onPlantLimit: () -> Unit,
     onOpenLimit: (String) -> Unit,
     onOpenCircle: () -> Unit,
+    onOpenTroubleshoot: () -> Unit = {},
     viewModel: GardenViewModel = viewModel { GardenViewModel() },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    GardenContent(profile, state, onOpenSettings, onOpenProfile, onOpenSetup, onPlantLimit, onOpenLimit, onOpenCircle)
+    var askFor by rememberSaveable { mutableStateOf<String?>(null) }
+    GardenContent(
+        profile, state, onOpenSettings, onOpenProfile, onOpenSetup, onPlantLimit, onOpenLimit, onOpenCircle,
+        onOpenTroubleshoot = onOpenTroubleshoot,
+        onAsk = { askFor = it },
+    )
+    askFor?.let { AskForTimeDialog(packageName = it, onDismiss = { askFor = null }) }
 }
 
 /** The garden itself, drawn from plain state (also used for previews and screenshots). */
@@ -119,7 +135,10 @@ fun GardenContent(
     onPlantLimit: () -> Unit = {},
     onOpenLimit: (String) -> Unit = {},
     onOpenCircle: () -> Unit = {},
+    onOpenTroubleshoot: () -> Unit = {},
+    onAsk: (String) -> Unit = {},
 ) {
+    val canAsk = profile.approverIds.isNotEmpty()
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             // One item, so no gap is left when there's no emergency unlock to show.
@@ -136,6 +155,16 @@ fun GardenContent(
                     text = stringResource(R.string.garden_notice_setup),
                     action = stringResource(R.string.garden_notice_setup_action),
                     onClick = onOpenSetup,
+                )
+            }
+        }
+        if (state.essentialsReady && state.batteryRestricted) {
+            item {
+                Notice(
+                    emoji = "🔋",
+                    text = stringResource(R.string.garden_notice_battery),
+                    action = stringResource(R.string.trouble_button),
+                    onClick = onOpenTroubleshoot,
                 )
             }
         }
@@ -178,7 +207,11 @@ fun GardenContent(
         items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
             Row(Modifier.animateItem().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { budget ->
-                    FlowerTile(budget, Modifier.weight(1f)) { onOpenLimit(budget.limit.packageName) }
+                    FlowerTile(
+                        budget,
+                        Modifier.weight(1f),
+                        onAsk = if (canAsk && !budget.emergency) ({ onAsk(budget.limit.packageName) }) else null,
+                    ) { onOpenLimit(budget.limit.packageName) }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -231,7 +264,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
 }
 
 @Composable
-private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Unit) {
+private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {
     val garden = Garden.colors
     val color = remember(budget.limit.packageName) {
         garden.petals[(budget.limit.packageName.hashCode() and 0x7fffffff) % garden.petals.size]
@@ -253,6 +286,9 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Uni
         Text(
             when {
                 budget.emergency -> stringResource(R.string.garden_tile_emergency)
+                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                    ?.let { stringResource(R.string.garden_tile_resting_until, opensAtText(it)) }
+                    ?: stringResource(R.string.garden_tile_resting_hours)
                 budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)
                 budget.exhausted -> stringResource(R.string.garden_tile_resting_today)
                 budget.weeklyIsTighter -> stringResource(R.string.garden_tile_left_week, durationText(budget.remainingMs))
@@ -271,6 +307,11 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onClick: () -> Uni
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
             )
+        }
+        if (onAsk != null) {
+            TextButton(onClick = onAsk, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(stringResource(R.string.garden_tile_ask), style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }

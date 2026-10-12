@@ -163,7 +163,8 @@ fun ChatScreen(
 
 /**
  * A conversation, drawn from plain state (also used for previews and screenshots).
- * [requestCard] shows a request message; by default it follows the live request.
+ * [requestCard] shows a request message (with whether you asked it); by default it follows the
+ * live request.
  */
 @Composable
 fun ChatContent(
@@ -173,7 +174,7 @@ fun ChatContent(
     loading: Boolean = false,
     onSend: (String) -> Unit = {},
     onBack: () -> Unit = {},
-    requestCard: @Composable (requestId: String) -> Unit = { RequestMessage(it, profile.uid) },
+    requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -203,7 +204,7 @@ fun ChatContent(
             items(messages, key = { it.id }) { message ->
                 Box(Modifier.animateItem()) {
                     when (message.kind) {
-                        MessageKind.REQUEST -> message.requestId?.let { requestCard(it) }
+                        MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
                         MessageKind.SYSTEM -> SystemMessage(message)
                         MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
                     }
@@ -271,13 +272,15 @@ private fun SystemMessage(message: ChatMessage) {
     )
 }
 
-class RequestMessageViewModel(requestId: String) : ViewModel() {
-    val request: StateFlow<LimitRequest?> = AppGraph.requests.observe(requestId).stateWhileVisible(this, null)
+class RequestMessageViewModel(requestId: String, myUid: String, mine: Boolean) : ViewModel() {
+    val request: StateFlow<LimitRequest?> =
+        (if (mine) AppGraph.requests.observe(requestId) else AppGraph.requests.observeInbox(myUid, requestId))
+            .stateWhileVisible(this, null)
 }
 
 @Composable
-private fun RequestMessage(requestId: String, myUid: String) {
-    val viewModel = viewModel(key = "request-$requestId") { RequestMessageViewModel(requestId) }
+private fun RequestMessage(requestId: String, myUid: String, mine: Boolean) {
+    val viewModel = viewModel(key = "request-$requestId") { RequestMessageViewModel(requestId, myUid, mine) }
     val request by viewModel.request.collectAsStateWithLifecycle()
     request?.let { RequestCard(it, myUid, modifier = Modifier.padding(horizontal = 12.dp), compact = true) }
 }

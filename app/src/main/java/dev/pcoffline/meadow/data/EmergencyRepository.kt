@@ -93,7 +93,7 @@ class EmergencyRepository(
             return
         }
         val uid = backend.uid ?: return
-        withTimeoutOrNull(8_000L) { backend.user(uid).update("emergencyUntil", FieldValue.serverTimestamp()).await() }
+        withTimeoutOrNull(8_000L) { backend.account(uid).update("emergencyUntil", FieldValue.serverTimestamp()).await() }
     }
 
     companion object {

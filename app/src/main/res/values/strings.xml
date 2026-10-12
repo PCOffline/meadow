@@ -76,4 +76,6 @@
     <string name="update_failed_check">Couldn\'t check for updates just now. Please try again later.</string>
     <string name="update_failed_install">Android couldn\'t install the update. Please try again.</string>
     <string name="update_cancelled">Update cancelled.</string>
+
+    <string name="error_strict_needs_setup">Strict mode needs unrestricted battery and notification access first.</string>
 </resources>

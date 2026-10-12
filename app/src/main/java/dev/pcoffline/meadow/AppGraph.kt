@@ -46,7 +46,7 @@ object AppGraph {
     val sync by lazy { SyncManager(backend, auth, store, scope) }
     val requests by lazy { RequestRepository(backend) }
     val limits by lazy { LimitsRepository(backend, store, requests) }
-    val social by lazy { SocialRepository(backend, store, requests) }
+    val social by lazy { SocialRepository(backend) { protection.current().strictReady } }
     val chats by lazy { ChatRepository(backend) }
     val share by lazy { UsageShareRepository(backend) }
     val tracker by lazy { UsageTracker(app) }

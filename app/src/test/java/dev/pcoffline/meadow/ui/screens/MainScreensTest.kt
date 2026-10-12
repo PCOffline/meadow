@@ -147,7 +147,7 @@ class MainScreensTest : ScreenTest() {
     fun `chat shows the conversation and sends what you type`() {
         val sent = mutableListOf<String>()
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { sent += it }, requestCard = { Text("Request $it") })
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { sent += it }, requestCard = { id, _ -> Text("Request $id") })
         }
         compose.onNodeWithText("Thank you! 💛").assertExists()
         compose.onNodeWithText("Request r1").assertExists()

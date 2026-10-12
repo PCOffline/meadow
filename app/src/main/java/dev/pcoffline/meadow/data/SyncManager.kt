@@ -76,14 +76,14 @@ class SyncManager(
         _accountConfirmed.value = false
         var tokenRegistered = false
         var appearanceSynced = false
-        // The public profile plus the owner-only account (who looks after whom, preferences).
+        // The name card plus the owner-only account (who looks after whom, settings, status).
         combine(backend.user(uid).observe(), backend.account(uid).observe()) { doc, accountDoc -> doc to accountDoc }.collect { (doc, accountDoc) ->
             if (!doc.exists()) {
                 if (!doc.metadata.isFromCache && !leaving) _profile.value = ProfileState.Missing
                 return@collect
             }
             val account = if (accountDoc.exists()) accountDoc.toAccount() else Account()
-            val profile = doc.toProfile(account)
+            val profile = doc.toProfile(accountDoc)
             store.setStrictMode(profile.strictMode)
             store.setApproverCount(profile.approverIds.size)
             store.setPrivacy(profile.privacy)

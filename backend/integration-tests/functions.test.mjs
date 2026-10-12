@@ -38,12 +38,24 @@ async function admin(fn) {
 }
 const read = (path) => admin(async (db) => (await getDoc(doc(db, path))).data());
 const friendCodeOf = async (p) => (await read(`users/${p.uid}/private/account`)).friendCode;
-/** Reads a Storage file with rules off. */
+/**
+ * Reads a Storage file with rules off. The Functions emulator's default bucket depends on the
+ * firebase-tools version, so both default bucket names are tried.
+ */
 async function readFile(path) {
   let text;
+  let lastError;
   await env.withSecurityRulesDisabled(async (ctx) => {
-    text = new TextDecoder().decode(await getBytes(storageRef(ctx.storage(), path)));
+    for (const bucket of [`${PROJECT}.appspot.com`, `${PROJECT}.firebasestorage.app`]) {
+      try {
+        text = new TextDecoder().decode(await getBytes(storageRef(ctx.storage(`gs://${bucket}`), path)));
+        return;
+      } catch (e) {
+        lastError = e;
+      }
+    }
   });
+  if (text === undefined) throw lastError;
   return text;
 }
 

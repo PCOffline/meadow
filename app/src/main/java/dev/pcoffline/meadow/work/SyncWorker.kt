@@ -31,7 +31,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             if (privacy.shareUsage) AppGraph.share.upload(todaySummary())
             val now = System.currentTimeMillis()
             if (now - AppGraph.store.lastHeartbeatMillis >= HEARTBEAT_EVERY_MS) {
-                AppGraph.share.heartbeat(if (privacy.shareProtection) AppGraph.protection.current().asMap() else emptyMap())
+                AppGraph.share.heartbeat()
                 AppGraph.store.lastHeartbeatMillis = now
             }
             AppGraph.protection.check()

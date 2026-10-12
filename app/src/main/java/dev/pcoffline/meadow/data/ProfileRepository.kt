@@ -67,18 +67,11 @@ class ProfileRepository(
         runCatchingCancellable { backend.account(uid).update(mapOf("theme" to theme, "darkMode" to darkMode)).awaitWrite() }
     }
 
-    /**
-     * Updates what Bumblebees can see. Turning usage sharing off also removes what was already
-     * shared; turning protection sharing off clears the shared protection status.
-     */
+    /** Updates what Bumblebees can see. Turning usage sharing off also removes what was already shared. */
     suspend fun setPrivacy(privacy: Privacy) {
         val uid = backend.requireUid()
         store.setPrivacy(privacy)
-        val updates = mutableMapOf<String, Any>(
-            "privacy" to mapOf("shareUsage" to privacy.shareUsage, "shareProtection" to privacy.shareProtection),
-        )
-        if (!privacy.shareProtection) updates["protection"] = emptyMap<String, Boolean>()
-        backend.user(uid).update(updates).awaitWrite()
+        backend.account(uid).update("privacy", mapOf("shareUsage" to privacy.shareUsage)).awaitWrite()
         if (!privacy.shareUsage) {
             withTimeoutOrNull(WRITE_TIMEOUT_MS) {
                 val shared = backend.user(uid).collection("usage").get().await()
@@ -87,7 +80,6 @@ class ProfileRepository(
                 batch.commit().awaitWrite()
             }
         }
-        if (privacy.shareProtection) store.lastReportedProtection = null
     }
 
     /** Records that the person accepted [version] of the terms and privacy notice. */
@@ -99,10 +91,18 @@ class ProfileRepository(
         }
     }
 
-    /** Everything the backend holds about you, as pretty-printed JSON. */
+    /**
+     * Everything the backend holds about you, as pretty-printed JSON. The backend writes it to
+     * your own private folder; it's fetched once and then deleted there.
+     */
     suspend fun exportData(): String {
-        val data = backend.call("exportMyData", timeoutSeconds = 130)
-        return PrettyJson.encodeToString(JsonElement.serializer(), toJson(data))
+        val result = backend.call("exportMyData", timeoutSeconds = 130)
+        val path = result["path"] as? String ?: throw FriendlyException(dev.pcoffline.meadow.R.string.error_generic)
+        val ref = storage.reference.child(path)
+        val bytes = ref.getBytes(MAX_EXPORT_BYTES).await()
+        runCatchingCancellable { ref.delete().await() }
+        val data = Json.parseToJsonElement(bytes.decodeToString())
+        return PrettyJson.encodeToString(JsonElement.serializer(), data)
     }
 
     /** Deletes the account and everything tied to it, then forgets it on this phone too. */
@@ -153,6 +153,7 @@ class ProfileRepository(
         const val BIO_MAX = 80
         private const val PHOTO_SIZE = 384
         private const val MAX_DECODE = 1600
+        private const val MAX_EXPORT_BYTES = 32L * 1024 * 1024
         private val PrettyJson = Json { prettyPrint = true }
 
         /** Converts a callable result (maps, lists, primitives) into JSON. */

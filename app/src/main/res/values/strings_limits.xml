@@ -46,4 +46,23 @@
     <string name="limit_remove_body_ask">Your Bumblebees will be asked first. The limit stays until one of them says yes.</string>
     <string name="limit_remove_body_now">The limit will be removed straight away.</string>
     <string name="limit_remove_ask">Ask</string>
+
+    <string name="limit_and_hours">%1$s, %2$s</string>
+    <string name="limit_editor_hours">Allowed hours</string>
+    <string name="limit_editor_hours_hint">Outside these hours the app rests, even with time left.</string>
+    <string name="limit_editor_share">Share this commitment</string>
+    <string name="schedule_every_day">Every day</string>
+    <string name="schedule_per_day">Per weekday</string>
+    <string name="schedule_window">%1$s–%2$s</string>
+    <string name="schedule_all_day">all day</string>
+    <string name="schedule_closed">Resting all day</string>
+    <string name="schedule_never">never</string>
+    <string name="schedule_only">only %1$s</string>
+    <string name="schedule_by_day">set hours each day</string>
+    <string name="schedule_preset_until">Until %1$s</string>
+    <string name="schedule_preset_from">From %1$s</string>
+    <string name="schedule_add_window">Add hours</string>
+    <string name="schedule_close_day">Rest all day</string>
+    <string name="schedule_remove_window">Remove these hours</string>
+    <string name="schedule_bad_window">The end has to be after the start.</string>
 </resources>

@@ -30,7 +30,7 @@ class LocalStoreTest {
         assertEquals(emptyList<AppLimit>(), store.limits.value)
         assertFalse(store.strictMode.value)
         assertTrue(store.autoUpdate.value)
-        assertEquals(Privacy(shareUsage = true, shareProtection = true), store.privacy.value)
+        assertEquals(Privacy(shareUsage = true), store.privacy.value)
         assertEquals(0, store.acceptedTerms.value)
         assertNull(store.theme.value)
     }
@@ -44,7 +44,7 @@ class LocalStoreTest {
             setGrants(grants)
             setStrictMode(true)
             setEmergency(Emergency(5_000L, "com.insta"))
-            setPrivacy(Privacy(shareUsage = false, shareProtection = true))
+            setPrivacy(Privacy(shareUsage = false))
             setAppearance("pond", "dark")
             setAutoUpdate(false)
             acceptedTermsVersion = 1

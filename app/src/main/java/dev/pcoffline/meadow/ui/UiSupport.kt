@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.ui
 
 import android.content.Context
+import android.os.SystemClock
 import android.text.format.DateUtils
 import android.util.Log
 import androidx.compose.material3.SnackbarHostState
@@ -39,13 +40,20 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
     var error by mutableStateOf<String?>(null)
     internal var attached = true
 
+    private var finishedAt = -SETTLE_MS
+
+    /**
+     * Runs [block] unless an action is already running or only just succeeded, so a double tap
+     * acts once. A failed action can be retried straight away.
+     */
     fun run(successMessage: String? = null, onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
-        if (busy) return
+        if (busy || SystemClock.elapsedRealtime() - finishedAt < SETTLE_MS) return
+        busy = true
         AppGraph.scope.launch(Dispatchers.Main.immediate) {
-            busy = true
             error = null
             try {
                 block()
+                finishedAt = SystemClock.elapsedRealtime()
                 if (attached) {
                     onSuccess()
                     successMessage?.let { launch { snackbar.showSnackbar(it) } }
@@ -59,6 +67,10 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
                 busy = false
             }
         }
+    }
+
+    private companion object {
+        const val SETTLE_MS = 600L
     }
 
     fun toast(message: String) {

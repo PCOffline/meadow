@@ -84,6 +84,7 @@ class RequestsViewModel(uid: String) : ViewModel() {
 fun RequestsScreen(
     profile: UserProfile,
     onOpenCircle: () -> Unit,
+    onOpenBeeStats: () -> Unit = {},
     viewModel: RequestsViewModel = viewModel(key = "requests-${profile.uid}") { RequestsViewModel(profile.uid) },
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -113,6 +114,13 @@ fun RequestsScreen(
             val list = if (tab == 0) incoming else outgoing
             LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Spacer(Modifier.height(4.dp)) }
+                if (tab == 0 && profile.approveeIds.isNotEmpty()) {
+                    item {
+                        TextButton(onClick = onOpenBeeStats, modifier = Modifier.padding(horizontal = 12.dp)) {
+                            Text(stringResource(R.string.bee_stats_open))
+                        }
+                    }
+                }
                 if (list != null && list.isEmpty()) {
                     item {
                         if (tab == 0) {
@@ -142,7 +150,8 @@ fun RequestsScreen(
 @Composable
 fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modifier, compact: Boolean = false) {
     val mine = request.requesterId == myUid
-    val canDecide = !mine && request.status == RequestStatus.PENDING && myUid in request.approverIds
+    // A Bumblebee's own copy: theirs to answer while it's waiting.
+    val canDecide = !mine && request.status == RequestStatus.PENDING
     var deciding by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
@@ -176,11 +185,23 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
             )
         }
         val decider = request.decidedByName
-        if (request.status != RequestStatus.PENDING && decider != null) {
-            val note = request.decisionNote?.takeIf { it.isNotBlank() }
-            val answer = stringResource(if (request.status == RequestStatus.APPROVED) R.string.request_decided_yes else R.string.request_decided_no, decider)
+        val answered = request.status == RequestStatus.APPROVED || request.status == RequestStatus.DENIED
+        val outcome = when {
+            !answered -> null
+            mine && decider != null -> {
+                val note = request.decisionNote?.takeIf { it.isNotBlank() }
+                val answer = stringResource(if (request.status == RequestStatus.APPROVED) R.string.request_decided_yes else R.string.request_decided_no, decider)
+                if (note != null) stringResource(R.string.request_decided_with_note, answer, note) else answer
+            }
+            mine -> null
+            // Who else answered stays private; only that someone did.
+            request.myDecision == null -> stringResource(R.string.request_answered_by_other)
+            request.myDecision == "yes" -> stringResource(R.string.request_you_said_yes)
+            else -> stringResource(R.string.request_you_said_no)
+        }
+        if (outcome != null) {
             Text(
-                if (note != null) stringResource(R.string.request_decided_with_note, answer, note) else answer,
+                outcome,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -277,6 +298,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
     var selected by rememberSaveable { mutableStateOf(packageName ?: limits.firstOrNull()?.packageName) }
     var minutes by rememberSaveable { mutableIntStateOf(15) }
     var message by rememberSaveable { mutableStateOf("") }
+    val picks = rememberBeePicks()
     val action = rememberAction()
     // Limits may arrive after the dialog opens, so fall back to the first one once they do.
     val limit: AppLimit? = limits.firstOrNull { it.packageName == selected } ?: limits.firstOrNull().takeIf { packageName == null }
@@ -308,6 +330,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                BumblebeePicker(picks)
                 ErrorNote(action.error)
             }
         },
@@ -323,6 +346,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
                             packageName = l.packageName,
                             appName = l.appName,
                             minutes = minutes,
+                            approverIds = BeePicks.commit(picks.value),
                         )
                     }
                 },

@@ -7,18 +7,22 @@ enum class ChangeOutcome { APPLIED, REQUESTED }
 
 /**
  * Tightening a limit always applies immediately. Loosening or removing one needs a Bumblebee
- * to agree once you have any approvers; Firestore rules enforce the same thing server-side.
+ * to agree once you have any approvers; Firestore rules and the backend enforce the same.
  */
 class LimitsRepository(
     private val backend: Backend,
     private val store: LocalStore,
     private val requests: RequestRepository,
 ) {
-    suspend fun save(limit: AppLimit, message: String = ""): ChangeOutcome {
+    /** [approverIds] picks which Bumblebees to ask if it needs a yes; null asks all of them. */
+    suspend fun save(limit: AppLimit, message: String = "", approverIds: List<String>? = null): ChangeOutcome {
         val uid = backend.requireUid()
-        if (limit.dailyMinutes <= 0 && limit.weeklyMinutes <= 0) throw FriendlyException(R.string.error_set_a_limit)
+        if (limit.dailyMinutes <= 0 && limit.weeklyMinutes <= 0 && limit.schedule == null) {
+            throw FriendlyException(R.string.error_set_a_limit)
+        }
         val current = store.limits.value.firstOrNull { it.packageName == limit.packageName }
-        if (current != null && isLooser(current, limit) && store.approverCount.value > 0) {
+        val hasBumblebees = store.approverCount.value > 0
+        if (current != null && isLooser(current, limit) && hasBumblebees) {
             requests.create(
                 type = RequestType.CHANGE_LIMIT,
                 message = message,
@@ -26,8 +30,25 @@ class LimitsRepository(
                 appName = limit.appName,
                 dailyMinutes = limit.dailyMinutes,
                 weeklyMinutes = limit.weeklyMinutes,
+                schedule = limit.schedule,
+                approverIds = approverIds,
             )
             return ChangeOutcome.REQUESTED
+        }
+        // Rules can't compare hours, so with Bumblebees a new schedule goes through the backend,
+        // which only accepts stricter ones.
+        if (current != null && hasBumblebees && current.schedule != limit.schedule) {
+            backend.call(
+                "saveLimit",
+                mapOf(
+                    "packageName" to limit.packageName,
+                    "appName" to limit.appName,
+                    "dailyMinutes" to limit.dailyMinutes,
+                    "weeklyMinutes" to limit.weeklyMinutes,
+                    "schedule" to limit.schedule?.toFirestore(),
+                ),
+            )
+            return ChangeOutcome.APPLIED
         }
         val data = mutableMapOf<String, Any>(
             "packageName" to limit.packageName,
@@ -36,13 +57,14 @@ class LimitsRepository(
             "weeklyMinutes" to limit.weeklyMinutes,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
+        limit.schedule?.let { data["schedule"] = it.toFirestore() }
         if (current == null) data["createdAt"] = FieldValue.serverTimestamp()
         // The local snapshot updates right away; offline writes are queued by Firestore.
         backend.user(uid).collection("limits").document(limit.packageName).set(data).awaitWrite()
         return ChangeOutcome.APPLIED
     }
 
-    suspend fun remove(limit: AppLimit, message: String = ""): ChangeOutcome {
+    suspend fun remove(limit: AppLimit, message: String = "", approverIds: List<String>? = null): ChangeOutcome {
         val uid = backend.requireUid()
         if (store.approverCount.value > 0) {
             requests.create(
@@ -50,6 +72,7 @@ class LimitsRepository(
                 message = message,
                 packageName = limit.packageName,
                 appName = limit.appName,
+                approverIds = approverIds,
             )
             return ChangeOutcome.REQUESTED
         }
@@ -61,7 +84,7 @@ class LimitsRepository(
         fun isLooser(old: AppLimit, new: AppLimit): Boolean {
             val dailyLooser = old.dailyMinutes > 0 && (new.dailyMinutes == 0 || new.dailyMinutes > old.dailyMinutes)
             val weeklyLooser = old.weeklyMinutes > 0 && (new.weeklyMinutes == 0 || new.weeklyMinutes > old.weeklyMinutes)
-            return dailyLooser || weeklyLooser
+            return dailyLooser || weeklyLooser || !Schedule.isStricter(old.schedule, new.schedule)
         }
     }
 }

@@ -29,17 +29,9 @@
     <string name="circle_bee_role">Looks after your garden</string>
     <string name="circle_chat_with">Chat with %1$s</string>
     <string name="circle_remove_title">Remove %1$s?</string>
-    <string name="circle_remove_body_others">Only %1$s will be told. Your other Bumblebees won\'t be.</string>
-    <string name="circle_remove_body_last">%1$s will be told. Without a Bumblebee, your limits aren\'t locked in anymore.</string>
-    <string name="circle_bee_removed">%1$s isn\'t your Bumblebee anymore</string>
 
     <string name="circle_looking_after">Gardens you look after</string>
     <string name="circle_looking_after_empty">None yet. When a friend sends you an invite link and you say yes, their garden shows up here.</string>
-    <string name="circle_last_seen">Last seen %1$s</string>
-    <string name="circle_not_seen">Not seen yet</string>
-    <string name="circle_status_unprotected">Protection off</string>
-    <string name="circle_status_quiet">Quiet lately</string>
-    <string name="circle_status_blooming">Blooming</string>
 
     <string name="circle_join_title">Be someone\'s Bumblebee</string>
     <string name="join_link_title">Got an invite link?</string>
@@ -60,23 +52,9 @@
     <string name="accept_invite_yes">Yes, I\'ll be their Bumblebee</string>
     <string name="accept_invite_not_now">Not now</string>
     <string name="accept_invite_done">You\'re %1$s\'s Bumblebee now 🐝</string>
-
-    <string name="friend_strict_on">Strict mode on 🌿</string>
-    <string name="friend_strict_off">Strict mode off</string>
-    <string name="friend_protections">Protections</string>
-    <string name="friend_protection_on">On ✓</string>
-    <string name="friend_protection_off">Off ⚠️</string>
-    <string name="friend_protection_unknown">Unknown</string>
-    <string name="friend_emergency_active">🚨 Emergency unlock on for %1$s</string>
-    <string name="friend_emergency_used">Emergency unlocks: %1$d of %2$d used in the last 30 days</string>
-    <string name="friend_checked_in">Phone last checked in %1$s</string>
     <string name="friend_gone_title">This garden isn\'t here any more</string>
     <string name="friend_gone_body">They may have left Meadow, or you\'re no longer in each other\'s circle.</string>
-    <string name="friend_never_checked_in">Their phone hasn\'t checked in yet</string>
     <string name="friend_today">Today</string>
-    <string name="friend_no_usage">Nothing shared yet today.</string>
-    <string name="friend_usage_private">%1$s keeps their screen time private.</string>
-    <string name="friend_protection_private">%1$s keeps their protection status private.</string>
     <string name="friend_screen_time">%1$s of screen time</string>
     <string name="friend_used_of">%1$s of %2$s</string>
     <string name="friend_limits">Their limits</string>
@@ -87,4 +65,12 @@
     <string name="friend_step_down_confirm">Step down</string>
     <string name="friend_step_down_stay">Stay</string>
     <string name="friend_stepped_down">You\'ve stepped down</string>
+
+    <string name="circle_bee_leaving">Leaving in %1$s</string>
+    <string name="circle_bee_keep">Keep</string>
+    <string name="circle_bee_kept">%1$s stays your Bumblebee 🐝</string>
+    <string name="circle_bee_removing">%1$s will stop being your Bumblebee in 24 hours</string>
+    <string name="circle_remove_body_delayed">%1$s stops being your Bumblebee in 24 hours, so it can\'t be a way around a \"not today\". You can change your mind until then. Only %1$s is told, straight away.</string>
+    <string name="circle_garden_role">You\'re their Bumblebee</string>
+    <string name="friend_no_usage_shared">%1$s hasn\'t shared any screen time today.</string>
 </resources>

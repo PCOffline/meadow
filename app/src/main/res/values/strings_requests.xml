@@ -41,4 +41,39 @@
     <string name="ask_why">Why? It helps them say yes</string>
     <string name="ask_sending">Sending…</string>
     <string name="ask_sent">Asked your Bumblebees 💌</string>
+
+    <string name="ask_who">Ask</string>
+    <string name="ask_who_private">Each Bumblebee sees only your request, not who else you asked.</string>
+    <string name="request_answered_by_other">Another Bumblebee answered</string>
+    <string name="request_you_said_yes">You said yes</string>
+    <string name="request_you_said_no">You said not today</string>
+
+    <string name="bee_stats_open">Your answers as a Bumblebee</string>
+    <string name="bee_stats_title">Your answers</string>
+    <string name="bee_stats_private">Worked out on this phone from the requests sent to you. Only you see it, unless you share it.</string>
+    <string name="bee_stats_empty_title">No requests yet</string>
+    <string name="bee_stats_empty_body">Once the people you look after ask for something, you\'ll see how you\'ve answered here.</string>
+    <string name="bee_stats_leniency">How you answer</string>
+    <string name="bee_stats_leniency_unknown">Answer at least %1$d requests to see how you lean.</string>
+    <string name="bee_stats_leniency_score">Leniency %1$d of 100</string>
+    <string name="bee_stats_leniency_how">A \"not today\" counts 0 and a yes counts 100; a yes with fewer minutes than asked counts the share you gave.</string>
+    <string name="bee_leaning_very_strict">Very strict 🌵</string>
+    <string name="bee_leaning_strict">Strict 🌿</string>
+    <string name="bee_leaning_balanced">Balanced 🌼</string>
+    <string name="bee_leaning_gentle">Gentle 🌸</string>
+    <string name="bee_leaning_very_gentle">Very gentle 🌻</string>
+    <string name="bee_stats_overall">Overall</string>
+    <string name="bee_stats_asked">Requests sent to you</string>
+    <string name="bee_stats_yes">You said yes</string>
+    <string name="bee_stats_no">You said not today</string>
+    <string name="bee_stats_rate">Yes rate</string>
+    <string name="bee_stats_minutes">Extra time you gave</string>
+    <string name="bee_stats_missed">Answered by someone else, withdrawn or expired</string>
+    <string name="bee_stats_waiting">Waiting for you</string>
+    <string name="bee_stats_by_person">By person</string>
+    <string name="bee_stats_person_line">Asked %1$d · yes %2$d · not today %3$d</string>
+    <string name="bee_stats_percent">%1$d%%</string>
+    <string name="bee_stats_none">–</string>
+    <string name="bee_stats_share">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d requests and said yes to %2$d%%.</string>
+    <string name="bee_stats_share_with_leaning">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d requests and said yes to %2$d%%. My style: %3$s</string>
 </resources>

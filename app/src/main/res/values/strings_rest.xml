@@ -15,4 +15,7 @@
     <string name="rest_ask">Ask a Bumblebee for extra time</string>
     <string name="rest_home">Go do something lovely</string>
     <string name="rest_emergency">Emergency? Unlock now</string>
+
+    <string name="rest_body_hours">%1$s rests until %2$s.</string>
+    <string name="rest_body_hours_closed">%1$s is resting outside its allowed hours.</string>
 </resources>

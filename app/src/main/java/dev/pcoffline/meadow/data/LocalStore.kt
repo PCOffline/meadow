@@ -73,13 +73,13 @@ class LocalStore(context: Context) {
         _autoUpdate.value = enabled
     }
 
-    private val _privacy = MutableStateFlow(Privacy(prefs.getBoolean(KEY_SHARE_USAGE, true), prefs.getBoolean(KEY_SHARE_PROTECTION, true)))
+    private val _privacy = MutableStateFlow(Privacy(prefs.getBoolean(KEY_SHARE_USAGE, true)))
 
     /** Mirrors the profile's privacy choices so background work can respect them offline. */
     val privacy: StateFlow<Privacy> = _privacy.asStateFlow()
 
     fun setPrivacy(privacy: Privacy) {
-        prefs.edit().putBoolean(KEY_SHARE_USAGE, privacy.shareUsage).putBoolean(KEY_SHARE_PROTECTION, privacy.shareProtection).apply()
+        prefs.edit().putBoolean(KEY_SHARE_USAGE, privacy.shareUsage).apply()
         _privacy.value = privacy
     }
 
@@ -117,6 +117,7 @@ class LocalStore(context: Context) {
         acceptedTermsVersion = 0
         lastReportedProtection = null
         warnedKeys = emptySet()
+        lastAskedBees = emptySet()
         pendingEmergency?.let { if (it.ownerUid != null && it.ownerUid != uid) pendingEmergency = null }
     }
 
@@ -150,6 +151,7 @@ class LocalStore(context: Context) {
         get() = prefs.getString(KEY_OWNER, null)
         set(value) = prefs.edit().putString(KEY_OWNER, value).apply()
 
+    /** The protections last seen switched on, to notice one being switched off. */
     var lastReportedProtection: String?
         get() = prefs.getString(KEY_PROTECTION, null)
         set(value) = prefs.edit().putString(KEY_PROTECTION, value).apply()
@@ -158,6 +160,11 @@ class LocalStore(context: Context) {
     var lastHeartbeatMillis: Long
         get() = prefs.getLong(KEY_HEARTBEAT, 0L)
         set(value) = prefs.edit().putLong(KEY_HEARTBEAT, value).apply()
+
+    /** The Bumblebees last asked for something, picked first next time. */
+    var lastAskedBees: Set<String>
+        get() = prefs.getStringSet(KEY_LAST_ASKED, emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_LAST_ASKED, value).apply()
 
     var warnedKeys: Set<String>
         get() = prefs.getStringSet(KEY_WARNED, emptySet()) ?: emptySet()
@@ -216,6 +223,7 @@ class LocalStore(context: Context) {
         const val KEY_OWNER = "owner_uid"
         const val KEY_PROTECTION = "last_protection"
         const val KEY_WARNED = "warned_keys"
+        const val KEY_LAST_ASKED = "last_asked_bees"
         const val KEY_HEARTBEAT = "last_heartbeat"
         const val KEY_EMERGENCY = "emergency"
         const val KEY_OFFLINE_EMERGENCY = "offline_emergency_at"
@@ -225,7 +233,6 @@ class LocalStore(context: Context) {
         const val KEY_DARK_MODE = "dark_mode"
         const val KEY_AUTO_UPDATE = "auto_update"
         const val KEY_SHARE_USAGE = "share_usage"
-        const val KEY_SHARE_PROTECTION = "share_protection"
         const val KEY_TERMS = "accepted_terms_version"
         const val KEY_NOTIFIED_UPDATE = "notified_update"
         const val KEY_LINK_EMAIL = "link_email"
