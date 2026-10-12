@@ -3,7 +3,9 @@ import { setGlobalOptions } from "firebase-functions/v2";
 
 initializeApp();
 // Set once in backend/functions/.env, which Firebase loads when deploying and running.
-setGlobalOptions({ region: process.env.MEADOW_REGION || "us-central1", maxInstances: 10 });
+const region = process.env.MEADOW_REGION?.trim();
+if (!region) throw new Error("Set MEADOW_REGION in backend/functions/.env, e.g. MEADOW_REGION=europe-west1");
+setGlobalOptions({ region, maxInstances: 10 });
 
 export {
   createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, respondInvite, cancelInvite,

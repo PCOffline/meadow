@@ -197,11 +197,12 @@ storage costs at zero.
 **The functions region** is set in one place, `backend/functions/.env`:
 
 ```
-MEADOW_REGION=us-central1
+MEADOW_REGION=europe-west1
 ```
 
-The backend, the app's build, the emulators and CI all read it from there. Set it **before the
-first deploy**, to the region next to your Firestore database: `us-central1` for `nam5`,
+The backend, the app's build, the emulators and CI all read it from there, and nothing else in
+the code names a region: if it's missing, the deploy and the app's build stop and say so. Set it
+**before the first deploy**, to the region next to your Firestore database: `us-central1` for `nam5`,
 `europe-west1` for `eur3`, or the database's own region if you picked a single one. Commit the
 change, so builds from GitHub Actions use it too.
 

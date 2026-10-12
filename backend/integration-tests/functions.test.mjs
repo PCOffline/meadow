@@ -16,7 +16,8 @@ import { readFileSync } from "node:fs";
 
 const PROJECT = "demo-meadow";
 // The emulator serves the functions in the region set in functions/.env.
-const REGION = readFileSync(new URL("../functions/.env", import.meta.url), "utf8").match(/^MEADOW_REGION=(.+)$/m)?.[1].trim() || "us-central1";
+const REGION = readFileSync(new URL("../functions/.env", import.meta.url), "utf8").match(/^MEADOW_REGION=(.+)$/m)?.[1].trim();
+if (!REGION) throw new Error("Set MEADOW_REGION in backend/functions/.env");
 const apps = [];
 let env;
 let counter = 0;

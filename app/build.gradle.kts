@@ -31,8 +31,8 @@ val appVersionCode = appVersion.substringBefore('-').split('.').map { it.toInt()
 // The Cloud Functions region, set once in backend/functions/.env, which the backend reads too.
 val functionsRegion = rootProject.file("backend/functions/.env").takeIf { it.exists() }?.readLines()
     ?.firstNotNullOfOrNull { line -> line.trim().takeIf { it.startsWith("MEADOW_REGION=") }?.substringAfter('=')?.trim()?.trim('"') }
-    ?.also { require(Regex("^[a-z]+-[a-z]+[0-9]+$").matches(it)) { "MEADOW_REGION in backend/functions/.env isn't a region: $it" } }
-    ?: "us-central1"
+    .let { requireNotNull(it) { "Set MEADOW_REGION in backend/functions/.env, e.g. MEADOW_REGION=europe-west1" } }
+    .also { require(Regex("^[a-z]+-[a-z]+[0-9]+$").matches(it)) { "MEADOW_REGION in backend/functions/.env isn't a region: $it" } }
 
 // Release signing comes from environment variables (CI secrets). Without them, release builds
 // fall back to the debug key, which is fine for testing but can't update a published install.
