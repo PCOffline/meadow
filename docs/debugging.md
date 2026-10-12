@@ -34,6 +34,10 @@ adb logcat -s MeadowTrace
 | `→ upload avatars/abc (48213 bytes)` / `→ download exports/abc/…` | Storage transfers. |
 | `push registered as …` / `push received: {…}` | Push registration and each push. |
 
+On screen, error messages in a trace build also show the technical cause underneath, such as
+`Firestore: PERMISSION_DENIED …`. Normal builds only tell people what they can act on (offline,
+sign in again) and otherwise ask them to try again later.
+
 Trace mode also turns on the Firestore SDK's own log, which shows every read, write and listen
 at the wire level. It is very verbose:
 

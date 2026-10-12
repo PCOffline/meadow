@@ -43,23 +43,24 @@ class BackendErrorsTest {
 
     @Test
     fun `failures without the backend's words get a helpful message for their kind`() {
-        assertEquals(context.getString(R.string.error_server_missing), shown("", Code.NOT_FOUND))
-        assertEquals(context.getString(R.string.error_server_refused), shown("", Code.PERMISSION_DENIED))
+        // Faults on the server's side don't explain themselves: there's nothing to do but wait.
+        assertEquals(context.getString(R.string.error_unavailable), shown("", Code.NOT_FOUND))
+        assertEquals(context.getString(R.string.error_unavailable), shown("", Code.PERMISSION_DENIED))
         assertEquals(context.getString(R.string.error_auth_recent_login), shown("", Code.UNAUTHENTICATED))
         assertEquals(context.getString(R.string.error_server_busy), shown("", Code.RESOURCE_EXHAUSTED))
-        assertEquals(context.getString(R.string.error_generic), shown("", Code.INTERNAL))
+        assertEquals(context.getString(R.string.error_unavailable), shown("", Code.INTERNAL))
         assertEquals(context.getString(R.string.error_offline), shown("", Code.UNAVAILABLE, unreachable = true))
         assertEquals(context.getString(R.string.error_offline), shown("", null, unreachable = true))
         assertEquals("That request is gone.", shown("That request is gone.", Code.NOT_FOUND))
     }
 
     @Test
-    fun `a garden that can't be read says why in plain words`() {
+    fun `a garden that can't be read says only what the person can act on`() {
         fun read(code: FirebaseFirestoreException.Code) =
             FirebaseFirestoreException(code.name, code).friendlyMessage(context)
-        assertEquals(context.getString(R.string.error_server_refused), read(FirebaseFirestoreException.Code.PERMISSION_DENIED))
-        assertEquals(context.getString(R.string.error_server_missing), read(FirebaseFirestoreException.Code.NOT_FOUND))
+        assertEquals(context.getString(R.string.error_unavailable), read(FirebaseFirestoreException.Code.PERMISSION_DENIED))
+        assertEquals(context.getString(R.string.error_unavailable), read(FirebaseFirestoreException.Code.NOT_FOUND))
+        assertEquals(context.getString(R.string.error_unavailable), read(FirebaseFirestoreException.Code.INTERNAL))
         assertEquals(context.getString(R.string.error_offline), read(FirebaseFirestoreException.Code.UNAVAILABLE))
-        assertEquals(context.getString(R.string.error_generic), read(FirebaseFirestoreException.Code.INTERNAL))
     }
 }

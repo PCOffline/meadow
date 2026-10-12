@@ -208,7 +208,7 @@ change, so builds from GitHub Actions use it too.
 
 To move the functions later, change it, deploy again, and confirm when the CLI offers to delete
 the functions in the old region. Then build and install a new app: older builds keep calling the
-old region and fail with "Meadow's server can't do this right now".
+old region and fail with "Meadow isn't available right now".
 
 ## 5. Let links open the app
 
@@ -400,28 +400,27 @@ then deploy again.
 deployed. Check **Firestore → Indexes**; if they're missing, run
 `firebase deploy --only firestore:indexes`.
 
-**The app says "Your garden couldn't be opened", or stays on "Gathering petals…".** The app
-couldn't read your profile from Firestore. The message under the title says why:
+**The app says "Meadow isn't available right now", or stays on "Gathering petals…".** Something
+on the server's side failed. The app doesn't tell people why, so build it with trace mode to see
+the cause on screen and in the log (see [Debugging Meadow](debugging.md)). Without trace mode,
+`adb logcat -s MeadowSync MeadowBackend MeadowFirestore` shows it too. By the code it names:
 
-- *"Meadow's server turned this down"*: the security rules refused the read. Usually they were
-  never deployed, so Firestore still has the locked-down rules it starts with. Run
+- `PERMISSION_DENIED` reading your profile (`users/<uid>`): the security rules refused it. Usually
+  they were never deployed, so Firestore still has the locked-down rules it starts with. Run
   `firebase deploy --only firestore,storage` from `backend/`.
-- *"Meadow's server can't do this right now"*: there is no Firestore database the app can find.
-  Meadow uses the one named `(default)`; check **Firestore** in the console.
-- *"You seem to be offline"*, or the loader says it's taking longer than usual: the phone can't
-  reach Firebase. Check its connection.
+- `NOT_FOUND` or `FAILED_PRECONDITION` from Firestore: there is no database the app can use.
+  Meadow uses the one named `(default)`, in Firestore Native mode; check **Firestore** in the
+  console.
+- `NOT_FOUND` from a Cloud Function: it isn't deployed where the app looked. Usually the app was
+  built with a different `MEADOW_REGION` than the functions were deployed with: check
+  **Functions** in the console for the region, set the same one in `backend/functions/.env`, and
+  build the app again. Otherwise, deploy the functions again.
+- `PERMISSION_DENIED` from a Cloud Function: it can't be called from the internet, usually
+  because the deploy couldn't make it public: see *Failed to set the IAM Policy* below.
+- `INTERNAL` from a Cloud Function: it crashed; `firebase functions:log` shows why.
 
-For the exact error, connect the phone and run `adb logcat -s MeadowSync`, or build with trace
-mode (see [Debugging Meadow](debugging.md)).
-
-**The app says "Meadow's server can't do this right now".** The app called a function that
-isn't deployed where it looked. Usually the app was built with a different `MEADOW_REGION` than
-the functions were deployed with: check **Functions** in the console for the region, set the same
-one in `backend/functions/.env`, and build the app again. Otherwise, deploy the functions again.
-
-**The app says "Meadow's server turned this down".** The functions can't be called from the
-internet, usually because the deploy couldn't make them public: see *Failed to set the IAM
-Policy* below.
+If instead the app says you seem to be offline, or the loader says it's taking longer than usual,
+the phone can't reach Firebase. Check its connection.
 
 **The app opens on "connect your backend".** It was built without `app/google-services.json`
 (locally) or without the `GOOGLE_SERVICES_JSON` secret (in Actions).

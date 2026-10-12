@@ -51,8 +51,7 @@
     <!-- Errors -->
     <string name="error_generic">Something went wrong. Please try again.</string>
     <string name="error_offline">You seem to be offline. Check your connection and try again.</string>
-    <string name="error_server_missing">Meadow\'s server can\'t do this right now. Please try again later, or update Meadow if a newer version is out.</string>
-    <string name="error_server_refused">Meadow\'s server turned this down. Please try again later.</string>
+    <string name="error_unavailable">Meadow isn\'t available right now. Please try again later.</string>
     <string name="error_server_busy">Meadow is very busy right now. Please try again in a few minutes.</string>
     <string name="error_auth_invalid_email">That email address doesn\'t look right.</string>
     <string name="error_auth_wrong_credentials">That email and password don\'t match.</string>
