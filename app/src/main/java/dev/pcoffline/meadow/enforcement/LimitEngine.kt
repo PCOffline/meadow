@@ -76,21 +76,22 @@ class LimitEngine(
         foregroundSince = System.currentTimeMillis()
     }
 
-    /** Phone and emergency apps are never limited, whatever is stored. */
+    /** Phone and emergency apps, launchers and the system UI are never limited, whatever is stored. */
     fun limitFor(packageName: String): AppLimit? {
-        if (packageName in catalog.essentialPackages()) return null
+        if (!limitable(packageName)) return null
         return store.limits.value.firstOrNull { it.packageName == packageName }
     }
+
+    private fun limitable(packageName: String): Boolean =
+        packageName !in catalog.essentialPackages() && packageName !in catalog.homePackages()
 
     fun budget(packageName: String, forceRefresh: Boolean = false): AppBudget? {
         val limit = limitFor(packageName) ?: return null
         return computeBudgets(listOf(limit), forceRefresh).firstOrNull()
     }
 
-    fun budgets(forceRefresh: Boolean = false): List<AppBudget> {
-        val essentials = catalog.essentialPackages()
-        return computeBudgets(store.limits.value.filter { it.packageName !in essentials }, forceRefresh)
-    }
+    fun budgets(forceRefresh: Boolean = false): List<AppBudget> =
+        computeBudgets(store.limits.value.filter { limitable(it.packageName) }, forceRefresh)
 
     /** Today's usage per app, measured fresh enough for display. */
     @Synchronized

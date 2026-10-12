@@ -28,7 +28,11 @@ class UsageTracker(private val context: Context) {
         val clippedEnd = minOf(end, System.currentTimeMillis())
         // Look back a little so an app that was already open at `start` is counted from `start`.
         val events = readEvents(start - LOOKBACK_MS, clippedEnd)
-        if (events.isEmpty()) return aggregateFallback(start, clippedEnd)
+        if (events.isEmpty()) {
+            // A quiet log for recent hours means nothing was used. The daily aggregates would
+            // answer with whole buckets, yesterday's included, so they're only for older days.
+            return if (clippedEnd > System.currentTimeMillis() - LOOKBACK_MS) emptyMap() else aggregateFallback(start, clippedEnd)
+        }
         return ForegroundTime.totals(events, start, clippedEnd)
     }
 
@@ -53,9 +57,10 @@ class UsageTracker(private val context: Context) {
                 UsageEvents.Event.ACTIVITY_PAUSED, EVENT_ACTIVITY_STOPPED -> ScreenEvent.Kind.PAUSED
                 UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN, EVENT_DEVICE_SHUTDOWN ->
                     ScreenEvent.Kind.SCREEN_OFF
+                EVENT_DEVICE_STARTUP -> ScreenEvent.Kind.STARTUP
                 else -> continue
             }
-            result += ScreenEvent(event.timeStamp, kind, pkg)
+            result += ScreenEvent(event.timeStamp, kind, pkg, event.className)
         }
         return result
     }
@@ -72,5 +77,6 @@ class UsageTracker(private val context: Context) {
         // Constants added in later API levels; the values are stable.
         const val EVENT_ACTIVITY_STOPPED = 23
         const val EVENT_DEVICE_SHUTDOWN = 26
+        const val EVENT_DEVICE_STARTUP = 27
     }
 }

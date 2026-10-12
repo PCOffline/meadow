@@ -26,6 +26,8 @@ class UsageHistory(
         val key = Days.key(date)
         if (date.isBefore(today)) cache[key]?.let { return it }
         if (date.isAfter(today)) return emptyMap()
+        // A finished day is stored for good, so judge it against the apps installed now.
+        if (date.isBefore(today)) catalog.invalidate()
         val raw = tracker.usageBetween(Days.startMillis(date), Days.endMillis(date))
         val usage = catalog.userFacing(raw)
         if (date.isBefore(today) && usage.isNotEmpty()) {

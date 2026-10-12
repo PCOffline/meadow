@@ -52,7 +52,14 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             .setContentIntent(openApp(null, 0))
             .build()
 
-    fun updateGuardian(text: String) = post(GUARDIAN_ID, guardianNotification(text))
+    private var guardianText: String? = null
+
+    /** Updates the ongoing notification, only when its text actually changes. */
+    fun updateGuardian(text: String) {
+        if (text == guardianText) return
+        guardianText = text
+        post(GUARDIAN_ID, guardianNotification(text))
+    }
 
     /** Gentle reminders at five minutes and one minute left, once each per day. */
     fun maybeWarn(budget: AppBudget) {
@@ -64,7 +71,8 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             else -> return
         }
         val today = Days.todayKey()
-        val key = "${budget.limit.packageName}|$today|$threshold"
+        // Extra time from a Bumblebee changes the allowance, and earns its own reminders.
+        val key = "${budget.limit.packageName}|$today|$threshold|${budget.dailyAllowedMs}/${budget.weeklyAllowedMs}"
         val warned = store.warnedKeys
         if (key in warned) return
         store.warnedKeys = warned.filter { it.contains("|$today|") }.toSet() + key
@@ -93,6 +101,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
                 .setSmallIcon(R.drawable.ic_flower)
                 .setContentTitle(context.getString(R.string.notify_time_up_title, budget.limit.appName))
                 .setContentText(context.getString(R.string.notify_time_up_body))
+                .setOnlyAlertOnce(true)
                 .setContentIntent(
                     PendingIntent.getActivity(
                         context, budget.limit.packageName.hashCode(), intent,

@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import android.util.LruCache
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -85,7 +86,14 @@ class GuardianAccessibilityService : AccessibilityService() {
     /** Re-checks the open app's budget, sleeping until it might run out. */
     private suspend fun watch(pkg: String) {
         var first = true
+        val power = getSystemService(PowerManager::class.java)
         while (currentCoroutineContext().isActive && currentPackage == pkg) {
+            // The screen went off on this app: nothing is being used until it's back on.
+            if (!power.isInteractive) {
+                delay(15_000L)
+                first = true
+                continue
+            }
             val budget = AppGraph.engine.budget(pkg, forceRefresh = first) ?: return
             first = false
             if (budget.exhausted) {
@@ -115,10 +123,20 @@ class GuardianAccessibilityService : AccessibilityService() {
         val text = StringBuilder()
         collectText(root, text, IntArray(1) { 600 })
         val screen = text.toString().lowercase()
-        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase())) {
+        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase(), localWords = settingsWords)) {
             performGlobalAction(GLOBAL_ACTION_BACK)
             performGlobalAction(GLOBAL_ACTION_HOME)
             Toast.makeText(this, R.string.strict_mode_blocked, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Settings' own words for "Force stop", "Uninstall" and so on, in the phone's language. */
+    private val settingsWords: List<String> by lazy {
+        val res = runCatching { packageManager.getResourcesForApplication(SETTINGS) }.getOrNull() ?: return@lazy emptyList()
+        SETTINGS_STRINGS.mapNotNull { name ->
+            @Suppress("DiscouragedApi") // Another app's resources can only be found by name.
+            val id = res.getIdentifier(name, "string", SETTINGS)
+            if (id == 0) null else runCatching { res.getString(id).lowercase().trim() }.getOrNull()?.takeIf { it.length > 2 }
         }
     }
 
@@ -148,6 +166,9 @@ class GuardianAccessibilityService : AccessibilityService() {
         @Volatile var running = false
             private set
 
+        private const val SETTINGS = "com.android.settings"
+        private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")
+
         val GUARDED_SYSTEM_PACKAGES = setOf(
             "com.android.settings",
             "com.samsung.android.settings",
@@ -169,9 +190,10 @@ object StrictModeRules {
     )
     private val clockKeywords = listOf("set time", "set date", "automatic date", "use network-provided time")
 
-    fun shouldBlock(pkg: String, screenText: String, appLabel: String): Boolean {
+    /** [localWords] are the same dangers in the phone's language, read from the Settings app. */
+    fun shouldBlock(pkg: String, screenText: String, appLabel: String, localWords: List<String> = emptyList()): Boolean {
         if (clockKeywords.any { it in screenText } && pkg.contains("settings")) return true
         if (appLabel !in screenText) return false
-        return dangerousNearApp.any { it in screenText }
+        return dangerousNearApp.any { it in screenText } || localWords.any { it in screenText }
     }
 }

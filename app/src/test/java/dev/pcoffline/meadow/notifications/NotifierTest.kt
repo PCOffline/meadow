@@ -65,6 +65,16 @@ class NotifierTest {
     }
 
     @Test
+    fun `extra time from a Bumblebee gets its own reminders`() {
+        notifier.maybeWarn(budget(usedMinutes = 25.5))
+        manager.cancelAll()
+        // 15 more minutes were granted and are nearly used up too.
+        val extended = AppBudget(AppLimit("demo.app", "Demo", 30, 0), (40.5 * 60_000).toLong(), 0L, 15, 0)
+        notifier.maybeWarn(extended)
+        assertEquals(1, posted())
+    }
+
+    @Test
     fun `no reminders during an emergency unlock or once time is up`() {
         notifier.maybeWarn(budget(usedMinutes = 27.0, emergencyUntil = System.currentTimeMillis() + 60_000))
         notifier.maybeWarn(budget(usedMinutes = 30.0))

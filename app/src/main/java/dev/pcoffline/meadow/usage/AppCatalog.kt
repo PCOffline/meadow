@@ -28,7 +28,7 @@ class AppCatalog(private val context: Context) {
         return pm.queryIntentActivities(intent, 0)
             .map { it.activityInfo.packageName }
             .distinct()
-            .filter { it != context.packageName && it !in essentialPackages() }
+            .filter { it != context.packageName && it !in essentialPackages() && it !in homePackages() }
             .map { InstalledApp(it, label(it)) }
             .sortedBy { it.label.lowercase() }
     }
@@ -78,6 +78,7 @@ class AppCatalog(private val context: Context) {
         return bitmap.asImageBitmap().also { iconCache.put(packageName, it) }
     }
 
+    /** Forgets cached app lists; called when apps are installed or removed. */
     fun invalidate() {
         launchableCache = null
         homeCache = null

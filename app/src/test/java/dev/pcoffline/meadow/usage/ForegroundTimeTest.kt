@@ -3,12 +3,36 @@ package dev.pcoffline.meadow.usage
 import dev.pcoffline.meadow.usage.ScreenEvent.Kind.PAUSED
 import dev.pcoffline.meadow.usage.ScreenEvent.Kind.RESUMED
 import dev.pcoffline.meadow.usage.ScreenEvent.Kind.SCREEN_OFF
+import dev.pcoffline.meadow.usage.ScreenEvent.Kind.STARTUP
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ForegroundTimeTest {
-    private fun e(time: Long, kind: ScreenEvent.Kind, pkg: String = "a") = ScreenEvent(time, kind, pkg)
+    private fun e(time: Long, kind: ScreenEvent.Kind, pkg: String = "a", screen: String? = null) =
+        ScreenEvent(time, kind, pkg, screen)
+
+    @Test
+    fun `moving between an app's own screens keeps counting`() {
+        // A splash screen hands over to the main one; its pause and stop arrive after the new resume.
+        val events = listOf(
+            e(0, RESUMED, screen = "Splash"),
+            e(100, RESUMED, screen = "Main"),
+            e(110, PAUSED, screen = "Splash"),
+            e(120, PAUSED, screen = "Splash"),
+            e(900, PAUSED, screen = "Main"),
+        )
+        assertEquals(mapOf("a" to 900L), ForegroundTime.totals(events, start = 0, end = 1_000))
+        assertEquals("a", ForegroundTime.foregroundAfter(null, events.dropLast(1)))
+        assertNull(ForegroundTime.foregroundAfter(null, events))
+    }
+
+    @Test
+    fun `an app open when the battery died isn't counted until the phone is back on`() {
+        val events = listOf(e(100, RESUMED), e(5_000, STARTUP, "android"), e(5_100, SCREEN_OFF, "android"))
+        assertEquals(emptyMap<String, Long>(), ForegroundTime.totals(events, start = 0, end = 10_000))
+        assertNull(ForegroundTime.foregroundAfter("a", listOf(e(5_000, STARTUP, "android"))))
+    }
 
     @Test
     fun `counts time between resume and pause`() {

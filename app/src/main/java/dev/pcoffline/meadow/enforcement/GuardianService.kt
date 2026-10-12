@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ServiceCompat
@@ -50,8 +51,15 @@ class GuardianService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     private suspend fun loop() {
+        val power = getSystemService(PowerManager::class.java)
         var tick = 0
         while (scope.isActive) {
+            // Nothing can be used with the screen off, so there's nothing to check.
+            if (!power.isInteractive) {
+                delay(SCREEN_OFF_DELAY_MS)
+                tick = 0
+                continue
+            }
             runCatching {
                 if (GuardianAccessibilityService.running) {
                     probedUntil = 0L
@@ -72,8 +80,9 @@ class GuardianService : Service() {
     /** Fallback enforcement through the usage log when accessibility is off. */
     private fun pollForeground() {
         val now = System.currentTimeMillis()
-        // The first probe looks back an hour; later ones only read events since the previous probe.
-        val from = if (probedUntil == 0L) now - 60 * 60_000L else probedUntil
+        // The first probe looks back an hour; later ones read events since the previous probe,
+        // overlapping a little because the system can log an event a moment after it happened.
+        val from = if (probedUntil == 0L) now - 60 * 60_000L else probedUntil - PROBE_OVERLAP_MS
         foreground = AppGraph.tracker.foregroundAfter(foreground, from, now)
         probedUntil = now
         val pkg = foreground ?: return
@@ -83,12 +92,13 @@ class GuardianService : Service() {
             if (!budget.emergency) AppGraph.notifier.maybeWarn(budget)
             return
         }
+        // Starting an activity from the background requires the overlay permission; without it,
+        // a notification asks to rest the app instead, repeated at most once a minute.
+        val canShow = Settings.canDrawOverlays(this)
         val last = lastBlocked
-        if (last != null && last.first == pkg && now - last.second < 4_000L) return
+        if (last != null && last.first == pkg && now - last.second < if (canShow) 4_000L else 60_000L) return
         lastBlocked = pkg to now
-        // Starting an activity from the background requires the overlay permission.
-        if (Settings.canDrawOverlays(this)) BlockActivity.launch(this, pkg)
-        else AppGraph.notifier.timeUp(budget)
+        if (canShow) BlockActivity.launch(this, pkg) else AppGraph.notifier.timeUp(budget)
     }
 
     private fun updateSummary() {
@@ -119,6 +129,8 @@ class GuardianService : Service() {
 
     companion object {
         private const val TAG = "MeadowGuardian"
+        private const val SCREEN_OFF_DELAY_MS = 15_000L
+        private const val PROBE_OVERLAP_MS = 2_000L
 
         fun start(context: Context) {
             runCatching {
