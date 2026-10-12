@@ -10,7 +10,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -98,7 +97,10 @@ class OtherScreensTest : ScreenTest() {
         assertAccessible()
         compose.onAllNodesWithText(text(R.string.setup_step_allow)).onFirst().performClick()
         node(R.string.disclosure_title).assertExists()
-        compose.onNodeWithText("Meadow will read your phone", substring = true).assertExists()
+        // Which step comes first depends on what this device already allows.
+        val explained = listOf(R.string.disclosure_usage, R.string.disclosure_keeper)
+            .sumOf { compose.onAllNodesWithText(text(it)).fetchSemanticsNodes().size }
+        assertEquals(1, explained)
         node(R.string.disclosure_not_now).performClick()
         node(R.string.disclosure_title).assertDoesNotExist()
     }
