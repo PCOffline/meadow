@@ -247,7 +247,7 @@ permissions**, so the Release workflow can publish releases. Save.
 | Workflow | When it runs | What it does | Secrets it needs |
 |---|---|---|---|
 | **Build** (`build.yml`) | Every push and pull request | Builds the app, runs unit tests and lint; tests the functions, security rules, hosting pages; runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON` it builds against your backend; without it, it builds the "connect your backend" version |
-| **Release** (`release.yml`) | When you push a tag like `v1.2.0` | Tests, builds and signs the release APK and publishes it on your fork's Releases page | All five below |
+| **Release** (`release.yml`) | After Build passes on `main` (once you turn it on, 7.5), when you push a tag like `v1.2.0`, or when you run it from the Actions tab | Tests, builds and signs the release APK and publishes it on your fork's Releases page | All five below |
 | **Screenshots** (`screenshots.yml`) | Pushes whose commit message contains `[screenshots]` | Re-renders the README images and commits them | None |
 
 The workflows never deploy the backend. Deploy it from your computer (step 4) whenever
@@ -279,16 +279,38 @@ add each of these:
 | `MEADOW_KEY_ALIAS` | The key alias, for example `meadow` |
 | `MEADOW_KEY_PASSWORD` | The key password |
 
-### 7.5 Publish a release
+### 7.5 Publish releases
+
+**Automatically.** Open **Settings → Secrets and variables → Actions → Variables → New
+repository variable** and add `AUTO_RELEASE` with the value `true`. From then on, every push to
+`main` that passes Build and changes the app publishes a release:
+
+- The first release is `1.0.0`. Each one after raises the last part: `1.0.0`, `1.0.1`, `1.0.2`.
+- Put `[minor]` in a commit message to raise the middle part instead (`1.0.2` → `1.1.0`), or
+  `[major]` for the first (`1.1.0` → `2.0.0`).
+- Put `[skip release]` in a commit message to not release that push; its changes go out with the
+  next release.
+- Pushes that only change other files, like the docs, the backend or the workflows, don't release.
+
+A release goes out as soon as Build passes, so deploy any backend changes it needs first
+(step 8).
+
+The Release run says why when it skips. Delete the variable, or set it to anything but `true`, to
+stop.
+
+**By hand.** Push a tag with the exact version you want:
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The Release workflow appears under **Actions**. When it finishes, the signed APK is on your
-fork's **Releases** page as `meadow-1.0.0.apk`. Versions must look like `v1.2.3` and must go up
-with every release.
+Or open **Actions → Release → Run workflow**, keep `main`, and pick which part of the version to
+raise.
+
+Either way, the signed APK appears on your fork's **Releases** page as `meadow-1.0.0.apk`.
+Versions must look like `1.2.3` and must go up with every release; the automatic and manual ways
+both continue from the highest `v*` tag.
 
 Release builds check for updates on the repository that built them, so copies installed from your
 fork update from your fork's releases. People can turn the checks off in Settings. If you
@@ -312,8 +334,9 @@ npm ci && npm --prefix functions ci
 firebase deploy --only firestore,functions,storage,hosting
 ```
 
-Deploy the backend **before** releasing an app that depends on it. Finally, tag a new release
-(step 7.5).
+Deploy the backend **before** releasing an app that depends on it. With automatic releases on,
+that means before pushing to `main`, since the push itself releases the app. Otherwise, publish a
+release by hand (step 7.5).
 
 ## Developing against the emulators
 

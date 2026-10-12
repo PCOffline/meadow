@@ -1,33 +1,79 @@
 name: Release
 
-# Push a tag like v1.2.0 to publish a signed APK as a GitHub release.
-# The app's updater reads these releases, so every release must be signed with the same key.
+# Publishes a signed APK as a GitHub release. The app's updater reads these releases, so every
+# release must be signed with the same key. Three ways to release:
+# - Automatically, once Build passes on main, when the repository variable AUTO_RELEASE is "true"
+#   and the app changed since the last release. Each release raises the patch version; a commit
+#   message with [minor] or [major] raises that part instead, and [skip release] skips one.
+# - Push a tag like v1.2.0 to release exactly that version.
+# - Actions → Release → Run workflow on main, choosing which part of the version to raise.
+# .github/scripts/plan_release.py decides whether to release and picks the version.
 on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+    branches: [main]
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to raise
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 permissions:
   contents: write
 
+# One release at a time, so two quick merges can't claim the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
+    # Automatic runs only for passing pushes to this repository's main, and only when enabled.
+    if: >-
+      github.event_name != 'workflow_run' || (
+        vars.AUTO_RELEASE == 'true' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
+      - name: Only release from main
+        if: github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch
+        run: |
+          echo "::error::Run this workflow on ${{ github.event.repository.default_branch }}"
+          exit 1
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # The whole history and tags, to find the last release and what changed since.
+          fetch-depth: 0
+      - name: Choose the version
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          BUMP: ${{ inputs.bump }}
+        run: python3 .github/scripts/plan_release.py
+      - name: Nothing to release
+        if: steps.plan.outputs.release != 'true'
+        env:
+          REASON: ${{ steps.plan.outputs.reason }}
+        run: echo "::notice::No release, because $REASON"
       - uses: actions/setup-java@v6
+        if: steps.plan.outputs.release == 'true'
         with:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v6
-      - name: Check the tag is a version
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME must look like v1.2.3"
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+        if: steps.plan.outputs.release == 'true'
       - name: Add Firebase config
+        if: steps.plan.outputs.release == 'true'
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
@@ -37,6 +83,7 @@ jobs:
           fi
           echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
       - name: Add signing key
+        if: steps.plan.outputs.release == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.MEADOW_KEYSTORE_BASE64 }}
         run: |
@@ -47,16 +94,30 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
           echo "MEADOW_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - name: Test and build
+        if: steps.plan.outputs.release == 'true'
         env:
+          VERSION: ${{ steps.plan.outputs.version }}
           MEADOW_KEYSTORE_PASSWORD: ${{ secrets.MEADOW_KEYSTORE_PASSWORD }}
           MEADOW_KEY_ALIAS: ${{ secrets.MEADOW_KEY_ALIAS }}
           MEADOW_KEY_PASSWORD: ${{ secrets.MEADOW_KEY_PASSWORD }}
         # Copies built from a fork look for updates on that fork's releases.
         run: ./gradlew testDebugUnitTest assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
       - name: Publish
+        if: steps.plan.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          SHA: ${{ steps.plan.outputs.sha }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk "meadow-$VERSION.apk"
-          gh release create "$GITHUB_REF_NAME" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --verify-tag
-          rm -f "$RUNNER_TEMP/release.jks"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --verify-tag
+          else
+            # Creates the tag on the released commit. Tags made with this token don't start
+            # another Release run.
+            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --target "$SHA"
+          fi
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
