@@ -90,6 +90,14 @@ android {
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric loads a whole Android framework per test class.
+            it.maxHeapSize = "3g"
+            it.testLogging {
+                events("failed")
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            }
+        }
         // Each end-to-end test starts from a freshly cleared app.
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
