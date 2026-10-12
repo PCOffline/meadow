@@ -24,3 +24,6 @@ backend/hosting/.well-known/
 # Signing keys must never be committed
 *.jks
 *.keystore
+
+backend/.firebase/*.cache
+backend/functions/*.log
