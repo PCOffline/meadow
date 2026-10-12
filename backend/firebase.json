@@ -65,7 +65,8 @@
       }
     ],
     "predeploy": [
-      "node \"$PROJECT_DIR/render-legal.mjs\""
+      "node \"$PROJECT_DIR/render-legal.mjs\"",
+      "node \"$PROJECT_DIR/render-app-links.mjs\""
     ]
   },
   "storage": {

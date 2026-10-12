@@ -158,9 +158,15 @@ a cleanup policy for function images, say yes.
 ### 4. Make invite and sign-in links open the app
 Invite links (`https://<project-id>.web.app/i/…`) and passwordless sign-in links
 (`https://<project-id>.web.app/__/auth/links…`) open straight in Meadow once Android trusts your
-domain. Put your signing keys' **SHA-256** fingerprints (from `./gradlew signingReport`) into
-`backend/hosting/.well-known/assetlinks.json` and deploy hosting again. Without it, invite links
-still work through the web page's *Open in Meadow* button, but sign-in links open in the browser.
+domain:
+1. Run `./gradlew signingReport` and copy the **SHA-256** of each key you build with.
+2. Add them in the Firebase console (**⚙ Project settings → Your apps → Add fingerprint**).
+3. Add them to `"sha256"` in `backend/app-links.json`, then deploy hosting again
+   (`firebase deploy --only hosting`). The deploy turns them into
+   `/.well-known/assetlinks.json`.
+
+Without this, invite links still work through the web page's *Open in Meadow* button, but
+sign-in links open in the browser, which shows a page asking to open them on the phone.
 
 ### 5. Build
 ```bash

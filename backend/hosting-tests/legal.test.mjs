@@ -40,3 +40,14 @@ test("the privacy notice says who to contact and names its processors", () => {
   assert.match(html, /github\.com\/PCOffline\/meadow/);
   assert.match(html, /Firebase|Google/);
 });
+
+test("app links list every signing key, and refuse anything that isn't a fingerprint", async () => {
+  const { assetLinks } = await import("../render-app-links.mjs");
+  const key = "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89";
+  assert.equal(assetLinks({ packageName: "dev.pcoffline.meadow", sha256: [] }), null);
+  const [entry] = assetLinks({ packageName: "dev.pcoffline.meadow", sha256: [key.toLowerCase()] });
+  assert.deepEqual(entry.relation, ["delegate_permission/common.handle_all_urls"]);
+  assert.equal(entry.target.package_name, "dev.pcoffline.meadow");
+  assert.deepEqual(entry.target.sha256_cert_fingerprints, [key]);
+  assert.throws(() => assetLinks({ packageName: "x", sha256: ["REPLACE_ME"] }), /fingerprint/);
+});

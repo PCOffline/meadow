@@ -19,3 +19,4 @@ backend/*-debug.log
 backend/hosting/privacy.html
 backend/hosting/terms.html
 backend/hosting/licenses.html
+backend/hosting/.well-known/
