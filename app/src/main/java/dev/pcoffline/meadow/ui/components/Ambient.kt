@@ -60,6 +60,7 @@ import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import nl.dionsegijn.konfetti.core.models.Shape
+import nl.dionsegijn.konfetti.xml.image.ImageUtil
 import androidx.compose.ui.platform.LocalContext
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
@@ -294,7 +295,7 @@ fun PetalBurst(trigger: Int, modifier: Modifier = Modifier) {
     val colors = Garden.colors.petals.map { it.toArgb() }
     val context = LocalContext.current
     val flower = remember { ContextCompat.getDrawable(context, R.drawable.ic_flower) }
-    val shapes = listOfNotNull(Shape.Circle, Shape.Rectangle(0.55f), flower?.let { Shape.DrawableShape(it) })
+    val shapes = listOfNotNull(Shape.Circle, Shape.Rectangle(0.55f), flower?.let { ImageUtil.loadDrawable(it) })
     // Re-keying restarts the particle system for every new celebration.
     key(trigger) {
         KonfettiView(

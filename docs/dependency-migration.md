@@ -38,7 +38,7 @@ Latest stable versions as of 12 October 2026.
 | kotlinx-coroutines | 1.10.2 | 1.11.0 | None used |
 | kotlinx-serialization | 1.8.1 | 1.11.0 | None used |
 | Coil | 3.2.0 | 3.6.3 | Needs Kotlin 2.4 and compileSdk 37; 3.6.3 fixes R8 with AGP 9.4 |
-| konfetti-compose | 2.0.4 | 2.0.5 | Fixes an idling-resource timeout in instrumentation tests |
+| konfetti-compose | 2.0.4 | 2.0.5 | `Shape.DrawableShape` now takes a `CoreImage`; drawables go through `ImageUtil.loadDrawable`. Fixes an idling-resource timeout in instrumentation tests |
 | multiplatform-markdown-renderer-m3 | 0.34.0 | 0.45.0 | Only `Markdown(content, modifier)` is used; removed APIs don't apply |
 | org.jetbrains:markdown (tests) | 0.7.3 | 0.7.16 | Parser fixes |
 | Robolectric | 4.14.1 | 4.17 | Deprecated symbols removed (only `shadowOf` used). SDK 36+ needs Java 21; tests stay on SDK 34 |
