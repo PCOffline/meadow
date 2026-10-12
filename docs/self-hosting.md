@@ -167,7 +167,9 @@ npm --prefix functions ci     # the Cloud Functions' own packages
 firebase deploy --only firestore,functions,storage,hosting
 ```
 
-`firebase use --add` writes `backend/.firebaserc`, which stays out of git.
+`firebase use --add` writes `backend/.firebaserc`, which stays out of git. With
+[just](https://just.systems) the same is `just setup`, `just use-project` and `just deploy`; `just`
+lists the other commands, such as `just deploy-rules` or `just deploy-functions`.
 
 The deploy:
 

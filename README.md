@@ -116,6 +116,9 @@ project. To run your own copy, see [Running your own Meadow](docs/self-hosting.m
 
 ## Tests
 
+The `justfile` has a shortcut for each of these and for building, installing and deploying: run
+`just` to list them (for example `just check`, `just install-trace` or `just deploy`).
+
 | What | Command |
 |---|---|
 | App unit, screen and accessibility tests | `./gradlew testDebugUnitTest` |
