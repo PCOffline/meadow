@@ -44,6 +44,11 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
 
     val uid: Flow<String?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener {
+            Trace.log {
+                val user = it.currentUser
+                if (user == null) "auth: signed out"
+                else "auth: ${user.uid} anonymous=${user.isAnonymous} providers=${user.providerData.map { p -> p.providerId }}"
+            }
             _anonymous.value = it.currentUser?.isAnonymous == true
             trySend(it.currentUser?.uid)
         }

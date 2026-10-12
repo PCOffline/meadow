@@ -348,7 +348,8 @@ Android emulator):
 ./gradlew installDebug -Pmeadow.emulatorHost=10.0.2.2
 ```
 
-The README's *Tests* section lists every test suite and how to run it.
+The README's *Tests* section lists every test suite and how to run it. To watch every request
+and why it was allowed or refused, see [Debugging Meadow](debugging.md).
 
 ## Troubleshooting
 
@@ -410,7 +411,8 @@ couldn't read your profile from Firestore. The message under the title says why:
 - *"You seem to be offline"*, or the loader says it's taking longer than usual: the phone can't
   reach Firebase. Check its connection.
 
-For the exact error, connect the phone and run `adb logcat -s MeadowSync`.
+For the exact error, connect the phone and run `adb logcat -s MeadowSync`, or build with trace
+mode (see [Debugging Meadow](debugging.md)).
 
 **The app says "Meadow's server can't do this right now".** The app called a function that
 isn't deployed where it looked. Usually the app was built with a different `MEADOW_REGION` than

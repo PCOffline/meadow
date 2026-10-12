@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.google.firebase.functions.HttpsCallableResult
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
@@ -23,7 +24,7 @@ class Backend {
 
     fun user(uid: String) = db.collection("users").document(uid)
 
-    /** Owner-only document: who looks after whom, push tokens and preferences. */
+    /** Owner-only document: who looks after whom, the phones to push to, and preferences. */
     fun account(uid: String) = user(uid).collection("private").document("account")
 
     /** Write-only: when this phone last checked in. Nobody can read it but the backend. */
@@ -39,7 +40,7 @@ class Backend {
     suspend fun call(name: String, data: Map<String, Any?> = emptyMap(), timeoutSeconds: Long = DEFAULT_TIMEOUT_S): Map<String, Any?> {
         try {
             val callable = functions.getHttpsCallable(name).apply { setTimeout(timeoutSeconds, TimeUnit.SECONDS) }
-            val result = callable.call(data).await()
+            val result = Trace.request<HttpsCallableResult>("call $name $data", describe = { it.data.toString() }) { callable.call(data).await() }
             @Suppress("UNCHECKED_CAST")
             return (result.data as? Map<String, Any?>) ?: emptyMap()
         } catch (e: FirebaseFunctionsException) {

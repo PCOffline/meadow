@@ -1,7 +1,6 @@
 package dev.pcoffline.meadow.data
 
 import android.util.Log
-import com.google.firebase.firestore.snapshots
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.pcoffline.meadow.AppGraph
@@ -90,7 +89,7 @@ class SyncManager(
         var pushRegistered = false
         var appearanceSynced = false
         // The name card plus the owner-only account (who looks after whom, settings, status).
-        combine(backend.user(uid).snapshots(), backend.account(uid).snapshots()) { doc, accountDoc -> doc to accountDoc }
+        combine(backend.user(uid).tracedSnapshots(), backend.account(uid).tracedSnapshots()) { doc, accountDoc -> doc to accountDoc }
             .catch { e ->
                 // Without this the app would wait forever. A profile already shown stays, so
                 // limits keep working; the cause is logged for whoever runs the backend.

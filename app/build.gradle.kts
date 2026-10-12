@@ -73,9 +73,13 @@ android {
         debug {
             // -Pmeadow.emulatorHost=10.0.2.2 points debug builds at the Firebase emulators (end-to-end tests).
             buildConfigField("String", "EMULATOR_HOST", "\"${findProperty("meadow.emulatorHost") ?: ""}\"")
+            // -Pmeadow.trace=true logs every request to Firebase and its answer (see docs/debugging.md).
+            buildConfigField("boolean", "TRACE", "${findProperty("meadow.trace") == "true"}")
         }
         release {
             buildConfigField("String", "EMULATOR_HOST", "\"\"")
+            // The trace includes people's data, so release builds never have it.
+            buildConfigField("boolean", "TRACE", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

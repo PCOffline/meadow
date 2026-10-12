@@ -127,7 +127,8 @@ project. To run your own copy, see [Running your own Meadow](docs/self-hosting.m
 | End to end, on an Android emulator | Start the Firebase emulators (`npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2` |
 
 Building and testing need Java 21 or newer (CI uses 25) and Node 24; `mise install` sets both up.
-CI runs everything on every pull request and every push to `main`.
+CI runs everything on every pull request and every push to `main`. To see every request the app
+makes and what comes back, see [Debugging Meadow](docs/debugging.md).
 
 ## Contributing
 
