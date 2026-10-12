@@ -15,7 +15,7 @@ interface Person {
 export const errors = {
   signIn: "Please sign in first.",
   noProfile: "That person hasn't set up Meadow yet.",
-  generic: "Something in that request wasn't right.",
+  generic: "Something in that didn't look right. Please check it and try again.",
   needsEmail: "Add an email to your account first, so your garden can't get lost.",
   noBumblebees: "Invite a Bumblebee first.",
   noFriendCode: "Couldn't find a free friend code. Please try again.",
