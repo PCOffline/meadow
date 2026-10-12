@@ -65,6 +65,9 @@ neither existed (Firebase JS SDK's Node 24 requirement, Robolectric's SDK and JD
 
 ## Steps
 
+All five are done; CI (Android build, unit tests, lint, R8 release, rules, functions, emulator
+integration and end-to-end tests) is green after each.
+
 1. **Backend.** TypeScript 7, firebase-admin 14, firebase-functions 7, zod, marked; functions
    runtime Node 24; build hook and `tsconfig` fixes; grpc override.
 2. **Build toolchain and runtimes.** Gradle 9.8.1, AGP 9.4.0, Kotlin 2.4.21 (remove the
@@ -72,18 +75,17 @@ neither existed (Firebase JS SDK's Node 24 requirement, Robolectric's SDK and JD
    workflow runs `testDebugUnitTest`). CI on Node 24 and Java 21 everywhere; `mise.toml`
    updated; docs updated.
 3. **Libraries.** compileSdk 37 with the AndroidX set, Compose BOM, kotlinx, Coil, markdown
-   renderer, konfetti, Robolectric and androidx.test.
-4. **Java 25.** Move CI and `mise.toml` to Java 25 for the Gradle build, unit tests and Firebase
-   emulators. If any of them fails on 25 and the failure isn't ours to fix, stay on 21 and
-   record why here.
-5. **Screenshots.** Re-render the README images after Material 3 1.4 (`[screenshots]` commit).
+   renderer, konfetti, Robolectric and androidx.test. Follow-ups CI asked for: konfetti's
+   `CoreImage` shapes, and Compose lint's observable locale and resource reads.
+4. **Java 25.** CI and `mise.toml` on Temurin 25: Gradle, AGP, R8, Robolectric and the Firebase
+   emulators all pass on it. The docs keep 21 as the minimum.
+5. **Screenshots.** Re-rendered for Material 3 1.4 by the `[screenshots]` workflow.
 
 ## Risks
 
 - KGP 2.4.21 is tested up to Gradle 9.7 and AGP 9.3.1. Newer versions are allowed but may warn.
-- R8 with AGP 9.4 and Kotlin module names: if the release build fails, set the Kotlin module
-  name explicitly.
-- AGP and Robolectric on Java 25 aren't officially confirmed; CI covers both.
+- AGP and Robolectric on Java 25 aren't officially confirmed; CI covers both, so a regression
+  would show there first.
 - Material 3 1.4 and Compose 1.9+ semantics changes can affect screenshot and accessibility
   tests.
 
