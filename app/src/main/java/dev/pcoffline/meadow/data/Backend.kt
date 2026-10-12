@@ -74,17 +74,23 @@ class Backend {
         private const val DEFAULT_TIMEOUT_S = 70L
         private const val TAG = "MeadowBackend"
 
-        /** The codes Meadow's backend throws, always with text written for people (see copy.ts). */
-        private val BACKEND_CODES = setOf(
-            FirebaseFunctionsException.Code.ALREADY_EXISTS,
-            FirebaseFunctionsException.Code.FAILED_PRECONDITION,
-            FirebaseFunctionsException.Code.INVALID_ARGUMENT,
-            FirebaseFunctionsException.Code.NOT_FOUND,
-            FirebaseFunctionsException.Code.PERMISSION_DENIED,
-            FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED,
-            FirebaseFunctionsException.Code.UNAUTHENTICATED,
-            FirebaseFunctionsException.Code.UNAVAILABLE,
-        )
+        /**
+         * The codes Meadow's backend throws, always with text written for people (see copy.ts).
+         * Lazy: Code's own setup needs the Android runtime, which plain JVM tests of classes that
+         * merely reference Backend don't have.
+         */
+        private val BACKEND_CODES by lazy {
+            setOf(
+                FirebaseFunctionsException.Code.ALREADY_EXISTS,
+                FirebaseFunctionsException.Code.FAILED_PRECONDITION,
+                FirebaseFunctionsException.Code.INVALID_ARGUMENT,
+                FirebaseFunctionsException.Code.NOT_FOUND,
+                FirebaseFunctionsException.Code.PERMISSION_DENIED,
+                FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED,
+                FirebaseFunctionsException.Code.UNAUTHENTICATED,
+                FirebaseFunctionsException.Code.UNAVAILABLE,
+            )
+        }
 
         /**
          * The backend's own message for a failed call, or null when the failure came from Firebase
