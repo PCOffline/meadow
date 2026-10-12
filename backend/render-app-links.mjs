@@ -1,5 +1,5 @@
 // Writes hosting/.well-known/assetlinks.json from app-links.json, so Android opens invite and
-// sign-in links straight in Meadow. Runs before every hosting deploy (see firebase.json).
+// sign-in links straight in Meadow. Runs before every hosting deploy (see predeploy.cjs).
 // Add each signing key's SHA-256 (./gradlew signingReport) to "sha256" in app-links.json.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
@@ -15,7 +15,7 @@ export function assetLinks({ packageName, sha256 }) {
   }];
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function writeAssetLinks() {
   const config = JSON.parse(readFileSync(new URL("app-links.json", import.meta.url), "utf8"));
   const target = new URL("hosting/.well-known/assetlinks.json", import.meta.url);
   const links = assetLinks(config);
