@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Voice: warm, calm and plain. Sentence case. At most one emoji, at the end.
+    Terms (use exactly these):
+      Bumblebee / Bumblebees  a friend who looks after your garden (code calls them "approvers")
+      garden                  your limits together
+      limit                   time allowed for one app, per day and/or week
+      resting                 an app whose time is up for now
+      extra time              what you ask a Bumblebee for
+      say yes / not today     a Bumblebee's answers
+      emergency unlock        lifting limits without a Bumblebee
+    The backend's functions/src/copy.ts uses the same terms for notifications.
+-->
+<resources>
+    <string name="app_name">Meadow</string>
+    <string name="accessibility_label">Meadow garden keeper</string>
+    <string name="accessibility_description">Meadow notices which app is on screen so it can gently close apps once their time is up. It never reads what you type, and nothing on your screen leaves your phone.</string>
+    <string name="device_admin_label">Meadow uninstall protection</string>
+    <string name="device_admin_description">Keeps Meadow from being uninstalled without first turning this off. Your Bumblebees are told if it\'s turned off.</string>
+
+    <!-- Shared -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_send">Send</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_keep">Keep</string>
+    <string name="action_ok">OK</string>
+    <string name="action_more">More options</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_chat">Chat</string>
+    <string name="loading_garden">Gathering petals…</string>
+    <string name="time_just_now">just now</string>
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+    <string name="greeting_night">Hello, night owl</string>
+    <string name="flower_picker_title">Pick your flower</string>
+    <string name="flower_picker_item">Flower %1$s</string>
+
+    <!-- Tabs -->
+    <string name="tab_garden">Garden</string>
+    <string name="tab_growth">Growth</string>
+    <string name="tab_requests">Requests</string>
+    <string name="tab_circle">Circle</string>
+    <string name="tab_chats">Chats</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="error_offline">You seem to be offline. Check your connection and try again.</string>
+    <string name="error_auth_invalid_email">That email address doesn\'t look right.</string>
+    <string name="error_auth_wrong_credentials">That email and password don\'t match.</string>
+    <string name="error_auth_email_taken">That email already has a Meadow garden. Try signing in instead.</string>
+    <string name="error_auth_weak_password">Use at least 6 characters for your password.</string>
+    <string name="error_auth_too_many">Too many tries. Take a short break and try again.</string>
+    <string name="error_auth_recent_login">For your safety, please sign in again first.</string>
+    <string name="error_sign_in_first">Please sign in first.</string>
+    <string name="error_auth_other_method">That email already has a garden with another way to sign in. Sign in that way first.</string>
+    <string name="error_link_invalid">That sign-in link has expired or was already used. Ask for a new one.</string>
+    <string name="error_name_required">Please choose a name.</string>
+    <string name="error_email_required">Enter your email first.</string>
+    <string name="error_set_a_limit">Set a daily or weekly limit.</string>
+    <string name="error_photo">That picture couldn\'t be opened. Try another one.</string>
+    <string name="error_bad_invite_link">That doesn\'t look like a Meadow invite link.</string>
+    <string name="error_emergency_minutes">Pick 15, 30 or 60 minutes.</string>
+    <string name="error_emergency_reason">Please say briefly what the emergency is.</string>
+    <string name="error_emergency_offline_used">You can\'t reach Meadow right now, and this month\'s offline emergency unlock is used up.</string>
+
+    <!-- Durations -->
+    <string name="duration_minutes">%1$dm</string>
+    <string name="duration_hours">%1$dh</string>
+    <string name="duration_hours_minutes">%1$dh %2$dm</string>
+    <string name="duration_under_a_minute">&lt;1m</string>
+    <string name="update_failed_checksum">The download didn\'t check out, so it wasn\'t installed. Please try again.</string>
+    <string name="update_failed_signature">This update wasn\'t signed like your Meadow, so it can\'t replace it. Reinstall from the releases page if you moved between builds.</string>
+    <string name="update_failed_install">Android couldn\'t install the update. Please try again.</string>
+    <string name="update_cancelled">Update cancelled.</string>
+</resources>

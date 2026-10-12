@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="requests_title">Requests</string>
+    <string name="requests_subtitle">Asking for extra time, and answering friends</string>
+    <string name="requests_tab_for_you">For you</string>
+    <string name="requests_tab_for_you_count">For you (%1$d)</string>
+    <string name="requests_tab_yours">Yours</string>
+    <string name="requests_empty_for_you_title">Nothing to answer</string>
+    <string name="requests_empty_for_you_body">When a friend you look after asks for extra time, it shows up here.</string>
+    <string name="requests_empty_yours_title">No requests yet</string>
+    <string name="requests_empty_yours_body">When an app is resting, you can ask your Bumblebees for a little extra time.</string>
+    <string name="requests_ask_button">Ask for extra time</string>
+    <string name="requests_invite_button">Invite a Bumblebee</string>
+
+    <string name="request_you_asked">You asked for</string>
+    <string name="request_they_ask">%1$s asks for</string>
+    <string name="quoted">“%1$s”</string>
+    <string name="request_decided_yes">%1$s said yes</string>
+    <string name="request_decided_no">%1$s said not today</string>
+    <string name="request_decided_with_note">%1$s: “%2$s”</string>
+    <string name="request_say_yes">Say yes 🌸</string>
+    <string name="request_not_today">Not today</string>
+    <string name="request_withdraw">Withdraw</string>
+    <string name="request_withdrawn">Request withdrawn</string>
+    <string name="request_sent_yes">Your yes is on its way 🌸</string>
+    <string name="request_sent_no">Your answer is on its way 🍃</string>
+    <string name="request_sending_answer">Sending your answer…</string>
+    <string name="request_status_waiting">Waiting</string>
+    <string name="request_status_yes">Yes 🌸</string>
+    <string name="request_status_no">Not today</string>
+    <string name="request_status_withdrawn">Withdrawn</string>
+    <string name="request_status_expired">Expired</string>
+    <string name="request_decide_yes_title">Say yes to %1$s?</string>
+    <string name="request_decide_no_title">Not today?</string>
+    <string name="request_decide_less">You can give a little less if you like:</string>
+    <string name="request_decide_note">A kind word (optional)</string>
+
+    <string name="ask_title">Ask for a little extra time</string>
+    <string name="ask_no_limits">You haven\'t planted any limits yet.</string>
+    <string name="ask_how_much">How much?</string>
+    <string name="ask_why">Why? It helps them say yes</string>
+    <string name="ask_sending">Sending…</string>
+    <string name="ask_sent">Asked your Bumblebees 💌</string>
+</resources>

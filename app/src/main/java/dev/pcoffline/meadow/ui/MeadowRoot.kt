@@ -1,0 +1,325 @@
+package dev.pcoffline.meadow.ui
+
+import androidx.annotation.StringRes
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.LocalFlorist
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.ProfileState
+import dev.pcoffline.meadow.data.RequestStatus
+import dev.pcoffline.meadow.data.UserProfile
+import dev.pcoffline.meadow.ui.auth.AuthScreen
+import dev.pcoffline.meadow.ui.auth.EmailLinkDialog
+import dev.pcoffline.meadow.ui.auth.ProfileSetupScreen
+import dev.pcoffline.meadow.ui.chat.ChatListScreen
+import dev.pcoffline.meadow.ui.chat.ChatScreen
+import dev.pcoffline.meadow.ui.circle.AcceptInviteDialog
+import dev.pcoffline.meadow.ui.circle.CircleScreen
+import dev.pcoffline.meadow.ui.circle.FriendScreen
+import dev.pcoffline.meadow.ui.components.Loading
+import dev.pcoffline.meadow.ui.components.PetalBurst
+import dev.pcoffline.meadow.ui.home.GardenScreen
+import dev.pcoffline.meadow.ui.legal.LegalDoc
+import dev.pcoffline.meadow.ui.legal.LegalScreen
+import dev.pcoffline.meadow.ui.legal.TermsUpdateDialog
+import dev.pcoffline.meadow.ui.limits.AppPickerScreen
+import dev.pcoffline.meadow.ui.profile.ProfileScreen
+import dev.pcoffline.meadow.ui.limits.LimitEditorScreen
+import dev.pcoffline.meadow.ui.navigation.ChatRoute
+import dev.pcoffline.meadow.ui.navigation.ChatsRoute
+import dev.pcoffline.meadow.ui.navigation.CircleRoute
+import dev.pcoffline.meadow.ui.navigation.DeepLinks
+import dev.pcoffline.meadow.ui.navigation.FriendRoute
+import dev.pcoffline.meadow.ui.navigation.GardenRoute
+import dev.pcoffline.meadow.ui.navigation.LegalRoute
+import dev.pcoffline.meadow.ui.navigation.LimitRoute
+import dev.pcoffline.meadow.ui.navigation.ProfileRoute
+import dev.pcoffline.meadow.ui.navigation.PickAppRoute
+import dev.pcoffline.meadow.ui.navigation.RequestsRoute
+import dev.pcoffline.meadow.ui.navigation.SettingsRoute
+import dev.pcoffline.meadow.ui.navigation.SetupRoute
+import dev.pcoffline.meadow.ui.navigation.StatsRoute
+import dev.pcoffline.meadow.ui.requests.RequestsScreen
+import dev.pcoffline.meadow.ui.settings.SettingsScreen
+import dev.pcoffline.meadow.ui.setup.BackendMissingScreen
+import dev.pcoffline.meadow.ui.setup.SetupScreen
+import dev.pcoffline.meadow.ui.stats.StatsScreen
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+@Composable
+fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
+    if (!AppGraph.backendReady) {
+        BackendMissingScreen()
+        return
+    }
+    val state by AppGraph.sync.profile.collectAsStateWithLifecycle()
+    val creating by AppGraph.auth.creatingProfile.collectAsStateWithLifecycle()
+    val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
+    val s = state
+    val signInLink by AppGraph.auth.incomingLink.collectAsStateWithLifecycle()
+    signInLink?.let { EmailLinkDialog(it) }
+    // Onboarding stays put while a new garden is planted, and after a failed try (so its error
+    // shows), instead of flashing the "Almost there" screen meant for accounts with an email.
+    val onboarding = s == ProfileState.SignedOut || creating || (s == ProfileState.Missing && anonymous)
+    if (onboarding) {
+        AuthScreen()
+    } else {
+        when (s) {
+            ProfileState.Loading -> Loading()
+            ProfileState.Missing -> ProfileSetupScreen()
+            is ProfileState.Ready -> MainScaffold(s.profile, pendingRoute)
+            ProfileState.SignedOut -> Unit
+        }
+    }
+}
+
+internal enum class Tab(
+    val route: Any,
+    val matches: (NavDestination) -> Boolean,
+    @StringRes val label: Int,
+    val icon: ImageVector,
+) {
+    GARDEN(GardenRoute, { it.hasRoute<GardenRoute>() }, R.string.tab_garden, Icons.Outlined.LocalFlorist),
+    STATS(StatsRoute, { it.hasRoute<StatsRoute>() }, R.string.tab_growth, Icons.Outlined.BarChart),
+    REQUESTS(RequestsRoute, { it.hasRoute<RequestsRoute>() }, R.string.tab_requests, Icons.Outlined.Inbox),
+    CIRCLE(CircleRoute, { it.hasRoute<CircleRoute>() }, R.string.tab_circle, Icons.Outlined.People),
+    CHATS(ChatsRoute, { it.hasRoute<ChatsRoute>() }, R.string.tab_chats, Icons.Outlined.ChatBubbleOutline),
+}
+
+/** Counts shown on the tab bar. */
+data class Badges(val requests: Int = 0, val invites: Int = 0, val chats: Int = 0)
+
+class MainViewModel(uid: String) : ViewModel() {
+    val badges: StateFlow<Badges> = combine(
+        AppGraph.requests.incoming(uid),
+        AppGraph.social.incomingInvites(uid),
+        AppGraph.chats.chats(uid),
+    ) { incoming, invites, chats ->
+        Badges(
+            requests = incoming.count { it.status == RequestStatus.PENDING },
+            invites = invites.size,
+            chats = chats.count { it.isUnread(uid) },
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Badges())
+}
+
+@Composable
+private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<String?>) {
+    val nav = rememberNavController()
+    val snackbar = remember { SnackbarHostState() }
+    val main = viewModel(key = profile.uid) { MainViewModel(profile.uid) }
+    val badges by main.badges.collectAsStateWithLifecycle()
+    val backStack by nav.currentBackStackEntryAsState()
+    val destination = backStack?.destination
+    val currentTab = destination?.let { d -> Tab.entries.firstOrNull { it.matches(d) } }
+
+    var celebration by remember { mutableIntStateOf(0) }
+    val haptics = LocalHapticFeedback.current
+    val celebrate: () -> Unit = remember {
+        {
+            celebration++
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!AppGraph.protection.current().essentialsReady) nav.navigate(SetupRoute)
+    }
+    val link by pendingRoute.collectAsStateWithLifecycle()
+    LaunchedEffect(link) {
+        val target = link?.let(DeepLinks::toRoute) ?: return@LaunchedEffect
+        pendingRoute.value = null
+        nav.navigate(target) { launchSingleTop = true }
+    }
+    val pendingInvite by AppGraph.store.pendingInvite.collectAsStateWithLifecycle()
+    val acceptedTerms by AppGraph.store.acceptedTerms.collectAsStateWithLifecycle()
+    val accountConfirmed by AppGraph.sync.accountConfirmed.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalCelebrate provides celebrate) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbar) },
+            bottomBar = {
+                if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
+            },
+        ) { padding ->
+            Box(Modifier.padding(padding)) {
+                NavHost(
+                    nav,
+                    startDestination = GardenRoute,
+                    enterTransition = { fadeIn(tween(260)) + slideInVertically(tween(320)) { it / 28 } },
+                    exitTransition = { fadeOut(tween(180)) },
+                    popEnterTransition = { fadeIn(tween(260)) },
+                    popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
+                ) {
+                    composable<SetupRoute> { SetupScreen(onDone = { nav.popBackStack() }) }
+                    composable<GardenRoute> {
+                        GardenScreen(
+                            profile = profile,
+                            onOpenSettings = { nav.navigate(SettingsRoute) },
+                            onOpenProfile = { nav.navigate(ProfileRoute) },
+                            onOpenSetup = { nav.navigate(SetupRoute) },
+                            onPlantLimit = { nav.navigate(PickAppRoute) },
+                            onOpenLimit = { nav.navigate(LimitRoute(it)) },
+                            onOpenCircle = { nav.switchTab(CircleRoute) },
+                        )
+                    }
+                    composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }) }
+                    composable<RequestsRoute> { RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }) }
+                    composable<CircleRoute> {
+                        CircleScreen(
+                            profile = profile,
+                            onOpenChat = { nav.navigate(ChatRoute(it)) },
+                            onOpenFriend = { nav.navigate(FriendRoute(it)) },
+                        )
+                    }
+                    composable<ChatsRoute> { ChatListScreen(profile, onOpenChat = { nav.navigate(ChatRoute(it)) }) }
+                    composable<SettingsRoute> {
+                        SettingsScreen(
+                            profile = profile,
+                            onBack = { nav.popBackStack() },
+                            onOpenSetup = { nav.navigate(SetupRoute) },
+                            onOpenProfile = { nav.navigate(ProfileRoute) },
+                            onOpenLegal = { nav.navigate(LegalRoute(it.name)) },
+                        )
+                    }
+                    composable<ProfileRoute> { ProfileScreen(profile, onBack = { nav.popBackStack() }) }
+                    composable<LegalRoute> { entry ->
+                        LegalScreen(LegalDoc.fromName(entry.toRoute<LegalRoute>().doc), onBack = { nav.popBackStack() })
+                    }
+                    composable<PickAppRoute> {
+                        AppPickerScreen(
+                            onBack = { nav.popBackStack() },
+                            onPick = { nav.navigate(LimitRoute(it)) { popUpTo<PickAppRoute> { inclusive = true } } },
+                        )
+                    }
+                    composable<LimitRoute> { entry ->
+                        LimitEditorScreen(entry.toRoute<LimitRoute>().packageName, onDone = { nav.popBackStack() })
+                    }
+                    composable<ChatRoute> { entry ->
+                        ChatScreen(profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() })
+                    }
+                    composable<FriendRoute> { entry ->
+                        FriendScreen(
+                            me = profile,
+                            uid = entry.toRoute<FriendRoute>().uid,
+                            onBack = { nav.popBackStack() },
+                            onOpenChat = { nav.navigate(ChatRoute(it)) },
+                        )
+                    }
+                }
+                PetalBurst(celebration, Modifier.fillMaxSize())
+            }
+        }
+        if (accountConfirmed && acceptedTerms < LegalDoc.CURRENT_VERSION) {
+            TermsUpdateDialog(onAccept = { scope.launch { AppGraph.profiles.acceptTerms(LegalDoc.CURRENT_VERSION) } })
+        }
+        pendingInvite?.let { token ->
+            AcceptInviteDialog(token = token, onClose = { AppGraph.store.setPendingInvite(null) })
+        }
+    }
+}
+
+/** The bottom tab bar, with counts for new requests, invites and messages. */
+@Composable
+internal fun MeadowTabBar(current: Tab, badges: Badges, onSelect: (Tab) -> Unit) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Tab.entries.forEach { tab ->
+            val count = when (tab) {
+                Tab.REQUESTS -> badges.requests
+                Tab.CIRCLE -> badges.invites
+                Tab.CHATS -> badges.chats
+                else -> 0
+            }
+            TabItem(tab, selected = tab == current, count = count) { onSelect(tab) }
+        }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: Tab, selected: Boolean, count: Int, onClick: () -> Unit) {
+    val iconScale by animateFloatAsState(
+        if (selected) 1.18f else 1f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "tabIcon",
+    )
+    val label = stringResource(tab.label)
+    NavigationBarItem(
+        selected = selected,
+        onClick = onClick,
+        icon = {
+            BadgedBox(badge = { if (count > 0) Badge { Text(count.toString()) } }) {
+                Icon(tab.icon, contentDescription = label, modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale })
+            }
+        },
+        label = { Text(label) },
+        colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer),
+    )
+}
+
+fun NavController.switchTab(route: Any) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}

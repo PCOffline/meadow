@@ -1,0 +1,34 @@
+package dev.pcoffline.meadow.ui.screens
+
+import android.app.Application
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.test.core.app.ApplicationProvider
+import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.a11y.assertAccessible
+import dev.pcoffline.meadow.ui.theme.DarkMode
+import dev.pcoffline.meadow.ui.theme.GardenTheme
+import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import org.junit.Before
+import org.junit.Rule
+
+/** Shared set-up for screen tests: a phone-sized screen, the app graph, strings and a11y checks. */
+abstract class ScreenTest {
+    @get:Rule val compose: ComposeContentTestRule = createComposeRule()
+    protected val app: Application = ApplicationProvider.getApplicationContext()
+
+    @Before
+    fun initGraph() = AppGraph.init(app)
+
+    protected fun text(@StringRes id: Int, vararg args: Any): String = app.getString(id, *args)
+
+    protected fun node(@StringRes id: Int, vararg args: Any) = compose.onNodeWithText(text(id, *args))
+
+    protected fun show(theme: GardenTheme = GardenTheme.MEADOW, mode: DarkMode = DarkMode.LIGHT, content: @Composable () -> Unit) =
+        compose.setContent { MeadowTheme(theme, mode, content) }
+
+    protected fun assertAccessible(requireHeading: Boolean = true) = compose.assertAccessible(compose.density, requireHeading)
+}

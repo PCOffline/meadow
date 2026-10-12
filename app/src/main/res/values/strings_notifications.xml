@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_guardian">Garden keeper</string>
+    <string name="channel_guardian_description">The quiet notification that keeps your limits working.</string>
+    <string name="channel_warnings">Time reminders</string>
+    <string name="channel_warnings_description">A heads-up before an app\'s time runs out.</string>
+    <string name="channel_requests">Requests from friends</string>
+    <string name="channel_requests_description">Friends asking you for extra time or a change to their limits.</string>
+    <string name="channel_decisions">Answers from your Bumblebees</string>
+    <string name="channel_decisions_description">When a Bumblebee says yes or not today.</string>
+    <string name="channel_chat">Messages</string>
+    <string name="channel_social">Invites and Bumblebees</string>
+    <string name="channel_social_description">New Bumblebees, invites, and Bumblebees stepping down.</string>
+    <string name="channel_alerts">Protection alerts</string>
+    <string name="channel_alerts_description">When a friend you look after turns off a protection or uses an emergency unlock.</string>
+
+    <string name="channel_updates">Updates</string>
+    <string name="channel_updates_description">When a new version of Meadow is ready.</string>
+    <string name="notify_update_title">Meadow %1$s is ready 🌱</string>
+    <string name="notify_update_body">Tap to see what\'s new and update.</string>
+
+    <string name="notify_warning_title">%1$s left on %2$s 🌷</string>
+    <string name="notify_warning_body_today">Your %1$s time for today is almost up. Time to wind down.</string>
+    <string name="notify_warning_body_week">Your %1$s time for this week is almost up. Time to wind down.</string>
+    <string name="notify_time_up_title">%1$s is resting now 🌙</string>
+    <string name="notify_time_up_body">You\'ve used the time you set aside. Tap to ask a Bumblebee for extra time.</string>
+
+    <string name="guardian_starting">Looking after your garden 🌱</string>
+    <string name="guardian_no_limits">No limits yet. Plant one in Meadow. 🌱</string>
+    <string name="guardian_left">%1$s: %2$s left</string>
+    <plurals name="guardian_resting">
+        <item quantity="one">%1$d app resting</item>
+        <item quantity="other">%1$d apps resting</item>
+    </plurals>
+    <string name="guardian_joined">%1$s · %2$s</string>
+    <string name="guardian_emergency">🚨 Emergency unlock: limits paused for %1$s</string>
+    <string name="strict_mode_blocked">Strict mode is on. Ask a Bumblebee to turn it off first. 🌿</string>
+    <string name="device_admin_disable_warning">Turning this off lets Meadow be uninstalled. Your Bumblebees will be told.</string>
+</resources>

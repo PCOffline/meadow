@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="garden_greeting">%1$s, %2$s %3$s</string>
+    <string name="garden_screen_time_today">Screen time today</string>
+    <plurals name="garden_across_apps">
+        <item quantity="one">across %1$d app</item>
+        <item quantity="other">across %1$d apps</item>
+    </plurals>
+    <string name="garden_notice_setup">Meadow can\'t look after your limits until usage access and the garden keeper are on.</string>
+    <string name="garden_notice_setup_action">Finish setup</string>
+    <string name="garden_notice_no_bees">Your limits aren\'t locked in yet. Invite a Bumblebee, and from then on only they can give you extra time.</string>
+    <string name="garden_notice_no_bees_action">Invite a Bumblebee</string>
+    <string name="garden_title">Your garden</string>
+    <string name="garden_plant">Plant a limit</string>
+    <string name="garden_empty_title">Plant your first limit</string>
+    <string name="garden_empty_body">Pick an app and choose how long it may bloom each day.</string>
+    <string name="garden_tile_left_today">%1$s left today</string>
+    <string name="garden_tile_left_week">%1$s left this week</string>
+    <string name="garden_tile_resting_today">Resting until tomorrow 🌙</string>
+    <string name="garden_tile_resting_week">Resting until next week 🌙</string>
+    <string name="garden_tile_emergency">Paused for an emergency 🚨</string>
+    <string name="garden_tile_extra">+%1$s extra today 🌸</string>
+</resources>

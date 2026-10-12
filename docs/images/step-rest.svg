@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220" role="img" aria-label="When time is up, the app rests"><title>When time is up, the app rests</title><style>
+.sway{transform-box:fill-box;transform-origin:50% 100%;animation:sway 5s ease-in-out infinite alternate}
+@keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+.drift{animation:drift 70s linear infinite}
+@keyframes drift{from{transform:translateX(-260px)}to{transform:translateX(1500px)}}
+.glow{transform-box:fill-box;transform-origin:center;animation:glow 4s ease-in-out infinite alternate}
+@keyframes glow{from{opacity:.35;transform:scale(.92)}to{opacity:.7;transform:scale(1.08)}}
+.twinkle{animation:twinkle 3s ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.25}to{opacity:1}}
+.fall{animation:fall 26s linear infinite}
+@keyframes fall{from{transform:translate(0,-40px)}to{transform:translate(-140px,470px)}}
+.waft{animation:waft 4.5s ease-in-out infinite alternate}
+@keyframes waft{from{transform:translateX(-26px)}to{transform:translateX(26px)}}
+.tumble{transform-box:fill-box;transform-origin:center;animation:tumble 6s ease-in-out infinite alternate}
+@keyframes tumble{0%{transform:rotate(-35deg) scaleX(1)}50%{transform:rotate(25deg) scaleX(.45)}100%{transform:rotate(80deg) scaleX(.95)}}
+.bob{animation:bob .9s ease-in-out infinite alternate}
+@keyframes bob{from{transform:translateY(-4px)}to{transform:translateY(4px)}}
+.wing{transform-box:fill-box;transform-origin:20% 100%;animation:wing .09s ease-in-out infinite alternate}
+.wing.back{transform-origin:80% 100%;animation-delay:-.045s}
+@keyframes wing{from{transform:rotate(-24deg)}to{transform:rotate(18deg)}}
+.float{animation:float 7s ease-in-out infinite alternate}
+@keyframes float{from{transform:translate(0,0)}to{transform:translate(26px,-22px)}}
+.rise{animation:rise 3s ease-out infinite;opacity:0}
+@keyframes rise{0%{opacity:0;transform:translate(0,0) scale(.7)}25%{opacity:1}100%{opacity:0;transform:translate(14px,-46px) scale(1.15)}}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop 2.4s ease-in-out infinite}
+@keyframes pop{0%,100%{transform:scale(.85)}50%{transform:scale(1.12)}}
+.grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow 4s ease-in-out infinite}
+@keyframes grow{0%{transform:scaleY(.15)}45%,85%{transform:scaleY(1)}100%{transform:scaleY(.15)}}
+.bloom{transform-box:fill-box;transform-origin:center;animation:bloom 4s ease-in-out infinite}
+@keyframes bloom{0%,20%{transform:scale(0)}50%,85%{transform:scale(1)}100%{transform:scale(0)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}.rise{opacity:1}}
+</style><defs><clipPath id="tile"><circle cx="110" cy="110" r="104"/></clipPath></defs><circle cx="110" cy="110" r="104" fill="#FBF3E6"/><g clip-path="url(#tile)"><rect width="220" height="220" fill="#3A4658" opacity=".12"/><path d="M62,36 A22,22 0 1,0 62,80 A17,22 0 1,1 62,36 Z" fill="#E9C46A"/><path d="M0,170 C60,150 160,150 220,170 V220 H0Z" fill="#9CC08E"/><path d="M110,172 C108,150 112,136 114,122 C118,110 104,108 104,112" stroke="#5B7F55" stroke-width="6" fill="none" stroke-linecap="round"/><g transform="rotate(25 110 112)"><ellipse cx="116.0" cy="106.8" rx="10" ry="6" fill="#B4A7D6" transform="rotate(-20 110 112)"/><ellipse cx="122.0" cy="112.0" rx="10" ry="6" fill="#B4A7D6" transform="rotate(0 110 112)"/><ellipse cx="116.0" cy="117.2" rx="10" ry="6" fill="#B4A7D6" transform="rotate(20 110 112)"/><ellipse cx="104.0" cy="117.2" rx="10" ry="6" fill="#B4A7D6" transform="rotate(40 110 112)"/><ellipse cx="98.0" cy="112.0" rx="10" ry="6" fill="#B4A7D6" transform="rotate(60 110 112)"/><ellipse cx="104.0" cy="106.8" rx="10" ry="6" fill="#B4A7D6" transform="rotate(80 110 112)"/><circle cx="110" cy="112" r="7" fill="#F6E3A1"/></g><text class="rise" style="animation-delay:-0s" x="132" y="96" font-family="Georgia,serif" font-size="18" font-weight="700" fill="#6F675A">z</text><text class="rise" style="animation-delay:-1s" x="140" y="90" font-family="Georgia,serif" font-size="22" font-weight="700" fill="#6F675A">z</text><text class="rise" style="animation-delay:-2s" x="148" y="84" font-family="Georgia,serif" font-size="26" font-weight="700" fill="#6F675A">z</text></g><circle cx="110" cy="110" r="104" fill="none" stroke="#E6DCC8" stroke-width="3"/></svg>

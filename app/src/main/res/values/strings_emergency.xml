@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="emergency_title">Emergency unlock</string>
+    <string name="emergency_dialog_title">Emergency unlock 🚨</string>
+    <string name="emergency_dialog_body">For real emergencies, like finding your way, reaching someone, or a crisis at work. Limits lift straight away without a Bumblebee, and your Bumblebees are told at once, with your reason.</string>
+    <string name="emergency_dialog_signed_out">You\'re signed out, so this uses your one offline emergency unlock for the month.</string>
+    <string name="emergency_dialog_used_up">You\'ve used all %1$d emergency unlocks for the last 30 days. Ask a Bumblebee for extra time instead.</string>
+    <string name="emergency_dialog_left">%1$d of %2$d left for the last 30 days</string>
+    <string name="emergency_dialog_just_app">Just %1$s</string>
+    <string name="emergency_dialog_all_apps">All apps</string>
+    <string name="emergency_dialog_reason">What\'s the emergency?</string>
+    <string name="emergency_dialog_reason_hint">A few words. Your Bumblebees will see this.</string>
+    <string name="emergency_dialog_unlock">Unlock now</string>
+    <string name="emergency_dialog_unlock_countdown">Unlock (%1$d)</string>
+    <string name="emergency_dialog_unlocking">Unlocking…</string>
+    <string name="emergency_unlocked">Unlocked until %1$s. Your Bumblebees have been told.</string>
+    <string name="emergency_unlocked_offline">Unlocked until %1$s. Your Bumblebees will be told once you\'re back online.</string>
+    <string name="emergency_banner_all">All limits paused for %1$s</string>
+    <string name="emergency_banner_app">%1$s paused for %2$s</string>
+    <string name="emergency_banner_end">End now</string>
+    <string name="emergency_ended">Limits are back 🌿</string>
+</resources>

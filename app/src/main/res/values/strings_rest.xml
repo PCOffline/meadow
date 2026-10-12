@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rest_title">%1$s is resting 🌙</string>
+    <string name="rest_title_yes">Your Bumblebee said yes 🌸</string>
+    <string name="rest_title_emergency">Emergency unlock on 🚨</string>
+    <string name="rest_body_today">You\'ve used the %1$s you set aside today. It blooms again tomorrow.</string>
+    <string name="rest_body_week">You\'ve used the %1$s you set aside for this week. It blooms again next week.</string>
+    <string name="rest_body_generic">You\'ve used the time you set aside.</string>
+    <string name="rest_body_yes">You have %1$s of extra time. Enjoy it mindfully.</string>
+    <string name="rest_body_emergency">%1$s is open for %2$s. Take care of what you need to.</string>
+    <string name="rest_open">Open %1$s</string>
+    <string name="rest_pending">💌 You asked for %1$s of extra time. We\'ll let you know when a Bumblebee answers.</string>
+    <string name="rest_signed_out">Sign in to Meadow to ask a Bumblebee for extra time.</string>
+    <string name="rest_no_bees">Invite a Bumblebee in Meadow, and you\'ll be able to ask for extra time.</string>
+    <string name="rest_ask">Ask a Bumblebee for extra time</string>
+    <string name="rest_home">Go do something lovely</string>
+    <string name="rest_emergency">Emergency? Unlock now</string>
+</resources>

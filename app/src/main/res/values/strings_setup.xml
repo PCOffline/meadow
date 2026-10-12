@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">Prepare the soil 🌱</string>
+    <string name="setup_body">A few permissions let Meadow keep your promises for you. Your flower blooms as you go.</string>
+    <string name="setup_progress">%1$d of %2$d ready</string>
+    <string name="setup_usage_title">Usage access</string>
+    <string name="setup_usage_body">Lets Meadow measure how long each app is open. Required.</string>
+    <string name="setup_keeper_title">Garden keeper</string>
+    <string name="setup_keeper_body">An accessibility service that notices which app is on screen and gently closes it when its time is up. It never reads what you type, and nothing on your screen leaves your phone. Required.\n\nIf the switch is greyed out, open Meadow\'s App info, tap ⋮ and choose \"Allow restricted settings\", then try again.</string>
+    <string name="setup_notifications_title">Notifications</string>
+    <string name="setup_notifications_body">Reminders before time runs out, answers from your Bumblebees, and messages.</string>
+    <string name="setup_overlay_title">Show over other apps</string>
+    <string name="setup_overlay_body">A backup, so the resting screen still appears if the garden keeper is ever paused.</string>
+    <string name="setup_admin_title">Uninstall protection</string>
+    <string name="setup_admin_body">Makes uninstalling Meadow a deliberate step. If it\'s ever turned off, your Bumblebees are told.</string>
+    <string name="setup_admin_explanation">Keeps Meadow from being removed on a whim. Your Bumblebees are told if this is turned off.</string>
+    <string name="setup_battery_title">Run in the background</string>
+    <string name="setup_battery_body">Keeps the battery saver from putting the garden keeper to sleep.</string>
+    <string name="setup_step_done">Done ✓</string>
+    <string name="setup_step_allow">Allow</string>
+    <string name="setup_done">Into the garden 🌼</string>
+    <string name="setup_needs_essentials">Usage access and the garden keeper are needed</string>
+    <string name="setup_later">I\'ll do this later</string>
+    <string name="backend_missing_title">The garden needs its soil</string>
+    <string name="backend_missing_body">This build of Meadow isn\'t connected to a backend yet. Add your Firebase project\'s google-services.json to the app folder, deploy the backend, then rebuild. The README walks through each step.</string>
+</resources>

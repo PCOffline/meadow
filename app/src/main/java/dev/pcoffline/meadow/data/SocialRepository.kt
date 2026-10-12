@@ -1,0 +1,95 @@
+package dev.pcoffline.meadow.data
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
+
+class SocialRepository(
+    private val backend: Backend,
+    private val store: LocalStore,
+    private val requests: RequestRepository,
+) {
+    private val invites get() = backend.db.collection("invites")
+
+    fun profile(uid: String): Flow<UserProfile?> =
+        backend.user(uid).observe().map { if (it.exists()) it.toProfile() else null }
+
+    fun profiles(uids: List<String>): Flow<List<UserProfile>> {
+        if (uids.isEmpty()) return flowOf(emptyList())
+        return combine(uids.distinct().map { profile(it) }) { list -> list.filterNotNull() }
+    }
+
+    fun incomingInvites(uid: String): Flow<List<Invite>> =
+        invites.whereEqualTo("toUid", uid).whereEqualTo("status", "pending").observe()
+            .map { snapshot -> snapshot.documents.map { it.toInvite() }.sortedByDescending { it.createdAtMillis } }
+
+    fun outgoingInvites(uid: String): Flow<List<Invite>> =
+        invites.whereEqualTo("fromUid", uid).whereEqualTo("status", "pending").observe()
+            .map { snapshot -> snapshot.documents.map { it.toInvite() }.sortedByDescending { it.createdAtMillis } }
+
+    /** Creates a one-time link; whoever accepts it becomes my Bumblebee. */
+    suspend fun createInviteLink(): InviteLink {
+        val result = backend.call("createInviteLink")
+        return InviteLink(
+            token = result["token"] as String,
+            url = result["url"] as String,
+            expiresAtMillis = (result["expiresAt"] as Number).toLong(),
+        )
+    }
+
+    suspend fun previewInviteLink(token: String): InviteLinkPreview {
+        val result = backend.call("previewInviteLink", mapOf("token" to token))
+        return InviteLinkPreview(
+            ownerName = result["ownerName"] as? String ?: "",
+            ownerFlower = result["ownerFlower"] as? String ?: "🌼",
+            status = when (result["status"]) {
+                "expired" -> InviteLinkStatus.EXPIRED
+                "used" -> InviteLinkStatus.USED
+                "own" -> InviteLinkStatus.OWN
+                "already" -> InviteLinkStatus.ALREADY
+                else -> InviteLinkStatus.OK
+            },
+        )
+    }
+
+    /** Becomes the Bumblebee of whoever created the link. */
+    suspend fun acceptInviteLink(token: String) {
+        backend.call("acceptInviteLink", mapOf("token" to token))
+    }
+
+    /** Asks the person with [friendCode] to be my Bumblebee. */
+    suspend fun invite(friendCode: String) {
+        backend.call("sendInvite", mapOf("friendCode" to friendCode.trim().uppercase()))
+    }
+
+    suspend fun respond(inviteId: String, accept: Boolean) {
+        backend.call("respondInvite", mapOf("inviteId" to inviteId, "accept" to accept))
+    }
+
+    suspend fun cancelInvite(inviteId: String) {
+        backend.call("cancelInvite", mapOf("inviteId" to inviteId))
+    }
+
+    /** I stop being [approveeUid]'s Bumblebee. They are notified. */
+    suspend fun stepDown(approveeUid: String) {
+        backend.call("stepDown", mapOf("approveeUid" to approveeUid))
+    }
+
+    /** Removes one of my Bumblebees straight away. They, and my other pals, are notified. */
+    suspend fun removeApprover(approverUid: String) {
+        backend.call("removeApprover", mapOf("approverUid" to approverUid))
+    }
+
+    /** Turning strict mode on is instant; turning it off needs a Bumblebee's yes once you have any. */
+    suspend fun setStrictMode(enabled: Boolean, message: String = ""): ChangeOutcome {
+        val uid = backend.requireUid()
+        if (!enabled && store.approverCount.value > 0) {
+            requests.create(type = RequestType.DISABLE_STRICT_MODE, message = message)
+            return ChangeOutcome.REQUESTED
+        }
+        backend.user(uid).update("strictMode", enabled).await()
+        return ChangeOutcome.APPLIED
+    }
+}
