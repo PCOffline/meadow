@@ -3,7 +3,7 @@
 A cozy Android app for keeping daily and weekly app time limits **with your friends**.
 You plant a limit for an app; when its time is up the app closes and rests until tomorrow.
 The only way to get more time — or to loosen, remove or switch off anything — is to ask one of
-your approvers, and they say yes or no from their own phone.
+your Petal Pals, and they say yes or no from their own phone.
 
 ## Features
 
@@ -12,26 +12,28 @@ your approvers, and they say yes or no from their own phone.
   home with a calm "resting" screen once their time is up. A foreground service polls the usage
   log as a fallback if the accessibility service is ever paused.
 - **Commitments can't be quietly undone.**
-  - Tightening applies immediately; loosening/removing a limit needs an approver's yes.
-  - Adding or removing approvers once you have one needs your existing approvers' yes.
+  - Tightening applies immediately; loosening/removing a limit needs a Petal Pal's yes.
   - Strict mode (optional) keeps Meadow's App info, accessibility toggle, uninstall dialogs and
     the date/time settings out of reach. Turning it off needs approval.
   - Device-admin uninstall protection.
   - **Emergency unlock:** in a real emergency you can lift all limits (or one app's) for 15, 30 or
     60 minutes without waiting for anyone. It's rationed to 3 per rolling 30 days (counted by the
-    backend), needs a written reason and a 5-second confirm, can be ended early, and every approver
+    backend), needs a written reason and a 5-second confirm, can be ended early, and every Petal Pal
     is notified at once with the reason. Without a connection, one offline unlock per 30 days is
     allowed and reported as soon as the phone is back online.
   - Phone, dialer and emergency apps can never be limited.
-  - Approvers are alerted when a protection is switched off, or when a phone stops checking in
+  - Petal Pals are alerted when a protection is switched off, or when a phone stops checking in
     for 6+ hours.
   - All of the above is enforced **server-side** by Firestore rules and Cloud Functions, not just
     in the app UI.
-- **Social:** invite approvers with a 6-character friend code, accept/decline invites, step down,
-  see the people you approve for (their usage today, limits and protection status).
-- **Requests:** ask for 5–60 extra minutes with a note; approvers can approve (optionally fewer
+- **Petal Pals** are the friends who look after your garden (the app's word for "approvers").
+  You can add or remove them any time without anyone's approval; removed pals and your remaining
+  pals are always notified, so nobody can be dropped quietly.
+- **Social:** invite Petal Pals with a 6-character friend code, accept/decline invites, step down,
+  see the friends you're a Petal Pal for (their usage today, limits and protection status).
+- **Requests:** ask for 5–60 extra minutes with a note; Petal Pals can approve (optionally fewer
   minutes), decline with a kind word, or answer straight from the notification.
-- **Chat:** a 1:1 chat opens with each approver; requests appear in it as live cards with
+- **Chat:** a 1:1 chat opens with each Petal Pal; requests appear in it as live cards with
   approve/decline buttons.
 - **Notifications:** 5-minute and 1-minute warnings, time's-up, new requests, answers, messages,
   invites and protection alerts (FCM push).
@@ -39,7 +41,7 @@ your approvers, and they say yes or no from their own phone.
   previous period, monthly heatmap. Finished days are cached so monthly history survives the
   system's short usage-log retention.
 - **No registration to start.** A name and a flower are enough (anonymous Firebase account).
-  An email is required only before inviting your first approver, so commitments survive a
+  An email is required only before inviting your first Petal Pal, so commitments survive a
   reinstall — and the backend refuses invites from email-less accounts.
 - **Look & feel:** cream, moss and petal palette; Fraunces (soft) and Nunito fonts; hand-drawn
   flowers that sprout in and bloom or wilt with the time left; a living sky header that follows
@@ -93,6 +95,13 @@ normal personal usage stays within the free tier).
    Open in Android Studio, or install with `adb install app/build/outputs/apk/debug/app-debug.apk`.
    Without `google-services.json` the app still builds, but shows a "connect your backend" screen.
 
+### Cost
+
+Auth (email and anonymous), Firestore's free quota and Cloud Messaging cost nothing for personal
+use. Cloud Functions need the Blaze (pay-as-you-go) plan, but its free monthly allowance (millions of
+invocations) covers a small group of friends; expect $0 or a few cents for build-image storage.
+Set a budget alert in Google Cloud billing to be safe.
+
 ### CI
 
 `.github/workflows/build.yml` builds the debug APK (uploaded as an artifact) and compiles the
@@ -108,7 +117,7 @@ functions on every push. To get a connected APK from CI, add a repository secret
    - Android 13+ blocks accessibility for sideloaded apps until you open Meadow's
      *App info → ⋮ → Allow restricted settings*.
 3. Plant limits on the Garden tab.
-4. Circle tab → add an email to your garden, then enter your friend's code under *Invite someone to be your approver*; they accept
+4. Circle tab → add an email to your garden, then enter your friend's code under *Invite someone to be your Petal Pal*; they accept
    in their Circle tab. From then on, extra time and loosening need their yes.
 
 ## How enforcement works
@@ -120,13 +129,13 @@ functions on every push. To get a connected APK from CI, add a repository secret
 | `GuardianService` | Foreground service: status notification, fallback polling when accessibility is off, protection checks. |
 | `SyncWorker` | Every 15 min: restarts the guardian if killed, uploads today's usage summary, heartbeat. |
 | `LocalStore` | Enforcement reads limits/grants only from the on-device copy, so limits keep working offline or signed out. |
-| Firestore rules | Clients can only create limits or make them stricter once they have approvers; grants, invites, requests and approver lists are written by Cloud Functions only. |
+| Firestore rules | Clients can only create limits or make them stricter once they have Petal Pals; grants, invites, requests and Petal Pal lists are written by Cloud Functions only. |
 
 ### Limits of what an app can do
 
 No Android app can make itself impossible to remove for the phone's owner: safe mode, a factory
 reset, ADB or a rooted device can always get around it. Meadow's approach is to make bypassing
-deliberate and visible — approvers are told when protections go off or the phone goes quiet.
+deliberate and visible — Petal Pals are told when protections go off or the phone goes quiet.
 
 ## Firestore data model
 

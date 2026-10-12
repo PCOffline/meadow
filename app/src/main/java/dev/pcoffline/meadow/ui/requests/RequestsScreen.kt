@@ -94,12 +94,12 @@ fun RequestsScreen(profile: UserProfile, nav: NavController) {
                         if (tab == 0) {
                             EmptyState(
                                 "🌤️", "Nothing to answer",
-                                "When someone you approve for asks for more time, it shows up here.",
+                                "When someone you're a Petal Pal for asks for more time, it shows up here.",
                             )
                         } else {
                             EmptyState(
                                 "🌱", "No requests yet",
-                                "When an app is resting, you can ask your approvers for a little more time.",
+                                "When an app is resting, you can ask your Petal Pals for a little more time.",
                             )
                         }
                     }
@@ -115,7 +115,7 @@ fun RequestsScreen(profile: UserProfile, nav: NavController) {
                 if (profile.approverIds.isEmpty()) nav.switchTab("circle") else asking = true
             },
             icon = { Icon(Icons.Outlined.MoreTime, contentDescription = null) },
-            text = { Text(if (profile.approverIds.isEmpty()) "Invite an approver" else "Ask for time") },
+            text = { Text(if (profile.approverIds.isEmpty()) "Invite a Petal Pal" else "Ask for time") },
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
         )
@@ -294,7 +294,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit, onSent: () -> 
                 enabled = limit != null && !action.busy,
                 onClick = {
                     val l = limit ?: return@TextButton
-                    action.run(successMessage = "Asked your approvers 💌", onSuccess = { onSent(); onDismiss() }) {
+                    action.run(successMessage = "Asked your Petal Pals 💌", onSuccess = { onSent(); onDismiss() }) {
                         AppGraph.requests.create(
                             type = RequestType.EXTRA_TIME,
                             message = message,

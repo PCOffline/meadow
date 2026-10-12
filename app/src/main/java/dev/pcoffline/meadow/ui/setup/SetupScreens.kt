@@ -122,7 +122,7 @@ fun SetupScreen(onDone: () -> Unit) {
         SetupStep(
             emoji = "🛡️",
             title = "Uninstall protection",
-            body = "Makes uninstalling Meadow a deliberate step. If it's ever turned off, your approvers hear about it.",
+            body = "Makes uninstalling Meadow a deliberate step. If it's ever turned off, your Petal Pals hear about it.",
             done = state.deviceAdmin,
         ) {
             context.startActivity(
@@ -130,7 +130,7 @@ fun SetupScreen(onDone: () -> Unit) {
                     .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, AppGraph.protection.adminComponent())
                     .putExtra(
                         DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                        "Keeps Meadow from being removed on a whim. Your approvers are told if this is switched off.",
+                        "Keeps Meadow from being removed on a whim. Your Petal Pals are told if this is switched off.",
                     ),
             )
         }

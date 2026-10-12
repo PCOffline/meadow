@@ -241,7 +241,7 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             modifier = Modifier.fillMaxWidth().height(54.dp),
         ) { Text(if (action.busy) "Planting…" else "Plant my garden 🌱", style = MaterialTheme.typography.titleMedium) }
         Text(
-            "No email needed to start. You'll add one before inviting your first approver, so your garden can't get lost.",
+            "No email needed to start. You'll add one before inviting your first Petal Pal, so your garden can't get lost.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

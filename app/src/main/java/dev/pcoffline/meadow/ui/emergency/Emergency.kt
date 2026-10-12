@@ -77,13 +77,13 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "For real emergencies — finding your way, reaching someone, a crisis at work. Limits lift " +
-                        "right away with no approval, and your approvers are told immediately, with your reason.",
+                        "right away with no approval, and your Petal Pals are told immediately, with your reason.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
                     when {
                         left == null -> "You're signed out, so this uses your one offline emergency unlock for the month."
-                        usedUp -> "You've used all ${Emergency.ALLOWANCE} emergency unlocks for the last 30 days. Ask an approver for time instead."
+                        usedUp -> "You've used all ${Emergency.ALLOWANCE} emergency unlocks for the last 30 days. Ask a Petal Pal for time instead."
                         else -> "You have $left of ${Emergency.ALLOWANCE} left in the last 30 days."
                     },
                     style = MaterialTheme.typography.labelLarge,
@@ -105,7 +105,7 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         value = reason,
                         onValueChange = { reason = it.take(280) },
                         label = { Text("What's the emergency?") },
-                        supportingText = { if (!reasonOk) Text("A few words — your approvers will see this.") },
+                        supportingText = { if (!reasonOk) Text("A few words — your Petal Pals will see this.") },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -122,8 +122,8 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         val time = Instant.ofEpochMilli(result.untilMillis).atZone(ZoneId.systemDefault())
                             .format(DateTimeFormatter.ofPattern("h:mm a"))
                         action.toast(
-                            if (result.offline) "Unlocked until $time. Your approvers will be told once you're back online."
-                            else "Unlocked until $time. Your approvers have been told.",
+                            if (result.offline) "Unlocked until $time. Your Petal Pals will be told once you're back online."
+                            else "Unlocked until $time. Your Petal Pals have been told.",
                         )
                     }
                 },
@@ -132,7 +132,7 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                     when {
                         action.busy -> "Unlocking…"
                         countdown > 0 -> "Unlock ($countdown)"
-                        else -> "Unlock now",
+                        else -> "Unlock now"
                     },
                     color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.SemiBold,

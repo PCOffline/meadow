@@ -17,7 +17,7 @@ class BootReceiver : BroadcastReceiver() {
 /** Device admin only exists to make uninstalling Meadow a deliberate, visible act. */
 class MeadowDeviceAdmin : DeviceAdminReceiver() {
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence =
-        "Turning this off lets Meadow be uninstalled. Your approvers will be told. 🌷"
+        "Turning this off lets Meadow be uninstalled. Your Petal Pals will be told. 🌷"
 
     override fun onDisabled(context: Context, intent: Intent) {
         AppGraph.protection.check(AppGraph.protection.current().copy(deviceAdmin = false))

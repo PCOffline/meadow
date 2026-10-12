@@ -206,7 +206,7 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
                                 textAlign = TextAlign.Center,
                             )
                             profile.approverIds.isEmpty() -> Text(
-                                "Invite an approver in Meadow so you can ask a friend for more time.",
+                                "Invite a Petal Pal in Meadow so you can ask a friend for more time.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                             )

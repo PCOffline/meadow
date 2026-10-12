@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -77,7 +78,7 @@ class GuardianAccessibilityService : AccessibilityService() {
     /** Re-checks the open app's budget, sleeping until it might run out. */
     private suspend fun watch(pkg: String) {
         var first = true
-        while (isActive && currentPackage == pkg) {
+        while (currentCoroutineContext().isActive && currentPackage == pkg) {
             val budget = AppGraph.engine.budget(pkg, forceRefresh = first) ?: return
             first = false
             if (budget.exhausted) {
@@ -110,7 +111,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         if (StrictModeRules.shouldBlock(pkg, screen, appLabel = "meadow")) {
             performGlobalAction(GLOBAL_ACTION_BACK)
             performGlobalAction(GLOBAL_ACTION_HOME)
-            Toast.makeText(this, "Strict mode is on 🌿 Ask your approvers to turn it off first.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Strict mode is on 🌿 Ask your Petal Pals to turn it off first.", Toast.LENGTH_LONG).show()
         }
     }
 

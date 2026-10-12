@@ -1,6 +1,9 @@
 package dev.pcoffline.meadow.data
 
+import kotlinx.serialization.Serializable
+
 /** A committed limit for one app. A value of 0 means "no limit" for that period. */
+@Serializable
 data class AppLimit(
     val packageName: String,
     val appName: String,
@@ -8,7 +11,8 @@ data class AppLimit(
     val weeklyMinutes: Int,
 )
 
-/** Extra minutes an approver granted for a single day. */
+/** Extra minutes a Petal Pal granted for a single day. */
+@Serializable
 data class Grant(
     val id: String,
     val packageName: String,
@@ -39,6 +43,7 @@ data class UserProfile(
 }
 
 /** Limits lifted without approval until [untilMillis], for one app or (when null) all of them. */
+@Serializable
 data class Emergency(val untilMillis: Long, val packageName: String?) {
     fun isActive(now: Long = System.currentTimeMillis()) = untilMillis > now
 
@@ -57,9 +62,7 @@ enum class RequestType(val wire: String) {
     EXTRA_TIME("extra_time"),
     CHANGE_LIMIT("change_limit"),
     REMOVE_LIMIT("remove_limit"),
-    DISABLE_STRICT_MODE("disable_strict_mode"),
-    ADD_APPROVER("add_approver"),
-    REMOVE_APPROVER("remove_approver");
+    DISABLE_STRICT_MODE("disable_strict_mode");
 
     companion object {
         fun fromWire(value: String?) = entries.firstOrNull { it.wire == value } ?: EXTRA_TIME
@@ -84,8 +87,6 @@ data class LimitRequest(
     val minutes: Int,
     val dailyMinutes: Int,
     val weeklyMinutes: Int,
-    val targetUid: String?,
-    val targetName: String?,
     val message: String,
     val status: RequestStatus,
     val approverIds: List<String>,
@@ -100,8 +101,6 @@ data class LimitRequest(
             RequestType.CHANGE_LIMIT -> "Change ${appName ?: "an app"} to ${limitText(dailyMinutes, weeklyMinutes)}"
             RequestType.REMOVE_LIMIT -> "Remove the limit on ${appName ?: "an app"}"
             RequestType.DISABLE_STRICT_MODE -> "Turn off strict mode"
-            RequestType.ADD_APPROVER -> "Invite ${targetName ?: "someone"} as an approver"
-            RequestType.REMOVE_APPROVER -> "Remove ${targetName ?: "an approver"} as an approver"
         }
 
     companion object {
@@ -114,7 +113,7 @@ data class LimitRequest(
 
 enum class InviteStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }
 
-/** An invitation from [fromUid] asking [toUid] to become their approver. */
+/** An invitation from [fromUid] asking [toUid] to become their Petal Pal. */
 data class Invite(
     val id: String,
     val fromUid: String,
@@ -155,7 +154,7 @@ data class ChatMessage(
     val pending: Boolean,
 )
 
-/** Per-app usage of a person for one day, as uploaded for their approvers. */
+/** Per-app usage of a person for one day, as uploaded for their Petal Pals. */
 data class SharedUsage(
     val dayKey: String,
     val totalMinutes: Int,

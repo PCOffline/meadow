@@ -1,6 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { chatIdFor, db, input, int, notify, postToChat, requireAuth, text, userOf, users, UserDoc } from "./shared";
+import { z } from "zod";
+import { chatIdFor, db, notify, parse, postToChat, requireAuth, userOf, users, UserDoc } from "./shared";
 
 /** Emergency unlocks skip approval, so they are rationed and always reported to approvers. */
 export const EMERGENCY_ALLOWANCE = 3;
@@ -20,19 +21,27 @@ function recentUses(raw: unknown, now: number): number[] {
  * already took while offline: that one is reported even if it went over the allowance,
  * because it has already happened.
  */
+const EmergencyInput = z.object({
+  minutes: z.number().int().refine((m) => ALLOWED_MINUTES.includes(m), "Pick 15, 30 or 60 minutes."),
+  reason: z.string().trim().min(10, "Please say briefly what the emergency is.").max(280),
+  packageName: z.string().trim().max(200).nullish(),
+  appName: z.string().trim().max(100).nullish(),
+  // Set only when reporting an unlock the phone already took while offline.
+  startedAt: z.number().int().positive().nullish(),
+  endedAt: z.number().int().positive().nullish(),
+});
+
 export const emergencyUnlock = onCall(async (req) => {
   const uid = requireAuth(req);
-  const data = input(req);
-  const minutes = int(data.minutes, 1, 60, "Minutes");
-  if (!ALLOWED_MINUTES.includes(minutes)) throw new HttpsError("invalid-argument", "Pick 15, 30 or 60 minutes.");
-  const reason = text(data.reason, 280);
-  if (reason.length < 10) throw new HttpsError("invalid-argument", "Please say briefly what the emergency is.");
-  const packageName = text(data.packageName, 200) || null;
+  const input = parse(EmergencyInput, req.data);
+  const { minutes, reason } = input;
+  const packageName = input.packageName || null;
+  const appName = input.appName || null;
   const now = Date.now();
-  const offline = typeof data.startedAt === "number";
-  const startedAt = offline ? Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, data.startedAt as number)) : now;
+  const offline = input.startedAt != null;
+  const startedAt = offline ? Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, input.startedAt!)) : now;
   // An offline unlock that was ended early on the phone must not come back to life here.
-  const endedAt = offline && typeof data.endedAt === "number" ? Math.max(startedAt, data.endedAt as number) : Infinity;
+  const endedAt = offline && input.endedAt != null ? Math.max(startedAt, input.endedAt) : Infinity;
   const until = Math.min(startedAt + minutes * 60_000, endedAt);
   const userRef = users().doc(uid);
 
@@ -44,7 +53,7 @@ export const emergencyUnlock = onCall(async (req) => {
     if (overAllowance && !offline) {
       throw new HttpsError(
         "resource-exhausted",
-        `You've used all ${EMERGENCY_ALLOWANCE} emergency unlocks for the last 30 days. Ask an approver for time instead.`,
+        `You've used all ${EMERGENCY_ALLOWANCE} emergency unlocks for the last 30 days. Ask a Petal Pal for time instead.`,
       );
     }
     const currentUntil = (snap.get("emergencyUntil") as Timestamp | undefined)?.toMillis() ?? 0;
@@ -60,7 +69,7 @@ export const emergencyUnlock = onCall(async (req) => {
       reason,
       minutes,
       packageName,
-      appName: text(data.appName, 100) || null,
+      appName,
       offline,
       overAllowance,
       startedAt: Timestamp.fromMillis(startedAt),
@@ -72,7 +81,7 @@ export const emergencyUnlock = onCall(async (req) => {
   await announce(uid, result.user, {
     minutes,
     reason,
-    appName: text(data.appName, 100) || null,
+    appName,
     offline,
     overAllowance: result.overAllowance,
   });

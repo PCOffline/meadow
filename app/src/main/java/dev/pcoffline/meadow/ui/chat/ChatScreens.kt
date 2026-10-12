@@ -75,7 +75,7 @@ fun ChatListScreen(profile: UserProfile, nav: NavController) {
         )
         val list = chats
         if (list != null && list.isEmpty()) {
-            EmptyState("🕊️", "No conversations yet", "A chat opens automatically with each approver and each friend you approve for.")
+            EmptyState("🕊️", "No conversations yet", "A chat opens automatically with each Petal Pal and each friend you're a Petal Pal for.")
         }
         LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
             items(list.orEmpty(), key = { it.id }) { chat ->
@@ -134,7 +134,7 @@ fun ChatScreen(profile: UserProfile, chatId: String, nav: NavController) {
         ) {
             if (chat == null) {
                 item {
-                    EmptyState("🕊️", "This chat isn't open", "Chats open once someone becomes an approver.")
+                    EmptyState("🕊️", "This chat isn't open", "Chats open once someone becomes a Petal Pal.")
                 }
             }
             items(messages, key = { it.id }) { message ->

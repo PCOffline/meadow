@@ -200,7 +200,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
                 MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
                     Text("💌 This loosens your limit", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Your approvers will be asked first. The new limit starts once one of them says yes.",
+                        "Your Petal Pals will be asked first. The new limit starts once one of them says yes.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     OutlinedTextField(
@@ -211,7 +211,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
                 }
             } else if (existing == null && approverCount > 0) {
                 Text(
-                    "Once planted, loosening or removing this limit needs a yes from an approver.",
+                    "Once planted, loosening or removing this limit needs a yes from a Petal Pal.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -224,7 +224,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
                         val outcome = AppGraph.limits.save(proposed, message)
                         if (outcome == ChangeOutcome.APPLIED) celebrate()
                         action.toast(
-                            if (outcome == ChangeOutcome.REQUESTED) "Request sent to your approvers 💌"
+                            if (outcome == ChangeOutcome.REQUESTED) "Request sent to your Petal Pals 💌"
                             else if (existing == null) "Planted 🌱" else "Limit updated 🌿",
                         )
                         nav.popBackStack()
@@ -235,7 +235,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
             ) {
                 Text(
                     when {
-                        needsApproval -> "Ask my approvers"
+                        needsApproval -> "Ask my Petal Pals"
                         existing == null -> "Plant this limit"
                         else -> "Save"
                     },
@@ -256,7 +256,7 @@ fun LimitEditorScreen(packageName: String, nav: NavController) {
             title = { Text("Uproot ${existing.appName}'s limit?") },
             text = {
                 Text(
-                    if (approverCount > 0) "Your approvers will be asked first. The limit stays until one of them agrees."
+                    if (approverCount > 0) "Your Petal Pals will be asked first. The limit stays until one of them agrees."
                     else "This removes the limit straight away.",
                 )
             },

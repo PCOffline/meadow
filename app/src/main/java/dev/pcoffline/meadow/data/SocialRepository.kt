@@ -29,17 +29,9 @@ class SocialRepository(
         invites.whereEqualTo("fromUid", uid).whereEqualTo("status", "pending").observe()
             .map { snapshot -> snapshot.documents.map { it.toInvite() }.sortedByDescending { it.createdAtMillis } }
 
-    /**
-     * Invites the person with [friendCode] to become my approver. When I already have approvers,
-     * this becomes a request they must approve first, so nobody can quietly add a friendlier one.
-     * Returns true when the invite was sent right away.
-     */
-    suspend fun invite(friendCode: String, message: String = ""): Boolean {
-        val result = backend.call(
-            "sendInvite",
-            mapOf("friendCode" to friendCode.trim().uppercase(), "message" to message.trim()),
-        )
-        return result["status"] == "invited"
+    /** Asks the person with [friendCode] to become my Petal Pal. */
+    suspend fun invite(friendCode: String) {
+        backend.call("sendInvite", mapOf("friendCode" to friendCode.trim().uppercase()))
     }
 
     suspend fun respond(inviteId: String, accept: Boolean) {
@@ -50,13 +42,14 @@ class SocialRepository(
         backend.call("cancelInvite", mapOf("inviteId" to inviteId))
     }
 
-    /** I stop approving for [approveeUid]. They are notified. */
+    /** I stop being [approveeUid]'s Petal Pal. They are notified. */
     suspend fun stepDown(approveeUid: String) {
         backend.call("stepDown", mapOf("approveeUid" to approveeUid))
     }
 
-    suspend fun requestRemoveApprover(approverUid: String, message: String = "") {
-        requests.create(type = RequestType.REMOVE_APPROVER, message = message, targetUid = approverUid)
+    /** Removes one of my Petal Pals straight away. They, and my other pals, are notified. */
+    suspend fun removeApprover(approverUid: String) {
+        backend.call("removeApprover", mapOf("approverUid" to approverUid))
     }
 
     suspend fun updateProfile(displayName: String, flower: String) {
@@ -64,7 +57,7 @@ class SocialRepository(
         backend.user(uid).update(mapOf("displayName" to displayName.trim(), "flower" to flower)).await()
     }
 
-    /** Turning strict mode on is instant; turning it off needs approval once approvers exist. */
+    /** Turning strict mode on is instant; turning it off needs a Petal Pal's yes once you have any. */
     suspend fun setStrictMode(enabled: Boolean, message: String = ""): ChangeOutcome {
         val uid = backend.requireUid()
         if (!enabled && store.approverCount.value > 0) {

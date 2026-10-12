@@ -108,9 +108,9 @@ fun GardenScreen(profile: UserProfile, nav: NavController) {
             item {
                 Notice(
                     emoji = "💌",
-                    text = "Your limits aren't locked in yet. Invite a friend as your approver — after that, " +
+                    text = "Your limits aren't locked in yet. Invite a friend as your Petal Pal — after that, " +
                         "only they can give you more time.",
-                    action = "Invite an approver",
+                    action = "Invite a Petal Pal",
                 ) { nav.switchTab("circle") }
             }
         }

@@ -1,24 +1,38 @@
 import { FieldValue, Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { z } from "zod";
 import {
-  chatIdFor, createInvite, db, input, int, notify, postToChat, requests, requireAuth, RequestDoc, RequestType,
-  summarize, text, userOf, users, UserDoc,
+  chatIdFor, db, notify, parse, postToChat, requests, requireAuth, RequestDoc, summarize, userOf, users, UserDoc,
 } from "./shared";
 
-const CLIENT_TYPES: RequestType[] = ["extra_time", "change_limit", "remove_limit", "disable_strict_mode", "remove_approver"];
 const MAX_PENDING = 10;
+
+const note = z.string().trim().max(280).default("");
+const packageName = z.string().trim().min(1, "Which app?").max(200);
+const appName = z.string().trim().max(100).nullish();
+const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Bad date.");
+
+const CreateInput = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("extra_time"), packageName, appName, minutes: z.number().int().min(1).max(240), message: note, dayKey }),
+  z.object({
+    type: z.literal("change_limit"),
+    packageName,
+    appName,
+    dailyMinutes: z.number().int().min(0).max(1440),
+    weeklyMinutes: z.number().int().min(0).max(10080),
+    message: note,
+    dayKey,
+  }).refine((r) => r.dailyMinutes > 0 || r.weeklyMinutes > 0, "Set a daily or weekly limit."),
+  z.object({ type: z.literal("remove_limit"), packageName, appName, message: note, dayKey }),
+  z.object({ type: z.literal("disable_strict_mode"), message: note, dayKey }),
+], { error: "Unknown request type." });
 
 type NewRequest = Omit<RequestDoc, "requesterId" | "requesterName" | "status" | "approverIds">;
 
-/** Stores a request, drops a card into each approver's chat and pings them. */
-export async function createApprovalRequest(uid: string, me: UserDoc, req: NewRequest): Promise<string> {
-  let approverIds = [...me.approverIds];
-  if (req.type === "remove_approver" && req.targetUid) {
-    // The other approvers decide; if there are none, the approver being removed decides.
-    const others = approverIds.filter((id) => id !== req.targetUid);
-    approverIds = others.length > 0 ? others : [req.targetUid];
-  }
-  if (approverIds.length === 0) throw new HttpsError("failed-precondition", "Invite an approver first.");
+/** Stores a request, drops a card into each Petal Pal's chat and pings them. */
+async function createApprovalRequest(uid: string, me: UserDoc, req: NewRequest): Promise<string> {
+  const approverIds = [...me.approverIds];
+  if (approverIds.length === 0) throw new HttpsError("failed-precondition", "Invite a Petal Pal first.");
 
   const ref = requests().doc();
   const doc: RequestDoc & { createdAt: FieldValue } = {
@@ -53,43 +67,33 @@ export async function createApprovalRequest(uid: string, me: UserDoc, req: NewRe
 
 export const createRequest = onCall(async (call) => {
   const uid = requireAuth(call);
-  const data = input(call);
-  const type = data.type as RequestType;
-  if (!CLIENT_TYPES.includes(type)) throw new HttpsError("invalid-argument", "Unknown request type.");
-
+  const input = parse(CreateInput, call.data);
   const me = userOf(await users().doc(uid).get());
-  if (me.approverIds.length === 0) throw new HttpsError("failed-precondition", "Invite an approver first.");
+  if (me.approverIds.length === 0) throw new HttpsError("failed-precondition", "Invite a Petal Pal first.");
 
-  const dayKey = text(data.dayKey, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) throw new HttpsError("invalid-argument", "Bad date.");
-  const message = text(data.message, 280);
-  const packageName = text(data.packageName, 200) || null;
-  let appName = text(data.appName, 100) || null;
-  let minutes = 0;
-  let dailyMinutes = 0;
-  let weeklyMinutes = 0;
-  let targetUid: string | null = null;
-  let targetName: string | null = null;
-
-  if (type === "extra_time" || type === "change_limit" || type === "remove_limit") {
-    if (!packageName) throw new HttpsError("invalid-argument", "Which app?");
-    const limit = await users().doc(uid).collection("limits").doc(packageName).get();
+  const request: NewRequest = {
+    type: input.type,
+    packageName: null,
+    appName: null,
+    minutes: 0,
+    dailyMinutes: 0,
+    weeklyMinutes: 0,
+    message: input.message,
+    dayKey: input.dayKey,
+  };
+  if (input.type !== "disable_strict_mode") {
+    const limit = await users().doc(uid).collection("limits").doc(input.packageName).get();
     if (!limit.exists) throw new HttpsError("failed-precondition", "That app doesn't have a limit.");
-    appName = appName ?? (limit.get("appName") as string);
+    request.packageName = input.packageName;
+    request.appName = input.appName || (limit.get("appName") as string);
   }
-  if (type === "extra_time") minutes = int(data.minutes, 1, 240, "Minutes");
-  if (type === "change_limit") {
-    dailyMinutes = int(data.dailyMinutes, 0, 1440, "Daily minutes");
-    weeklyMinutes = int(data.weeklyMinutes, 0, 10080, "Weekly minutes");
-    if (dailyMinutes === 0 && weeklyMinutes === 0) throw new HttpsError("invalid-argument", "Set a daily or weekly limit.");
+  if (input.type === "extra_time") request.minutes = input.minutes;
+  if (input.type === "change_limit") {
+    request.dailyMinutes = input.dailyMinutes;
+    request.weeklyMinutes = input.weeklyMinutes;
   }
-  if (type === "disable_strict_mode" && !me.strictMode) {
+  if (input.type === "disable_strict_mode" && !me.strictMode) {
     throw new HttpsError("failed-precondition", "Strict mode is already off.");
-  }
-  if (type === "remove_approver") {
-    targetUid = text(data.targetUid, 128);
-    if (!me.approverIds.includes(targetUid)) throw new HttpsError("failed-precondition", "They're not your approver.");
-    targetName = userOf(await users().doc(targetUid).get()).displayName;
   }
 
   const pending = await requests().where("requesterId", "==", uid).where("status", "==", "pending").get();
@@ -97,24 +101,16 @@ export const createRequest = onCall(async (call) => {
     throw new HttpsError("resource-exhausted", "You have lots of requests waiting already. Give your friends a moment 🌿");
   }
   const duplicate = pending.docs.some((d) =>
-    d.get("type") === type && (d.get("packageName") ?? null) === packageName && (d.get("targetUid") ?? null) === targetUid,
+    d.get("type") === request.type && (d.get("packageName") ?? null) === request.packageName,
   );
   if (duplicate) throw new HttpsError("already-exists", "You've already asked for this — it's waiting for an answer.");
 
-  const requestId = await createApprovalRequest(uid, me, {
-    type, packageName, appName, minutes, dailyMinutes, weeklyMinutes, targetUid, targetName, message, dayKey,
-  });
+  const requestId = await createApprovalRequest(uid, me, request);
   return { requestId };
 });
 
 /** Applies an approved request. Runs inside the decision transaction. */
-function applyApproval(
-  tx: Transaction,
-  requestId: string,
-  r: RequestDoc,
-  deciderUid: string,
-  grantedMinutes: number,
-): void {
+function applyApproval(tx: Transaction, requestId: string, r: RequestDoc, deciderUid: string, grantedMinutes: number): void {
   const requesterRef = users().doc(r.requesterId);
   switch (r.type) {
     case "extra_time":
@@ -146,22 +142,19 @@ function applyApproval(
     case "disable_strict_mode":
       tx.update(requesterRef, { strictMode: false });
       break;
-    case "remove_approver":
-      tx.update(requesterRef, { approverIds: FieldValue.arrayRemove(r.targetUid) });
-      tx.update(users().doc(r.targetUid!), { approveeIds: FieldValue.arrayRemove(r.requesterId) });
-      break;
-    case "add_approver":
-      // The invite itself is sent after the transaction commits.
-      break;
   }
 }
 
+const DecideInput = z.object({
+  requestId: z.string().trim().min(1).max(100),
+  approve: z.boolean(),
+  note: z.string().trim().max(200).default(""),
+  minutes: z.number().int().min(1).nullish(),
+});
+
 export const decideRequest = onCall(async (call) => {
   const uid = requireAuth(call);
-  const data = input(call);
-  const requestId = text(data.requestId, 100);
-  const approve = data.approve === true;
-  const note = text(data.note, 200);
+  const { requestId, approve, note: decisionNote, minutes } = parse(DecideInput, call.data);
   const requestRef = requests().doc(requestId);
 
   const outcome = await db().runTransaction(async (tx) => {
@@ -170,43 +163,29 @@ export const decideRequest = onCall(async (call) => {
     const r = snap.data() as RequestDoc;
     if (r.status !== "pending") throw new HttpsError("failed-precondition", "That request was already answered.");
     if (r.requesterId === uid) throw new HttpsError("permission-denied", "You can't answer your own request 🌱");
-    if (!r.approverIds.includes(uid)) throw new HttpsError("permission-denied", "You're not an approver for this.");
+    if (!r.approverIds.includes(uid)) throw new HttpsError("permission-denied", "You're not a Petal Pal for this.");
 
-    const [requesterSnap, deciderSnap] = await Promise.all([
-      tx.get(users().doc(r.requesterId)),
-      tx.get(users().doc(uid)),
-    ]);
+    const [requesterSnap, deciderSnap] = await Promise.all([tx.get(users().doc(r.requesterId)), tx.get(users().doc(uid))]);
     const requester = userOf(requesterSnap);
     const decider = userOf(deciderSnap);
-    // Approvers who stepped down since the request was made can't answer it.
-    const stillApprover = requester.approverIds.includes(uid) ||
-      (r.type === "remove_approver" && r.targetUid === uid);
-    if (!stillApprover) throw new HttpsError("permission-denied", "You're no longer their approver.");
+    // Pals who were removed or stepped down since the request was made can't answer it.
+    if (!requester.approverIds.includes(uid)) throw new HttpsError("permission-denied", "You're no longer their Petal Pal.");
 
-    let grantedMinutes = r.minutes;
-    if (approve && r.type === "extra_time" && typeof data.minutes === "number") {
-      grantedMinutes = int(data.minutes, 1, r.minutes, "Minutes");
-    }
+    const grantedMinutes = approve && r.type === "extra_time" && minutes ? Math.min(minutes, r.minutes) : r.minutes;
     if (approve) applyApproval(tx, requestId, r, uid, grantedMinutes);
     tx.update(requestRef, {
       status: approve ? "approved" : "denied",
       decidedBy: uid,
       decidedByName: decider.displayName,
-      decisionNote: note,
+      decisionNote,
       decidedAt: FieldValue.serverTimestamp(),
       ...(r.type === "extra_time" && approve ? { minutes: grantedMinutes } : {}),
     });
-    return { r: { ...r, minutes: grantedMinutes }, requester, decider };
+    return { r: { ...r, minutes: grantedMinutes }, decider };
   });
 
-  const { r, requester, decider } = outcome;
+  const { r, decider } = outcome;
   const summary = summarize(r);
-
-  if (approve && r.type === "add_approver" && r.targetUid) {
-    const target = userOf(await users().doc(r.targetUid).get());
-    await createInvite(r.requesterId, requester, r.targetUid, target);
-  }
-
   await postToChat(chatIdFor(uid, r.requesterId), {
     senderId: uid,
     kind: "system",
@@ -216,14 +195,15 @@ export const decideRequest = onCall(async (call) => {
     type: "request_decided",
     requestId,
     title: approve ? `🌸 ${decider.displayName} said yes!` : `🍃 ${decider.displayName} said not today`,
-    body: note ? `${capitalize(summary)} — “${note}”` : capitalize(summary),
+    body: decisionNote ? `${capitalize(summary)} — “${decisionNote}”` : capitalize(summary),
   });
   return { ok: true };
 });
 
 export const cancelRequest = onCall(async (call) => {
   const uid = requireAuth(call);
-  const requestRef = requests().doc(text(input(call).requestId, 100));
+  const { requestId } = parse(z.object({ requestId: z.string().trim().min(1).max(100) }), call.data);
+  const requestRef = requests().doc(requestId);
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(requestRef);
     if (!snap.exists || snap.get("requesterId") !== uid) throw new HttpsError("not-found", "That request is gone.");

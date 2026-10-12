@@ -82,7 +82,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
                         Text("Strict mode", style = MaterialTheme.typography.titleMedium)
                         Text(
                             "Keeps Meadow's own settings, uninstalling and the clock out of reach, so limits can't be " +
-                                "switched off in a weak moment. Turning it off needs an approver's yes.",
+                                "switched off in a weak moment. Turning it off needs a Petal Pal's yes.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -100,15 +100,15 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
             if (anonymous) {
                 SecureAccountCard(
                     reason = "Your garden isn't linked to an email yet. Add one so you can sign in on a new phone " +
-                        "and invite approvers.",
+                        "and invite Petal Pals.",
                 )
             }
             EmergencyBanner()
             MeadowCard(Modifier.fillMaxWidth()) {
                 Text("Emergency unlock", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Lifts all limits for up to an hour without waiting for an approver. You get " +
-                        "${Emergency.ALLOWANCE} every 30 days, and your approvers are told each time, with your reason. " +
+                    "Lifts all limits for up to an hour without waiting for a Petal Pal. You get " +
+                        "${Emergency.ALLOWANCE} every 30 days, and your Petal Pals are told each time, with your reason. " +
                         "Calls and emergency apps are never limited.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -140,10 +140,11 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
                 Text("How Meadow keeps its promises", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "• Tightening a limit applies right away.\n" +
-                        "• Loosening or removing one, turning off strict mode, or changing approvers needs an approver's yes.\n" +
-                        "• In a real emergency you can lift limits yourself for up to an hour, a few times a month — your approvers are told.\n" +
+                        "• Loosening or removing one, or turning off strict mode, needs a Petal Pal's yes.\n" +
+                        "• You can add or remove Petal Pals any time — they're always told.\n" +
+                        "• In a real emergency you can lift limits yourself for up to an hour, a few times a month — your Petal Pals are told.\n" +
                         "• When an app's time is up it closes and rests until tomorrow, unless a friend gifts more time.\n" +
-                        "• If protections are switched off or your phone goes quiet, your approvers are told.\n" +
+                        "• If protections are switched off or your phone goes quiet, your Petal Pals are told.\n" +
                         "• Limits stay on this phone even when you're offline or signed out.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 6.dp),
@@ -164,7 +165,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
             text = {
                 Text(
                     if (profile.approverIds.isEmpty()) "Strict mode will turn off right away."
-                    else "Your approvers will be asked first.",
+                    else "Your Petal Pals will be asked first.",
                 )
             },
             confirmButton = {
@@ -172,7 +173,7 @@ fun SettingsScreen(profile: UserProfile, nav: NavController) {
                     confirmStrictOff = false
                     action.run {
                         val outcome = AppGraph.social.setStrictMode(false)
-                        action.toast(if (outcome == ChangeOutcome.REQUESTED) "Asked your approvers 💌" else "Strict mode off")
+                        action.toast(if (outcome == ChangeOutcome.REQUESTED) "Asked your Petal Pals 💌" else "Strict mode off")
                     }
                 }) { Text(if (profile.approverIds.isEmpty()) "Turn off" else "Ask") }
             },

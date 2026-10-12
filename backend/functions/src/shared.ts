@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { getFirestore, FieldValue, DocumentSnapshot } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import { z } from "zod";
 import { logger } from "firebase-functions/v2";
 
 export const db = () => getFirestore();
@@ -21,13 +22,7 @@ export interface UserDoc {
   fcmTokens?: string[];
 }
 
-export type RequestType =
-  | "extra_time"
-  | "change_limit"
-  | "remove_limit"
-  | "disable_strict_mode"
-  | "add_approver"
-  | "remove_approver";
+export type RequestType = "extra_time" | "change_limit" | "remove_limit" | "disable_strict_mode";
 
 export interface RequestDoc {
   requesterId: string;
@@ -38,8 +33,6 @@ export interface RequestDoc {
   minutes: number;
   dailyMinutes: number;
   weeklyMinutes: number;
-  targetUid: string | null;
-  targetName: string | null;
   message: string;
   status: "pending" | "approved" | "denied" | "cancelled" | "expired";
   approverIds: string[];
@@ -52,21 +45,13 @@ export function requireAuth(req: CallableRequest<unknown>): string {
   return uid;
 }
 
-export function input(req: CallableRequest<unknown>): Record<string, unknown> {
-  const data = req.data;
-  return data && typeof data === "object" ? (data as Record<string, unknown>) : {};
-}
-
-export function text(value: unknown, max: number): string {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
-
-export function int(value: unknown, min: number, max: number, field: string): number {
-  const n = typeof value === "number" ? Math.round(value) : NaN;
-  if (!Number.isFinite(n) || n < min || n > max) {
-    throw new HttpsError("invalid-argument", `${field} must be between ${min} and ${max}.`);
+/** Validates callable input with a zod schema, turning the first problem into a friendly error. */
+export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
+  const result = schema.safeParse(data ?? {});
+  if (!result.success) {
+    throw new HttpsError("invalid-argument", result.error.issues[0]?.message ?? "Something in that request wasn't right.");
   }
-  return n;
+  return result.data;
 }
 
 export function userOf(snap: DocumentSnapshot): UserDoc {
@@ -120,10 +105,6 @@ export function summarize(r: RequestDoc): string {
       return `remove the limit on ${app}`;
     case "disable_strict_mode":
       return "turn off strict mode";
-    case "add_approver":
-      return `invite ${r.targetName ?? "someone"} as an approver`;
-    case "remove_approver":
-      return `remove ${r.targetName ?? "an approver"} as an approver`;
   }
 }
 
@@ -213,7 +194,7 @@ export async function createInvite(fromUid: string, from: UserDoc, toUid: string
   await notify([toUid], {
     type: "invite",
     inviteId: ref.id,
-    title: `${from.flower} ${from.displayName} would like you as their approver`,
+    title: `${from.flower} ${from.displayName} would like you as their Petal Pal`,
     body: "Open Meadow to accept. You'll get to say yes or no when they ask for more time.",
   });
   return ref.id;

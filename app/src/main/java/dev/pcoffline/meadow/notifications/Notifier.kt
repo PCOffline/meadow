@@ -37,7 +37,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             NotificationChannel(CH_CHAT, "Messages", NotificationManager.IMPORTANCE_HIGH),
             NotificationChannel(CH_SOCIAL, "Invites and your circle", NotificationManager.IMPORTANCE_DEFAULT),
             NotificationChannel(CH_ALERTS, "Protection alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "When someone you approve for turns off their protections."
+                description = "When someone you're a Petal Pal for turns off their protections."
             },
         ).forEach(nm::createNotificationChannel)
     }

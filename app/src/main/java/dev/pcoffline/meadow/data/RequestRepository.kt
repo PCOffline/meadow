@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.map
 class RequestRepository(private val backend: Backend) {
     private val requests get() = backend.db.collection("requests")
 
-    /** Requests other people sent to me as one of their approvers. */
+    /** Requests other people sent to me as one of their Petal Pals. */
     fun incoming(uid: String): Flow<List<LimitRequest>> =
         requests.whereArrayContains("approverIds", uid)
             .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -34,7 +34,6 @@ class RequestRepository(private val backend: Backend) {
         minutes: Int = 0,
         dailyMinutes: Int = 0,
         weeklyMinutes: Int = 0,
-        targetUid: String? = null,
     ): String {
         val result = backend.call(
             "createRequest",
@@ -46,7 +45,6 @@ class RequestRepository(private val backend: Backend) {
                 "minutes" to minutes,
                 "dailyMinutes" to dailyMinutes,
                 "weeklyMinutes" to weeklyMinutes,
-                "targetUid" to targetUid,
                 "dayKey" to Days.todayKey(),
             ),
         )

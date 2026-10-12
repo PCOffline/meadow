@@ -6,7 +6,6 @@ import android.net.NetworkCapabilities
 import com.google.firebase.firestore.FieldValue
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONObject
 
 /**
  * Emergency unlocks lift limits right away, without waiting for an approver. They're rationed
@@ -49,12 +48,7 @@ class EmergencyRepository(
         val now = System.currentTimeMillis()
         val until = now + minutes * 60_000L
         store.lastOfflineEmergencyMillis = now
-        store.pendingEmergency = JSONObject()
-            .put("minutes", minutes)
-            .put("reason", reason.trim())
-            .put("packageName", packageName ?: JSONObject.NULL)
-            .put("appName", appName ?: JSONObject.NULL)
-            .put("startedAt", now)
+        store.pendingEmergency = PendingEmergency(minutes, reason.trim(), packageName, appName, startedAt = now)
         store.setEmergency(Emergency(until, packageName))
         return Result(until, offline = true)
     }
@@ -67,12 +61,12 @@ class EmergencyRepository(
             backend.call(
                 "emergencyUnlock",
                 mapOf(
-                    "minutes" to pending.getInt("minutes"),
-                    "reason" to pending.getString("reason"),
-                    "packageName" to pending.optString("packageName").takeIf { !pending.isNull("packageName") },
-                    "appName" to pending.optString("appName").takeIf { !pending.isNull("appName") },
-                    "startedAt" to pending.getLong("startedAt"),
-                    "endedAt" to pending.optLong("endedAt").takeIf { pending.has("endedAt") },
+                    "minutes" to pending.minutes,
+                    "reason" to pending.reason,
+                    "packageName" to pending.packageName,
+                    "appName" to pending.appName,
+                    "startedAt" to pending.startedAt,
+                    "endedAt" to pending.endedAt,
                 ),
             )
             store.pendingEmergency = null
@@ -87,7 +81,7 @@ class EmergencyRepository(
         val now = System.currentTimeMillis()
         store.setEmergency(Emergency(now, null))
         store.pendingEmergency?.let {
-            store.pendingEmergency = it.put("endedAt", now)
+            store.pendingEmergency = it.copy(endedAt = now)
             return
         }
         val uid = backend.uid ?: return

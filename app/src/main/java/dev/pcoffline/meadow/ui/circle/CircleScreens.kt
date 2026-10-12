@@ -94,7 +94,7 @@ fun CircleScreen(profile: UserProfile, nav: NavController) {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp)) {
                 Text("Your circle", style = MaterialTheme.typography.headlineMedium)
                 Text(
-                    "The friends who keep your garden honest — and the ones you look after.",
+                    "Petal Pals keep your garden honest — and you look after theirs.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -111,13 +111,13 @@ fun CircleScreen(profile: UserProfile, nav: NavController) {
                             style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Monospace, letterSpacing = 4.sp),
                         )
                         Text(
-                            "Friends can invite you as their approver with this code.",
+                            "Friends can invite you as their Petal Pal with this code.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     Spacer(Modifier.height(12.dp))
                     SecureAccountCard(
-                        reason = "Before inviting an approver, add an email. That way your limits and friends come back " +
+                        reason = "Before inviting a Petal Pal, add an email. That way your limits and friends come back " +
                             "if you change phones — and can't be wiped by reinstalling.",
                     )
                 }
@@ -131,11 +131,11 @@ fun CircleScreen(profile: UserProfile, nav: NavController) {
             items(incoming, key = { it.id }) { IncomingInvite(it) }
         }
 
-        item { SectionTitle("Your approvers", Modifier.padding(horizontal = 20.dp)) }
+        item { SectionTitle("Your Petal Pals", Modifier.padding(horizontal = 20.dp)) }
         if (approvers.isEmpty()) {
             item {
                 EmptyState(
-                    "🌻", "No approvers yet",
+                    "🌻", "No Petal Pals yet",
                     "Share your code with someone you trust. Once they accept, only they can give you extra time or loosen your limits.",
                 )
             }
@@ -147,7 +147,7 @@ fun CircleScreen(profile: UserProfile, nav: NavController) {
             items(outgoing, key = { it.id }) { OutgoingInvite(it) }
         }
 
-        item { SectionTitle("You're approving for", Modifier.padding(horizontal = 20.dp)) }
+        item { SectionTitle("You're a Petal Pal for", Modifier.padding(horizontal = 20.dp)) }
         if (approvees.isEmpty()) {
             item {
                 Text(
@@ -180,14 +180,15 @@ private fun InviteCard(profile: UserProfile) {
                 )
             }
             IconButton(onClick = {
-                val text = "Will you be my Meadow approver? 🌼 Open Meadow → Circle and enter my code: ${profile.friendCode}"
+                // Whoever enters this code invites *me* to look after *their* garden.
+                val text = "Want me as your Petal Pal in Meadow? 🌼 Open Meadow → Circle and enter my code: ${profile.friendCode}"
                 context.startActivity(
                     Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share your code"),
                 )
             }) { Icon(Icons.Outlined.Share, contentDescription = "Share code") }
         }
         Spacer(Modifier.height(10.dp))
-        Text("Invite someone to be your approver", style = MaterialTheme.typography.titleSmall)
+        Text("Invite someone to be your Petal Pal", style = MaterialTheme.typography.titleSmall)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
             OutlinedTextField(
                 value = code,
@@ -201,8 +202,8 @@ private fun InviteCard(profile: UserProfile) {
             Button(
                 onClick = {
                     action.run {
-                        val direct = AppGraph.social.invite(code)
-                        action.toast(if (direct) "Invite sent 💌" else "Your approvers will be asked to OK this first 💌")
+                        AppGraph.social.invite(code)
+                        action.toast("Invite sent 💌")
                         code = ""
                     }
                 },
@@ -222,7 +223,7 @@ private fun IncomingInvite(invite: Invite) {
             FlowerAvatar(invite.fromFlower)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("${invite.fromName} would like you as their approver", style = MaterialTheme.typography.titleSmall)
+                Text("${invite.fromName} would like you as their Petal Pal", style = MaterialTheme.typography.titleSmall)
                 Text(
                     "You'll be able to say yes or no when they ask for more time.",
                     style = MaterialTheme.typography.bodySmall,
@@ -233,7 +234,7 @@ private fun IncomingInvite(invite: Invite) {
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = {
-                    action.run(successMessage = "You're now ${invite.fromName}'s approver 🌻", onSuccess = celebrate) {
+                    action.run(successMessage = "You're now ${invite.fromName}'s Petal Pal 🌻", onSuccess = celebrate) {
                         AppGraph.social.respond(invite.id, true)
                     }
                 },
@@ -271,12 +272,12 @@ private fun ApproverRow(me: UserProfile, friend: UserProfile, onChat: () -> Unit
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(friend.displayName, style = MaterialTheme.typography.titleMedium)
-            Text("Approves your extra time", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Looks after your garden", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onChat) { Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = "Chat") }
         IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "More") }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(text = { Text("Ask to remove") }, onClick = { menu = false; confirm = true })
+            DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; confirm = true })
         }
     }
     if (confirm) {
@@ -285,15 +286,17 @@ private fun ApproverRow(me: UserProfile, friend: UserProfile, onChat: () -> Unit
             title = { Text("Remove ${friend.displayName}?") },
             text = {
                 Text(
-                    if (me.approverIds.size > 1) "Your other approvers will be asked to agree first."
-                    else "${friend.displayName} will be asked to agree, since they're your only approver.",
+                    if (me.approverIds.size > 1) "${friend.displayName} and your other Petal Pals will be told."
+                    else "${friend.displayName} will be told. Without a Petal Pal, your limits are no longer locked in.",
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirm = false
-                    action.run(successMessage = "Request sent 💌") { AppGraph.social.requestRemoveApprover(friend.uid) }
-                }) { Text("Ask") }
+                    action.run(successMessage = "${friend.displayName} is no longer your Petal Pal") {
+                        AppGraph.social.removeApprover(friend.uid)
+                    }
+                }) { Text("Remove") }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Keep") } },
         )
@@ -440,7 +443,7 @@ fun FriendScreen(me: UserProfile, uid: String, nav: NavController) {
 
             ErrorNote(action.error)
             OutlinedButton(onClick = { confirmStepDown = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Stop being ${f.displayName}'s approver")
+                Text("Stop being ${f.displayName}'s Petal Pal")
             }
             Spacer(Modifier.height(24.dp))
         }

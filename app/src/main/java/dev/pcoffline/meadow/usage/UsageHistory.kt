@@ -2,7 +2,9 @@ package dev.pcoffline.meadow.usage
 
 import android.content.Context
 import dev.pcoffline.meadow.data.Days
-import org.json.JSONObject
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.LocalDate
 
@@ -49,27 +51,12 @@ class UsageHistory(
         cache.keys.filter { it < oldest }.forEach { cache.remove(it) }
     }
 
-    private fun load(): MutableMap<String, Map<String, Long>> {
-        if (!file.exists()) return mutableMapOf()
-        return runCatching {
-            val root = JSONObject(file.readText())
-            val result = mutableMapOf<String, Map<String, Long>>()
-            root.keys().forEach { day ->
-                val apps = root.getJSONObject(day)
-                result[day] = apps.keys().asSequence().associateWith { apps.getLong(it) }
-            }
-            result
-        }.getOrDefault(mutableMapOf())
-    }
+    private fun load(): MutableMap<String, Map<String, Long>> =
+        runCatching { Json.decodeFromString<Map<String, Map<String, Long>>>(file.readText()).toMutableMap() }
+            .getOrDefault(mutableMapOf())
 
     private fun save() {
-        val root = JSONObject()
-        cache.forEach { (day, apps) ->
-            val obj = JSONObject()
-            apps.forEach { (pkg, ms) -> obj.put(pkg, ms) }
-            root.put(day, obj)
-        }
-        runCatching { file.writeText(root.toString()) }
+        runCatching { file.writeText(Json.encodeToString<Map<String, Map<String, Long>>>(cache)) }
     }
 
     private companion object {

@@ -45,6 +45,17 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.runtime.key
+import java.util.concurrent.TimeUnit
+import androidx.core.content.ContextCompat
+import dev.pcoffline.meadow.R
+import nl.dionsegijn.konfetti.compose.KonfettiView
+import nl.dionsegijn.konfetti.core.Angle
+import nl.dionsegijn.konfetti.core.Party
+import nl.dionsegijn.konfetti.core.Position
+import nl.dionsegijn.konfetti.core.emitter.Emitter
+import nl.dionsegijn.konfetti.core.models.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -234,43 +245,36 @@ fun FallingPetals(modifier: Modifier = Modifier, count: Int = 14) {
     }
 }
 
-private data class BurstPetal(val angle: Float, val speed: Float, val spin: Float, val size: Float, val colorIndex: Int)
-
 /**
- * A celebratory burst of petals from the top centre. Each time [trigger] changes to a new
- * positive value it plays once. Draws nothing while idle.
+ * A celebratory shower of petals, drawn by Konfetti. Plays once each time [trigger] changes
+ * to a new positive value; draws nothing while idle or when animations are off.
  */
 @Composable
 fun PetalBurst(trigger: Int, modifier: Modifier = Modifier) {
-    val garden = Garden.colors
-    val progress = remember { Animatable(1f) }
-    val reduced = rememberReducedMotion()
-    val petals = remember(trigger) {
-        val r = Random(trigger)
-        List(46) { BurstPetal(-PI.toFloat() * r.nextFloat(), 0.5f + r.nextFloat() * 0.8f, r.nextFloat() * 720f - 360f, 5f + r.nextFloat() * 6f, r.nextInt(5)) }
-    }
-    LaunchedEffect(trigger) {
-        if (trigger <= 0 || reduced) return@LaunchedEffect
-        progress.snapTo(0f)
-        progress.animateTo(1f, tween(2000, easing = LinearEasing))
-    }
-    Canvas(modifier) {
-        val p = progress.value
-        if (p >= 1f) return@Canvas
-        val origin = Offset(size.width / 2f, size.height * 0.12f)
-        petals.forEach { petal ->
-            val dist = petal.speed * size.width * 0.6f * p
-            val gravity = size.height * 0.9f * p * p
-            val pos = origin + Offset(cos(petal.angle) * dist, sin(petal.angle) * dist + gravity)
-            val s = petal.size * density / 2f
-            rotate(petal.spin * p, pivot = pos) {
-                drawOval(
-                    garden.petals[petal.colorIndex].copy(alpha = (1f - p).coerceIn(0f, 1f)),
-                    topLeft = Offset(pos.x - s, pos.y - s * 0.6f),
-                    size = Size(s * 2f, s * 1.2f),
-                )
-            }
-        }
+    if (trigger <= 0 || rememberReducedMotion()) return
+    val colors = Garden.colors.petals.map { it.toArgb() }
+    val context = LocalContext.current
+    val flower = remember { ContextCompat.getDrawable(context, R.drawable.ic_flower) }
+    val shapes = listOfNotNull(Shape.Circle, Shape.Rectangle(0.55f), flower?.let { Shape.DrawableShape(it) })
+    // Re-keying restarts the particle system for every new celebration.
+    key(trigger) {
+        KonfettiView(
+            modifier = modifier,
+            parties = listOf(
+                Party(
+                    angle = Angle.TOP,
+                    spread = 100,
+                    speed = 18f,
+                    maxSpeed = 42f,
+                    damping = 0.9f,
+                    colors = colors,
+                    shapes = shapes,
+                    timeToLive = 2600,
+                    position = Position.Relative(0.5, 0.35),
+                    emitter = Emitter(duration = 150, TimeUnit.MILLISECONDS).max(70),
+                ),
+            ),
+        )
     }
 }
 
