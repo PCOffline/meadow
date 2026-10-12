@@ -74,7 +74,8 @@ object AppGraph {
                 FirebaseOptions.Builder()
                     .setProjectId("demo-meadow")
                     .setApplicationId("1:1234567890:android:0000000000000000")
-                    .setApiKey("demo-api-key")
+                    // Never used for real requests, but Firebase checks that it looks like an API key.
+                    .setApiKey("AIzaSyDemoKeyForTheFirebaseEmulators000")
                     .setStorageBucket("demo-meadow.appspot.com")
                     .build(),
             )
