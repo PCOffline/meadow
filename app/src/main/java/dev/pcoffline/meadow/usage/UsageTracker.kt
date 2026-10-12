@@ -7,10 +7,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Process
 
-/**
- * Computes foreground time per app from the system usage event log. Only one app is treated as
- * being in the foreground at a time, which matches what the person actually sees on screen.
- */
+/** Reads the system usage log; the arithmetic lives in [ForegroundTime]. */
 class UsageTracker(private val context: Context) {
     private val usm = context.getSystemService(UsageStatsManager::class.java)
 
@@ -28,48 +25,11 @@ class UsageTracker(private val context: Context) {
     /** Milliseconds of foreground time per package inside [start, end). */
     fun usageBetween(start: Long, end: Long): Map<String, Long> {
         if (!hasPermission() || end <= start) return emptyMap()
-        val now = System.currentTimeMillis()
-        val clippedEnd = minOf(end, now)
+        val clippedEnd = minOf(end, System.currentTimeMillis())
         // Look back a little so an app that was already open at `start` is counted from `start`.
-        val events = usm.queryEvents(start - LOOKBACK_MS, clippedEnd) ?: return emptyMap()
-        val totals = HashMap<String, Long>()
-        var current: String? = null
-        var since = 0L
-        var sawEvent = false
-
-        fun close(at: Long) {
-            val pkg = current ?: return
-            val from = maxOf(since, start)
-            val to = minOf(at, clippedEnd)
-            if (to > from) totals[pkg] = (totals[pkg] ?: 0L) + (to - from)
-            current = null
-        }
-
-        val event = UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            sawEvent = true
-            val pkg = event.packageName ?: continue
-            val t = event.timeStamp
-            when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    if (current != pkg) {
-                        close(t)
-                        current = pkg
-                        since = t
-                    }
-                }
-                UsageEvents.Event.ACTIVITY_PAUSED, EVENT_ACTIVITY_STOPPED -> {
-                    if (current == pkg) close(t)
-                }
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE,
-                UsageEvents.Event.KEYGUARD_SHOWN,
-                EVENT_DEVICE_SHUTDOWN -> close(t)
-            }
-        }
-        close(clippedEnd)
-        if (!sawEvent) return aggregateFallback(start, clippedEnd)
-        return totals
+        val events = readEvents(start - LOOKBACK_MS, clippedEnd)
+        if (events.isEmpty()) return aggregateFallback(start, clippedEnd)
+        return ForegroundTime.totals(events, start, clippedEnd)
     }
 
     /**
@@ -78,19 +38,26 @@ class UsageTracker(private val context: Context) {
      */
     fun foregroundAfter(current: String?, from: Long, to: Long): String? {
         if (!hasPermission() || to <= from) return current
-        val events = usm.queryEvents(from, to) ?: return current
-        var foreground = current
+        return ForegroundTime.foregroundAfter(current, readEvents(from, to))
+    }
+
+    private fun readEvents(from: Long, to: Long): List<ScreenEvent> {
+        val log = usm.queryEvents(from, to) ?: return emptyList()
+        val result = ArrayList<ScreenEvent>()
         val event = UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> foreground = event.packageName
-                UsageEvents.Event.ACTIVITY_PAUSED, EVENT_ACTIVITY_STOPPED ->
-                    if (foreground == event.packageName) foreground = null
-                UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> foreground = null
+        while (log.hasNextEvent()) {
+            log.getNextEvent(event)
+            val pkg = event.packageName ?: continue
+            val kind = when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> ScreenEvent.Kind.RESUMED
+                UsageEvents.Event.ACTIVITY_PAUSED, EVENT_ACTIVITY_STOPPED -> ScreenEvent.Kind.PAUSED
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN, EVENT_DEVICE_SHUTDOWN ->
+                    ScreenEvent.Kind.SCREEN_OFF
+                else -> continue
             }
+            result += ScreenEvent(event.timeStamp, kind, pkg)
         }
-        return foreground
+        return result
     }
 
     /** Older days may have aged out of the event log; daily aggregates are less precise but kept longer. */
@@ -101,7 +68,8 @@ class UsageTracker(private val context: Context) {
 
     private companion object {
         const val LOOKBACK_MS = 3 * 60 * 60_000L
-        // Public constants that only exist on newer API levels.
+
+        // Constants added in later API levels; the values are stable.
         const val EVENT_ACTIVITY_STOPPED = 23
         const val EVENT_DEVICE_SHUTDOWN = 26
     }

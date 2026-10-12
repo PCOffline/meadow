@@ -25,14 +25,22 @@ jobs:
           else
             echo "No GOOGLE_SERVICES_JSON secret; building without a backend"
           fi
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build, unit test and lint
+        run: ./gradlew assembleDebug testDebugUnitTest lintDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: meadow-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-reports
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/tests/
+          if-no-files-found: ignore
 
-  backend:
+  functions:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,4 +53,25 @@ jobs:
           cache: npm
           cache-dependency-path: backend/functions/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - name: Build and unit test
+        run: npm test
+
+  rules:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Security rules tests (Firestore emulator)
+        run: npm run test:rules

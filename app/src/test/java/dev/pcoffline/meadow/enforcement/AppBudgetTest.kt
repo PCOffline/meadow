@@ -1,0 +1,72 @@
+package dev.pcoffline.meadow.enforcement
+
+import dev.pcoffline.meadow.data.AppLimit
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AppBudgetTest {
+    private val minute = 60_000L
+
+    private fun budget(
+        daily: Int = 30,
+        weekly: Int = 0,
+        usedToday: Long = 0,
+        usedWeek: Long = usedToday,
+        bonusToday: Int = 0,
+        bonusWeek: Int = bonusToday,
+        emergencyUntil: Long = 0,
+    ) = AppBudget(AppLimit("app", "App", daily, weekly), usedToday, usedWeek, bonusToday, bonusWeek, emergencyUntil)
+
+    @Test
+    fun `remaining time counts down from the daily limit`() {
+        val b = budget(usedToday = 10 * minute)
+        assertEquals(20 * minute, b.remainingMs)
+        assertFalse(b.exhausted)
+    }
+
+    @Test
+    fun `used up means exhausted`() {
+        assertTrue(budget(usedToday = 30 * minute).exhausted)
+        assertTrue(budget(usedToday = 45 * minute).exhausted)
+        assertEquals(0L, budget(usedToday = 45 * minute).remainingMs)
+    }
+
+    @Test
+    fun `extra time from a Bumblebee is added`() {
+        val b = budget(usedToday = 30 * minute, bonusToday = 15)
+        assertFalse(b.exhausted)
+        assertEquals(15 * minute, b.remainingMs)
+    }
+
+    @Test
+    fun `the tighter of daily and weekly wins`() {
+        val b = budget(daily = 60, weekly = 120, usedToday = 10 * minute, usedWeek = 100 * minute)
+        assertEquals(20 * minute, b.remainingMs)
+        assertTrue(b.weeklyIsTighter)
+    }
+
+    @Test
+    fun `no limits means unlimited`() {
+        val b = budget(daily = 0, weekly = 0, usedToday = 999 * minute)
+        assertEquals(Long.MAX_VALUE, b.remainingMs)
+        assertFalse(b.exhausted)
+    }
+
+    @Test
+    fun `an emergency unlock keeps an exhausted app open`() {
+        val b = budget(usedToday = 40 * minute, emergencyUntil = System.currentTimeMillis() + 10 * minute)
+        assertTrue(b.emergency)
+        assertFalse(b.exhausted)
+        val ended = budget(usedToday = 40 * minute, emergencyUntil = System.currentTimeMillis() - 1)
+        assertFalse(ended.emergency)
+        assertTrue(ended.exhausted)
+    }
+
+    @Test
+    fun `used fraction is capped at one`() {
+        assertEquals(0.5f, budget(usedToday = 15 * minute).usedFraction, 0.001f)
+        assertEquals(1f, budget(usedToday = 90 * minute).usedFraction, 0.001f)
+    }
+}

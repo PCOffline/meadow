@@ -369,7 +369,7 @@ fun FlowerPicker(selected: String, onSelect: (String) -> Unit) {
                             onClickLabel = pickLabel,
                             role = Role.RadioButton,
                         ) { onSelect(f) }
-                        .semantics { selected = chosen },
+                        .semantics { this.selected = chosen },
                     contentAlignment = Alignment.Center,
                 ) { Text(f, fontSize = 24.sp) }
             }
