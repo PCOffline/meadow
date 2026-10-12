@@ -1,9 +1,11 @@
 package dev.pcoffline.meadow.data
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
@@ -44,20 +46,52 @@ class Backend {
             val unreachable = e.code == FirebaseFunctionsException.Code.UNAVAILABLE ||
                 e.code == FirebaseFunctionsException.Code.DEADLINE_EXCEEDED ||
                 e.cause is IOException
-            throw CallFailed(e.message.orEmpty(), unreachable, e)
+            val text = backendText(e.code, e.message)
+            // Not the backend's own words: a setup problem (e.g. a function missing in this region)
+            // that the person can't fix, so keep the details for whoever runs the backend.
+            if (text == null && !unreachable) Log.w(TAG, "Cloud Function $name failed with ${e.code}", e)
+            throw CallFailed(text.orEmpty(), unreachable, e.code, e)
         } catch (e: IOException) {
-            throw CallFailed("", unreachable = true, cause = e)
+            throw CallFailed("", unreachable = true, code = null, cause = e)
         }
     }
 
     /**
-     * A failed Cloud Function call. Its message is the backend's friendly text (see copy.ts);
+     * A failed Cloud Function call. Its message is the backend's friendly text (see copy.ts), or
+     * empty when the failure came from elsewhere; [code] then says what kind of failure it was.
      * [unreachable] means the backend couldn't be reached at all.
      */
-    class CallFailed(message: String, val unreachable: Boolean, cause: Throwable?) : IllegalStateException(message, cause)
+    class CallFailed(
+        message: String,
+        val unreachable: Boolean,
+        val code: FirebaseFunctionsException.Code?,
+        cause: Throwable?,
+    ) : IllegalStateException(message, cause)
 
     companion object {
-        const val FUNCTIONS_REGION = "us-central1"
+        /** Set once in backend/functions/.env, which the backend reads too. */
+        const val FUNCTIONS_REGION = BuildConfig.FUNCTIONS_REGION
         private const val DEFAULT_TIMEOUT_S = 70L
+        private const val TAG = "MeadowBackend"
+
+        /** The codes Meadow's backend throws, always with text written for people (see copy.ts). */
+        private val BACKEND_CODES = setOf(
+            FirebaseFunctionsException.Code.ALREADY_EXISTS,
+            FirebaseFunctionsException.Code.FAILED_PRECONDITION,
+            FirebaseFunctionsException.Code.INVALID_ARGUMENT,
+            FirebaseFunctionsException.Code.NOT_FOUND,
+            FirebaseFunctionsException.Code.PERMISSION_DENIED,
+            FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED,
+            FirebaseFunctionsException.Code.UNAUTHENTICATED,
+            FirebaseFunctionsException.Code.UNAVAILABLE,
+        )
+
+        /**
+         * The backend's own message for a failed call, or null when the failure came from Firebase
+         * itself. Those carry only the code's name ("NOT_FOUND" for a function that isn't deployed)
+         * or an English diagnostic, neither fit to show.
+         */
+        internal fun backendText(code: FirebaseFunctionsException.Code, message: String?): String? =
+            message?.trim()?.takeIf { code in BACKEND_CODES && it.isNotEmpty() && it != code.name }
     }
 }

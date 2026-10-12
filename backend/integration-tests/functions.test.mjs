@@ -12,8 +12,11 @@ import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/
 import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
 import { getBytes, ref as storageRef } from "firebase/storage";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
+import { readFileSync } from "node:fs";
 
 const PROJECT = "demo-meadow";
+// The emulator serves the functions in the region set in functions/.env.
+const REGION = readFileSync(new URL("../functions/.env", import.meta.url), "utf8").match(/^MEADOW_REGION=(.+)$/m)?.[1].trim() || "us-central1";
 const apps = [];
 let env;
 let counter = 0;
@@ -65,7 +68,7 @@ async function person(name, { anonymous = false, profile = true, flower = "🌼"
   apps.push(app);
   const auth = getAuth(app);
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  const functions = getFunctions(app, "us-central1");
+  const functions = getFunctions(app, REGION);
   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
   const email = `${name.toLowerCase()}-${counter}-${Date.now()}@example.com`;
   const cred = anonymous ? await signInAnonymously(auth) : await createUserWithEmailAndPassword(auth, email, "petals-and-bees");
@@ -149,7 +152,7 @@ describe("profiles", () => {
   test("calls without signing in are refused", async () => {
     const app = initializeApp({ projectId: PROJECT, apiKey: "fake-api-key" }, `nobody-${++counter}`);
     apps.push(app);
-    const functions = getFunctions(app, "us-central1");
+    const functions = getFunctions(app, REGION);
     connectFunctionsEmulator(functions, "127.0.0.1", 5001);
     await rejects(httpsCallable(functions, "createInviteLink")({}), "unauthenticated");
   });

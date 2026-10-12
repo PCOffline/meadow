@@ -127,9 +127,10 @@ jobs:
         run: |
           npm ci && npm --prefix functions ci && npm --prefix functions run build
           nohup npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow > emulators.log 2>&1 &
+          region=$(sed -n 's/^MEADOW_REGION=//p' functions/.env)
           for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' \
-              http://127.0.0.1:5001/demo-meadow/us-central1/createProfile || true)
+              "http://127.0.0.1:5001/demo-meadow/$region/createProfile" || true)
             if [ "$code" != "000" ] && [ "$code" != "404" ]; then echo "Emulators ready ($code)"; exit 0; fi
             sleep 2
           done

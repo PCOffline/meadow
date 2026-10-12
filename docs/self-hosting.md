@@ -102,7 +102,8 @@ cd meadow
 2. If asked for an edition, choose **Standard**. Keep the database ID as **(default)**: Meadow
    uses the default database.
 3. Choose a **location** close to the people who'll use it. It can't be changed later. If
-   unsure, `nam5 (United States)` or `eur3 (Europe)` are good choices.
+   unsure, `nam5 (United States)` or `eur3 (Europe)` are good choices. Note it: the functions
+   should run next to it (step 4).
 4. Choose **Start in production mode** and **Create**.
 
 That's all. Leave the database empty: the deploy in step 4 replaces the default rules with
@@ -172,7 +173,8 @@ The deploy:
 
 - uploads the Firestore rules and creates the indexes;
 - uploads the Storage rules;
-- compiles the functions (`backend/build-functions.cjs`) and deploys them to `us-central1`,
+- compiles the functions (`backend/build-functions.cjs`) and deploys them to the region in
+  `backend/functions/.env` (see below),
   along with two scheduled jobs: `expireRequests` every 5 minutes and `hourlyCare` every hour;
 - renders the legal pages and app links (`backend/predeploy.cjs`) and publishes
   `backend/hosting/` to `https://<project-id>.web.app`.
@@ -192,9 +194,20 @@ storage costs at zero.
 - **Storage → Rules** shows Meadow's rules.
 - `https://<project-id>.web.app/privacy` opens the privacy notice.
 
-The functions region is set in `backend/functions/src/index.ts` and, for the app, in
-`Backend.FUNCTIONS_REGION` (`app/src/main/java/dev/pcoffline/meadow/data/Backend.kt`). Change both
-together if you want another region.
+**The functions region** is set in one place, `backend/functions/.env`:
+
+```
+MEADOW_REGION=us-central1
+```
+
+The backend, the app's build, the emulators and CI all read it from there. Set it **before the
+first deploy**, to the region next to your Firestore database: `us-central1` for `nam5`,
+`europe-west1` for `eur3`, or the database's own region if you picked a single one. Commit the
+change, so builds from GitHub Actions use it too.
+
+To move the functions later, change it, deploy again, and confirm when the CLI offers to delete
+the functions in the old region. Then build and install a new app: older builds keep calling the
+old region and fail with "Meadow's server can't do this right now".
 
 ## 5. Let links open the app
 
@@ -348,12 +361,51 @@ compile; run the same command yourself to see them. Older copies of `firebase.js
 **`HTTP Error: 403, … API has not been used in project … or it is disabled`.** A Google Cloud API
 was only just turned on. Wait two minutes and deploy again.
 
+**`Could not build the function due to a missing permission on the build service account`.**
+Newer Google Cloud projects build functions as the Compute Engine default service account and no
+longer give it any roles. Grant it the Cloud Build role, then deploy again (your project number is
+on the Firebase console's **Project settings** page):
+
+```bash
+gcloud projects add-iam-policy-binding <project-id> \
+  --member="serviceAccount:<project-number>-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudbuild.builds.builder"
+```
+
+**`Repository "gcf-artifacts" not found`.** The first deploy to a region didn't create the
+repository for function images. Create it, then deploy again:
+
+```bash
+gcloud artifacts repositories create gcf-artifacts --repository-format=docker \
+  --location=<region> --project=<project-id>
+```
+
+**`Failed to set the IAM Policy on the Service`.** Callable functions must be public, because the
+app calls them directly (each function still checks who's signed in). Google Cloud organizations
+made since 2024 forbid that by default with the *Domain restricted sharing* policy
+(`iam.allowedPolicyMemberDomains`). An organization admin can override it for this project only:
+
+```bash
+gcloud org-policies reset iam.allowedPolicyMemberDomains --project=<project-id>
+```
+
+This needs the *Organization Policy Administrator* role on the organization. Then deploy again.
+
 **`Firebase Storage has not been set up` or `could not find the default bucket`.** Do step 2.5,
 then deploy again.
 
 **Firestore says *The query requires an index*.** The indexes are still building, or weren't
 deployed. Check **Firestore → Indexes**; if they're missing, run
 `firebase deploy --only firestore:indexes`.
+
+**The app says "Meadow's server can't do this right now".** The app called a function that
+isn't deployed where it looked. Usually the app was built with a different `MEADOW_REGION` than
+the functions were deployed with: check **Functions** in the console for the region, set the same
+one in `backend/functions/.env`, and build the app again. Otherwise, deploy the functions again.
+
+**The app says "Meadow's server turned this down".** The functions can't be called from the
+internet, usually because the deploy couldn't make them public: see *Failed to set the IAM
+Policy* below.
 
 **The app opens on "connect your backend".** It was built without `app/google-services.json`
 (locally) or without the `GOOGLE_SERVICES_JSON` secret (in Actions).

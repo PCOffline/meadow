@@ -28,6 +28,12 @@ val appVersionCode = appVersion.substringBefore('-').split('.').map { it.toInt()
     parts.getOrElse(0) { 0 } * 1_000_000 + parts.getOrElse(1) { 0 } * 1_000 + parts.getOrElse(2) { 0 }
 }
 
+// The Cloud Functions region, set once in backend/functions/.env, which the backend reads too.
+val functionsRegion = rootProject.file("backend/functions/.env").takeIf { it.exists() }?.readLines()
+    ?.firstNotNullOfOrNull { line -> line.trim().takeIf { it.startsWith("MEADOW_REGION=") }?.substringAfter('=')?.trim()?.trim('"') }
+    ?.also { require(Regex("^[a-z]+-[a-z]+[0-9]+$").matches(it)) { "MEADOW_REGION in backend/functions/.env isn't a region: $it" } }
+    ?: "us-central1"
+
 // Release signing comes from environment variables (CI secrets). Without them, release builds
 // fall back to the debug key, which is fine for testing but can't update a published install.
 val releaseKeystore = System.getenv("MEADOW_KEYSTORE_PATH")?.let(::file)?.takeIf { it.exists() }
@@ -45,6 +51,7 @@ android {
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        buildConfigField("String", "FUNCTIONS_REGION", "\"$functionsRegion\"")
         buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/meadow"}\"")
         manifestPlaceholders["inviteHost"] = inviteHost
         // Passwordless sign-in links arrive on the same Hosting domain as invite links.
