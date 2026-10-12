@@ -260,7 +260,7 @@ permissions**, so the Release workflow can publish releases. Save.
 
 | Workflow | When it runs | What it does | Secrets it needs |
 |---|---|---|---|
-| **Build** (`build.yml`) | Every push and pull request | Builds the app, runs unit tests and lint; tests the functions, security rules, hosting pages; runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON` it builds against your backend; without it, it builds the "connect your backend" version |
+| **Build** (`build.yml`) | Every pull request and every push to `main` (run it from the Actions tab for any other branch) | Builds the app, runs unit tests and lint; tests the functions, security rules, hosting pages; runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON` it builds against your backend; without it, it builds the "connect your backend" version |
 | **Release** (`release.yml`) | When you push a tag like `v1.2.0` | Tests, builds and signs the release APK and publishes it on your fork's Releases page | All five below |
 | **Screenshots** (`screenshots.yml`) | Pushes whose commit message contains `[screenshots]` | Re-renders the README images and commits them | None |
 

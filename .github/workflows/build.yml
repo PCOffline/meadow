@@ -1,9 +1,18 @@
 name: Build
 
+# Pull requests are tested as they would merge; pushes only for main, so a branch with an open
+# pull request isn't built twice. Run it by hand for a branch without one.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+
+# A newer push to the same pull request makes its older run pointless. Other runs, such as every
+# push to main, get a group of their own, so none is cancelled.
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   android:
