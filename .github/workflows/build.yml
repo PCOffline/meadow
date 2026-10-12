@@ -142,7 +142,7 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
+          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb logcat -d | grep -iE "meadow|firebase|functions|okhttp|AndroidRuntime" | tail -n 300; exit 1)
       - name: Show end-to-end results
         if: failure()
         run: |

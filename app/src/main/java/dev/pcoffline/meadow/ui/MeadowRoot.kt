@@ -110,11 +110,21 @@ fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
         return
     }
     val state by AppGraph.sync.profile.collectAsStateWithLifecycle()
-    when (val s = state) {
-        ProfileState.SignedOut -> AuthScreen()
-        ProfileState.Loading -> Loading()
-        ProfileState.Missing -> ProfileSetupScreen()
-        is ProfileState.Ready -> MainScaffold(s.profile, pendingRoute)
+    val creating by AppGraph.auth.creatingProfile.collectAsStateWithLifecycle()
+    val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
+    val s = state
+    // Onboarding stays put while a new garden is planted, and after a failed try (so its error
+    // shows), instead of flashing the "Almost there" screen meant for accounts with an email.
+    val onboarding = s == ProfileState.SignedOut || creating || (s == ProfileState.Missing && anonymous)
+    if (onboarding) {
+        AuthScreen()
+    } else {
+        when (s) {
+            ProfileState.Loading -> Loading()
+            ProfileState.Missing -> ProfileSetupScreen()
+            is ProfileState.Ready -> MainScaffold(s.profile, pendingRoute)
+            ProfileState.SignedOut -> Unit
+        }
     }
 }
 

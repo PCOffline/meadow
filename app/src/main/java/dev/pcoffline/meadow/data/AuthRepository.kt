@@ -21,6 +21,11 @@ class AuthRepository(private val backend: Backend) {
     /** True while the account has no email attached (started with "no registration"). */
     val anonymous: StateFlow<Boolean> = _anonymous.asStateFlow()
 
+    private val _creatingProfile = MutableStateFlow(false)
+
+    /** True while a new garden is being set up, so onboarding stays on screen until it's ready. */
+    val creatingProfile: StateFlow<Boolean> = _creatingProfile.asStateFlow()
+
     val uid: Flow<String?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener {
             _anonymous.value = it.currentUser?.isAnonymous == true
@@ -40,8 +45,14 @@ class AuthRepository(private val backend: Backend) {
 
     /** Starts without an email: an anonymous account plus a profile. */
     suspend fun startWithoutEmail(displayName: String, flower: String, termsVersion: Int) {
-        if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
-        createProfile(displayName, flower, termsVersion)
+        if (displayName.isBlank()) throw FriendlyException(R.string.error_name_required)
+        _creatingProfile.value = true
+        try {
+            if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
+            createProfile(displayName, flower, termsVersion)
+        } finally {
+            _creatingProfile.value = false
+        }
     }
 
     /**

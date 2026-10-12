@@ -2,6 +2,7 @@ package dev.pcoffline.meadow.ui
 
 import android.content.Context
 import android.text.format.DateUtils
+import android.util.Log
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,6 +53,7 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.w("Meadow", "Action failed", e)
                 error = e.friendlyMessage(context)
             } finally {
                 busy = false
