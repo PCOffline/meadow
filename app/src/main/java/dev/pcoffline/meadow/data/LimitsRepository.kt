@@ -2,8 +2,6 @@ package dev.pcoffline.meadow.data
 
 import com.google.firebase.firestore.FieldValue
 import dev.pcoffline.meadow.R
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeoutOrNull
 
 enum class ChangeOutcome { APPLIED, REQUESTED }
 
@@ -40,9 +38,7 @@ class LimitsRepository(
         )
         if (current == null) data["createdAt"] = FieldValue.serverTimestamp()
         // The local snapshot updates right away; offline writes are queued by Firestore.
-        withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            backend.user(uid).collection("limits").document(limit.packageName).set(data).await()
-        }
+        backend.user(uid).collection("limits").document(limit.packageName).set(data).awaitWrite()
         return ChangeOutcome.APPLIED
     }
 
@@ -57,15 +53,11 @@ class LimitsRepository(
             )
             return ChangeOutcome.REQUESTED
         }
-        withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-            backend.user(uid).collection("limits").document(limit.packageName).delete().await()
-        }
+        backend.user(uid).collection("limits").document(limit.packageName).delete().awaitWrite()
         return ChangeOutcome.APPLIED
     }
 
     companion object {
-        private const val WRITE_TIMEOUT_MS = 8_000L
-
         fun isLooser(old: AppLimit, new: AppLimit): Boolean {
             val dailyLooser = old.dailyMinutes > 0 && (new.dailyMinutes == 0 || new.dailyMinutes > old.dailyMinutes)
             val weeklyLooser = old.weeklyMinutes > 0 && (new.weeklyMinutes == 0 || new.weeklyMinutes > old.weeklyMinutes)

@@ -2,6 +2,7 @@
 
 package dev.pcoffline.meadow.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -48,6 +49,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +66,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -103,6 +107,8 @@ private enum class Step { INTRO, NAME, SIGN_IN }
 @Composable
 fun AuthScreen() {
     var step by rememberSaveable { mutableStateOf(Step.INTRO) }
+    // Back walks back through onboarding instead of closing the app on a half-typed name.
+    BackHandler(enabled = step != Step.INTRO) { step = Step.INTRO }
     AnimatedContent(
         targetState = step,
         transitionSpec = {
@@ -248,6 +254,7 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             value = name, onValueChange = { name = it.take(30) },
             label = { Text(stringResource(R.string.onboarding_name_label)) }, singleLine = true,
             shape = RoundedCornerShape(18.dp),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
             modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
@@ -342,13 +349,18 @@ private fun SignInOptions(
     var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
     val action = rememberAction()
     val resetSent = stringResource(R.string.sign_in_reset_sent)
+    val canSendLink = !action.busy && email.isNotBlank()
+    val canUsePassword = !action.busy && email.isNotBlank() && password.isNotBlank()
+    val sendLink = { action.run(onSuccess = { sentTo = email.trim() }) { AppGraph.auth.sendSignInLink(email) } }
+    val usePasswordNow = { action.run { onPassword(email, password) } }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedTextField(
             value = email, onValueChange = { email = it; sentTo = null },
             label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
             shape = RoundedCornerShape(18.dp),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = if (usePassword) ImeAction.Next else ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { if (canSendLink) sendLink() }),
             modifier = Modifier.fillMaxWidth(),
         )
         if (usePassword) {
@@ -357,7 +369,8 @@ private fun SignInOptions(
                 label = { Text(stringResource(R.string.field_password)) }, singleLine = true,
                 shape = RoundedCornerShape(18.dp),
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (canUsePassword) usePasswordNow() }),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -367,8 +380,8 @@ private fun SignInOptions(
         }
         if (usePassword) {
             Button(
-                onClick = { action.run { onPassword(email, password) } },
-                enabled = !action.busy && email.isNotBlank() && password.isNotBlank(),
+                onClick = usePasswordNow,
+                enabled = canUsePassword,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(stringResource(if (action.busy) R.string.sign_in_busy else passwordButton)) }
             if (offerPasswordReset) {
@@ -379,8 +392,8 @@ private fun SignInOptions(
             TextButton(onClick = { usePassword = false }) { Text(stringResource(R.string.auth_link_instead)) }
         } else {
             Button(
-                onClick = { action.run(onSuccess = { sentTo = email.trim() }) { AppGraph.auth.sendSignInLink(email) } },
-                enabled = !action.busy && email.isNotBlank(),
+                onClick = sendLink,
+                enabled = canSendLink,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(stringResource(R.string.auth_email_link)) }
             TextButton(onClick = { usePassword = true }) { Text(stringResource(R.string.auth_password_instead)) }
@@ -410,20 +423,27 @@ fun EmailLinkDialog(link: String) {
     var email by rememberSaveable { mutableStateOf(known.orEmpty()) }
     val action = rememberAction()
     val done = stringResource(R.string.link_done)
+    // Tried once on its own; a rotation mustn't spend the one-time link a second time.
+    var tried by rememberSaveable(link) { mutableStateOf(false) }
     LaunchedEffect(link) {
-        if (known != null) action.run(successMessage = done) { AppGraph.auth.finishSignInLink(link, known) }
+        if (known != null && !tried) {
+            tried = true
+            action.run(successMessage = done) { AppGraph.auth.finishSignInLink(link, known) }
+        }
     }
+    // If the address this phone remembers didn't work, the link may have gone to another one.
+    val askEmail = known == null || action.error != null
     AlertDialog(
         onDismissRequest = { if (!action.busy) AppGraph.auth.dismissLink() },
         title = { Text(stringResource(R.string.link_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (known == null) {
-                    Text(stringResource(R.string.link_ask_email))
+                if (askEmail) {
+                    if (known == null) Text(stringResource(R.string.link_ask_email))
                     OutlinedTextField(
                         value = email, onValueChange = { email = it },
                         label = { Text(stringResource(R.string.field_email)) }, singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (action.busy) {
@@ -433,7 +453,7 @@ fun EmailLinkDialog(link: String) {
             }
         },
         confirmButton = {
-            if (known == null || action.error != null) {
+            if (askEmail || (!action.busy && tried)) {
                 TextButton(
                     onClick = { action.run(successMessage = done) { AppGraph.auth.finishSignInLink(link, email) } },
                     enabled = !action.busy && email.isNotBlank(),
@@ -498,7 +518,9 @@ fun ProfileSetupScreen() {
         OutlinedTextField(
             value = name, onValueChange = { name = it.take(30) },
             label = { Text(stringResource(R.string.onboarding_name_label)) }, singleLine = true,
-            shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
         ConsentCheckbox(agreed, onChange = { agreed = it }, onOpen = { reading = it })

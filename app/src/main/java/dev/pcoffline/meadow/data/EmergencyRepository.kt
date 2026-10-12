@@ -5,6 +5,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.google.firebase.firestore.FieldValue
 import dev.pcoffline.meadow.R
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -47,15 +49,21 @@ class EmergencyRepository(
         val now = System.currentTimeMillis()
         val until = now + minutes * 60_000L
         store.lastOfflineEmergencyMillis = now
-        store.pendingEmergency = PendingEmergency(minutes, reason.trim(), packageName, appName, startedAt = now)
+        store.pendingEmergency = PendingEmergency(minutes, reason.trim(), packageName, appName, startedAt = now, ownerUid = backend.uid)
         store.setEmergency(Emergency(until, packageName))
         return Result(until, offline = true)
     }
 
-    /** Reports an offline unlock so approvers hear about it and it counts against the allowance. */
-    suspend fun flushPending() {
-        val pending = store.pendingEmergency ?: return
-        if (backend.uid == null) return
+    private val flushing = Mutex()
+
+    /**
+     * Reports an offline unlock so approvers hear about it and it counts against the allowance.
+     * App start and background sync can both get here at once; the lock keeps it to one report.
+     */
+    suspend fun flushPending(): Unit = flushing.withLock {
+        val pending = store.pendingEmergency ?: return@withLock
+        val uid = backend.uid ?: return@withLock
+        if (pending.ownerUid != null && pending.ownerUid != uid) return@withLock
         try {
             backend.call(
                 "emergencyUnlock",
@@ -66,6 +74,7 @@ class EmergencyRepository(
                     "appName" to pending.appName,
                     "startedAt" to pending.startedAt,
                     "endedAt" to pending.endedAt,
+                    "reportId" to pending.reportId,
                 ),
             )
             store.pendingEmergency = null

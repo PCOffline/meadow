@@ -1,7 +1,6 @@
 package dev.pcoffline.meadow.data
 
 import android.util.Log
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.pcoffline.meadow.AppGraph
 import kotlinx.coroutines.CoroutineScope
@@ -46,7 +45,7 @@ class SyncManager(
                     return@collectLatest
                 }
                 _profile.value = ProfileState.Loading
-                store.ownerUid = uid
+                store.switchAccount(uid)
                 // Scoped so every listener stops when the account changes.
                 coroutineScope {
                     launch { syncProfile(uid) }
@@ -114,8 +113,11 @@ class SyncManager(
 
     private suspend fun syncLimits(uid: String) {
         backend.user(uid).collection("limits").observe().collect { snapshot ->
-            // An empty answer from a cold cache must not wipe commitments we already hold.
-            if (snapshot.isEmpty && snapshot.metadata.isFromCache && store.limits.value.isNotEmpty()) return@collect
+            // An empty answer from a cold cache must not wipe commitments we already hold. One that
+            // comes from this phone's own pending write (the last limit removed offline) is real.
+            if (snapshot.isEmpty && snapshot.metadata.isFromCache && !snapshot.metadata.hasPendingWrites() &&
+                store.limits.value.isNotEmpty()
+            ) return@collect
             store.setLimits(snapshot.documents.map { it.toLimit() }.filter { it.packageName.isNotBlank() })
         }
     }
@@ -143,7 +145,19 @@ class SyncManager(
         scope.launch { runCatchingCancellable { saveToken(uid, token) } }
     }
 
+    /**
+     * Adds this phone's push token. Tokens of reinstalled or reset phones are never removed by
+     * them, so the list keeps only the newest few, or the backend would refuse new phones.
+     */
     private suspend fun saveToken(uid: String, token: String) {
-        backend.account(uid).update("fcmTokens", FieldValue.arrayUnion(token)).await()
+        val account = backend.account(uid)
+        val current = account.get().await().stringList("fcmTokens")
+        if (token in current) return
+        account.update("fcmTokens", (current + token).takeLast(MAX_TOKENS)).awaitWrite()
+    }
+
+    private companion object {
+        /** Must stay within the limit in firestore.rules. */
+        const val MAX_TOKENS = 10
     }
 }

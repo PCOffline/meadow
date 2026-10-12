@@ -6,6 +6,7 @@ import com.google.firebase.auth.EmailAuthProvider
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.channels.awaitClose
@@ -15,7 +16,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 class AuthRepository(private val backend: Backend, private val store: LocalStore) {
 
@@ -107,26 +111,52 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
     /** The email a link was sent to from this phone, if any. */
     val linkEmail: String? get() = store.pendingLinkEmail
 
+    private val linking = Mutex()
+    private var usedLink: String? = null
+
     /**
      * Uses a sign-in link. [email] must be the address it was sent to. A garden started without
      * an email keeps everything: the address is attached to it instead of starting a new one.
+     * A link works once, so a second try at the same one (after a rotation, say) is ignored.
      */
-    suspend fun finishSignInLink(link: String, email: String) {
-        signInOrAttach(EmailAuthProvider.getCredentialWithLink(email.trim(), link))
+    suspend fun finishSignInLink(link: String, email: String) = linking.withLock {
+        if (link != usedLink) {
+            signInOrAttach(email.trim(), EmailAuthProvider.getCredentialWithLink(email.trim(), link))
+            usedLink = link
+        }
         store.pendingLinkEmail = null
         _incomingLink.value = null
     }
 
-    private suspend fun signInOrAttach(credential: AuthCredential) {
+    private suspend fun signInOrAttach(email: String, credential: AuthCredential) {
         val user = backend.auth.currentUser
-        if (user != null && user.isAnonymous) {
-            user.linkWithCredential(credential).await()
-            user.reload().await()
-            _anonymous.value = false
-        } else {
+        if (user == null) {
             backend.auth.signInWithCredential(credential).await()
+            return
+        }
+        when {
+            user.isAnonymous -> try {
+                user.linkWithCredential(credential).await()
+                user.reload().await()
+                _anonymous.value = false
+            } catch (e: FirebaseAuthUserCollisionException) {
+                // The address already has a garden. An unused anonymous start (no profile yet)
+                // has nothing to lose, so sign in to that garden instead.
+                if (hasProfile(user.uid)) throw e
+                backend.auth.signInWithCredential(credential).await()
+            }
+            // Already signed in with this address: nothing to do.
+            user.email.equals(email, ignoreCase = true) -> Unit
+            // Signed in as someone else: sign them out properly (push token included) first.
+            else -> {
+                signOut()
+                backend.auth.signInWithCredential(credential).await()
+            }
         }
     }
+
+    private suspend fun hasProfile(uid: String): Boolean =
+        runCatchingCancellable { backend.user(uid).get().await().exists() }.getOrDefault(true)
 
     suspend fun sendPasswordReset(email: String) {
         if (email.isBlank()) throw FriendlyException(R.string.error_email_required)
@@ -142,14 +172,23 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         )
     }
 
+    /** Stops this phone getting the account's pushes, then signs out. Never waits long offline. */
     suspend fun signOut() {
         val uid = backend.uid
         if (uid != null) {
             runCatchingCancellable {
-                val token = FirebaseMessaging.getInstance().token.await()
-                backend.account(uid).update("fcmTokens", FieldValue.arrayRemove(token)).await()
+                withTimeoutOrNull(SIGN_OUT_TIMEOUT_MS) {
+                    val token = FirebaseMessaging.getInstance().token.await()
+                    backend.account(uid).update("fcmTokens", FieldValue.arrayRemove(token)).awaitWrite(SIGN_OUT_TIMEOUT_MS)
+                    // A fresh token for whoever signs in next, so this one can't reach them.
+                    FirebaseMessaging.getInstance().deleteToken().await()
+                }
             }
         }
         backend.auth.signOut()
+    }
+
+    private companion object {
+        const val SIGN_OUT_TIMEOUT_MS = 4_000L
     }
 }

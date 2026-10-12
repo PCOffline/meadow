@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.data
 
 import android.util.Log
+import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -9,6 +10,8 @@ import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "MeadowFirestore"
 
@@ -18,6 +21,17 @@ fun Query.observe(): Flow<QuerySnapshot> =
 
 fun DocumentReference.observe(): Flow<DocumentSnapshot> =
     snapshots().catch { Log.w(TAG, "Document listener failed", it) }
+
+/**
+ * Waits for the server to confirm a write, but not forever. Offline, the write's task only
+ * completes once back online; Firestore has already applied it locally and keeps it queued, so
+ * there's nothing to wait for. A write the server rejects still throws.
+ */
+suspend fun <T> Task<T>.awaitWrite(timeoutMs: Long = WRITE_TIMEOUT_MS) {
+    withTimeoutOrNull(timeoutMs) { await() }
+}
+
+const val WRITE_TIMEOUT_MS = 8_000L
 
 fun DocumentSnapshot.millis(field: String): Long =
     getTimestamp(field, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.toDate()?.time ?: 0L

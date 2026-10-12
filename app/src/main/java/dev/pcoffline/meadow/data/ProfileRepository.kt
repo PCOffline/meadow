@@ -12,6 +12,7 @@ import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -39,7 +40,7 @@ class ProfileRepository(
                 "avatarColor" to color,
                 "bio" to bio.trim().take(BIO_MAX),
             ),
-        ).await()
+        ).awaitWrite()
     }
 
     /** Crops the picked image to a small square, uploads it, and makes it your avatar. */
@@ -50,12 +51,12 @@ class ProfileRepository(
         ref.putBytes(bytes, StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
         // The fragment changes the image cache key so the new photo shows straight away.
         val url = ref.downloadUrl.await().toString() + "#v=" + System.currentTimeMillis()
-        backend.user(uid).update("photoUrl", url).await()
+        backend.user(uid).update("photoUrl", url).awaitWrite()
     }
 
     suspend fun removePhoto() {
         val uid = backend.requireUid()
-        backend.user(uid).update("photoUrl", null).await()
+        backend.user(uid).update("photoUrl", null).awaitWrite()
         runCatchingCancellable { storage.reference.child("avatars/$uid").delete().await() }
     }
 
@@ -63,7 +64,7 @@ class ProfileRepository(
     suspend fun setAppearance(theme: String, darkMode: String) {
         store.setAppearance(theme, darkMode)
         val uid = backend.uid ?: return
-        runCatchingCancellable { backend.account(uid).update(mapOf("theme" to theme, "darkMode" to darkMode)).await() }
+        runCatchingCancellable { backend.account(uid).update(mapOf("theme" to theme, "darkMode" to darkMode)).awaitWrite() }
     }
 
     /**
@@ -77,12 +78,14 @@ class ProfileRepository(
             "privacy" to mapOf("shareUsage" to privacy.shareUsage, "shareProtection" to privacy.shareProtection),
         )
         if (!privacy.shareProtection) updates["protection"] = emptyMap<String, Boolean>()
-        backend.user(uid).update(updates).await()
+        backend.user(uid).update(updates).awaitWrite()
         if (!privacy.shareUsage) {
-            val shared = backend.user(uid).collection("usage").get().await()
-            val batch = backend.db.batch()
-            shared.documents.forEach { batch.delete(it.reference) }
-            batch.commit().await()
+            withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+                val shared = backend.user(uid).collection("usage").get().await()
+                val batch = backend.db.batch()
+                shared.documents.forEach { batch.delete(it.reference) }
+                batch.commit().awaitWrite()
+            }
         }
         if (privacy.shareProtection) store.lastReportedProtection = null
     }
@@ -92,13 +95,13 @@ class ProfileRepository(
         store.acceptedTermsVersion = version
         val uid = backend.uid ?: return
         runCatchingCancellable {
-            backend.account(uid).update("acceptedTerms", mapOf("version" to version, "at" to FieldValue.serverTimestamp())).await()
+            backend.account(uid).update("acceptedTerms", mapOf("version" to version, "at" to FieldValue.serverTimestamp())).awaitWrite()
         }
     }
 
     /** Everything the backend holds about you, as pretty-printed JSON. */
     suspend fun exportData(): String {
-        val data = backend.call("exportMyData")
+        val data = backend.call("exportMyData", timeoutSeconds = 130)
         return PrettyJson.encodeToString(JsonElement.serializer(), toJson(data))
     }
 
@@ -107,7 +110,7 @@ class ProfileRepository(
         // The profile disappears mid-call; keep the app from offering to create a new one.
         sync().beginLeaving()
         try {
-            backend.call("deleteAccount")
+            backend.call("deleteAccount", timeoutSeconds = 310)
         } catch (e: Exception) {
             sync().cancelLeaving()
             throw e

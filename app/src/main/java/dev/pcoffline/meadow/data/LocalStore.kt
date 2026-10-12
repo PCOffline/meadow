@@ -18,7 +18,12 @@ data class PendingEmergency(
     val appName: String?,
     val startedAt: Long,
     val endedAt: Long? = null,
-)
+    /** The account that took it; null if taken signed out, then it's reported by whoever signs in. */
+    val ownerUid: String? = null,
+) {
+    /** Lets the backend recognise a retried report of the same unlock. */
+    val reportId: String get() = "offline-$startedAt"
+}
 
 /**
  * On-device copy of everything enforcement needs. Enforcement only ever reads from here,
@@ -100,6 +105,21 @@ class LocalStore(context: Context) {
             _acceptedTerms.value = value
         }
 
+    /**
+     * Forgets what belonged to the previous account when a different one signs in. Limits stay
+     * until the new account's arrive, so signing in elsewhere is never a way around them.
+     */
+    fun switchAccount(uid: String) {
+        val previous = ownerUid
+        ownerUid = uid
+        if (previous == null || previous == uid) return
+        setGrants(emptyList())
+        acceptedTermsVersion = 0
+        lastReportedProtection = null
+        warnedKeys = emptySet()
+        pendingEmergency?.let { if (it.ownerUid != null && it.ownerUid != uid) pendingEmergency = null }
+    }
+
     /** Wipes everything this phone holds, after the account is deleted. */
     fun clearAll() {
         prefs.edit().clear().apply()
@@ -133,6 +153,11 @@ class LocalStore(context: Context) {
     var lastReportedProtection: String?
         get() = prefs.getString(KEY_PROTECTION, null)
         set(value) = prefs.edit().putString(KEY_PROTECTION, value).apply()
+
+    /** When this phone last told the backend it's alive. */
+    var lastHeartbeatMillis: Long
+        get() = prefs.getLong(KEY_HEARTBEAT, 0L)
+        set(value) = prefs.edit().putLong(KEY_HEARTBEAT, value).apply()
 
     var warnedKeys: Set<String>
         get() = prefs.getStringSet(KEY_WARNED, emptySet()) ?: emptySet()
@@ -191,6 +216,7 @@ class LocalStore(context: Context) {
         const val KEY_OWNER = "owner_uid"
         const val KEY_PROTECTION = "last_protection"
         const val KEY_WARNED = "warned_keys"
+        const val KEY_HEARTBEAT = "last_heartbeat"
         const val KEY_EMERGENCY = "emergency"
         const val KEY_OFFLINE_EMERGENCY = "offline_emergency_at"
         const val KEY_PENDING_EMERGENCY = "pending_emergency_v2"

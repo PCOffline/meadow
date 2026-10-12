@@ -7,6 +7,7 @@ import com.google.firebase.functions.FirebaseFunctionsException
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 /** Thin access point to Firebase. Only touched once [dev.pcoffline.meadow.AppGraph.backendReady] is true. */
 class Backend {
@@ -23,10 +24,14 @@ class Backend {
     /** Owner-only document: who looks after whom, push tokens and preferences. */
     fun account(uid: String) = user(uid).collection("private").document("account")
 
-    /** Calls an HTTPS callable Cloud Function, turning its error into a readable message. */
-    suspend fun call(name: String, data: Map<String, Any?> = emptyMap()): Map<String, Any?> {
+    /**
+     * Calls an HTTPS callable Cloud Function, turning its error into a readable message.
+     * [timeoutSeconds] must cover the function's own timeout, or a slow call looks like being offline.
+     */
+    suspend fun call(name: String, data: Map<String, Any?> = emptyMap(), timeoutSeconds: Long = DEFAULT_TIMEOUT_S): Map<String, Any?> {
         try {
-            val result = functions.getHttpsCallable(name).call(data).await()
+            val callable = functions.getHttpsCallable(name).apply { setTimeout(timeoutSeconds, TimeUnit.SECONDS) }
+            val result = callable.call(data).await()
             @Suppress("UNCHECKED_CAST")
             return (result.data as? Map<String, Any?>) ?: emptyMap()
         } catch (e: FirebaseFunctionsException) {
@@ -47,5 +52,6 @@ class Backend {
 
     companion object {
         const val FUNCTIONS_REGION = "us-central1"
+        private const val DEFAULT_TIMEOUT_S = 70L
     }
 }

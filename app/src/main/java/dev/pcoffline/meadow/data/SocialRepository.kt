@@ -1,10 +1,12 @@
 package dev.pcoffline.meadow.data
 
+import android.util.Log
+import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
 
 class SocialRepository(
     private val backend: Backend,
@@ -13,8 +15,14 @@ class SocialRepository(
 ) {
     private val invites get() = backend.db.collection("invites")
 
+    /** Someone's profile; null if it's gone or can't be read, so lists built from several still show the rest. */
     fun profile(uid: String): Flow<UserProfile?> =
-        backend.user(uid).observe().map { if (it.exists()) it.toProfile() else null }
+        backend.user(uid).snapshots()
+            .map { if (it.exists()) it.toProfile() else null }
+            .catch {
+                Log.w("MeadowSocial", "Profile listener failed", it)
+                emit(null)
+            }
 
     fun profiles(uids: List<String>): Flow<List<UserProfile>> {
         if (uids.isEmpty()) return flowOf(emptyList())
@@ -89,7 +97,7 @@ class SocialRepository(
             requests.create(type = RequestType.DISABLE_STRICT_MODE, message = message)
             return ChangeOutcome.REQUESTED
         }
-        backend.user(uid).update("strictMode", enabled).await()
+        backend.user(uid).update("strictMode", enabled).awaitWrite()
         return ChangeOutcome.APPLIED
     }
 }

@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,7 +58,6 @@ import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.update.UpdateState
-import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -256,7 +254,6 @@ private fun UpdatesCard() {
     val updater = AppGraph.updater
     val state by updater.state.collectAsStateWithLifecycle()
     val auto by AppGraph.store.autoUpdate.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     var needsPermission by remember { mutableStateOf(false) }
 
     MeadowCard(Modifier.fillMaxWidth()) {
@@ -301,7 +298,7 @@ private fun UpdatesCard() {
                     }) { Text(stringResource(R.string.settings_updates_allow_button)) }
                 }
                 Button(onClick = {
-                    if (updater.canInstall()) scope.launch { updater.install(s.update) } else needsPermission = true
+                    if (updater.canInstall()) updater.startInstall(s.update) else needsPermission = true
                 }) { Text(stringResource(R.string.settings_updates_install)) }
             }
             is UpdateState.Downloading -> {
@@ -313,7 +310,7 @@ private fun UpdatesCard() {
         }
         val busy = state is UpdateState.Checking || state is UpdateState.Downloading || state is UpdateState.Installing
         if (state !is UpdateState.Available) {
-            OutlinedButton(onClick = { scope.launch { updater.check() } }, enabled = !busy, modifier = Modifier.padding(top = 4.dp)) {
+            OutlinedButton(onClick = { updater.checkInBackground() }, enabled = !busy, modifier = Modifier.padding(top = 4.dp)) {
                 Text(stringResource(R.string.settings_updates_check))
             }
         }
