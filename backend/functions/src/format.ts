@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { describeSchedule, Schedule } from "./schedule";
+import { describeSchedule, type Schedule } from "./schedule";
 
 /** "disable_strict_mode" only appears on old requests: strict mode now turns off without asking. */
 export type RequestType = "extra_time" | "change_limit" | "remove_limit" | "disable_strict_mode";

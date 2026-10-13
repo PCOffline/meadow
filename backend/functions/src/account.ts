@@ -1,6 +1,6 @@
 /** Data rights: download everything Meadow holds about you, or delete it for good. */
 import { getAuth } from "firebase-admin/auth";
-import { DocumentData, FieldValue, GrpcStatus, Timestamp } from "firebase-admin/firestore";
+import { type DocumentData, FieldValue, GrpcStatus, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";

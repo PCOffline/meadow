@@ -1,10 +1,10 @@
-import { DocumentData, DocumentReference, FieldValue, Timestamp, Transaction, UpdateData } from "firebase-admin/firestore";
+import { type DocumentData, type DocumentReference, FieldValue, Timestamp, type Transaction, type UpdateData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { chatNotes, errors, pushes } from "./copy";
 import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
-import { chatIdFor, formatMinutes, RequestType, summarize } from "./format";
-import { isScheduleStricter, normalize, Schedule } from "./schedule";
+import { chatIdFor, formatMinutes, type RequestType, summarize } from "./format";
+import { isScheduleStricter, normalize, type Schedule } from "./schedule";
 import { CreateRequestInput, DecideRequestInput, RequestIdInput, SaveLimitInput } from "./schemas";
 
 const MAX_PENDING = 10;
@@ -215,6 +215,12 @@ export async function expireStaleRequests(now: number): Promise<number> {
   return stale.size;
 }
 
+/** The limit a change or removal request is about. Such requests always name an app. */
+function limitOf(requesterRef: DocumentReference, r: RequestDoc): DocumentReference {
+  if (r.packageName == null) throw new Error(`A ${r.type} request has no app`);
+  return requesterRef.collection("limits").doc(r.packageName);
+}
+
 /** Applies an approved request. Runs inside the decision transaction. */
 function applyApproval(tx: Transaction, requestId: string, r: RequestDoc, deciderUid: string, grantedMinutes: number): void {
   const requesterRef = users().doc(r.requesterId);
@@ -231,7 +237,7 @@ function applyApproval(tx: Transaction, requestId: string, r: RequestDoc, decide
       break;
     case "change_limit":
       tx.set(
-        requesterRef.collection("limits").doc(r.packageName!),
+        limitOf(requesterRef, r),
         {
           packageName: r.packageName,
           appName: r.appName,
@@ -244,7 +250,7 @@ function applyApproval(tx: Transaction, requestId: string, r: RequestDoc, decide
       );
       break;
     case "remove_limit":
-      tx.delete(requesterRef.collection("limits").doc(r.packageName!));
+      tx.delete(limitOf(requesterRef, r));
       break;
     case "disable_strict_mode":
       // Old requests only: strict mode now turns off without asking.
@@ -333,8 +339,8 @@ export const saveLimit = onCall(async (call) => {
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const schedule = normalize(input.schedule);
-    if (snap.exists) {
-      const old = snap.data()!;
+    const old = snap.data();
+    if (old) {
       const minutesStricter = (o: number, n: number) => o === 0 || (n > 0 && n <= o);
       const stricter = minutesStricter(old.dailyMinutes ?? 0, input.dailyMinutes)
         && minutesStricter(old.weeklyMinutes ?? 0, input.weeklyMinutes)

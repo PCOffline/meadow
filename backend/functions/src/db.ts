@@ -1,9 +1,9 @@
 /** Firestore and FCM plumbing shared by every function. */
-import { getFirestore, FieldPath, FieldValue, DocumentSnapshot, DocumentReference, SetOptions, DocumentData, Transaction } from "firebase-admin/firestore";
+import { getFirestore, FieldPath, FieldValue, type DocumentSnapshot, type DocumentReference, type SetOptions, type DocumentData, type Transaction } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
-import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
-import { z } from "zod";
+import type { z } from "zod";
 import { errors } from "./copy";
 
 export const db = () => getFirestore();
