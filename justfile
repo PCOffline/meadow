@@ -132,7 +132,12 @@ deploy-hosting:
 functions-log:
     cd backend && {{ firebase }} functions:log
 
-# Tag a version and push the tag; GitHub Actions builds, signs and publishes the APK
+# Let GitHub Actions deploy to Firebase without a stored key (docs/self-hosting.md, 7.6)
+[group('backend')]
+deploy-access project repo:
+    .github/scripts/setup-deploy-access.sh {{ project }} {{ repo }}
+
+# Tag a version and push the tag; the Deliver workflow builds, signs and publishes the APK
 [group('release')]
 release version:
     #!/usr/bin/env bash
