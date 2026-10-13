@@ -19,7 +19,27 @@ RESULTS = """<?xml version="1.0"?>
 </testsuite>""" % "\n".join(f"line {i}" for i in range(40))
 
 
+HANG = """<?xml version="1.0"?>
+<testsuite name="EditorsTest" tests="1" failures="1">
+  <testcase name="hangs" classname="dev.pcoffline.meadow.ui.screens.EditorsTest">
+    <failure message="androidx.test.espresso.AppNotIdleException: Compose did not get idle">androidx.test.espresso.AppNotIdleException: Compose did not get idle
+	at androidx.compose.ui.test.junit4.ComposeIdlingResource.waitForIdle(ComposeIdlingResource.kt:10)
+	at dev.pcoffline.meadow.ui.screens.ScreenTest.node(ScreenTest.kt:40)
+	at dev.pcoffline.meadow.ui.screens.EditorsTest.hangs(EditorsTest.kt:66)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)</failure>
+  </testcase>
+</testsuite>"""
+
+
 class FailedTestsTest(unittest.TestCase):
+    def test_shows_where_in_the_project_it_happened(self):
+        text = failures(HANG)[0][1]
+        self.assertIn("at dev.pcoffline.meadow.ui.screens.EditorsTest.hangs(EditorsTest.kt:66)", text)
+        self.assertIn("at dev.pcoffline.meadow.ui.screens.ScreenTest.node(ScreenTest.kt:40)", text)
+        self.assertNotIn("ComposeIdlingResource", text.split("\n", 1)[1])
+        self.assertNotIn("FrameworkMethod", text)
+
     def test_lists_failures_and_errors_only_not_skips(self):
         found = failures(RESULTS)
         self.assertEqual([name for name, _ in found], ["RenderedContrastTest > the garden", "RenderedContrastTest > crashes"])

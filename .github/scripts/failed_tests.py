@@ -7,6 +7,10 @@ import sys
 import xml.etree.ElementTree as ET
 
 MAX_LINES = 20
+MAX_FRAMES = 6
+# Stack frames from these are the framework's, not the project's: they don't say where a test was.
+FRAMEWORK = ("java.", "javax.", "jdk.", "sun.", "kotlin.", "kotlinx.", "org.junit.", "junit.", "androidx.",
+             "android.", "com.android.", "org.robolectric.", "org.gradle.", "worker.org.gradle.", "com.google.")
 SKIPPED = "AssumptionViolatedException"
 
 
@@ -24,8 +28,25 @@ def failures(xml_text: str) -> list[tuple[str, str]]:
                 continue  # A test that chose not to run (an unmet assumption) didn't fail.
             lines = text.splitlines()
             shown = "\n".join(lines[:MAX_LINES]) + (f"\n... ({len(lines) - MAX_LINES} more lines)" if len(lines) > MAX_LINES else "")
+            frames = own_frames(problem.text or "")
+            if frames:
+                shown += "\n" + "\n".join(f"  at {f}" for f in frames)
             found.append((name, shown))
     return found
+
+
+def own_frames(trace: str) -> list[str]:
+    """The project's own stack frames in [trace], outermost cause last: where in the test it happened."""
+    frames = []
+    for line in trace.splitlines():
+        line = line.strip()
+        if not line.startswith("at "):
+            continue
+        frame = line[3:]
+        if frame.startswith(FRAMEWORK) or frame in frames:
+            continue
+        frames.append(frame)
+    return frames[:MAX_FRAMES]
 
 
 def main(dirs: list[str]) -> int:
