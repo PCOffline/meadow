@@ -42,6 +42,7 @@ class GuardianAccessibilityService : AccessibilityService() {
     @Volatile private var pipPackage: String? = null
     private var lastLimitedLeft: String? = null
     private val watchers = HashMap<String, Job>()
+    private val windowPackages = WindowPackages()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -101,14 +102,18 @@ class GuardianAccessibilityService : AccessibilityService() {
     private fun scanWindows() {
         val all = runCatching { windows }.getOrNull() ?: return
         var pip = false
-        val side = HashSet<String>()
+        val apps = ArrayList<AccessibilityWindowInfo>()
         for (w in all) {
             if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
             if (w.isInPictureInPictureMode) {
                 pip = true
                 continue
             }
-            val pkg = runCatching { w.root?.packageName?.toString() }.getOrNull() ?: continue
+            apps += w
+        }
+        // Reading a window's root asks its app, so each window is only asked once.
+        val side = HashSet<String>()
+        for (pkg in windowPackages.of(apps, { it.id }) { w -> runCatching { w.root?.packageName?.toString() }.getOrNull() }) {
             if (pkg != currentPackage && pkg != packageName && AppGraph.engine.limitFor(pkg) != null) side += pkg
         }
         pipPackage = if (!pip) null else pipPackage ?: lastLimitedLeft?.takeIf { it != currentPackage }
@@ -257,5 +262,27 @@ object StrictModeRules {
         if (clockKeywords.any { it in screenText } && pkg.contains("settings")) return true
         if (appLabel !in screenText) return false
         return dangerousNearApp.any { it in screenText } || localWords.any { it in screenText }
+    }
+}
+
+/**
+ * Which app each on-screen window belongs to. A window never changes app, so each window's app
+ * is looked up once, while it stays open.
+ */
+internal class WindowPackages {
+    private var known: Map<Int, String> = emptyMap()
+
+    /**
+     * The apps of [windows], identified by [id]. [lookup] is only asked about windows not seen in
+     * the previous call, or whose app it couldn't tell then; windows no longer listed are forgotten.
+     */
+    fun <W> of(windows: List<W>, id: (W) -> Int, lookup: (W) -> String?): List<String> {
+        val next = HashMap<Int, String>(windows.size)
+        val packages = windows.mapNotNull { w ->
+            val key = id(w)
+            (known[key] ?: lookup(w))?.also { next[key] = it }
+        }
+        known = next
+        return packages
     }
 }
