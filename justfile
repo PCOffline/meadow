@@ -117,6 +117,11 @@ deploy-functions:
 deploy-rules:
     cd backend && {{ firebase }} deploy --only firestore,storage
 
+# Delete data exports never downloaded after a day (once per project; docs/self-hosting.md, 2.5)
+[group('backend')]
+storage-lifecycle project:
+    gcloud storage buckets update gs://{{ project }}.firebasestorage.app --lifecycle-file=backend/storage-lifecycle.json
+
 # Deploy only the hosted pages (legal pages, invite and sign-in links)
 [group('backend')]
 deploy-hosting:

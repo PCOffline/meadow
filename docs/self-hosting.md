@@ -117,12 +117,20 @@ Collections appear on their own as people use the app.
    regions are billed from the first byte, but Meadow stores very little.
 3. Choose **Start in production mode** and **Create**. This makes the default bucket,
    `<project-id>.firebasestorage.app`.
+4. Data exports are deleted as soon as the app downloads them. So that any never downloaded go
+   too (the privacy notice promises it), add a lifecycle rule to the bucket, once:
 
-Again, nothing else to set up: the deploy uploads `backend/storage.rules`, which only lets people
-read and write their own photo and their own export files.
+   ```bash
+   just storage-lifecycle <project-id>
+   # or: gcloud storage buckets update gs://<project-id>.firebasestorage.app --lifecycle-file=backend/storage-lifecycle.json
+   ```
 
-Data exports are deleted as soon as the app downloads them, and the hourly housekeeping function
-deletes any that were never collected after a day.
+   Or in the console: <https://console.cloud.google.com/storage/browser>, choose the bucket, then
+   **Lifecycle → Add a rule → Delete object**, with conditions **Age: 1 day** and **Object name
+   matches prefix: `exports/`**.
+
+The deploy (section 4) uploads `backend/storage.rules`, which only lets people read and write their
+own photo and their own export files.
 
 ### 2.6 Cloud Messaging
 
