@@ -157,14 +157,13 @@ fun ChatScreen(
 ) {
     val loaded by viewModel.chat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
-    LaunchedEffect(messages.size) { viewModel.markRead() }
-    ChatContent(profile, loaded?.chat, messages, loading = loaded == null, onSend = viewModel::send, onBack = onBack)
+    ChatContent(profile, loaded?.chat, messages, loading = loaded == null, onSend = viewModel::send, onSeen = viewModel::markRead, onBack = onBack)
 }
 
 /**
  * A conversation, drawn from plain state (also used for previews and screenshots).
- * [requestCard] shows a request message (with whether you asked it); by default it follows the
- * live request.
+ * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
+ * message (with whether you asked it); by default it follows the live request.
  */
 @Composable
 fun ChatContent(
@@ -173,16 +172,22 @@ fun ChatContent(
     messages: List<ChatMessage>,
     loading: Boolean = false,
     onSend: (String) -> Unit = {},
+    onSeen: () -> Unit = {},
     onBack: () -> Unit = {},
     requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    // Keyed on the newest message, not the count: only the latest 300 are loaded, so once a
+    // chat has that many a new message leaves the count as it was.
+    val latestId = messages.lastOrNull()?.id
+    LaunchedEffect(latestId) { onSeen() }
+
     // Opens at the latest message straight away. Later ones scroll into view only if you're
     // already at the bottom or sent it yourself, so reading back isn't interrupted.
     var opened by remember { mutableStateOf(false) }
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(latestId) {
         if (messages.isEmpty()) return@LaunchedEffect
         val last = messages.size - 1 + if (chat == null && !loading) 1 else 0
         if (!opened) {

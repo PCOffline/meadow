@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -17,6 +18,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.ChatMessage
+import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.chat.ChatContent
@@ -158,6 +161,22 @@ class MainScreensTest : ScreenTest() {
         assertEquals(listOf("See you tomorrow"), sent)
         compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertDoesNotExist()
         assertAccessible()
+    }
+
+    @Test
+    fun `a full chat still shows and marks read each new message`() {
+        // Only the latest 300 messages are loaded, so a new one leaves the count at 300.
+        val all = (1..301).map { i -> ChatMessage("m$i", DemoGarden.maya.uid, "Message $i", MessageKind.TEXT, null, i * 1_000L, pending = false) }
+        var messages by mutableStateOf(all.take(300))
+        var seen = 0
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, messages, onSeen = { seen++ }) }
+        compose.onNodeWithText("Message 300").assertIsDisplayed()
+        assertEquals(1, seen)
+
+        messages = all.drop(1)
+        compose.waitForIdle()
+        compose.onNodeWithText("Message 301").assertIsDisplayed()
+        assertEquals(2, seen)
     }
 
     @Test
