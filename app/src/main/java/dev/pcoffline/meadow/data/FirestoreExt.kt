@@ -174,6 +174,7 @@ fun DocumentSnapshot.toChat() = Chat(
     lastMessageAtMillis = millis("lastMessageAt"),
     lastSenderId = getString("lastSenderId"),
     lastReadMillis = timestampMap("lastRead"),
+    closed = getBoolean("closed") == true,
 )
 
 fun DocumentSnapshot.toMessage() = ChatMessage(

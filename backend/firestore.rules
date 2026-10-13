@@ -175,16 +175,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // A chat opens when someone becomes a Bumblebee. When the two part ways (and don't still
+    // look after each other the other way round), the backend closes it: it keeps their old
+    // messages, readable by the two of them, but loses their names and pictures, and nobody
+    // can write in it until they join up again. It's deleted with either person's account.
     match /chats/{chatId} {
-      function participant() {
-        return signedIn() && me() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-      }
+      function chat() { return get(/databases/$(database)/documents/chats/$(chatId)).data; }
+      function participant() { return signedIn() && me() in chat().participants; }
+      function isOpen() { return !chat().get('closed', false); }
 
       allow read: if signedIn() && me() in resource.data.participants;
       allow create, delete: if false;
-      // Each person updates only their own side: the summary of a message they just sent, and
-      // when they last read the chat.
+      // Each person updates only their own side of an open chat: the summary of a message they
+      // just sent, and when they last read the chat.
       allow update: if signedIn() && me() in resource.data.participants
+        && !resource.data.get('closed', false)
         && changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastRead'])
         && (!changed().hasAny(['lastMessage', 'lastMessageAt', 'lastSenderId'])
             || (request.resource.data.lastSenderId == me()
@@ -195,7 +200,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if participant();
-        allow create: if participant()
+        allow create: if participant() && isOpen()
           && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
           && request.resource.data.senderId == me()
           && request.resource.data.kind == 'text'
