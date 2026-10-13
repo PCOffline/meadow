@@ -302,6 +302,37 @@ describe("managing Bumblebees is your own business", () => {
     await rejects(bee.call("stepDown", { approveeUid: sam.uid }), "failed-precondition");
   });
 
+  test("a removal can be cancelled even if the Bumblebee's profile is gone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    // As if deleting Bee's account had only got part of the way.
+    await admin((db) => deleteDoc(doc(db, `users/${bee.uid}`)));
+
+    await sam.call("cancelRemoval", { approverUid: bee.uid });
+    assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).pendingRemovals[bee.uid], undefined);
+    assert.equal(await read(`users/${bee.uid}`), undefined, "nothing of Bee's is brought back");
+  });
+
+  test("a Bumblebee can step down from someone whose account is gone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // As if deleting Sam's account had failed to take Sam off Bee's list.
+    await admin(async (db) => {
+      await deleteDoc(doc(db, `users/${sam.uid}/private/account`));
+      await deleteDoc(doc(db, `users/${sam.uid}`));
+    });
+
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, []);
+    assert.equal(await read(`users/${sam.uid}/private/account`), undefined, "nothing of Sam's is brought back");
+    assert.equal(await read(`users/${sam.uid}`), undefined);
+    await rejects(bee.call("stepDown", { approveeUid: sam.uid }), "failed-precondition");
+  });
+
   test("nobody can remove someone else's Bumblebee", async () => {
     const sam = await person("Sam");
     const bee = await person("Bee");

@@ -3,7 +3,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { chatNotes, errors, pushes } from "./copy";
 import {
-  accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, Person,
+  accountOf, accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, Person,
   postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken } from "./format";
@@ -280,7 +280,7 @@ export const cancelRemoval = onCall(async (req) => {
   const uid = requireAuth(req);
   const { approverUid } = parse(CancelRemovalInput, req.data);
   const { owner, bee } = await db().runTransaction(async (tx) => {
-    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx)]);
+    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx, { orMissing: true })]);
     const ref = removals().doc(removalId(uid, approverUid));
     if (!(await tx.get(ref)).exists) throw new HttpsError("failed-precondition", errors.noRemoval);
     tx.delete(ref);
@@ -317,10 +317,20 @@ export async function finishDueRemovals(now: number): Promise<number> {
   return due.size;
 }
 
-/** A Bumblebee stops looking after someone's garden. */
+/**
+ * A Bumblebee stops looking after someone's garden. If that person's account is gone (its
+ * deletion only got part of the way), they're just taken off the Bumblebee's own list.
+ */
 export const stepDown = onCall(async (req) => {
   const uid = requireAuth(req);
   const { approveeUid } = parse(StepDownInput, req.data);
-  await partWays(approveeUid, uid, "bee");
+  const ownerGone = await db().runTransaction(async (tx) => {
+    const [ownerAccount, mine] = await Promise.all([tx.get(accountRef(approveeUid)), tx.get(accountRef(uid))]);
+    if (ownerAccount.exists) return false;
+    if (!accountOf(mine).approveeIds.includes(approveeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
+    tx.update(accountRef(uid), { approveeIds: FieldValue.arrayRemove(approveeUid) });
+    return true;
+  });
+  if (!ownerGone) await partWays(approveeUid, uid, "bee");
   return { ok: true };
 });
