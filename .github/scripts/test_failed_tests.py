@@ -9,6 +9,10 @@ RESULTS = """<?xml version="1.0"?>
     <failure message="java.lang.AssertionError: 2 problems">java.lang.AssertionError: 2 problems
   at org.junit.Assert.fail</failure>
   </testcase>
+  <testcase name="skipped" classname="dev.pcoffline.meadow.ShowcaseTest"><skipped/></testcase>
+  <testcase name="assumed" classname="dev.pcoffline.meadow.ShowcaseTest">
+    <failure>org.junit.AssumptionViolatedException: Build with -Pmeadow.showcase</failure>
+  </testcase>
   <testcase name="crashes" classname="dev.pcoffline.meadow.ui.screens.RenderedContrastTest">
     <error>%s</error>
   </testcase>
@@ -16,7 +20,7 @@ RESULTS = """<?xml version="1.0"?>
 
 
 class FailedTestsTest(unittest.TestCase):
-    def test_lists_failures_and_errors_only(self):
+    def test_lists_failures_and_errors_only_not_skips(self):
         found = failures(RESULTS)
         self.assertEqual([name for name, _ in found], ["RenderedContrastTest > the garden", "RenderedContrastTest > crashes"])
         self.assertEqual(found[0][1], "java.lang.AssertionError: 2 problems")

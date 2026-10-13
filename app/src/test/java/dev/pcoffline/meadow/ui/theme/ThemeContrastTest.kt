@@ -50,7 +50,8 @@ class ThemeContrastTest {
             val scheme = colorSchemeFor(theme, dark)
             val surfaces = scheme.surfaceRoles(gardenColorsFor(theme, dark))
             for ((text, fg) in scheme.textRoles) for ((surface, bg) in surfaces) {
-                out.require("${name(theme, dark)} $text on $surface", fg, bg, 4.5f)
+                // With headroom over WCAG's 4.5:1, so text still passes once drawn (see TEXT_TARGET).
+                out.require("${name(theme, dark)} $text on $surface", fg, bg, TEXT_TARGET)
             }
         },
     )
@@ -124,11 +125,11 @@ class ThemeContrastTest {
         val cream = Color(0xFFFBF6EC)
         assertEquals(Color(0xFF3E3A32), readable(Color(0xFF3E3A32), listOf(cream)))
         val nudged = readable(Color(0xFFE9B949), listOf(cream))
-        assertTrue(contrast(nudged, cream) >= 4.5f)
-        assertTrue(contrast(nudged, cream) < 5.2f)
+        assertTrue(contrast(nudged, cream) >= TEXT_TARGET)
+        assertTrue(contrast(nudged, cream) < TEXT_TARGET + 0.7f)
         val night = Color(0xFF1F2420)
         val lifted = readable(Color(0xFF5B7F55), listOf(night), toward = Color.White)
-        assertTrue(contrast(lifted, night) >= 4.5f)
+        assertTrue(contrast(lifted, night) >= TEXT_TARGET)
         assertTrue(lifted.red > Color(0xFF5B7F55).red)
     }
 

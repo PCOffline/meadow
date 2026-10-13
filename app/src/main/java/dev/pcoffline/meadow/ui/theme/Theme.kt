@@ -132,10 +132,18 @@ internal fun contrast(a: Color, b: Color): Float {
 }
 
 /**
- * Moves [color] towards [toward] (black by default) only as much as needed to reach [min]:1
- * against every one of [backgrounds]: 4.5 for text (WCAG AA), 3 for control edges and icons.
+ * What text colours aim for: WCAG's 4.5:1, plus headroom. Phones blend the edges of thin strokes
+ * into the background, so text in a colour at exactly 4.5:1 measures lower as drawn (on an
+ * emulated phone, a field label at 4.77:1 measured 4.2:1); Accessibility Scanner measures the same
+ * way.
  */
-internal fun readable(color: Color, backgrounds: List<Color>, min: Float = 4.5f, toward: Color = Color.Black): Color {
+internal const val TEXT_TARGET = 5f
+
+/**
+ * Moves [color] towards [toward] (black by default) only as much as needed to reach [min]:1
+ * against every one of [backgrounds]: [TEXT_TARGET] for text, 3 for control edges and icons.
+ */
+internal fun readable(color: Color, backgrounds: List<Color>, min: Float = TEXT_TARGET, toward: Color = Color.Black): Color {
     var t = 0f
     while (t <= 1f) {
         val candidate = lerp(color, toward, t)

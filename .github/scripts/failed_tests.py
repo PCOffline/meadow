@@ -7,6 +7,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 MAX_LINES = 20
+SKIPPED = "AssumptionViolatedException"
 
 
 def failures(xml_text: str) -> list[tuple[str, str]]:
@@ -14,9 +15,13 @@ def failures(xml_text: str) -> list[tuple[str, str]]:
     found = []
     root = ET.fromstring(xml_text)
     for case in root.iter("testcase"):
+        if case.find("skipped") is not None:
+            continue
         for problem in [*case.findall("failure"), *case.findall("error")]:
             name = f"{case.get('classname', '').rsplit('.', 1)[-1]} > {case.get('name', '')}"
             text = (problem.get("message") or problem.text or "").strip()
+            if SKIPPED in text or SKIPPED in (problem.get("type") or ""):
+                continue  # A test that chose not to run (an unmet assumption) didn't fail.
             lines = text.splitlines()
             shown = "\n".join(lines[:MAX_LINES]) + (f"\n... ({len(lines) - MAX_LINES} more lines)" if len(lines) > MAX_LINES else "")
             found.append((name, shown))

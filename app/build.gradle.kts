@@ -112,6 +112,9 @@ android {
         unitTests.all {
             // Robolectric loads a whole Android framework per test class.
             it.maxHeapSize = "3g"
+            // Screenshots (captureToImage) drawn through the hardware renderer, like a phone: the
+            // default software path leaves dialog windows' text out, so their contrast can't be measured.
+            it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
             // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
             it.extensions.configure<JacocoTaskExtension> {
                 isIncludeNoLocationClasses = true
