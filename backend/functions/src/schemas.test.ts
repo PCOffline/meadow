@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CreateRequestInput, DecideRequestInput, EmergencyInput, InviteByCodeInput, InviteTokenInput, ProfileInput } from "./schemas";
+import {
+  CreateRequestInput, DecideRequestInput, EmergencyInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
+  RequestIdInput, SaveLimitInput,
+} from "./schemas";
 
 const firstError = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues[0]?.message;
 
@@ -12,6 +15,20 @@ test("profiles trim names and fall back to a daisy", () => {
 
 test("friend codes are normalised", () => {
   assert.equal(InviteByCodeInput.parse({ friendCode: " ab12cd " }).friendCode, "AB12CD");
+});
+
+test("nothing a caller sends can become a different document path", () => {
+  for (const bad of ["../../users/x", "a/b", ".", "..", "", " ", "x".repeat(129)]) {
+    assert.ok(!RequestIdInput.safeParse({ requestId: bad }).success, bad);
+    assert.ok(!InviteIdInput.safeParse({ inviteId: bad }).success, bad);
+    assert.ok(!RemoveBumblebeeInput.safeParse({ approverUid: bad }).success, bad);
+    assert.ok(!InviteByCodeInput.safeParse({ friendCode: `AB/${bad}CD` }).success, bad);
+  }
+  for (const bad of ["a/b", "../x", ".", "a..b", ".a", "a.", "com.app/../../x"]) {
+    assert.equal(firstError(SaveLimitInput.safeParse({ packageName: bad, dailyMinutes: 30, weeklyMinutes: 0 })), "Which app is this about?", bad);
+  }
+  assert.ok(RequestIdInput.safeParse({ requestId: "Xy3_k-9AbCdEfGh12345" }).success);
+  assert.ok(SaveLimitInput.safeParse({ packageName: "com.example.app_2", dailyMinutes: 30, weeklyMinutes: 0 }).success);
 });
 
 test("invite tokens must look right", () => {

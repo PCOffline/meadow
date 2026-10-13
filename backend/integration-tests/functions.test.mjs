@@ -688,7 +688,10 @@ describe("every callable is safe to call wrongly", () => {
   });
 
   test("junk input is refused politely, never with an internal error", async () => {
-    const junk = [null, 42, "text", [], { approverUid: { $gt: "" } }, { requestId: "../../users/x", approve: "yes" }, { minutes: -1e9, type: "x".repeat(5000) }];
+    const junk = [null, 42, "text", [], { approverUid: { $gt: "" } }, { requestId: "../../users/x", approve: "yes" },
+      { requestId: "../../users/x" }, { inviteId: "a/b", accept: true }, { approverUid: "../x" }, { approveeUid: "." },
+      { friendCode: "AB/CD" }, { token: "../../x" }, { packageName: "a/b", dailyMinutes: 10, weeklyMinutes: 0 },
+      { type: "extra_time", packageName: "../x", minutes: 15, dayKey: "2026-10-13" }, { minutes: -1e9, type: "x".repeat(5000) }];
     const failures = [];
     for (const fn of CALLABLES.filter((f) => f !== "deleteAccount")) {
       const someone = await person(`Junk ${fn}`);
@@ -706,6 +709,9 @@ describe("every callable is safe to call wrongly", () => {
   test("deleting an account twice is harmless", async () => {
     const sam = await person("Sam");
     await sam.call("deleteAccount");
-    await assert.rejects(sam.call("deleteAccount"));
+    // The old sign-in still works for a moment; a second delete finds nothing and changes nothing.
+    await sam.call("deleteAccount").catch((e) => assert.notEqual(e.code, "functions/internal"));
+    assert.equal(await read(`users/${sam.uid}`), undefined);
+    assert.equal(await read(`users/${sam.uid}/private/account`), undefined);
   });
 });

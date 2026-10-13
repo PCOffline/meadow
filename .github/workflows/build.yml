@@ -49,6 +49,20 @@ jobs:
             app/build/reports/tests/
           if-no-files-found: ignore
 
+  # Workflows and scripts: mistakes here only show up when a release or deploy runs.
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check workflows (actionlint, with shellcheck on their scripts)
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+      - name: Check shell scripts (shellcheck)
+        run: find . -name '*.sh' -not -path '*/node_modules/*' -print0 | xargs -0 -r shellcheck
+      - name: Check the release planner
+        run: python3 -m py_compile .github/scripts/*.py
+
   functions:
     runs-on: ubuntu-latest
     defaults:
@@ -107,7 +121,14 @@ jobs:
             backend/functions/package-lock.json
       - run: npm ci && npm --prefix functions ci
       - name: Cloud Functions integration tests (Auth, Firestore, Functions, Storage emulators)
+        # Also reports which backend code the tests ran (c8, from the emulator's own processes).
         run: npm run test:integration
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          if-no-files-found: ignore
 
   e2e:
     runs-on: ubuntu-latest
@@ -137,7 +158,7 @@ jobs:
           npm ci && npm --prefix functions ci && npm --prefix functions run build
           nohup npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow > emulators.log 2>&1 &
           region=$(sed -n 's/^MEADOW_REGION=//p' functions/.env)
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"data":{}}' \
               "http://127.0.0.1:5001/demo-meadow/$region/createProfile" || true)
             if [ "$code" != "000" ] && [ "$code" != "404" ]; then echo "Emulators ready ($code)"; exit 0; fi
