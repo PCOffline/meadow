@@ -197,13 +197,15 @@ private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit
 @Composable
 internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {}, onOpen: (String) -> Unit = {}) {
     val snackbar = remember { SnackbarHostState() }
-    var asking by rememberSaveable { mutableStateOf(false) }
-    var emergency by rememberSaveable { mutableStateOf(false) }
+    // Keyed by the app: this screen is reused when another app's time runs out (onNewIntent), and
+    // an open dialog or what the last app's budget was must not carry over to the next one.
+    var asking by rememberSaveable(pkg) { mutableStateOf(false) }
+    var emergency by rememberSaveable(pkg) { mutableStateOf(false) }
 
     // Petals when a Bumblebee's yes arrives while this screen is open.
-    var burst by remember { mutableIntStateOf(0) }
-    var wasUnlocked by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(state.unlocked, state.budget != null) {
+    var burst by remember(pkg) { mutableIntStateOf(0) }
+    var wasUnlocked by remember(pkg) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(pkg, state.unlocked, state.budget != null) {
         val budget = state.budget ?: return@LaunchedEffect
         if (wasUnlocked == false && state.unlocked && !budget.emergency) burst++
         wasUnlocked = state.unlocked

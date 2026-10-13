@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -164,8 +165,12 @@ fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp
 
 @Composable
 fun AppIcon(packageName: String, modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    val icon by produceState(AppGraph.catalog.cachedIcon(packageName), packageName) {
-        if (value == null) value = withContext(Dispatchers.IO) { AppGraph.catalog.icon(packageName) }
+    // Keyed by the app, not just restarted: produceState keeps its last value across a new key, so
+    // a reused screen (the block screen after onNewIntent) would go on showing the last app's icon.
+    val icon by key(packageName) {
+        produceState(AppGraph.catalog.cachedIcon(packageName)) {
+            if (value == null) value = withContext(Dispatchers.IO) { AppGraph.catalog.icon(packageName) }
+        }
     }
     val bitmap = icon
     if (bitmap != null) {
