@@ -182,17 +182,13 @@ jobs:
           exit 1
       - name: Build the test app
         run: ./gradlew assembleDebug assembleDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
+      - name: Start an Android emulator (a Pixel 6 on Android 14)
+        run: .github/scripts/android-emulator.sh start
       - name: End-to-end tests (Android emulator against Firebase emulators)
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          # A phone's screen, not the default AVD's low density: text contrast is measured from
-          # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
-          profile: pixel_6
-          disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb logcat -d -v time Meadow:V MeadowSync:V MeadowFirestore:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E '*:S' | tail -n 200; exit 1)
+        run: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb logcat -d -v time Meadow:V MeadowSync:V MeadowFirestore:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E '*:S' | tail -n 200; exit 1)
+      - name: Stop the Android emulator
+        if: always()
+        run: .github/scripts/android-emulator.sh stop
       - name: Show end-to-end results
         if: failure()
         run: |

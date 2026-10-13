@@ -16,7 +16,7 @@ Latest stable versions as of 12 October 2026.
 | Java bytecode target | 17 | 17 | Android 14 (API 34) supports Java 17 at most; 21 brings nothing on ART |
 | Node (CI, local, Cloud Functions) | 22 | 24 LTS | `firebase@13` and `@firebase/rules-unit-testing@6` need Node ≥ 24.12. Cloud Functions has Node 24 as GA until 2028-04. Node 26 becomes LTS on 2026-10-28, but firebase-tools 15.33 can't deploy it and Cloud Functions only has it in preview |
 | Gradle | 8.14.3 | 9.8.1 | Needed for AGP 9.4 and Java 25 |
-| GitHub Actions | checkout v7, setup-java v6, setup-node v7, setup-gradle v6, upload-artifact v7, android-emulator-runner v2 | unchanged | All already on their latest major |
+| GitHub Actions | checkout v7, setup-java v6, setup-node v7, setup-gradle v6, upload-artifact v7 (the emulator is started by `.github/scripts/android-emulator.sh`) | unchanged | All already on their latest major |
 
 ### Android (Gradle catalog)
 
