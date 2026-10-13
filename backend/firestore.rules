@@ -45,11 +45,19 @@ service cloud.firestore {
         && (old.weeklyMinutes == 0 || (next.weeklyMinutes > 0 && next.weeklyMinutes <= old.weeklyMinutes));
     }
 
+    // A photo is only ever your own upload in Meadow's Storage (or the emulators'). A link to
+    // anywhere else would tell that server whenever someone in your circle saw it.
+    function ownPhoto(url) {
+      return isString(url, 1000) && url.matches(
+        '(https://firebasestorage[.]googleapis[.]com|http://(10[.]0[.]2[.]2|127[.]0[.]0[.]1|localhost):9199)'
+        + '/v0/b/[a-z0-9._-]+/o/avatars%2F' + me() + '[?]alt=media(&token=[a-f0-9-]+)?(#v=[0-9]+)?');
+    }
+
     function validProfileEdit(d) {
       return (!('displayName' in changed()) || (d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 30))
         && (!('flower' in changed()) || isString(d.flower, 16))
         && (!('avatarColor' in changed()) || isString(d.avatarColor, 20))
-        && (!('photoUrl' in changed()) || d.photoUrl == null || isString(d.photoUrl, 1000))
+        && (!('photoUrl' in changed()) || d.photoUrl == null || ownPhoto(d.photoUrl))
         && (!('bio' in changed()) || isString(d.bio, 80));
     }
 
@@ -65,12 +73,12 @@ service cloud.firestore {
       match /private/{docId} {
         allow read: if signedIn() && me() == uid;
         allow update: if signedIn() && me() == uid && docId == 'account'
-          && changed().hasOnly(['fcmTokens', 'theme', 'darkMode', 'acceptedTerms', 'strictMode', 'privacy', 'emergencyUntil'])
+          && changed().hasOnly(['pushIds', 'theme', 'darkMode', 'acceptedTerms', 'strictMode', 'privacy', 'emergencyUntil'])
           && (!('acceptedTerms' in changed())
               || (request.resource.data.acceptedTerms.keys().hasOnly(['version', 'at'])
                   && request.resource.data.acceptedTerms.version is int
                   && request.resource.data.acceptedTerms.at == request.time))
-          && (!('fcmTokens' in changed()) || request.resource.data.fcmTokens.size() <= 10)
+          && (!('pushIds' in changed()) || request.resource.data.pushIds.size() <= 10)
           && (!('theme' in changed()) || isString(request.resource.data.theme, 20))
           && (!('darkMode' in changed()) || isString(request.resource.data.darkMode, 10))
           && (!('strictMode' in changed()) || request.resource.data.strictMode is bool)

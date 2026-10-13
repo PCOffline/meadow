@@ -31,7 +31,7 @@ const profile = (overrides = {}) => ({
 const account = (overrides = {}) => ({
   approverIds: [],
   approveeIds: [],
-  fcmTokens: ["token"],
+  pushIds: ["phone"],
   friendCode: "ABC234",
   strictMode: false,
   privacy: { shareUsage: true },
@@ -81,7 +81,6 @@ describe("profiles", () => {
   test("you can edit your name card within limits, and it holds nothing else", async () => {
     const me = doc(as("sam"), "users/sam");
     await assertSucceeds(updateDoc(me, { displayName: "Sammy", flower: "🐝", avatarColor: "honey", bio: "Growing calmer days" }));
-    await assertSucceeds(updateDoc(me, { photoUrl: "https://example.com/a.jpg" }));
     await assertSucceeds(updateDoc(me, { photoUrl: null }));
     await assertFails(updateDoc(me, { displayName: "" }));
     await assertFails(updateDoc(me, { bio: "x".repeat(81) }));
@@ -90,6 +89,23 @@ describe("profiles", () => {
       await assertFails(updateDoc(me, { [field]: true }));
     }
     await assertFails(updateDoc(doc(as("stranger"), "users/sam"), { displayName: "Hacked" }));
+  });
+
+  test("a photo can only be your own upload, so no other server learns when your circle sees it", async () => {
+    const me = doc(as("sam"), "users/sam");
+    const storage = "https://firebasestorage.googleapis.com/v0/b/meadow-1.firebasestorage.app/o";
+    await assertSucceeds(updateDoc(me, { photoUrl: `${storage}/avatars%2Fsam?alt=media&token=0a1b-2c3d#v=1760000000000` }));
+    await assertSucceeds(updateDoc(me, { photoUrl: "http://10.0.2.2:9199/v0/b/demo-meadow.appspot.com/o/avatars%2Fsam?alt=media&token=1f" }));
+    for (const url of [
+      "https://example.com/a.jpg",
+      `${storage}/avatars%2Fbee?alt=media&token=0a1b`,
+      `${storage}/exports%2Fsam%2Fmeadow-1.json?alt=media`,
+      `https://firebasestorage.googleapis.com.evil.dev/v0/b/x/o/avatars%2Fsam?alt=media`,
+      `http://192.168.1.20:9199/v0/b/x/o/avatars%2Fsam?alt=media`,
+      `${storage}/avatars%2Fsam?alt=media&token=0a1b&callback=https://evil.dev`,
+    ]) {
+      await assertFails(updateDoc(me, { photoUrl: url }));
+    }
   });
 
   test("profiles and Bumblebee lists are only created by the backend", async () => {
@@ -110,14 +126,14 @@ describe("profiles", () => {
 
   test("you can update your own settings, nothing the backend keeps", async () => {
     const mine = doc(as("sam"), "users/sam/private/account");
-    await assertSucceeds(updateDoc(mine, { fcmTokens: ["a", "b"], theme: "lavender", darkMode: "system" }));
+    await assertSucceeds(updateDoc(mine, { pushIds: ["a", "b"], theme: "lavender", darkMode: "system" }));
     await assertSucceeds(updateDoc(mine, { privacy: { shareUsage: false } }));
     await assertFails(updateDoc(mine, { privacy: { shareUsage: false, sneaky: true } }));
-    await assertFails(updateDoc(mine, { fcmTokens: Array.from({ length: 11 }, (_, i) => `t${i}`) }));
+    await assertFails(updateDoc(mine, { pushIds: Array.from({ length: 11 }, (_, i) => `t${i}`) }));
     for (const field of ["friendCode", "pendingRemovals", "emergencyUses", "lastAlertAt"]) {
       await assertFails(updateDoc(mine, { [field]: field === "friendCode" ? "MINE11" : { sneaky: 1 } }));
     }
-    await assertFails(updateDoc(doc(as("bee"), "users/sam/private/account"), { fcmTokens: [] }));
+    await assertFails(updateDoc(doc(as("bee"), "users/sam/private/account"), { pushIds: [] }));
   });
 
   test("strict mode goes on and off without asking anyone, and nobody else can see it", async () => {

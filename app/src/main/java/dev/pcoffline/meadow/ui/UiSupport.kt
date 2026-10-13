@@ -16,11 +16,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.FriendlyException
+import dev.pcoffline.meadow.data.Trace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,8 +95,23 @@ fun rememberAction(): ActionState {
     return state
 }
 
-/** Turns any failure into something kind and human to show. */
-fun Throwable.friendlyMessage(context: Context): String = when (this) {
+/**
+ * Turns any failure into something kind and human to show. People only learn what they can act
+ * on (offline, sign in again, wait a bit); a fault on the server's side is just "try again later".
+ * Trace builds add the technical cause underneath, for whoever is debugging.
+ */
+fun Throwable.friendlyMessage(context: Context): String {
+    val message = plainMessage(context)
+    return if (Trace.enabled) "$message\n\n${technicalCause()}" else message
+}
+
+private fun Throwable.technicalCause(): String = when (this) {
+    is Backend.CallFailed -> "Cloud Function failed: ${code ?: "unreachable"} ${cause?.message.orEmpty()}"
+    is FirebaseFirestoreException -> "Firestore: $code $message"
+    else -> "${javaClass.simpleName}: $message"
+}.trim()
+
+private fun Throwable.plainMessage(context: Context): String = when (this) {
     is FriendlyException -> context.getString(messageRes, *formatArgs)
     // Cloud Function errors already carry friendly text written in the backend's copy.ts.
     is Backend.CallFailed -> when {
@@ -102,16 +119,23 @@ fun Throwable.friendlyMessage(context: Context): String = when (this) {
         !message.isNullOrBlank() -> message.orEmpty()
         else -> context.getString(
             when (code) {
-                // The function isn't on the server, e.g. the app and backend disagree on its region.
-                FirebaseFunctionsException.Code.NOT_FOUND, FirebaseFunctionsException.Code.UNIMPLEMENTED -> R.string.error_server_missing
                 FirebaseFunctionsException.Code.UNAUTHENTICATED -> R.string.error_auth_recent_login
-                FirebaseFunctionsException.Code.PERMISSION_DENIED -> R.string.error_server_refused
                 FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED -> R.string.error_server_busy
-                else -> R.string.error_generic
+                // A missing function, refused call or crash: nothing the person can do but wait.
+                else -> R.string.error_unavailable
             },
         )
     }
     is FirebaseNetworkException -> context.getString(R.string.error_offline)
+    is FirebaseFirestoreException -> context.getString(
+        when (code) {
+            FirebaseFirestoreException.Code.UNAVAILABLE, FirebaseFirestoreException.Code.DEADLINE_EXCEEDED -> R.string.error_offline
+            FirebaseFirestoreException.Code.UNAUTHENTICATED -> R.string.error_auth_recent_login
+            FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED -> R.string.error_server_busy
+            // Refused by the rules, no database, or a fault on the server.
+            else -> R.string.error_unavailable
+        },
+    )
     is FirebaseAuthException -> context.getString(
         when (errorCode) {
             "ERROR_INVALID_EMAIL" -> R.string.error_auth_invalid_email

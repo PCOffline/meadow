@@ -111,6 +111,11 @@
                 android:value="Enforces the daily app time limits the user committed to." />
         </service>
 
+        <!-- Phones are reached by their Firebase installation ID rather than a token. -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
+
         <service
             android:name=".notifications.MeadowMessagingService"
             android:exported="false">

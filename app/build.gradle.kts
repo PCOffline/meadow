@@ -1,4 +1,7 @@
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+
 plugins {
+    jacoco
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
@@ -71,11 +74,17 @@ android {
 
     buildTypes {
         debug {
+            // createDebugUnitTestCoverageReport measures the Robolectric tests; CI enforces a floor.
+            enableUnitTestCoverage = true
             // -Pmeadow.emulatorHost=10.0.2.2 points debug builds at the Firebase emulators (end-to-end tests).
             buildConfigField("String", "EMULATOR_HOST", "\"${findProperty("meadow.emulatorHost") ?: ""}\"")
+            // -Pmeadow.trace=true logs every request to Firebase and its answer (see docs/debugging.md).
+            buildConfigField("boolean", "TRACE", "${findProperty("meadow.trace") == "true"}")
         }
         release {
             buildConfigField("String", "EMULATOR_HOST", "\"\"")
+            // The trace includes people's data, so release builds never have it.
+            buildConfigField("boolean", "TRACE", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -87,11 +96,23 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     // The privacy notice, terms and licences live in /legal, shared with the hosted web pages.
-    sourceSets["main"].assets.srcDir("../legal")
+    sourceSets["main"].assets.directories.add("../legal")
     // Sample data and helpers used by both JVM (Robolectric) and on-device tests.
     // Kotlin sources, so they're added as Kotlin source dirs (AGP's built-in Kotlin).
-    sourceSets["test"].kotlin.srcDir("src/sharedTest/java")
-    sourceSets["androidTest"].kotlin.srcDir("src/sharedTest/java")
+    sourceSets["test"].kotlin.directories.add("src/sharedTest/java")
+    sourceSets["androidTest"].kotlin.directories.add("src/sharedTest/java")
+
+    testCoverage {
+        jacocoVersion = libs.versions.jacoco.get()
+    }
+
+    lint {
+        // Findings in the CI log, not only in an HTML report nobody can download.
+        textReport = true
+        textOutput = file("stdout")
+        abortOnError = true
+        checkDependencies = true
+    }
 
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
@@ -99,6 +120,11 @@ android {
         unitTests.all {
             // Robolectric loads a whole Android framework per test class.
             it.maxHeapSize = "3g"
+            // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
+            it.extensions.configure<JacocoTaskExtension> {
+                isIncludeNoLocationClasses = true
+                excludes = listOf("jdk.internal.*")
+            }
             it.testLogging {
                 events("failed")
                 exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -153,6 +179,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.functions)
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.installations)
     implementation(libs.firebase.storage)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)

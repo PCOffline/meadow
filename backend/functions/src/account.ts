@@ -36,7 +36,8 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
   await db().runTransaction(async (tx) => (await consumeRate(tx, uid, "export", EXPORTS_PER_DAY, 24 * 60 * 60_000))());
   const userRef = users().doc(uid);
   const [profile, account] = await Promise.all([userRef.get(), accountRef(uid).get()]);
-  const { fcmTokens: _tokens, ...accountData } = account.data() ?? {};
+  // Phone IDs are plumbing, not the person's data (fcmTokens: from app versions before pushIds).
+  const { pushIds: _ids, fcmTokens: _tokens, ...accountData } = account.data() ?? {};
   const myChats = await chats().where("participants", "array-contains", uid).get();
   const conversations = await Promise.all(
     myChats.docs.map(async (chat) => ({

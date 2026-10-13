@@ -11,9 +11,10 @@ export const FLOWERS = [
 ] as const;
 export const EMERGENCY_MINUTES = [15, 30, 60];
 
-const id = z.string().trim().min(1).max(128);
+// Ids and package names become document paths, so they can't contain "/" or be "." or "..".
+const id = z.string().trim().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const note = z.string().trim().max(280).default("");
-const packageName = z.string().trim().min(1, errors.whichApp).max(200);
+const packageName = z.string().trim().regex(/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/, errors.whichApp).max(200);
 const appName = z.string().trim().max(100).nullish();
 const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, errors.badDate);
 export const inviteToken = z.string().trim().regex(new RegExp(`^[A-Za-z0-9]{${INVITE_TOKEN_LENGTH}}$`), errors.linkGone);
@@ -26,7 +27,7 @@ export const ProfileInput = z.object({
 });
 
 export const InviteByCodeInput = z.object({
-  friendCode: z.string().trim().toUpperCase().min(4, errors.codeRequired).max(12),
+  friendCode: z.string().trim().toUpperCase().min(4, errors.codeRequired).max(12).regex(/^[A-Z0-9]+$/, errors.codeUnknown),
 });
 export const RespondInviteInput = z.object({ inviteId: id, accept: z.boolean() });
 export const InviteIdInput = z.object({ inviteId: id });

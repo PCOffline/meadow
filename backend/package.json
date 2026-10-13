@@ -2,14 +2,19 @@
   "name": "meadow-backend",
   "private": true,
   "scripts": {
+    "emulators": "node emulators.mjs",
+    "seed": "node emulator-seed.mjs",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-meadow \"node --test --test-concurrency=1 rules-tests/*.test.mjs\"",
-    "test:integration": "node build-functions.cjs && firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
-    "test:hosting": "node --test hosting-tests/*.test.mjs"
+    "test:integration": "node build-functions.cjs && c8 --check-coverage --lines 95 --functions 95 --branches 80 --reporter=text --reporter=lcov --report-dir=coverage --all --src=functions/src --include=functions/lib/** --exclude=functions/lib/**/*.test.js firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
+    "test:hosting": "node --test hosting-tests/*.test.mjs",
+    "test:deploy": "node --test deploy-tests/*.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
+    "c8": "^12.0.0",
     "firebase": "^13.0.0",
     "firebase-tools": "^15.33.0",
+    "google-auth-library": "^9.15.1",
     "marked": "^18.1.1"
   },
   "overrides": {

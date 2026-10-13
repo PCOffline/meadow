@@ -47,7 +47,7 @@ test("only images under 2 MB are accepted", async () => {
 test("your circle can see your photo; strangers and signed-out visitors can't", async () => {
   // Who is in your circle lives in Firestore; the Storage rules look it up.
   await env.withSecurityRulesDisabled((ctx) =>
-    setDoc(doc(ctx.firestore(), "users/sam/private/account"), { approverIds: ["bee"], approveeIds: ["friend"], fcmTokens: [] }));
+    setDoc(doc(ctx.firestore(), "users/sam/private/account"), { approverIds: ["bee"], approveeIds: ["friend"], pushIds: [] }));
   await assertSucceeds(getBytes(ref(storageOf("bee"), "avatars/sam")));
   await assertSucceeds(getBytes(ref(storageOf("friend"), "avatars/sam")));
   await assertFails(getBytes(ref(storageOf("stranger"), "avatars/sam")));

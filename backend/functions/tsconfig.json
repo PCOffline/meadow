@@ -15,7 +15,11 @@
     "sourceMap": true,
     "types": [
       "node"
-    ]
+    ],
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
   },
   "compileOnSave": true,
   "include": [

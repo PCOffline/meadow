@@ -72,7 +72,6 @@ import dev.pcoffline.meadow.ui.chat.ChatScreen
 import dev.pcoffline.meadow.ui.circle.AcceptInviteDialog
 import dev.pcoffline.meadow.ui.circle.CircleScreen
 import dev.pcoffline.meadow.ui.circle.FriendScreen
-import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.PetalBurst
 import dev.pcoffline.meadow.ui.home.GardenScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -132,7 +131,8 @@ fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
         AuthScreen()
     } else {
         when (s) {
-            ProfileState.Loading -> Loading()
+            ProfileState.Loading -> StartupLoading()
+            is ProfileState.Unavailable -> GardenUnavailable(s.cause)
             ProfileState.Missing -> ProfileSetupScreen()
             is ProfileState.Ready -> MainScaffold(s.profile, pendingRoute)
             ProfileState.SignedOut -> Unit

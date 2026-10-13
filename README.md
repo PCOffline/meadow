@@ -56,7 +56,7 @@ turning it off needs a Bumblebee's yes too. If something gets switched off anywa
 goes quiet, your Bumblebees are told. Your limits keep working offline.
 
 ### For real emergencies
-Lost and need maps? Unlock everything for up to an hour, a few times a month, with a short note
+Lost and need maps? Unlock everything for up to an hour, three times in 30 days, with a short note
 for your Bumblebees. Calls and emergency apps are never limited.
 
 ### See your days take shape
@@ -116,6 +116,9 @@ project. To run your own copy, see [Running your own Meadow](docs/self-hosting.m
 
 ## Tests
 
+The `justfile` has a shortcut for each of these and for building, installing and deploying: run
+`just` to list them (for example `just check`, `just install-trace` or `just deploy`).
+
 | What | Command |
 |---|---|
 | App unit, screen and accessibility tests | `./gradlew testDebugUnitTest` |
@@ -124,10 +127,12 @@ project. To run your own copy, see [Running your own Meadow](docs/self-hosting.m
 | Security rules (Firestore and Storage) | `cd backend && npm ci && npm run test:rules` |
 | Cloud Functions on the emulators | `cd backend && npm ci && npm --prefix functions ci && npm run test:integration` |
 | Hosted legal pages | `cd backend && npm run test:hosting` |
-| End to end, on an Android emulator | Start the Firebase emulators (`npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2` |
+| End to end, on an Android emulator | Start the Firebase emulators (`npm run emulators` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2` |
+| CI scripts and workflows | `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`, plus `actionlint` and `shellcheck` |
 
 Building and testing need Java 21 or newer (CI uses 25) and Node 24; `mise install` sets both up.
-CI runs everything on every pull request and every push to `main`.
+CI runs everything on every pull request and every push to `main`. To see every request the app
+makes and what comes back, see [Debugging Meadow](docs/debugging.md).
 
 ## Contributing
 

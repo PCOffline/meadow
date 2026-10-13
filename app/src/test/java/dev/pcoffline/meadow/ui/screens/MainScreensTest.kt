@@ -54,7 +54,7 @@ class MainScreensTest : ScreenTest() {
     fun `the garden is accessible in every theme, by day and night`() {
         var look by mutableStateOf(GardenTheme.MEADOW to DarkMode.LIGHT)
         compose.setContent {
-            dev.pcoffline.meadow.ui.theme.MeadowTheme(look.first, look.second) { GardenContent(DemoGarden.robin, DemoGarden.garden) }
+            dev.pcoffline.meadow.ui.theme.MeadowTheme(look.first, look.second) { AppBackground { GardenContent(DemoGarden.robin, DemoGarden.garden) } }
         }
         for (theme in GardenTheme.entries) for (mode in listOf(DarkMode.LIGHT, DarkMode.DARK)) {
             look = theme to mode

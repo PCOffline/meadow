@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -112,6 +113,7 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 }
 
 @Immutable
+/** The sky behind a header. [onSky] is readable on all of it, hills included. */
 data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
 
 /**
@@ -187,7 +189,7 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
             cloud(Offset(((t * 9f) % (size.width + 240f)) - 120f, size.height * 0.18f), 1f, cloudAlpha)
             cloud(Offset(((t * 5.5f + size.width * 0.55f) % (size.width + 240f)) - 120f, size.height * 0.32f), 0.7f, cloudAlpha)
         }
-        MeadowHills(Modifier.fillMaxSize())
+        MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky)
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
             if (mood.night) {
@@ -362,7 +364,8 @@ fun SleepyZs(modifier: Modifier = Modifier) {
     val reduced = rememberReducedMotion()
     val transition = rememberInfiniteTransition(label = "zzz")
     val t = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "z")
-    Box(modifier.size(36.dp, 40.dp)) {
+    // Decoration: screen readers skip it.
+    Box(modifier.size(36.dp, 40.dp).clearAndSetSemantics { }) {
         repeat(3) { i ->
             Text(
                 "z",

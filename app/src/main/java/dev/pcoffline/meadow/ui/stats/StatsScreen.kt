@@ -380,7 +380,7 @@ private fun AppRow(app: AppTime, max: Long, total: Long, modifier: Modifier) {
                 }
                 Text(durationText(app.ms), style = MaterialTheme.typography.labelLarge)
             }
-            GrowthBar(app.ms.toFloat() / max.coerceAtLeast(1), height = 8.dp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f))
+            GrowthBar(app.ms.toFloat() / max.coerceAtLeast(1), height = 8.dp, color = MaterialTheme.colorScheme.primary)
             if (total > 0) {
                 Text(
                     stringResource(R.string.stats_share, (app.ms * 100 / total).toInt()),

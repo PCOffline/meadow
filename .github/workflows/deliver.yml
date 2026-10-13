@@ -1,0 +1,243 @@
+name: Deliver
+
+# Deploys the backend to Firebase, then publishes a signed APK as a GitHub release. The app's
+# updater reads these releases, so every release must be signed with the same key.
+#
+# The two are versioned separately with semantic versioning: the backend's deploys are tagged
+# backend-vX.Y.Z, the app's releases vX.Y.Z, each raised from its latest tag
+# (.github/scripts/plan_version.py).
+# Automatically, once Build passes on main:
+# - deploys when the repository variable AUTO_DEPLOY is "true" and backend/ or legal/ changed since
+#   the last deploy. A commit message with [skip deploy] skips one.
+# - releases when AUTO_RELEASE is "true" and the app changed since the last release. It waits for
+#   the deploy, so a new app never meets an old backend. [skip release] skips one.
+# Each raises its patch version; [minor] in a commit that changed it raises the minor, and [major]
+# or [breaking] the major, except below 1.0.0, where it raises the minor (SemVer's rule for 0.x).
+# By hand: Actions → Deliver → Run workflow on main, choosing for each which part to raise
+# (major included, which is how a version leaves 0.x), or auto to read it from the commits.
+# By tag: pushing a tag like v1.2.0 releases exactly that version of the app (no deploy).
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the backend, raising this part of its version (auto reads it from the commits, or redeploys an unchanged backend as it is)
+        type: choice
+        options: [none, auto, patch, minor, major]
+        default: auto
+      release:
+        description: Publish an APK, raising this part of the app's version (auto reads it from the commits)
+        type: choice
+        options: [none, auto, patch, minor, major]
+        default: none
+
+permissions:
+  contents: read
+
+# One delivery at a time, so two quick merges can't deploy out of order or claim the same version.
+concurrency:
+  group: deliver
+  cancel-in-progress: false
+
+env:
+  # The commit that passed Build, or the one this run was started on.
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  deploy:
+    name: Deploy to Firebase
+    # Automatic runs only for passing pushes to this repository's main.
+    if: >-
+      (github.event_name == 'workflow_run' && vars.AUTO_DEPLOY == 'true' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy != 'none')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # tags the deployed version
+      id-token: write # signs in to Google Cloud without a stored key (Workload Identity Federation)
+    outputs:
+      deployed: ${{ steps.plan.outputs.ship }}
+    steps:
+      - name: Only deploy from main
+        if: github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch
+        run: |
+          echo "::error::Run this workflow on ${{ github.event.repository.default_branch }}"
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          # The whole history and tags, to find the last deployed version and what changed since.
+          fetch-depth: 0
+      - name: Choose the backend version
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BUMP: ${{ inputs.deploy }}
+        run: python3 .github/scripts/plan_version.py backend
+      - name: Say what's happening
+        env:
+          SHIP: ${{ steps.plan.outputs.ship }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          REASON: ${{ steps.plan.outputs.reason }}
+        run: |
+          if [ "$SHIP" = true ]; then
+            echo "::notice::Deploying backend $VERSION ($REASON)"
+          else
+            echo "::notice::No deploy, because $REASON"
+          fi
+      - name: Check the settings
+        if: steps.plan.outputs.ship == 'true'
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
+          PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$PROJECT" ]; then
+            echo "::error::Set the FIREBASE_PROJECT variable to your Firebase project ID (docs/self-hosting.md, 7.6)"
+            exit 1
+          fi
+          if [ -z "$KEY" ] && { [ -z "$PROVIDER" ] || [ -z "$ACCOUNT" ]; }; then
+            echo "::error::Set GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT, or the FIREBASE_SERVICE_ACCOUNT secret (docs/self-hosting.md, 7.6)"
+            exit 1
+          fi
+      - uses: actions/setup-node@v7
+        if: steps.plan.outputs.ship == 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            backend/functions/package-lock.json
+      - name: Install
+        if: steps.plan.outputs.ship == 'true'
+        working-directory: backend
+        run: npm ci && npm --prefix functions ci
+      - name: Sign in to Google Cloud (Workload Identity Federation)
+        if: steps.plan.outputs.ship == 'true' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - name: Sign in to Google Cloud (service account key)
+        if: steps.plan.outputs.ship == 'true' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER == ''
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy
+        if: steps.plan.outputs.ship == 'true'
+        working-directory: backend
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
+        # --force answers the CLI's questions with yes: it deletes functions that were removed
+        # from the code and keeps the cleanup policy for function images.
+        run: npx firebase deploy --project "$PROJECT" --non-interactive --force
+      - name: Tag the deployed version
+        if: steps.plan.outputs.ship == 'true' && steps.plan.outputs.tag != ''
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        # Tags pushed with this token don't start another Deliver run.
+        run: |
+          git tag "$TAG" "$SHA"
+          git push origin "refs/tags/$TAG"
+
+  release:
+    name: Release the APK
+    needs: deploy
+    # Runs when the deploy succeeded or wasn't needed, never after a failed one.
+    if: >-
+      always() && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped') && (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.release != 'none') ||
+        (github.event_name == 'workflow_run' && vars.AUTO_RELEASE == 'true' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # creates the release and its tag
+    steps:
+      - name: Only release from main
+        if: github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch
+        run: |
+          echo "::error::Run this workflow on ${{ github.event.repository.default_branch }}"
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+          # The whole history and tags, to find the last release and what changed since.
+          fetch-depth: 0
+      - name: Choose the version
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          BUMP: ${{ inputs.release }}
+        run: python3 .github/scripts/plan_version.py app
+      - name: Nothing to release
+        if: steps.plan.outputs.ship != 'true'
+        env:
+          REASON: ${{ steps.plan.outputs.reason }}
+        run: echo "::notice::No release, because $REASON"
+      - uses: actions/setup-java@v6
+        if: steps.plan.outputs.ship == 'true'
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.plan.outputs.ship == 'true'
+      - name: Add Firebase config
+        if: steps.plan.outputs.ship == 'true'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::Add the GOOGLE_SERVICES_JSON secret before releasing"
+            exit 1
+          fi
+          echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+      - name: Add signing key
+        if: steps.plan.outputs.ship == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MEADOW_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Add the MEADOW_KEYSTORE_BASE64, MEADOW_KEYSTORE_PASSWORD, MEADOW_KEY_ALIAS and MEADOW_KEY_PASSWORD secrets before releasing"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "MEADOW_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+      - name: Test and build
+        if: steps.plan.outputs.ship == 'true'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          MEADOW_KEYSTORE_PASSWORD: ${{ secrets.MEADOW_KEYSTORE_PASSWORD }}
+          MEADOW_KEY_ALIAS: ${{ secrets.MEADOW_KEY_ALIAS }}
+          MEADOW_KEY_PASSWORD: ${{ secrets.MEADOW_KEY_PASSWORD }}
+        # Copies built from a fork look for updates on that fork's releases.
+        run: ./gradlew testDebugUnitTest assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
+      - name: Publish
+        if: steps.plan.outputs.ship == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "meadow-$VERSION.apk"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --verify-tag
+          else
+            # Creates the tag on the released commit. Tags made with this token don't start
+            # another Deliver run.
+            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --target "$SHA"
+          fi
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

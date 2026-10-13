@@ -84,6 +84,28 @@ object DemoGarden {
         )
     }
 
+    /** Last month, day by day, for the calendar and the month's chart. */
+    val monthStats: StatsUiState = run {
+        val from = Days.today().withDayOfMonth(1).minusMonths(1)
+        val days = (0 until from.lengthOfMonth()).map { from.plusDays(it.toLong()) }
+        // From quiet days to the busiest, so every shade of the calendar is drawn.
+        val minutes = days.indices.map { i -> if (i % 9 == 4) 0 else 30 + (i * 37) % 190 }
+        val selection = Selection(Period.MONTH, -1)
+        StatsUiState(
+            selection = selection,
+            stats = PeriodStats(
+                selection = selection,
+                from = from,
+                to = days.last(),
+                days = days.zip(minutes) { day, m -> day to m * MIN },
+                apps = stats.stats!!.apps,
+                totalMs = minutes.sum() * MIN,
+                previousTotalMs = 3_900 * MIN,
+            ),
+            hasPermission = true,
+        )
+    }
+
     val chat = Chat(
         id = "maya_robin",
         participants = listOf(maya.uid, robin.uid),
