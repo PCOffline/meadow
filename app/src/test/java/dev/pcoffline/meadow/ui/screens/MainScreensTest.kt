@@ -150,7 +150,7 @@ class MainScreensTest : ScreenTest() {
     fun `chat shows the conversation and sends what you type`() {
         val sent = mutableListOf<String>()
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { sent += it }, requestCard = { id, _ -> Text("Request $id") })
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { text, done -> sent += text; done() }, requestCard = { id, _ -> Text("Request $id") })
         }
         compose.onNodeWithText("Thank you! 💛").assertExists()
         compose.onNodeWithText("Request r1").assertExists()
@@ -161,6 +161,48 @@ class MainScreensTest : ScreenTest() {
         assertEquals(listOf("See you tomorrow"), sent)
         compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertDoesNotExist()
         assertAccessible()
+    }
+
+    @Test
+    fun `a message that fails to send stays in the box with the reason`() {
+        val failed = "Couldn't send that just now"
+        var error by mutableStateOf<String?>(null)
+        var sending by mutableStateOf(false)
+        val tries = mutableListOf<String>()
+        show {
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, sending = sending, error = error, onSend = { text, _ ->
+                tries += text
+                sending = true
+            }, requestCard = { id, _ -> Text("Request $id") })
+        }
+        val send = compose.onNodeWithContentDescription(text(R.string.action_send))
+        compose.onNode(hasSetTextAction()).performTextInput("See you tomorrow")
+        send.performClick()
+        // While it's on its way the text stays, and it can't be sent twice.
+        send.assertIsNotEnabled()
+        compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertExists()
+
+        sending = false
+        error = failed
+        compose.onNodeWithText(failed, substring = true).assertExists()
+        compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertExists()
+        send.assertIsEnabled()
+        assertEquals(listOf("See you tomorrow"), tries)
+        assertAccessible()
+    }
+
+    @Test
+    fun `text typed while a message sends isn't cleared when it's sent`() {
+        var finish: () -> Unit = {}
+        show {
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { _, done -> finish = done }, requestCard = { id, _ -> Text("Request $id") })
+        }
+        val field = compose.onNode(hasSetTextAction())
+        field.performTextInput("First")
+        compose.onNodeWithContentDescription(text(R.string.action_send)).performClick()
+        field.performTextInput(" and second")
+        compose.runOnIdle { finish() }
+        compose.onNode(hasSetTextAction() and hasText("First and second")).assertExists()
     }
 
     @Test
