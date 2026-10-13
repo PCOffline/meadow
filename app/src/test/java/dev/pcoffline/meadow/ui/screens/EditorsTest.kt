@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -90,7 +91,8 @@ class EditorsTest : ScreenTest() {
     fun `a Bumblebee who answered sees their own answer`() {
         show { RequestCard(request(status = RequestStatus.DENIED, decidedByName = "Bee", myDecision = "no"), myUid = "bee") }
         node(R.string.request_you_said_no).assertExists()
-        node(R.string.request_not_today).assertDoesNotExist()
+        // "Not today" is still its status, but no longer a button.
+        compose.onNode(hasText(text(R.string.request_not_today)) and hasClickAction()).assertDoesNotExist()
     }
 
     @Test

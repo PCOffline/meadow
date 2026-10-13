@@ -31,7 +31,6 @@ import dev.pcoffline.meadow.ui.chat.ChatContent
 import dev.pcoffline.meadow.ui.circle.CircleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
-import dev.pcoffline.meadow.ui.legal.TermsUpdateDialog
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.BeeStatsContent
 import dev.pcoffline.meadow.ui.requests.RequestCard
@@ -157,9 +156,6 @@ class RenderedContrastTest : ScreenTest() {
             Box(Modifier.align(Alignment.BottomCenter)) { MeadowTabBar(Tab.GARDEN, Badges(requests = 2, invites = 1, chats = 3), onSelect = {}) }
         }
     }
-
-    @Test
-    fun `a dialog`() = sweep { TermsUpdateDialog(onAccept = {}) }
 
     @Test
     fun `a snackbar`() = sweep {

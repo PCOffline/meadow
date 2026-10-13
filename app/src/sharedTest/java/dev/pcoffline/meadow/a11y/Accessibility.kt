@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.a11y
 
+import android.os.Build
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -72,16 +73,30 @@ fun SemanticsNodeInteractionsProvider.assertAccessible(density: Density, require
     if (problems.isNotEmpty()) throw AssertionError("Accessibility problems:\n" + problems.joinToString("\n") { "- $it" })
 }
 
-/** Text drawn too faintly anywhere on screen, measured from a capture of each window. */
+/**
+ * Text drawn too faintly anywhere on screen, measured from a capture of each window.
+ *
+ * Robolectric captures a dialog window's surface but not its text, so there dialogs are left to
+ * the end-to-end tests, which measure them on a real (emulated) phone. Their colours are still
+ * checked in every theme by ThemeContrastTest.
+ */
 fun SemanticsNodeInteractionsProvider.contrastProblems(): List<String> {
     val roots = onAllNodes(isRoot(), useUnmergedTree = true)
     return roots.fetchSemanticsNodes().indices.flatMap { i ->
         val root = roots[i]
         val node = root.fetchSemanticsNode()
-        // A window with nothing in it (say, the screen behind a dialog-only test) can't be captured.
-        if (node.size.width == 0 || node.size.height == 0) emptyList() else TextContrast.problems(node, root.captureToImage())
+        when {
+            // A window with nothing in it (say, the screen behind a dialog-only test) can't be captured.
+            node.size.width == 0 || node.size.height == 0 -> emptyList()
+            ROBOLECTRIC && isDialog(node) -> emptyList()
+            else -> TextContrast.problems(node, root.captureToImage())
+        }
     }
 }
+
+private val ROBOLECTRIC = Build.FINGERPRINT == "robolectric"
+
+private fun isDialog(node: SemanticsNode): Boolean = SemanticsProperties.IsDialog in node.config || node.children.any(::isDialog)
 
 /** Fails with every piece of text drawn too faintly. */
 fun SemanticsNodeInteractionsProvider.assertReadable() {
