@@ -5,6 +5,7 @@ import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
 import { accountOf, accountRef, chats, db, heartbeats, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
+import { deleteStaleExports } from "./account";
 import { finishDueRemovals } from "./social";
 
 const ALERT_COOLDOWN_MS = 2 * 60_000;
@@ -107,12 +108,16 @@ export const expireRequests = onSchedule("every 5 minutes", async () => {
   if (expired > 0) logger.info("Expired requests", { expired });
 });
 
-/** Hourly housekeeping: finish Bumblebee removals, notice quiet phones. */
+/** Hourly housekeeping: finish Bumblebee removals, clear uncollected exports, notice quiet phones. */
 export const hourlyCare = onSchedule("every 60 minutes", async () => {
   const now = Date.now();
   const migrated = await migrateProfiles();
 
   const removed = await finishDueRemovals(now);
+  const exports = await deleteStaleExports(now).catch((e) => {
+    logger.warn("Clearing old exports failed", { error: String(e) });
+    return 0;
+  });
 
   // Only phones not yet reported, so ones that stay quiet for good don't crowd out new ones.
   const cutoff = Timestamp.fromMillis(now - STALE_HEARTBEAT_MS);
@@ -133,5 +138,5 @@ export const hourlyCare = onSchedule("every 60 minutes", async () => {
     back.docs.forEach((d) => batch.update(d.ref, { staleNotified: false }));
     await batch.commit();
   }
-  logger.info("Hourly care done", { migrated, removed, quiet: quiet.size, recovered: back.size });
+  logger.info("Hourly care done", { migrated, removed, exports, quiet: quiet.size, recovered: back.size });
 });

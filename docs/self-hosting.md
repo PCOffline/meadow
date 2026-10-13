@@ -121,11 +121,8 @@ Collections appear on their own as people use the app.
 Again, nothing else to set up: the deploy uploads `backend/storage.rules`, which only lets people
 read and write their own photo and their own export files.
 
-Optional: data exports are deleted as soon as the app downloads them. To also clean up any export
-that was never downloaded, add a lifecycle rule in Google Cloud: open
-<https://console.cloud.google.com/storage/browser>, choose the bucket, then **Lifecycle → Add a
-rule → Delete object**, with conditions **Age: 1 day** and **Object name matches prefix:
-`exports/`**.
+Data exports are deleted as soon as the app downloads them, and the hourly housekeeping function
+deletes any that were never collected after a day.
 
 ### 2.6 Cloud Messaging
 

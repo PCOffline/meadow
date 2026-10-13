@@ -13,6 +13,23 @@ import {
 const EXPORTS_PER_DAY = 5;
 export const exportPath = (uid: string, at: number) => `exports/${uid}/meadow-${at}.json`;
 
+/** The app deletes an export once it has it; one it never collected is deleted after this long. */
+export const EXPORT_TTL_MS = 24 * 60 * 60_000;
+
+/** Whether the export at [path] is older than [EXPORT_TTL_MS]. A name that isn't an export's counts as stale. */
+export function isStaleExport(path: string, now: number): boolean {
+  const at = Number(/\/meadow-(\d+)\.json$/.exec(path)?.[1]);
+  return !Number.isFinite(at) || now - at > EXPORT_TTL_MS;
+}
+
+/** Deletes exports nobody collected, so personal data never lingers in Storage. */
+export async function deleteStaleExports(now: number): Promise<number> {
+  const [files] = await getStorage().bucket().getFiles({ prefix: "exports/" });
+  const stale = files.filter((f) => isStaleExport(f.name, now));
+  await Promise.all(stale.map((f) => f.delete({ ignoreNotFound: true })));
+  return stale.length;
+}
+
 /** Converts Firestore values (timestamps, nested maps) into plain JSON. */
 function plain(value: unknown): unknown {
   if (value instanceof Timestamp) return value.toDate().toISOString();
