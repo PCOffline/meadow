@@ -89,12 +89,16 @@ integration and end-to-end tests) is green after each.
 - Material 3 1.4 and Compose 1.9+ semantics changes can affect screenshot and accessibility
   tests.
 
+## Done since
+
+- **Installation IDs instead of FCM tokens:** the app registers with `FirebaseMessaging.register()`
+  and the backend sends with `sendEachForMulticast({ fids })`.
+
 ## Later
 
 - **targetSdk 36:** required by Google Play since 2026-08-31, only if Meadow is published there.
   The app is already edge-to-edge and uses predictive back; test on an API 36 emulator first.
 - **Node 26:** once firebase-tools lists `nodejs26` and Cloud Functions makes it GA.
-- **Installation IDs instead of FCM tokens:** needs app and backend changes together.
 - **Material icons:** the extended set is frozen; switch to Material Symbols drawables when
   convenient.
 - **firebase-tools' transitive advisories** (11, development only): wait for an upstream release.

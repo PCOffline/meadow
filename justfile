@@ -60,7 +60,7 @@ check: lint test
 
 # All unit, rules, integration and hosting tests
 [group('test')]
-test: test-app test-functions test-rules test-integration test-hosting
+test: test-app test-functions test-rules test-integration test-hosting test-deploy
 
 # App unit, screen and accessibility tests
 [group('test')]
@@ -92,6 +92,11 @@ test-integration:
 test-hosting:
     cd backend && npm run test:hosting
 
+# What the deploy does besides the Firebase CLI (the Storage lifecycle rule)
+[group('test')]
+test-deploy:
+    cd backend && npm run test:deploy
+
 # End to end on a running Android emulator; start `just emulators` in another terminal first
 [group('test')]
 test-e2e:
@@ -102,7 +107,7 @@ test-e2e:
 emulators:
     cd backend && node build-functions.cjs && {{ firebase }} emulators:start --only auth,firestore,functions,storage --project demo-meadow
 
-# Deploy everything: rules, indexes, functions and hosting
+# Deploy everything: rules, indexes, functions, hosting and the Storage lifecycle rule
 [group('backend')]
 deploy:
     cd backend && {{ firebase }} deploy
@@ -112,7 +117,7 @@ deploy:
 deploy-functions:
     cd backend && {{ firebase }} deploy --only functions
 
-# Deploy only the Firestore and Storage rules and indexes
+# Deploy only the Firestore and Storage rules and indexes, and the Storage lifecycle rule
 [group('backend')]
 deploy-rules:
     cd backend && {{ firebase }} deploy --only firestore,storage
