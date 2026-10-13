@@ -77,7 +77,9 @@ fun SemanticsNodeInteractionsProvider.contrastProblems(): List<String> {
     val roots = onAllNodes(isRoot(), useUnmergedTree = true)
     return roots.fetchSemanticsNodes().indices.flatMap { i ->
         val root = roots[i]
-        TextContrast.problems(root.fetchSemanticsNode(), root.captureToImage())
+        val node = root.fetchSemanticsNode()
+        // A window with nothing in it (say, the screen behind a dialog-only test) can't be captured.
+        if (node.size.width == 0 || node.size.height == 0) emptyList() else TextContrast.problems(node, root.captureToImage())
     }
 }
 

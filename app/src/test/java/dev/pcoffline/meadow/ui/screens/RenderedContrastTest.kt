@@ -63,7 +63,7 @@ class RenderedContrastTest : ScreenTest() {
     private fun <T> sweep(variants: List<T>, content: @Composable (T) -> Unit) {
         var look by mutableStateOf(looks.first())
         var variant by mutableStateOf(variants.first())
-        compose.setContent { MeadowTheme(look.first, look.second) { content(variant) } }
+        compose.setContent { MeadowTheme(look.first, look.second) { AppBackground { content(variant) } } }
         val problems = variants.flatMap { v ->
             looks.flatMap { next ->
                 variant = v

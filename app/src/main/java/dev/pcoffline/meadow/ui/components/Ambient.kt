@@ -42,7 +42,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -69,7 +68,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
-import dev.pcoffline.meadow.ui.theme.contrast
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -114,12 +113,8 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 }
 
 @Immutable
-data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int) {
-    /** Quieter text on the sky: [onSky] faded only as far as it stays readable (4.5:1) from top to bottom. */
-    val onSkySoft: Color
-        get() = generateSequence(0.75f) { it + 0.05f }.takeWhile { it < 1f }.map { onSky.copy(alpha = it) }
-            .firstOrNull { soft -> listOf(top, bottom).all { contrast(soft.compositeOver(it), it) >= 4.5f } } ?: onSky
-}
+/** The sky behind a header. [onSky] is readable on all of it, hills included. */
+data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
 
 /**
  * The current time, refreshed whenever the screen comes back into view, so a garden left open
@@ -194,7 +189,7 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
             cloud(Offset(((t * 9f) % (size.width + 240f)) - 120f, size.height * 0.18f), 1f, cloudAlpha)
             cloud(Offset(((t * 5.5f + size.width * 0.55f) % (size.width + 240f)) - 120f, size.height * 0.32f), 0.7f, cloudAlpha)
         }
-        MeadowHills(Modifier.fillMaxSize())
+        MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky)
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
             if (mood.night) {
@@ -369,7 +364,8 @@ fun SleepyZs(modifier: Modifier = Modifier) {
     val reduced = rememberReducedMotion()
     val transition = rememberInfiniteTransition(label = "zzz")
     val t = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "z")
-    Box(modifier.size(36.dp, 40.dp)) {
+    // Decoration: screen readers skip it.
+    Box(modifier.size(36.dp, 40.dp).clearAndSetSemantics { }) {
         repeat(3) { i ->
             Text(
                 "z",

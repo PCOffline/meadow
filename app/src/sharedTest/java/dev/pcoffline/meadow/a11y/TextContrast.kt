@@ -55,6 +55,8 @@ object TextContrast {
             val right = min(bitmap.width, bounds.right.toInt())
             val bottom = min(bitmap.height, bounds.bottom.toInt())
             if (right - left < 4 || bottom - top < 4) continue // Off screen or scrolled away.
+            // Partly scrolled out of view: only what's fully on screen can be measured fairly.
+            if (bottom - top < node.size.height - 2 || right - left < node.size.width - 2) continue
 
             val counts = HashMap<Int, Int>()
             for (y in top until bottom) for (x in left until right) {

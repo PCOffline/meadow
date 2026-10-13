@@ -583,3 +583,129 @@ describe("your data", () => {
     await assert.rejects(signInWithEmailAndPassword(sam.auth, sam.email, "petals-and-bees"));
   });
 });
+
+describe("scheduled jobs", () => {
+  // The emulators don't run schedules; runSchedulesForTests (emulator only) runs them as if at `now`.
+  const hours = (h) => Date.now() + h * 3600_000;
+  const runSchedules = (who, now) => who.call("runSchedulesForTests", { now });
+
+  test("a removal takes effect after its day, telling only the removed Bumblebee", async () => {
+    const sam = await person("Sam");
+    const [bee, other] = [await person("Bee"), await person("Other")];
+    await link(sam, bee);
+    await link(sam, other);
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    await runSchedules(sam, hours(23));
+    assert.ok((await read(`users/${sam.uid}/private/account`)).approverIds.includes(bee.uid), "not before the day is up");
+
+    await runSchedules(sam, hours(25));
+    const account = await read(`users/${sam.uid}/private/account`);
+    assert.deepEqual(account.approverIds, [other.uid]);
+    assert.equal(account.pendingRemovals?.[bee.uid], undefined);
+    assert.ok(!(await read(`users/${bee.uid}/private/account`)).approveeIds.includes(sam.uid));
+    assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
+    assert.equal((await outbox(bee.uid, "approver_left")).length, 1);
+    assert.equal((await outbox(other.uid)).length, 0, "other Bumblebees are never told");
+  });
+
+  test("a quiet phone is reported once, vaguely, and only to that garden's Bumblebees", async () => {
+    const sam = await person("Sam");
+    const [bee, stranger] = [await person("Bee"), await person("Stranger")];
+    await link(sam, bee);
+    await admin(async (db) => {
+      await setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
+      await setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.now(), staleNotified: false });
+    });
+    await runSchedules(sam, hours(5));
+    assert.equal((await outbox(bee.uid, "alert")).length, 0, "a few quiet hours are normal");
+
+    await runSchedules(sam, hours(7));
+    const alerts = (await outbox(bee.uid, "alert")).filter((a) => a.uid === sam.uid);
+    assert.equal(alerts.length, 1);
+    assert.doesNotMatch(alerts[0].title + alerts[0].body, /strict|battery|keeper|usage access|uninstall|accessibility/i);
+    assert.equal((await outbox(stranger.uid)).length, 0);
+
+    await runSchedules(sam, hours(8));
+    assert.equal((await outbox(bee.uid, "alert")).filter((a) => a.uid === sam.uid).length, 1, "reported once");
+
+    // Back in touch: the next silence is reported again.
+    await admin((db) => setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.fromMillis(hours(9)), staleNotified: true }));
+    await runSchedules(sam, hours(10));
+    assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
+  });
+
+  test("a garden without Bumblebees or limits raises no alarm", async () => {
+    const sam = await person("Sam");
+    await admin((db) => setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.now(), staleNotified: false }));
+    await runSchedules(sam, hours(7));
+    assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
+  });
+
+  test("unanswered requests expire on schedule, even if nobody looks", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), {
+      packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0,
+    }));
+    const { requestId } = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    await runSchedules(sam, Date.now() + 31 * 60_000);
+    assert.equal((await read(`requests/${requestId}`)).status, "expired");
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).status, "expired");
+  });
+});
+
+describe("invites by code can be withdrawn", () => {
+  test("only the sender can cancel, and a cancelled invite can't be accepted", async () => {
+    const sam = await person("Sam");
+    const [bee, other] = [await person("Bee"), await person("Other")];
+    await sam.call("sendInvite", { friendCode: await friendCodeOf(bee) });
+    const [invite] = await outbox(bee.uid, "invite");
+    await rejects(other.call("cancelInvite", { inviteId: invite.inviteId }), "not-found");
+    await rejects(bee.call("cancelInvite", { inviteId: invite.inviteId }), "not-found");
+    await sam.call("cancelInvite", { inviteId: invite.inviteId });
+    assert.equal((await read(`invites/${invite.inviteId}`)).status, "cancelled");
+    await rejects(bee.call("respondInvite", { inviteId: invite.inviteId, accept: true }), "failed-precondition");
+    assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approverIds, []);
+  });
+});
+
+describe("every callable is safe to call wrongly", () => {
+  const CALLABLES = [
+    "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "respondInvite", "cancelInvite",
+    "removeApprover", "cancelRemoval", "stepDown", "createRequest", "decideRequest", "cancelRequest", "saveLimit",
+    "emergencyUnlock", "exportMyData", "deleteAccount",
+  ];
+
+  test("nothing works without signing in", async () => {
+    const app = initializeApp({ projectId: PROJECT, apiKey: "fake-api-key" }, `signed-out-${++counter}`);
+    apps.push(app);
+    const functions = getFunctions(app, REGION);
+    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+    for (const fn of CALLABLES) {
+      await rejects(httpsCallable(functions, fn)({}), "unauthenticated");
+    }
+  });
+
+  test("junk input is refused politely, never with an internal error", async () => {
+    const junk = [null, 42, "text", [], { approverUid: { $gt: "" } }, { requestId: "../../users/x", approve: "yes" }, { minutes: -1e9, type: "x".repeat(5000) }];
+    const failures = [];
+    for (const fn of CALLABLES.filter((f) => f !== "deleteAccount")) {
+      const someone = await person(`Junk ${fn}`);
+      for (const data of junk) {
+        try {
+          await someone.call(fn, data);
+        } catch (e) {
+          if (e.code === "functions/internal" || e.code === "functions/unknown") failures.push(`${fn}(${JSON.stringify(data).slice(0, 40)}): ${e.code} ${e.message}`);
+        }
+      }
+    }
+    assert.deepEqual(failures, []);
+  });
+
+  test("deleting an account twice is harmless", async () => {
+    const sam = await person("Sam");
+    await sam.call("deleteAccount");
+    await assert.rejects(sam.call("deleteAccount"));
+  });
+});

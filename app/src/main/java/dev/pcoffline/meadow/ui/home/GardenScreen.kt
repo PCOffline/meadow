@@ -233,7 +233,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
         Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSkySoft)
+                    Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky)
                     Text(
                         stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.avatar.emoji),
                         style = MaterialTheme.typography.headlineSmall,
@@ -249,7 +249,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                 }
             }
             Spacer(Modifier.height(18.dp))
-            Text(stringResource(R.string.garden_screen_time_today), style = MaterialTheme.typography.labelLarge, color = mood.onSkySoft)
+            Text(stringResource(R.string.garden_screen_time_today), style = MaterialTheme.typography.labelLarge, color = mood.onSky)
             Text(
                 minutesText(minutes),
                 style = MaterialTheme.typography.displaySmall.copy(fontSize = 46.sp),
@@ -259,7 +259,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
             Text(
                 pluralStringResource(R.plurals.garden_across_apps, state.appsUsed, state.appsUsed),
                 style = MaterialTheme.typography.bodyMedium,
-                color = mood.onSkySoft,
+                color = mood.onSky,
             )
         }
     }
