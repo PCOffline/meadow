@@ -501,6 +501,24 @@ This takes effect at once, without deploying again, and later deploys keep it. T
 `gcloud run services get-iam-policy createprofile --region=<region> --project=<project-id>` lists
 `allUsers` with `roles/run.invoker`.
 
+**The functions can't reach Firestore** (their log says `7 PERMISSION_DENIED: Missing or
+insufficient permissions`, and the app gets `INTERNAL`). The functions run as the Compute Engine
+default service account. Newer Google Cloud projects give it no roles, as with the Cloud Build
+role above. Grant it only what the functions use: Firestore, Storage (data exports),
+Authentication (deleting accounts), Cloud Messaging (notifications), and calling the functions
+from Firestore triggers and schedules:
+
+```bash
+SA=<project-number>-compute@developer.gserviceaccount.com
+for role in roles/datastore.user roles/storage.objectAdmin roles/firebaseauth.admin \
+  roles/firebasecloudmessaging.admin roles/eventarc.eventReceiver roles/run.invoker; do
+  gcloud projects add-iam-policy-binding <project-id> --member="serviceAccount:$SA" \
+    --role="$role" --condition=None
+done
+```
+
+It takes effect within a minute, without deploying again.
+
 **`Firebase Storage has not been set up` or `could not find the default bucket`.** Do step 2.5,
 then deploy again.
 
@@ -527,7 +545,9 @@ the cause on screen and in the log (see [Debugging Meadow](debugging.md)). Witho
   asks you to sign in again; a trace build adds `Cloud Function failed: UNAUTHENTICATED`): Google
   Cloud refused the call before it reached Meadow, because the functions aren't public. See
   *Failed to set the IAM Policy* above.
-- `INTERNAL` from a Cloud Function: it crashed; `firebase functions:log` shows why.
+- `INTERNAL` from a Cloud Function: it crashed; `firebase functions:log` shows why. If the log
+  says `PERMISSION_DENIED: Missing or insufficient permissions`, see *The functions can't reach
+  Firestore* above.
 
 If instead the app says you seem to be offline, or the loader says it's taking longer than usual,
 the phone can't reach Firebase. Check its connection.
