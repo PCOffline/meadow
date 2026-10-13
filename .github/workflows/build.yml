@@ -35,7 +35,11 @@ jobs:
             echo "No GOOGLE_SERVICES_JSON secret; building without a backend"
           fi
       - name: Build, unit test and lint
-        run: ./gradlew assembleDebug assembleRelease testDebugUnitTest lintDebug --stacktrace
+        run: ./gradlew assembleDebug assembleRelease createDebugUnitTestCoverageReport lintDebug --stacktrace
+      - name: Unit test coverage floor
+        run: |
+          report=$(find app/build/reports/coverage -name report.xml | head -n 1)
+          python3 .github/scripts/coverage_floor.py "$report" --lines 0 --branches 0
       - uses: actions/upload-artifact@v7
         with:
           name: meadow-debug-apk
@@ -47,6 +51,7 @@ jobs:
           path: |
             app/build/reports/lint-results-debug.html
             app/build/reports/tests/
+            app/build/reports/coverage/
           if-no-files-found: ignore
 
   # Workflows and scripts: mistakes here only show up when a release or deploy runs.
@@ -60,8 +65,10 @@ jobs:
           ./actionlint -color
       - name: Check shell scripts (shellcheck)
         run: find . -name '*.sh' -not -path '*/node_modules/*' -print0 | xargs -0 -r shellcheck
-      - name: Check the release planner
-        run: python3 -m py_compile .github/scripts/*.py
+      - name: Check the CI Python scripts
+        run: |
+          python3 -m py_compile .github/scripts/*.py
+          python3 -B -m unittest discover -s .github/scripts -p 'test_*.py' -v
 
   functions:
     runs-on: ubuntu-latest
