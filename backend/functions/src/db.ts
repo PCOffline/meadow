@@ -20,7 +20,7 @@ export const removals = () => db().collection("removals");
 /** Server-only: per-person counters behind the rate limits. */
 export const rateLimits = () => db().collection("rateLimits");
 /**
- * Owner-only document: who looks after whom, push tokens, strict mode, emergency state and
+ * Owner-only document: who looks after whom, the phones to push to, strict mode, emergency state and
  * other settings. Nothing in it is ever shown to anyone else.
  */
 export const accountRef = (uid: string) => users().doc(uid).collection("private").doc("account");
@@ -44,7 +44,8 @@ export interface Profile {
 export interface Account {
   approverIds: string[];
   approveeIds: string[];
-  fcmTokens: string[];
+  /** Firebase installation IDs of the person's phones, to push to. */
+  pushIds: string[];
 }
 
 export interface Person {
@@ -119,7 +120,7 @@ export function profileOf(snap: DocumentSnapshot): Profile {
 
 export function accountOf(snap: DocumentSnapshot): Account {
   const d = snap.data() ?? {};
-  return { approverIds: list(d.approverIds), approveeIds: list(d.approveeIds), fcmTokens: list(d.fcmTokens) };
+  return { approverIds: list(d.approverIds), approveeIds: list(d.approveeIds), pushIds: list(d.pushIds) };
 }
 
 /** Reads someone's profile and account, inside a transaction when given one. */
@@ -168,7 +169,7 @@ export async function postToChat(
 
 /**
  * Sends a data-only push to every device of each user; the app builds the notification itself
- * so it can add actions like "Say yes". Dead tokens are cleaned up. Never throws.
+ * so it can add actions like "Say yes". Phones no longer registered are cleaned up. Never throws.
  *
  * In the emulator every push is also written to `_testOutbox`, so integration tests can check
  * exactly who was told what.
@@ -178,14 +179,11 @@ export async function notify(uids: string[], data: Record<string, string>): Prom
     [...new Set(uids)].map(async (uid) => {
       try {
         if (isEmulator()) await db().collection("_testOutbox").add({ to: uid, ...data, at: FieldValue.serverTimestamp() });
-        const tokens = accountOf(await accountRef(uid).get()).fcmTokens;
-        if (tokens.length === 0) return;
-        const result = await getMessaging().sendEachForMulticast({ tokens, data, android: { priority: "high" } });
-        const dead = tokens.filter((_, i) => {
-          const code = result.responses[i]?.error?.code;
-          return code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token";
-        });
-        if (dead.length) await accountRef(uid).update({ fcmTokens: FieldValue.arrayRemove(...dead) });
+        const fids = accountOf(await accountRef(uid).get()).pushIds;
+        if (fids.length === 0) return;
+        const result = await getMessaging().sendEachForMulticast({ fids, data, android: { priority: "high" } });
+        const dead = fids.filter((_, i) => result.responses[i]?.error?.code === "messaging/installation-id-not-registered");
+        if (dead.length) await accountRef(uid).update({ pushIds: FieldValue.arrayRemove(...dead) });
       } catch (e) {
         logger.warn("Push failed", { uid, error: String(e) });
       }

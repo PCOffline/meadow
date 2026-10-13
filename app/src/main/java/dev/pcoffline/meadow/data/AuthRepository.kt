@@ -8,6 +8,7 @@ import dev.pcoffline.meadow.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +44,11 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
 
     val uid: Flow<String?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener {
+            Trace.log {
+                val user = it.currentUser
+                if (user == null) "auth: signed out"
+                else "auth: ${user.uid} anonymous=${user.isAnonymous} providers=${user.providerData.map { p -> p.providerId }}"
+            }
             _anonymous.value = it.currentUser?.isAnonymous == true
             trySend(it.currentUser?.uid)
         }
@@ -178,10 +184,13 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         if (uid != null) {
             runCatchingCancellable {
                 withTimeoutOrNull(SIGN_OUT_TIMEOUT_MS) {
-                    val token = FirebaseMessaging.getInstance().token.await()
-                    backend.account(uid).update("fcmTokens", FieldValue.arrayRemove(token)).awaitWrite(SIGN_OUT_TIMEOUT_MS)
-                    // A fresh token for whoever signs in next, so this one can't reach them.
-                    FirebaseMessaging.getInstance().deleteToken().await()
+                    val installations = FirebaseInstallations.getInstance()
+                    val installationId = installations.id.await()
+                    backend.account(uid).update("pushIds", FieldValue.arrayRemove(installationId)).awaitWrite(SIGN_OUT_TIMEOUT_MS)
+                    FirebaseMessaging.getInstance().unregister().await()
+                    // A fresh ID for whoever signs in next, so pushes still addressed to this one
+                    // (if removing it above didn't reach the server) can't reach them.
+                    installations.delete().await()
                 }
             }
         }

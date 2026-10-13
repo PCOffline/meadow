@@ -2,4 +2,5 @@
 # Keep in step with CI (.github/workflows) and backend/functions/package.json engines.
 firebase = "15.33.0"
 java = "temurin-25"
+just = "1.40.0"
 node = "24"

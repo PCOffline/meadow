@@ -65,12 +65,12 @@ service cloud.firestore {
       match /private/{docId} {
         allow read: if signedIn() && me() == uid;
         allow update: if signedIn() && me() == uid && docId == 'account'
-          && changed().hasOnly(['fcmTokens', 'theme', 'darkMode', 'acceptedTerms', 'strictMode', 'privacy', 'emergencyUntil'])
+          && changed().hasOnly(['pushIds', 'theme', 'darkMode', 'acceptedTerms', 'strictMode', 'privacy', 'emergencyUntil'])
           && (!('acceptedTerms' in changed())
               || (request.resource.data.acceptedTerms.keys().hasOnly(['version', 'at'])
                   && request.resource.data.acceptedTerms.version is int
                   && request.resource.data.acceptedTerms.at == request.time))
-          && (!('fcmTokens' in changed()) || request.resource.data.fcmTokens.size() <= 10)
+          && (!('pushIds' in changed()) || request.resource.data.pushIds.size() <= 10)
           && (!('theme' in changed()) || isString(request.resource.data.theme, 20))
           && (!('darkMode' in changed()) || isString(request.resource.data.darkMode, 10))
           && (!('strictMode' in changed()) || request.resource.data.strictMode is bool)

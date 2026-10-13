@@ -545,7 +545,7 @@ describe("your data", () => {
     const bee = await person("Bee");
     await link(sam, bee);
     await admin(async (db) => {
-      await updateDoc(doc(db, `users/${sam.uid}/private/account`), { fcmTokens: arrayUnion("secret-token") });
+      await updateDoc(doc(db, `users/${sam.uid}/private/account`), { pushIds: arrayUnion("secret-phone-id"), fcmTokens: ["secret-old-token"] });
       await setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
     });
     const { path } = await sam.call("exportMyData");
@@ -556,7 +556,7 @@ describe("your data", () => {
     assert.equal(data.limits[0].id, "com.insta");
     assert.equal(data.conversations.length, 1);
     assert.ok(data.conversations[0].messages.length >= 1);
-    assert.doesNotMatch(await readFile(path), /secret-token/);
+    assert.doesNotMatch(await readFile(path), /secret-phone-id|secret-old-token/);
   });
 
   test("deleting an account removes it everywhere and tells only the people it affects", async () => {

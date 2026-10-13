@@ -2,7 +2,6 @@ package dev.pcoffline.meadow.data
 
 import android.util.Log
 import dev.pcoffline.meadow.R
-import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -18,7 +17,7 @@ class SocialRepository(
 
     /** Someone's name card; null if it's gone or can't be read, so lists built from several still show the rest. */
     fun profile(uid: String): Flow<UserProfile?> =
-        backend.user(uid).snapshots()
+        backend.user(uid).tracedSnapshots()
             .map { if (it.exists()) it.toProfile() else null }
             .catch {
                 Log.w("MeadowSocial", "Profile listener failed", it)
