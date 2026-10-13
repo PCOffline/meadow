@@ -9,7 +9,12 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -29,9 +34,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Dialogs in every theme, by day and by night, with their text measured from the pixels a phone
- * draws. Robolectric can't draw text in dialog windows, so this runs on the emulator; it needs no
- * backend.
+ * Dialogs, on a phone: what answering a request asks, and every dialog's text measured in every
+ * theme, by day and by night, from a screenshot. Robolectric can't capture dialog windows (and
+ * doesn't settle with these open), so this runs on the emulator; it needs no backend.
  */
 @RunWith(AndroidJUnit4::class)
 class DialogContrastTest {
@@ -68,6 +73,32 @@ class DialogContrastTest {
         decidedByName = null, decisionNote = null, dayKey = "2026-10-13",
         createdAtMillis = System.currentTimeMillis(), myDecision = null, usedMinutes = 29, allowedMinutes = 30,
     )
+
+    private fun text(id: Int, vararg args: Any) = app.getString(id, *args)
+    private fun inDialog(value: String) = compose.onNode(hasText(value) and hasAnyAncestor(isDialog()))
+
+    @Test
+    fun sayingYesAsksFirstAndOffersToGiveLess() {
+        compose.setContent { MeadowTheme { RequestCard(request, myUid = "bee") } }
+        compose.onNodeWithText(text(R.string.request_say_yes)).performClick()
+        inDialog(text(R.string.request_decide_yes_title, "Sam")).assertExists()
+        inDialog(text(R.string.request_decide_less)).assertExists()
+        inDialog(text(R.string.request_decide_note)).assertExists()
+        inDialog(text(R.string.request_say_yes)).assertExists()
+        // Back closes it without answering.
+        inDialog(text(R.string.action_back)).performClick()
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
+        compose.onNodeWithText(text(R.string.request_status_waiting)).assertExists()
+    }
+
+    @Test
+    fun notTodayHasNoMinutesOnlyAKindWord() {
+        compose.setContent { MeadowTheme { RequestCard(request, myUid = "bee") } }
+        compose.onNodeWithText(text(R.string.request_not_today)).performClick()
+        inDialog(text(R.string.request_decide_no_title)).assertExists()
+        inDialog(text(R.string.request_decide_note)).assertExists()
+        compose.onAllNodesWithText(text(R.string.request_decide_less)).assertCountEquals(0)
+    }
 
     @Test
     fun updatedTerms() = sweep { TermsUpdateDialog(onAccept = {}) }

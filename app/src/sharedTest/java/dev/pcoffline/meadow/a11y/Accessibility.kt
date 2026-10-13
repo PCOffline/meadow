@@ -1,6 +1,10 @@
 package dev.pcoffline.meadow.a11y
 
+import android.graphics.Bitmap
 import android.os.Build
+import android.os.SystemClock
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -9,6 +13,8 @@ import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.toSize
+import androidx.test.platform.app.InstrumentationRegistry
 
 /**
  * The checks screen reader and switch users rely on (WCAG 2.2 AA, Android accessibility
@@ -76,8 +82,9 @@ fun SemanticsNodeInteractionsProvider.assertAccessible(density: Density, require
 /**
  * Text drawn too faintly anywhere on screen, measured from a capture of each window.
  *
- * Robolectric captures a dialog window's surface but not its text, so there dialogs are left to
- * the end-to-end tests, which measure them on a real (emulated) phone. Their colours are still
+ * A dialog's root captures the activity's window behind it, not the dialog, so on a phone dialogs
+ * are measured from a screenshot of the whole screen instead. Robolectric can't take one, so
+ * there dialogs are left to the instrumented tests (DialogContrastTest); their colours are still
  * checked in every theme by ThemeContrastTest.
  */
 fun SemanticsNodeInteractionsProvider.contrastProblems(): List<String> {
@@ -88,13 +95,24 @@ fun SemanticsNodeInteractionsProvider.contrastProblems(): List<String> {
         when {
             // A window with nothing in it (say, the screen behind a dialog-only test) can't be captured.
             node.size.width == 0 || node.size.height == 0 -> emptyList()
-            ROBOLECTRIC && isDialog(node) -> emptyList()
+            isDialog(node) -> if (ROBOLECTRIC) emptyList() else dialogProblems(node)
             else -> TextContrast.problems(node, root.captureToImage())
         }
     }
 }
 
 private val ROBOLECTRIC = Build.FINGERPRINT == "robolectric"
+
+private fun dialogProblems(root: SemanticsNode): List<String> {
+    // The window's own fade-in isn't something Compose waits for.
+    SystemClock.sleep(WINDOW_SETTLE_MS)
+    val shot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        ?: throw AssertionError("Couldn't take a screenshot to measure a dialog")
+    val screen = shot.copy(Bitmap.Config.ARGB_8888, false).asImageBitmap()
+    return TextContrast.problems(root, screen) { Rect(it.positionOnScreen, it.size.toSize()) }
+}
+
+private const val WINDOW_SETTLE_MS = 400L
 
 private fun isDialog(node: SemanticsNode): Boolean = SemanticsProperties.IsDialog in node.config || node.children.any(::isDialog)
 

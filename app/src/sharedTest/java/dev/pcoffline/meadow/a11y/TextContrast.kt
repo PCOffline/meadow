@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.a11y
 
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -33,10 +34,10 @@ object TextContrast {
     private const val INK = 1.25f
 
     /**
-     * Problems with the text under [root] (an unmerged semantics tree), drawn in [image], which
-     * must be a capture of exactly that root.
+     * Problems with the text under [root] (an unmerged semantics tree), drawn in [image]. [bounds]
+     * says where each node is in the image: by default [image] is a capture of exactly that root.
      */
-    fun problems(root: SemanticsNode, image: ImageBitmap): List<String> {
+    fun problems(root: SemanticsNode, image: ImageBitmap, bounds: (SemanticsNode) -> Rect = { it.boundsInRoot }): List<String> {
         val bitmap = image.asAndroidBitmap()
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
@@ -49,11 +50,11 @@ object TextContrast {
             // Emoji and symbols are pictures, not text to read.
             if (text.none { it.isLetterOrDigit() }) continue
             if (disabled(node)) continue // Inactive controls are exempt (1.4.3).
-            val bounds = node.boundsInRoot
-            val left = max(0, bounds.left.toInt())
-            val top = max(0, bounds.top.toInt())
-            val right = min(bitmap.width, bounds.right.toInt())
-            val bottom = min(bitmap.height, bounds.bottom.toInt())
+            val where = bounds(node)
+            val left = max(0, where.left.toInt())
+            val top = max(0, where.top.toInt())
+            val right = min(bitmap.width, where.right.toInt())
+            val bottom = min(bitmap.height, where.bottom.toInt())
             if (right - left < 4 || bottom - top < 4) continue // Off screen or scrolled away.
             // Partly scrolled out of view: only what's fully on screen can be measured fairly.
             if (bottom - top < node.size.height - 2 || right - left < node.size.width - 2) continue
