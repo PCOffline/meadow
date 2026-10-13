@@ -118,8 +118,9 @@ Collections appear on their own as people use the app.
 3. Choose **Start in production mode** and **Create**. This makes the default bucket,
    `<project-id>.firebasestorage.app`.
 
-Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which only lets
-people read and write their own photo and their own export files, and sets the bucket's lifecycle
+Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which lets
+people change only their own photo, lets their Bumblebees and the people they look after see it,
+and keeps each export file to its owner, and sets the bucket's lifecycle
 rule.
 
 ### 2.6 Cloud Messaging
