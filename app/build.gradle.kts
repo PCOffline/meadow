@@ -48,7 +48,7 @@ android {
     defaultConfig {
         applicationId = "dev.pcoffline.meadow"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersion
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
