@@ -117,20 +117,10 @@ Collections appear on their own as people use the app.
    regions are billed from the first byte, but Meadow stores very little.
 3. Choose **Start in production mode** and **Create**. This makes the default bucket,
    `<project-id>.firebasestorage.app`.
-4. Data exports are deleted as soon as the app downloads them. So that any never downloaded go
-   too (the privacy notice promises it), add a lifecycle rule to the bucket, once:
 
-   ```bash
-   just storage-lifecycle <project-id>
-   # or: gcloud storage buckets update gs://<project-id>.firebasestorage.app --lifecycle-file=backend/storage-lifecycle.json
-   ```
-
-   Or in the console: <https://console.cloud.google.com/storage/browser>, choose the bucket, then
-   **Lifecycle → Add a rule → Delete object**, with conditions **Age: 1 day** and **Object name
-   matches prefix: `exports/`**.
-
-The deploy (section 4) uploads `backend/storage.rules`, which only lets people read and write their
-own photo and their own export files.
+Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which only lets
+people read and write their own photo and their own export files, and sets the bucket's lifecycle
+rule.
 
 ### 2.6 Cloud Messaging
 
@@ -172,6 +162,10 @@ npm --prefix functions ci     # the Cloud Functions' own packages
 firebase deploy --only firestore,functions,storage,hosting
 ```
 
+Setting the lifecycle rule needs a Google Cloud sign-in as well as the Firebase one: install
+[gcloud](https://cloud.google.com/sdk/docs/install) and run `gcloud auth application-default login`
+once. Without it, the deploy stops after the rules and says so.
+
 `firebase use --add` writes `backend/.firebaserc`, which stays out of git. With
 [just](https://just.systems) the same is `just setup`, `just use-project` and `just deploy`; `just`
 lists the other commands, such as `just deploy-rules` or `just deploy-functions`.
@@ -179,7 +173,9 @@ lists the other commands, such as `just deploy-rules` or `just deploy-functions`
 The deploy:
 
 - uploads the Firestore rules and creates the indexes;
-- uploads the Storage rules;
+- uploads the Storage rules, then sets the bucket's lifecycle rule (`backend/apply-lifecycle.cjs`,
+  from `backend/storage-lifecycle.json`): data exports are deleted as soon as the app downloads
+  them, and the rule deletes any never downloaded after a day, as the privacy notice promises;
 - compiles the functions (`backend/build-functions.cjs`) and deploys them to the region in
   `backend/functions/.env` (see below),
   along with two scheduled jobs: `expireRequests` every 5 minutes and `hourlyCare` every hour;
@@ -198,7 +194,8 @@ storage costs at zero.
   `expireRequests` and `hourlyCare`.
 - **Firestore → Rules** shows Meadow's rules, and **Firestore → Indexes** lists four indexes.
   They show *Building* for a few minutes, then *Enabled*.
-- **Storage → Rules** shows Meadow's rules.
+- **Storage → Rules** shows Meadow's rules, and the bucket's **Lifecycle** tab (in the Google
+  Cloud console) has one rule: delete objects under `exports/` after 1 day.
 - `https://<project-id>.web.app/privacy` opens the privacy notice.
 
 **The functions region** is set in one place, `backend/functions/.env`:

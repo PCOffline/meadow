@@ -4,12 +4,14 @@
   "scripts": {
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-meadow \"node --test --test-concurrency=1 rules-tests/*.test.mjs\"",
     "test:integration": "node build-functions.cjs && firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
-    "test:hosting": "node --test hosting-tests/*.test.mjs"
+    "test:hosting": "node --test hosting-tests/*.test.mjs",
+    "test:deploy": "node --test deploy-tests/*.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
     "firebase": "^13.0.0",
     "firebase-tools": "^15.33.0",
+    "google-auth-library": "^9.15.1",
     "marked": "^18.1.1"
   },
   "overrides": {

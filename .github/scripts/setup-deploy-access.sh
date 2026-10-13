@@ -50,6 +50,24 @@ for role in "${ROLES[@]}"; do
     --role "$role" --condition None --quiet > /dev/null
 done
 
+# The deploy also sets the Storage bucket's lifecycle rule (backend/apply-lifecycle.cjs), so it
+# may manage the default bucket: that bucket only, not every bucket in the project.
+BUCKET=""
+for name in "$PROJECT.firebasestorage.app" "$PROJECT.appspot.com"; do
+  if gcloud storage buckets describe "gs://$name" --project "$PROJECT" > /dev/null 2>&1; then
+    BUCKET="$name"
+    break
+  fi
+done
+if [ -n "$BUCKET" ]; then
+  echo "Letting it set the lifecycle rule on gs://$BUCKET"
+  gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member "serviceAccount:$ACCOUNT" \
+    --role roles/storage.admin > /dev/null
+else
+  echo "No default Storage bucket yet: create it (docs/self-hosting.md, 2.5), then run this again." >&2
+  exit 1
+fi
+
 if ! gcloud iam workload-identity-pools describe "$POOL" --project "$PROJECT" --location global > /dev/null 2>&1; then
   echo "Creating the workload identity pool"
   gcloud iam workload-identity-pools create "$POOL" --project "$PROJECT" --location global \
