@@ -137,13 +137,13 @@ functions-log:
 deploy-access project repo:
     .github/scripts/setup-deploy-access.sh {{ project }} {{ repo }}
 
-# Tag a version and push the tag; the Deliver workflow builds, signs and publishes the APK
+# Tag an app version and push the tag; the Deliver workflow builds, signs and publishes the APK
 [group('release')]
 release version:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! [[ "{{ version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "Use a version like 1.2.0" >&2
+        echo "Use a version like 0.4.0, above the latest release" >&2
         exit 1
     fi
     if ! git diff --quiet || ! git diff --cached --quiet; then

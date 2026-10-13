@@ -265,7 +265,7 @@ permissions**, so the Deliver workflow can publish releases. Save.
 | Workflow | When it runs | What it does | Secrets it needs |
 |---|---|---|---|
 | **Build** (`build.yml`) | Every pull request and every push to `main` (run it from the Actions tab for any other branch) | Builds the app, runs unit tests and lint; tests the functions, security rules, hosting pages; runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON` it builds against your backend; without it, it builds the "connect your backend" version |
-| **Deliver** (`deliver.yml`) | After Build passes on `main` (when turned on, see 7.5 and 7.6), when you push a tag like `v1.2.0`, or by hand | Deploys the backend to Firebase, then tests, builds and signs the release APK and publishes it on your fork's Releases page | The five in 7.4 to release; the Google Cloud access in 7.6 to deploy |
+| **Deliver** (`deliver.yml`) | After Build passes on `main` (when turned on, see 7.5 and 7.6), when you push a tag like `v0.4.0`, or by hand | Deploys the backend to Firebase, then tests, builds and signs the release APK and publishes it on your fork's Releases page | The five in 7.4 to release; the Google Cloud access in 7.6 to deploy |
 | **Screenshots** (`screenshots.yml`) | Pushes whose commit message contains `[screenshots]` | Re-renders the README images and commits them | None |
 
 Until you turn on automatic deploys (7.6), deploy the backend from your computer (step 4)
@@ -299,24 +299,40 @@ add each of these:
 
 ### 7.5 Publish releases
 
+The app and the backend have their own versions, both following
+[semantic versioning](https://semver.org): the app's releases are tagged `v0.4.2`, the backend's
+deploys `backend-v0.7.0` (7.6). The latest tag is the source of truth: each new version is it,
+raised by one part. Both start at 0.1.0.
+
+Automatic runs raise a version only when that part of Meadow changed, by the commits that changed
+it:
+
+| In a commit message | Means | 0.4.2 becomes | 1.4.2 becomes |
+|---|---|---|---|
+| nothing | a fix | 0.4.3 | 1.4.3 |
+| `[minor]` | a new feature | 0.5.0 | 1.5.0 |
+| `[major]` or `[breaking]` | an incompatible change | 0.5.0 | 2.0.0 |
+
+Below 1.0.0, an incompatible change raises the minor part, as SemVer has it for 0.x versions, so
+commits alone never take Meadow to 1.0.0. That's a choice made by hand: run Deliver and choose
+*major* (0.9.3 → 1.0.0). From then on, versions follow on from the new tag.
+
 **Automatically.** In **Settings → Secrets and variables → Actions → Variables**, add
 `AUTO_RELEASE` with the value `true`. From then on, every push to `main` that passes Build and
-changes the app publishes a release:
+changes the app publishes a release. Changes that don't touch the app (docs, the backend's code,
+workflows) don't make one, and `[skip release]` in the last commit's message skips one.
 
-- The version goes up by one patch (1.4.2 → 1.4.3). To raise the minor or major part instead,
-  put `[minor]` or `[major]` in a commit message since the last release.
-- Changes that don't touch the app (docs, the backend's code, workflows) don't make a release.
-  `[skip release]` in the last commit's message skips one.
-- The first release is 1.0.0.
+**By hand.** Open **Actions → Deliver → Run workflow** on `main`. Under *Publish an APK* and
+*Deploy the backend*, choose which part of each version to raise (*patch*, *minor* or *major*),
+*auto* to read it from the commits as automatic runs do, or *none*. Choosing a part makes a new
+version even when nothing changed.
 
-**By hand.** Open **Actions → Deliver → Run workflow** on `main`, and choose which part of the
-version to raise under *Publish an APK*.
-
-**With a tag**, to pick the exact version (`just release 1.2.0` does the same):
+**With a tag**, to pick the exact version (`just release 0.4.0` does the same). It must be above
+the latest release:
 
 ```bash
-git tag v1.2.0
-git push origin v1.2.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 Each way, the signed APK appears on your fork's **Releases** page as `meadow-<version>.apk` when
@@ -357,10 +373,11 @@ for the service account (**IAM → Service accounts → github-deploy → Keys �
 its contents as the secret `FIREBASE_SERVICE_ACCOUNT`, and leave the two `GCP_` variables out.
 Many organisations block key creation by default; the keyless way avoids that.
 
-Without `AUTO_DEPLOY`, deploy by hand from **Actions → Deliver → Run workflow** (tick *Deploy
-the backend*), or from your computer as in step 4. `[skip deploy]` in a commit message skips one
-automatic deploy. The workflow marks the last deployed commit with the `firebase-deployed` tag,
-and deploys again only when `backend/` or `legal/` changed since.
+Without `AUTO_DEPLOY`, deploy by hand from **Actions → Deliver → Run workflow** (choose how to
+raise the version under *Deploy the backend*), or from your computer as in step 4. `[skip deploy]` in a commit message skips one
+automatic deploy. Each deploy of a changed backend is tagged with its version (`backend-v0.7.0`,
+raised as in 7.5), and the next deploys only when `backend/` or `legal/` changed since. A deploy
+by hand with *auto* of an unchanged backend deploys the same version again.
 
 A deploy removes functions that are no longer in the code without asking, as `firebase deploy
 --force` does.
