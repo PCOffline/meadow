@@ -186,6 +186,9 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
+          # A phone's screen, not the default AVD's low density: text contrast is measured from
+          # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
+          profile: pixel_6
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb logcat -d -v time Meadow:V MeadowSync:V MeadowFirestore:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E '*:S' | tail -n 200; exit 1)
       - name: Show end-to-end results

@@ -69,7 +69,7 @@ class BumblebeeJourneyTest : EndToEndTest() {
             compose.onNode(joinField).performTextInput("Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
             node(R.string.join_link_button).performClick()
             waitForText(text(R.string.accept_invite_title, "Sam"))
-            node(R.string.accept_invite_yes).performScrollTo().performClick()
+            compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds") == listOf(me) }
 
             // Sam asks for 15 more minutes; the request arrives here, and a yes goes back.
