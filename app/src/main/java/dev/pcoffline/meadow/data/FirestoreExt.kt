@@ -7,19 +7,50 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "MeadowFirestore"
 
-/** Live query results via the SDK's own Flow; listener errors are logged instead of crashing collectors. */
-fun Query.observe(): Flow<QuerySnapshot> =
-    tracedSnapshots().catch { Log.w(TAG, "Query listener failed", it) }
+/** Live query results via the SDK's own Flow. A failed listener is logged and listens again ([relisten]). */
+fun Query.observe(): Flow<QuerySnapshot> = tracedSnapshots().relisten("Query listener")
 
-fun DocumentReference.observe(): Flow<DocumentSnapshot> =
-    tracedSnapshots().catch { Log.w(TAG, "Document listener failed", it) }
+fun DocumentReference.observe(): Flow<DocumentSnapshot> = tracedSnapshots().relisten("Document listener")
+
+/**
+ * Listens again whenever this listener fails, so one dropped by the server (offline for too long,
+ * refused by the rules for a moment, signed out mid-way) doesn't stay dead for as long as the
+ * process lives. Each failure is logged under [label], then [onFailure] runs before the pause.
+ */
+fun <T> Flow<T>.relisten(label: String, onFailure: suspend (Throwable) -> Unit = {}): Flow<T> =
+    retryWithBackoff { e, waitMs ->
+        Log.w(TAG, "$label failed; listening again in ${waitMs / 1_000} s", e)
+        onFailure(e)
+    }
+
+/**
+ * Starts this flow again after every failure, pausing [backoffMs] first: 1 s, then 2 s, 4 s and so
+ * on, never more than a minute, so a listener that can't recover (signed out, no longer allowed)
+ * asks once a minute instead of spinning. The count is kept for as long as the flow is collected.
+ * The SDK's flows end with a [kotlinx.coroutines.CancellationException] wrapping the error; that is
+ * retried too, while cancelling the collector still stops it. Failures thrown by the collector
+ * itself are not caught: put work that should be retried in an `onEach` before this.
+ */
+fun <T> Flow<T>.retryWithBackoff(onFailure: suspend (cause: Throwable, waitMs: Long) -> Unit = { _, _ -> }): Flow<T> =
+    retryWhen { cause, attempt ->
+        val waitMs = backoffMs(attempt)
+        onFailure(cause, waitMs)
+        delay(waitMs)
+        true
+    }
+
+/** The pause before listening again after failure number [attempt] (counted from 0). */
+fun backoffMs(attempt: Long): Long = minOf(MAX_BACKOFF_MS, 1_000L shl attempt.coerceIn(0L, 6L).toInt())
+
+const val MAX_BACKOFF_MS = 60_000L
 
 /**
  * Waits for the server to confirm a write, but not forever. Offline, the write's task only
