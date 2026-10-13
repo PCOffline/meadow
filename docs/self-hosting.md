@@ -118,14 +118,9 @@ Collections appear on their own as people use the app.
 3. Choose **Start in production mode** and **Create**. This makes the default bucket,
    `<project-id>.firebasestorage.app`.
 
-Again, nothing else to set up: the deploy uploads `backend/storage.rules`, which only lets people
-read and write their own photo and their own export files.
-
-Optional: data exports are deleted as soon as the app downloads them. To also clean up any export
-that was never downloaded, add a lifecycle rule in Google Cloud: open
-<https://console.cloud.google.com/storage/browser>, choose the bucket, then **Lifecycle → Add a
-rule → Delete object**, with conditions **Age: 1 day** and **Object name matches prefix:
-`exports/`**.
+Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which only lets
+people read and write their own photo and their own export files, and sets the bucket's lifecycle
+rule.
 
 ### 2.6 Cloud Messaging
 
@@ -167,6 +162,10 @@ npm --prefix functions ci     # the Cloud Functions' own packages
 firebase deploy --only firestore,functions,storage,hosting
 ```
 
+Setting the lifecycle rule needs a Google Cloud sign-in as well as the Firebase one: install
+[gcloud](https://cloud.google.com/sdk/docs/install) and run `gcloud auth application-default login`
+once. Without it, the deploy stops after the rules and says so.
+
 `firebase use --add` writes `backend/.firebaserc`, which stays out of git. With
 [just](https://just.systems) the same is `just setup`, `just use-project` and `just deploy`; `just`
 lists the other commands, such as `just deploy-rules` or `just deploy-functions`.
@@ -174,7 +173,9 @@ lists the other commands, such as `just deploy-rules` or `just deploy-functions`
 The deploy:
 
 - uploads the Firestore rules and creates the indexes;
-- uploads the Storage rules;
+- uploads the Storage rules, then sets the bucket's lifecycle rule (`backend/apply-lifecycle.cjs`,
+  from `backend/storage-lifecycle.json`): data exports are deleted as soon as the app downloads
+  them, and the rule deletes any never downloaded after a day, as the privacy notice promises;
 - compiles the functions (`backend/build-functions.cjs`) and deploys them to the region in
   `backend/functions/.env` (see below),
   along with two scheduled jobs: `expireRequests` every 5 minutes and `hourlyCare` every hour;
@@ -193,7 +194,8 @@ storage costs at zero.
   `expireRequests` and `hourlyCare`.
 - **Firestore → Rules** shows Meadow's rules, and **Firestore → Indexes** lists four indexes.
   They show *Building* for a few minutes, then *Enabled*.
-- **Storage → Rules** shows Meadow's rules.
+- **Storage → Rules** shows Meadow's rules, and the bucket's **Lifecycle** tab (in the Google
+  Cloud console) has one rule: delete objects under `exports/` after 1 day.
 - `https://<project-id>.web.app/privacy` opens the privacy notice.
 
 **The functions region** is set in one place, `backend/functions/.env`:
@@ -246,7 +248,7 @@ from `google-services.json`, so invite and sign-in links use your own web addres
 
 Without `google-services.json` the app still builds, but opens on a "connect your backend" screen.
 
-## 7. Build and release with GitHub Actions
+## 7. Build, deploy and release with GitHub Actions
 
 This part is optional. It needs a fork (step 1).
 
@@ -256,18 +258,18 @@ GitHub pauses workflows on new forks. Open your fork's **Actions** tab and click
 workflows, go ahead and enable them**.
 
 Then open **Settings → Actions → General → Workflow permissions** and choose **Read and write
-permissions**, so the Release workflow can publish releases. Save.
+permissions**, so the Deliver workflow can publish releases. Save.
 
 ### 7.2 What the workflows do
 
 | Workflow | When it runs | What it does | Secrets it needs |
 |---|---|---|---|
 | **Build** (`build.yml`) | Every pull request and every push to `main` (run it from the Actions tab for any other branch) | Builds the app, runs unit tests and lint; tests the functions, security rules, hosting pages; runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON` it builds against your backend; without it, it builds the "connect your backend" version |
-| **Release** (`release.yml`) | When you push a tag like `v1.2.0` | Tests, builds and signs the release APK and publishes it on your fork's Releases page | All five below |
+| **Deliver** (`deliver.yml`) | After Build passes on `main` (when turned on, see 7.5 and 7.6), when you push a tag like `v1.2.0`, or by hand | Deploys the backend to Firebase, then tests, builds and signs the release APK and publishes it on your fork's Releases page | The five in 7.4 to release; the Google Cloud access in 7.6 to deploy |
 | **Screenshots** (`screenshots.yml`) | Pushes whose commit message contains `[screenshots]` | Re-renders the README images and commits them | None |
 
-The workflows never deploy the backend. Deploy it from your computer (step 4) whenever
-`backend/` changes.
+Until you turn on automatic deploys (7.6), deploy the backend from your computer (step 4)
+whenever `backend/` changes.
 
 ### 7.3 Make a release key
 
@@ -295,20 +297,73 @@ add each of these:
 | `MEADOW_KEY_ALIAS` | The key alias, for example `meadow` |
 | `MEADOW_KEY_PASSWORD` | The key password |
 
-### 7.5 Publish a release
+### 7.5 Publish releases
+
+**Automatically.** In **Settings → Secrets and variables → Actions → Variables**, add
+`AUTO_RELEASE` with the value `true`. From then on, every push to `main` that passes Build and
+changes the app publishes a release:
+
+- The version goes up by one patch (1.4.2 → 1.4.3). To raise the minor or major part instead,
+  put `[minor]` or `[major]` in a commit message since the last release.
+- Changes that don't touch the app (docs, the backend's code, workflows) don't make a release.
+  `[skip release]` in the last commit's message skips one.
+- The first release is 1.0.0.
+
+**By hand.** Open **Actions → Deliver → Run workflow** on `main`, and choose which part of the
+version to raise under *Publish an APK*.
+
+**With a tag**, to pick the exact version (`just release 1.2.0` does the same):
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
-The Release workflow appears under **Actions**. When it finishes, the signed APK is on your
-fork's **Releases** page as `meadow-1.0.0.apk`. Versions must look like `v1.2.3` and must go up
-with every release.
+Each way, the signed APK appears on your fork's **Releases** page as `meadow-<version>.apk` when
+the workflow finishes. Versions must look like `1.2.3` and must go up with every release.
 
 Release builds check for updates on the repository that built them, so copies installed from your
 fork update from your fork's releases. People can turn the checks off in Settings. If you
 publish on Google Play instead, updates come from Play.
+
+### 7.6 Deploy the backend automatically
+
+The Deliver workflow can deploy `backend/` (rules, indexes, functions and hosting) after every
+push to `main` that passes Build and changes `backend/` or `legal/`. When a release goes out in
+the same run, it waits for the deploy, so a new app never meets an old backend.
+
+GitHub needs permission to deploy to your project. The safer way stores no key: GitHub signs in
+with Workload Identity Federation, and only workflows on your fork's `main` can. With
+[gcloud](https://cloud.google.com/sdk/docs/install) signed in as the project's owner, run:
+
+```bash
+just deploy-access <project-id> <owner>/<repo>
+# or: .github/scripts/setup-deploy-access.sh <project-id> <owner>/<repo>
+```
+
+Use the repository name exactly as GitHub shows it, for example `PCOffline/meadow`. The script
+creates a `github-deploy` service account with the roles a deploy needs, and prints the
+variables to add under **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Value |
+|---|---|
+| `FIREBASE_PROJECT` | Your project ID |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | The provider name the script printed (`projects/…/providers/github`) |
+| `GCP_SERVICE_ACCOUNT` | `github-deploy@<project-id>.iam.gserviceaccount.com` |
+| `AUTO_DEPLOY` | `true`, to deploy after every passing push to `main` |
+
+If you'd rather use a key, or your organisation doesn't allow identity federation: create a key
+for the service account (**IAM → Service accounts → github-deploy → Keys → Add key → JSON**), add
+its contents as the secret `FIREBASE_SERVICE_ACCOUNT`, and leave the two `GCP_` variables out.
+Many organisations block key creation by default; the keyless way avoids that.
+
+Without `AUTO_DEPLOY`, deploy by hand from **Actions → Deliver → Run workflow** (tick *Deploy
+the backend*), or from your computer as in step 4. `[skip deploy]` in a commit message skips one
+automatic deploy. The workflow marks the last deployed commit with the `firebase-deployed` tag,
+and deploys again only when `backend/` or `legal/` changed since.
+
+A deploy removes functions that are no longer in the code without asking, as `firebase deploy
+--force` does.
 
 ## 8. Keeping your copy up to date
 
@@ -320,7 +375,9 @@ git pull upstream main
 git push
 ```
 
-Then, if anything in `backend/` changed, deploy it again:
+With automatic deploys and releases turned on (7.5 and 7.6), the push to `main` deploys the
+backend and publishes a new release, in that order. Otherwise, if anything in `backend/` changed,
+deploy it again:
 
 ```bash
 cd backend
@@ -328,7 +385,7 @@ npm ci && npm --prefix functions ci
 firebase deploy --only firestore,functions,storage,hosting
 ```
 
-Deploy the backend **before** releasing an app that depends on it. Finally, tag a new release
+Deploy the backend **before** releasing an app that depends on it. Finally, publish a new release
 (step 7.5).
 
 ## Developing against the emulators
@@ -440,5 +497,16 @@ See step 5. Android may take a while to check again; reinstalling the app makes 
 battery optimisation for it (Meadow's *Troubleshoot* screen walks through it, including the extra
 steps some phone makers add).
 
-**Release workflow fails at *Add Firebase config* or *Add signing key*.** A secret is missing or
+**Deliver fails at *Add Firebase config* or *Add signing key*.** A secret is missing or
 misspelled; see step 7.4. If it fails at *Publish* with a permissions error, see step 7.1.
+
+**Deliver fails at *Sign in to Google Cloud*.** For keyless sign-in, check that
+`GCP_WORKLOAD_IDENTITY_PROVIDER` is the full name the setup script printed and that the script
+was run with the repository name exactly as GitHub shows it (a renamed repository needs the
+script run again with the new name). Only runs on `main` can sign in. If your organisation
+restricts identity federation, use a key instead (7.6).
+
+**Deliver fails at *Deploy* with `Permission denied` or `does not have permission`.** The
+`github-deploy` service account is missing a role, often for a product added since. The error
+names the permission; grant the role that has it under **IAM**, or run the setup script again.
+

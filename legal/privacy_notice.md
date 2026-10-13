@@ -1,6 +1,6 @@
 # Privacy notice
 
-Version 2 · 12 October 2026
+Version 2 · updated 13 October 2026
 
 Meadow helps you keep the app time limits you choose, with the help of friends you trust (your Bumblebees). This notice explains what Meadow collects, why, who can see it, and the choices you have. We've tried to keep it short and plain.
 
@@ -27,7 +27,8 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 | Today's screen time summary (top apps and minutes) | So your Bumblebees can see how you're doing. **Optional** |
 | When your phone last checked in | So Meadow can tell your Bumblebees, without details, if it may have stopped working. Only Meadow's servers read it |
 | Emergency unlocks: when, how long and your reason | So emergency unlocks stay rare and honest |
-| Notification tokens, theme and appearance choices | To send you notifications and keep your settings |
+| An ID for each phone you're signed in on (a Firebase installation ID) | To send your notifications to the right phones. Signing out removes that phone's ID |
+| Your theme, day or night choice, and which version of these documents you accepted | To keep your settings, and to ask again when the documents change |
 
 We don't sell your data, show ads, or use analytics or tracking tools.
 
@@ -42,7 +43,7 @@ We don't sell your data, show ads, or use analytics or tracking tools.
 
 ## Where your data is kept
 
-Meadow uses Google Firebase (Authentication, Cloud Firestore, Cloud Functions, Cloud Storage, Cloud Messaging and Hosting) to store and move your data. Google processes it on our behalf and may store it in the United States. Data is encrypted in transit, and security rules only let the right people read it.
+Meadow uses Google Firebase (Authentication, Cloud Firestore, Cloud Functions, Cloud Storage, Cloud Messaging, Installations and Hosting) to store and move your data. Google processes it on behalf of whoever runs your copy of Meadow. Your data is stored in the locations they chose when setting it up (for example, in Europe or the United States); some services, such as sign-in and notifications, may process it in the United States. Data is encrypted in transit and at rest, and security rules only let the right people read it.
 
 If you ask for a sign-in link, Firebase emails it to you.
 
@@ -54,7 +55,7 @@ We keep your data until you delete it or your account. Turning off screen-time s
 
 ## Your choices and rights
 
-- **See and download your data:** Settings → Download my data. The file is written to your private storage space, downloaded to your phone and then deleted from our systems.
+- **See and download your data:** Settings → Download my data. The file is written to a private folder only you can read, downloaded to your phone and then deleted from our systems. If it's never downloaded, it's deleted after a day.
 - **Correct it:** edit your profile at any time.
 - **Limit sharing:** Settings → Privacy.
 - **Delete everything:** Settings → Delete my account.

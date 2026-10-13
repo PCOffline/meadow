@@ -14,11 +14,12 @@ Source: github.com/PCOffline/meadow
 
 ## Libraries
 
-- **Android Jetpack** (AndroidX, Jetpack Compose, Navigation, Lifecycle, WorkManager) by Google, Apache License 2.0
+- **Android Jetpack** (AndroidX, Jetpack Compose, Material 3 and its icons, Navigation, Lifecycle, WorkManager) by Google, Apache License 2.0
 - **Firebase Android SDKs** by Google, Apache License 2.0
 - **Kotlin, kotlinx.coroutines and kotlinx.serialization** by JetBrains, Apache License 2.0
 - **Coil** by Coil Contributors, Apache License 2.0
 - **OkHttp** by Square, Apache License 2.0
+- **Multiplatform Markdown Renderer** by Mike Penz, Apache License 2.0
 - **Konfetti** by Dion Segijn, ISC License
 
 The full licence texts are available at opensource.org and in each project's repository.

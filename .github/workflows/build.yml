@@ -112,6 +112,8 @@ jobs:
         run: npm run test:rules
       - name: Hosted legal pages
         run: npm run test:hosting
+      - name: Deploy scripts (the Storage lifecycle rule)
+        run: npm run test:deploy
 
   integration:
     runs-on: ubuntu-latest

@@ -56,7 +56,7 @@ turning it off needs a Bumblebee's yes too. If something gets switched off anywa
 goes quiet, your Bumblebees are told. Your limits keep working offline.
 
 ### For real emergencies
-Lost and need maps? Unlock everything for up to an hour, a few times a month, with a short note
+Lost and need maps? Unlock everything for up to an hour, three times in 30 days, with a short note
 for your Bumblebees. Calls and emergency apps are never limited.
 
 ### See your days take shape
