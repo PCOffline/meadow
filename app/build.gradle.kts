@@ -28,7 +28,13 @@ val inviteHost = firebaseProjectId?.let { "$it.web.app" } ?: "invites.meadow.inv
 // updater can compare it with GitHub releases. versionCode must grow with every release.
 val appVersion = (findProperty("meadow.version") as String?)?.removePrefix("v") ?: "0.1.0"
 val appVersionCode = appVersion.substringBefore('-').split('.').map { it.toInt() }.let { parts ->
-    parts.getOrElse(0) { 0 } * 1_000_000 + parts.getOrElse(1) { 0 } * 1_000 + parts.getOrElse(2) { 0 }
+    val (major, minor, patch) = List(3) { parts.getOrElse(it) { 0 } }
+    // Minor and patch get three digits each; at 1000 they'd run into the next part.
+    require(minor < 1_000 && patch < 1_000) {
+        "Version $appVersion: minor and patch must each be below 1000, " +
+            "because versionCode is major * 1000000 + minor * 1000 + patch"
+    }
+    major * 1_000_000 + minor * 1_000 + patch
 }
 
 // The Cloud Functions region, set once in backend/functions/.env, which the backend reads too.
