@@ -40,7 +40,7 @@ Latest stable versions as of 12 October 2026.
 | Coil | 3.2.0 | 3.6.3 | Needs Kotlin 2.4 and compileSdk 37; 3.6.3 fixes R8 with AGP 9.4 |
 | konfetti-compose | 2.0.4 | 2.0.5 | `Shape.DrawableShape` now takes a `CoreImage`; drawables go through `ImageUtil.loadDrawable`. Fixes an idling-resource timeout in instrumentation tests |
 | multiplatform-markdown-renderer-m3 | 0.34.0 | 0.45.0 | Only `Markdown(content, modifier)` is used; removed APIs don't apply |
-| org.jetbrains:markdown (tests) | 0.7.3 | 0.7.16 | Parser fixes |
+| org.jetbrains:markdown (tests) | 0.7.3 | 0.7.17 | Parser fixes |
 | Robolectric | 4.14.1 | 4.17 | Deprecated symbols removed (only `shadowOf` used). SDK 36+ needs Java 21; tests stay on SDK 34 |
 | androidx.test core / ext / runner / orchestrator | 1.6.1 / 1.2.1 / 1.6.2 / 1.5.1 | 1.7.0 / 1.3.0 / 1.7.0 / 1.6.1 | None used |
 | JUnit | 4.13.2 | 4.13.2 | Latest JUnit 4 |
