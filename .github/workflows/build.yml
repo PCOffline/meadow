@@ -14,16 +14,24 @@ concurrency:
   group: build-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
+# Each job asks for only what it needs; Build's jobs only read the repository.
+permissions: {}
+
 jobs:
   android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 25
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Add Firebase config (optional)
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -45,11 +53,11 @@ jobs:
       - name: Show failed unit tests
         if: failure()
         run: python3 .github/scripts/failed_tests.py app/build/test-results
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: meadow-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: android-reports
@@ -62,12 +70,17 @@ jobs:
   # Workflows and scripts: mistakes here only show up when a release or deploy runs.
   scripts:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Check workflows (actionlint, with shellcheck on their scripts)
-        run: |
-          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
-          ./actionlint -color
+        run: pipx run actionlint-py==1.7.12.25 -color
+      - name: Check workflow security (zizmor)
+        run: pipx run zizmor==1.30.1 --offline --min-severity low .github/workflows
       - name: Check shell scripts (shellcheck)
         run: find . -name '*.sh' -not -path '*/node_modules/*' -print0 | xargs -0 -r shellcheck
       - name: Check the CI Python scripts
@@ -77,12 +90,17 @@ jobs:
 
   functions:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend/functions
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -93,16 +111,21 @@ jobs:
 
   rules:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -117,16 +140,21 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -137,7 +165,7 @@ jobs:
       - name: Cloud Functions integration tests (Auth, Firestore, Functions, Storage emulators)
         # Also reports which backend code the tests ran (c8, from the emulator's own processes).
         run: npm run test:integration
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: backend-coverage
@@ -146,21 +174,25 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 25
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: |
             backend/package-lock.json
             backend/functions/package-lock.json
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -183,7 +215,7 @@ jobs:
       - name: Build the test app
         run: ./gradlew assembleDebug assembleDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
       - name: End-to-end tests (Android emulator against Firebase emulators)
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
           target: google_apis
@@ -192,13 +224,13 @@ jobs:
           # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb logcat -d -v time Meadow:V MeadowSync:V MeadowFirestore:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E '*:S' | tail -n 200; exit 1)
+          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E '*:S' | tail -n 200; exit 1)
       - name: Show end-to-end results
         if: failure()
         run: |
           tail -n 80 backend/emulators.log || true
           python3 .github/scripts/failed_tests.py app/build/outputs/androidTest-results
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: e2e-reports
