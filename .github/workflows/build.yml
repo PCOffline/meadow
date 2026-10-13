@@ -40,6 +40,9 @@ jobs:
         run: |
           report=$(find app/build/reports/coverage -name report.xml | head -n 1)
           python3 .github/scripts/coverage_floor.py "$report" --lines 0 --branches 0
+      - name: Show failed unit tests
+        if: failure()
+        run: python3 .github/scripts/failed_tests.py app/build/test-results
       - uses: actions/upload-artifact@v7
         with:
           name: meadow-debug-apk
@@ -186,8 +189,8 @@ jobs:
       - name: Show end-to-end results
         if: failure()
         run: |
-          cat app/build/outputs/androidTest-results/connected/debug/*.xml 2>/dev/null || true
           tail -n 80 backend/emulators.log || true
+          python3 .github/scripts/failed_tests.py app/build/outputs/androidTest-results
       - uses: actions/upload-artifact@v7
         if: always()
         with:

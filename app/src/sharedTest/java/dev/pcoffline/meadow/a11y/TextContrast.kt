@@ -95,7 +95,16 @@ object TextContrast {
         return problems
     }
 
-    private fun walk(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::walk)
+    /**
+     * Every node, except under one that hides its content from accessibility services and says
+     * nothing instead (`clearAndSetSemantics { }`): that is decoration, which 1.4.3 exempts. Text
+     * summarised by a description is still read by sighted people, so it is still measured.
+     */
+    private fun walk(node: SemanticsNode): List<SemanticsNode> =
+        if (decorative(node)) emptyList() else listOf(node) + node.children.flatMap(::walk)
+
+    private fun decorative(node: SemanticsNode): Boolean =
+        node.config.isClearingSemantics && node.config.none { it.key == SemanticsProperties.ContentDescription || it.key == SemanticsProperties.Text }
 
     private fun textOf(node: SemanticsNode): String? {
         val config = node.config
