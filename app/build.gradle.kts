@@ -106,6 +106,14 @@ android {
         jacocoVersion = libs.versions.jacoco.get()
     }
 
+    lint {
+        // Findings in the CI log, not only in an HTML report nobody can download.
+        textReport = true
+        textOutput = file("stdout")
+        abortOnError = true
+        checkDependencies = true
+    }
+
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
         unitTests.isIncludeAndroidResources = true
