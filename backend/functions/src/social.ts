@@ -1,5 +1,6 @@
 import { FieldValue, Timestamp, Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/v2";
 import { chatNotes, errors, pushes } from "./copy";
 import {
   accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, Person,
@@ -220,7 +221,9 @@ export const cancelInvite = onCall(async (req) => {
  * whom is nobody else's business.
  */
 export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "bee"): Promise<void> {
-  const [owner, bee] = await Promise.all([loadPerson(ownerUid), loadPerson(beeUid)]);
+  // Someone whose account was only partly deleted can still be let go of.
+  const evenIfGone = { orMissing: true };
+  const [owner, bee] = await Promise.all([loadPerson(ownerUid, undefined, evenIfGone), loadPerson(beeUid, undefined, evenIfGone)]);
   if (!owner.account.approverIds.includes(beeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
 
   const batch = db().batch();
@@ -228,7 +231,7 @@ export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner
     approverIds: FieldValue.arrayRemove(beeUid),
     [`pendingRemovals.${beeUid}`]: FieldValue.delete(),
   });
-  batch.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
+  if ((await accountRef(beeUid).get()).exists) batch.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
   batch.delete(removals().doc(removalId(ownerUid, beeUid)));
   await batch.commit();
 
@@ -255,7 +258,7 @@ export const removeApprover = onCall(async (req) => {
   const { approverUid } = parse(RemoveBumblebeeInput, req.data);
   const effectiveAt = Date.now() + REMOVAL_DELAY_MS;
   const { owner, bee } = await db().runTransaction(async (tx) => {
-    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx)]);
+    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx, { orMissing: true })]);
     if (!owner.account.approverIds.includes(approverUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
     const existing = await tx.get(removals().doc(removalId(uid, approverUid)));
     if (existing.exists) throw new HttpsError("already-exists", errors.removalPending);
@@ -289,6 +292,9 @@ export const cancelRemoval = onCall(async (req) => {
   return { ok: true };
 });
 
+/** Whether [partWays] failed because the two had already parted, rather than for some other reason. */
+export const alreadyParted = (e: unknown): boolean => e instanceof HttpsError && e.code === "failed-precondition";
+
 /** Ends the removals whose day has passed. Called by the hourly housekeeping. */
 export async function finishDueRemovals(now: number): Promise<number> {
   const due = await removals().where("effectiveAt", "<=", Timestamp.fromMillis(now)).limit(200).get();
@@ -297,7 +303,12 @@ export async function finishDueRemovals(now: number): Promise<number> {
     const beeUid = doc.get("beeUid") as string;
     try {
       await partWays(ownerUid, beeUid, "owner");
-    } catch {
+    } catch (e) {
+      if (!alreadyParted(e)) {
+        // Most likely a passing problem: the next run tries again, rather than drop the removal.
+        logger.warn("Removal not finished yet", { ownerUid, beeUid, error: String(e) });
+        continue;
+      }
       // Already parted another way (stepped down, account deleted): just tidy up.
       await doc.ref.delete();
       await accountRef(ownerUid).update({ [`pendingRemovals.${beeUid}`]: FieldValue.delete() }).catch(() => undefined);
