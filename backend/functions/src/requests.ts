@@ -110,7 +110,7 @@ export function updateInboxes(
       decidedAt: FieldValue.serverTimestamp(),
       // Others only learn that it was answered, never by whom.
       answeredByMe: mine,
-      ...(mine ? { myDecision: decider!.approve ? "yes" : "no", grantedMinutes: decider!.grantedMinutes } : {}),
+      ...(mine ? { myDecision: decider.approve ? "yes" : "no", grantedMinutes: decider.grantedMinutes } : {}),
     });
   }
 }

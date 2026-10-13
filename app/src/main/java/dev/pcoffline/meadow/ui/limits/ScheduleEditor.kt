@@ -70,7 +70,7 @@ fun ScheduleEditor(schedule: Schedule, onChange: (Schedule) -> Unit) {
         }
         if (perDay) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                (1..7).forEach { d ->
+                for (d in 1..7) {
                     FilterChip(
                         selected = d == day,
                         onClick = { day = d },

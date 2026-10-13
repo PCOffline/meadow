@@ -88,10 +88,11 @@ export async function consumeRates(
   const next: Record<string, { count: number; since: number }> = {};
   for (const { key, max, windowMs } of limits) {
     const entry = snap.get(new FieldPath(key)) as { count?: number; since?: number } | undefined;
-    const fresh = !entry || typeof entry.since !== "number" || now - entry.since >= windowMs;
+    const since = entry?.since;
+    const fresh = typeof since !== "number" || now - since >= windowMs;
     const count = fresh ? 0 : (entry?.count ?? 0);
     if (count >= max) throw new HttpsError("resource-exhausted", errors.slowDown);
-    next[key] = { count: count + 1, since: fresh ? now : entry!.since! };
+    next[key] = { count: count + 1, since: fresh ? now : since };
   }
   // Returned rather than written here, because a transaction must do all its reads first.
   return () => tx.set(ref, next, { merge: true });
@@ -142,7 +143,7 @@ export function ensureChat(writer: Writer, a: Person, b: Person, id: string): vo
   writer.set(
     chats().doc(id),
     {
-      participants: [a.uid, b.uid].sort(),
+      participants: [a.uid, b.uid].toSorted(),
       names: { [a.uid]: a.profile.displayName, [b.uid]: b.profile.displayName },
       avatars: { [a.uid]: avatar(a), [b.uid]: avatar(b) },
     },
