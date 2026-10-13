@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.annotation.StringRes
@@ -70,8 +72,12 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
         if (state.essentialsReady) GuardianService.start(context)
         AppGraph.protection.check(state)
     }
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+    val activity = LocalActivity.current
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         state = AppGraph.protection.current()
+        val canAskAgain = activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)
+        context.afterNotificationRequest(granted, canAskAgain)
     }
     // Prominent disclosure: explain what each sensitive permission is used for before asking.
     var disclosure by remember { mutableStateOf<Disclosure?>(null) }
@@ -215,6 +221,15 @@ private fun SetupStep(emoji: String, @StringRes title: Int, @StringRes body: Int
             }
         }
     }
+}
+
+/**
+ * After asking to post notifications: once someone has refused for good, Android answers no
+ * without showing its dialog, so the step would do nothing. Opens the app's notification settings
+ * instead, where they can still be turned on.
+ */
+internal fun Context.afterNotificationRequest(granted: Boolean, canAskAgain: Boolean) {
+    if (!granted && !canAskAgain) openSettings(Settings.ACTION_APP_NOTIFICATION_SETTINGS, withExtraPackage = true)
 }
 
 private fun Context.openSettings(action: String, withPackageUri: Boolean = false, withExtraPackage: Boolean = false) {
