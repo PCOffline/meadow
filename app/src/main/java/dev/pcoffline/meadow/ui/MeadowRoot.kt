@@ -118,6 +118,12 @@ fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
         BackendMissingScreen()
         return
     }
+    // Onboarding and the sign-in link dialog show their snackbars here; the tabs have their own.
+    SnackbarScope { MeadowScreens(pendingRoute) }
+}
+
+@Composable
+private fun MeadowScreens(pendingRoute: MutableStateFlow<String?>) {
     val state by AppGraph.sync.profile.collectAsStateWithLifecycle()
     val creating by AppGraph.auth.creatingProfile.collectAsStateWithLifecycle()
     val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()

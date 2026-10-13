@@ -234,9 +234,10 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
             PetalBurst(burst, Modifier.fillMaxSize())
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
+        // Inside the provider, so what the dialogs say when they're done shows on this screen.
+        if (asking) AskForTimeDialog(packageName = pkg, onDismiss = { asking = false })
+        if (emergency) EmergencyDialog(packageName = pkg, appName = state.appName, onDismiss = { emergency = false })
     }
-    if (asking) AskForTimeDialog(packageName = pkg, onDismiss = { asking = false })
-    if (emergency) EmergencyDialog(packageName = pkg, appName = state.appName, onDismiss = { emergency = false })
 }
 
 @Composable

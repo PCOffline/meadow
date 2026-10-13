@@ -23,6 +23,7 @@ import dev.pcoffline.meadow.a11y.contrastProblems
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.legal.TermsUpdateDialog
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
@@ -51,7 +52,7 @@ class DialogContrastTest {
             // A fresh composition per look, so a dialog opened in one look doesn't carry over.
             key(look) {
                 MeadowTheme(look.first, look.second) {
-                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
+                    SnackbarScope { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() } }
                 }
             }
         }
@@ -79,7 +80,7 @@ class DialogContrastTest {
 
     @Test
     fun sayingYesAsksFirstAndOffersToGiveLess() {
-        compose.setContent { MeadowTheme { RequestCard(request, myUid = "bee") } }
+        compose.setContent { MeadowTheme { SnackbarScope { RequestCard(request, myUid = "bee") } } }
         compose.onNodeWithText(text(R.string.request_say_yes)).performClick()
         inDialog(text(R.string.request_decide_yes_title, "Sam")).assertExists()
         inDialog(text(R.string.request_decide_less)).assertExists()
@@ -93,7 +94,7 @@ class DialogContrastTest {
 
     @Test
     fun notTodayHasNoMinutesOnlyAKindWord() {
-        compose.setContent { MeadowTheme { RequestCard(request, myUid = "bee") } }
+        compose.setContent { MeadowTheme { SnackbarScope { RequestCard(request, myUid = "bee") } } }
         compose.onNodeWithText(text(R.string.request_not_today)).performClick()
         inDialog(text(R.string.request_decide_no_title)).assertExists()
         inDialog(text(R.string.request_decide_note)).assertExists()
