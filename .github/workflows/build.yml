@@ -37,9 +37,11 @@ jobs:
       - name: Build, unit test and lint
         run: ./gradlew assembleDebug assembleRelease createDebugUnitTestCoverageReport lintDebug --stacktrace
       - name: Unit test coverage floor
+        # Just under what the tests reach today (47.6% of lines, 32.8% of branches): it can only
+        # go up. Raise it as coverage grows.
         run: |
           report=$(find app/build/reports/coverage -name report.xml | head -n 1)
-          python3 .github/scripts/coverage_floor.py "$report" --lines 0 --branches 0
+          python3 .github/scripts/coverage_floor.py "$report" --lines 45 --branches 30
       - name: Show failed unit tests
         if: failure()
         run: python3 .github/scripts/failed_tests.py app/build/test-results

@@ -5,7 +5,7 @@
     "emulators": "node emulators.mjs",
     "seed": "node emulator-seed.mjs",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-meadow \"node --test --test-concurrency=1 rules-tests/*.test.mjs\"",
-    "test:integration": "node build-functions.cjs && c8 --reporter=text --reporter=lcov --report-dir=coverage --all --src=functions/src --include=functions/lib/** --exclude=functions/lib/**/*.test.js firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
+    "test:integration": "node build-functions.cjs && c8 --check-coverage --lines 95 --functions 95 --branches 80 --reporter=text --reporter=lcov --report-dir=coverage --all --src=functions/src --include=functions/lib/** --exclude=functions/lib/**/*.test.js firebase emulators:exec --only auth,firestore,functions,storage --project demo-meadow \"node --test --test-concurrency=1 integration-tests/*.test.mjs\"",
     "test:hosting": "node --test hosting-tests/*.test.mjs"
   },
   "devDependencies": {
