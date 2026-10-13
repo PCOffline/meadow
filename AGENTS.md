@@ -28,7 +28,7 @@ One branch, one task. A branch changes only what its task needs, plus the tests 
 Every feature and every fix adds tests that would fail without it:
 
 - App logic: unit tests in `app/src/test`.
-- Screens: a Robolectric screen test in `app/src/test/.../ui/screens` that calls `assertAccessible` (from `app/src/sharedTest`).
+- Screens: a Robolectric screen test in `app/src/test/.../ui/screens` that extends `ScreenTest` and calls `assertAccessible`.
 - Journeys across screens: an end-to-end test in `app/src/androidTest`.
 - Cloud Functions logic: unit tests next to the code (`backend/functions/src/*.test.ts`).
 - Cloud Functions end to end: `backend/integration-tests`, against the emulators.
