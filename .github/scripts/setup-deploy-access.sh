@@ -71,12 +71,22 @@ else
     --location global --workload-identity-pool "$POOL" --attribute-condition "$CONDITION" > /dev/null
 fi
 
-POOL_NAME="$(gcloud iam workload-identity-pools describe "$POOL" --project "$PROJECT" --location global --format 'value(name)')"
-PROVIDER_NAME="$(gcloud iam workload-identity-pools providers describe "$PROVIDER" --project "$PROJECT" \
+# A pool or provider created a moment ago can take a minute to be found, so ask a few times.
+retry() {
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    if "$@" 2> /dev/null; then return 0; fi
+    echo "Waiting for Google Cloud to catch up ($attempt)…" >&2
+    sleep 10
+  done
+  "$@"
+}
+POOL_NAME="$(retry gcloud iam workload-identity-pools describe "$POOL" --project "$PROJECT" --location global --format 'value(name)')"
+PROVIDER_NAME="$(retry gcloud iam workload-identity-pools providers describe "$PROVIDER" --project "$PROJECT" \
   --location global --workload-identity-pool "$POOL" --format 'value(name)')"
 
 echo "Letting $REPO act as the service account"
-gcloud iam service-accounts add-iam-policy-binding "$ACCOUNT" --project "$PROJECT" \
+retry gcloud iam service-accounts add-iam-policy-binding "$ACCOUNT" --project "$PROJECT" \
   --role roles/iam.workloadIdentityUser \
   --member "principalSet://iam.googleapis.com/$POOL_NAME/attribute.repository/$REPO" > /dev/null
 
