@@ -95,7 +95,7 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(stringResource(R.string.setup_progress, done, total), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                GrowthBar(done / total.toFloat(), color = Garden.colors.leaf)
+                GrowthBar(done / total.toFloat(), color = Garden.colors.growth)
             }
             Spacer(Modifier.width(12.dp))
             BloomFlower(0.1f + 0.9f * done / total, Garden.colors.petalPink, Modifier.size(76.dp, 116.dp), petals = 7)

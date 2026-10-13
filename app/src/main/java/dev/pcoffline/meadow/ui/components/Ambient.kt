@@ -42,6 +42,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.contrast
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -112,7 +114,12 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 }
 
 @Immutable
-data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
+data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int) {
+    /** Quieter text on the sky: [onSky] faded only as far as it stays readable (4.5:1) from top to bottom. */
+    val onSkySoft: Color
+        get() = generateSequence(0.75f) { it + 0.05f }.takeWhile { it < 1f }.map { onSky.copy(alpha = it) }
+            .firstOrNull { soft -> listOf(top, bottom).all { contrast(soft.compositeOver(it), it) >= 4.5f } } ?: onSky
+}
 
 /**
  * The current time, refreshed whenever the screen comes back into view, so a garden left open

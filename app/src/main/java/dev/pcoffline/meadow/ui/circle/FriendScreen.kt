@@ -136,7 +136,7 @@ private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppL
                             GrowthBar(
                                 if (app.limitMinutes > 0) app.minutes / app.limitMinutes.toFloat() else app.minutes / max.toFloat(),
                                 height = 6.dp,
-                                color = if (app.limitMinutes > 0) null else Garden.colors.leaf,
+                                color = if (app.limitMinutes > 0) null else Garden.colors.growth,
                             )
                         }
                     }

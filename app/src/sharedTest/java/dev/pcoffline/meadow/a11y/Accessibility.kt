@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.unit.Density
 
@@ -14,7 +15,8 @@ import androidx.compose.ui.unit.Density
  * - everything you can tap, toggle or type into says what it is;
  * - touch targets are at least 48dp;
  * - a screen has at least one heading to navigate by;
- * - images that carry meaning are described (decorative ones have no semantics at all).
+ * - images that carry meaning are described (decorative ones have no semantics at all);
+ * - text is readable where it's drawn ([TextContrast]).
  */
 object Accessibility {
     private const val MIN_TOUCH_DP = 48f
@@ -63,9 +65,24 @@ object Accessibility {
     }
 }
 
-/** Fails with every accessibility problem on screen, not just the first. */
+/** Fails with every accessibility problem on screen (dialogs included), not just the first. */
 fun SemanticsNodeInteractionsProvider.assertAccessible(density: Density, requireHeading: Boolean = true) {
     val roots = onAllNodes(isRoot()).fetchSemanticsNodes()
-    val problems = Accessibility.problems(roots, density, requireHeading)
+    val problems = Accessibility.problems(roots, density, requireHeading) + contrastProblems()
     if (problems.isNotEmpty()) throw AssertionError("Accessibility problems:\n" + problems.joinToString("\n") { "- $it" })
+}
+
+/** Text drawn too faintly anywhere on screen, measured from a capture of each window. */
+fun SemanticsNodeInteractionsProvider.contrastProblems(): List<String> {
+    val roots = onAllNodes(isRoot(), useUnmergedTree = true)
+    return roots.fetchSemanticsNodes().indices.flatMap { i ->
+        val root = roots[i]
+        TextContrast.problems(root.fetchSemanticsNode(), root.captureToImage())
+    }
+}
+
+/** Fails with every piece of text drawn too faintly. */
+fun SemanticsNodeInteractionsProvider.assertReadable() {
+    val problems = contrastProblems()
+    if (problems.isNotEmpty()) throw AssertionError("Contrast problems:\n" + problems.joinToString("\n") { "- $it" })
 }
