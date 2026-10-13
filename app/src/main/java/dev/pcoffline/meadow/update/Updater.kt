@@ -15,6 +15,8 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.FriendlyException
+import dev.pcoffline.meadow.usage.packageArchiveInfo
+import dev.pcoffline.meadow.usage.packageInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -193,10 +195,10 @@ class Updater(private val context: Context) {
             if (sha256(apk) != expected) throw FriendlyException(R.string.update_failed_checksum)
         }
         val pm = context.packageManager
-        val archive = pm.getPackageArchiveInfo(apk.path, signatureFlags())
+        val archive = pm.packageArchiveInfo(apk.path, signatureFlags())
             ?: throw FriendlyException(R.string.update_failed_checksum)
         if (archive.packageName != context.packageName) throw FriendlyException(R.string.update_failed_signature)
-        val mine = signatures(pm.getPackageInfo(context.packageName, signatureFlags()))
+        val mine = signatures(pm.packageInfo(context.packageName, signatureFlags()))
         val theirs = signatures(archive)
         // Some Android versions can't read an archive's signatures; the installer still checks them.
         if (theirs.isNotEmpty() && theirs != mine) throw FriendlyException(R.string.update_failed_signature)

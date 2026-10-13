@@ -25,7 +25,7 @@ class AppCatalog(private val context: Context) {
 
     fun launchableApps(): List<InstalledApp> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return pm.queryIntentActivities(intent, 0)
+        return pm.queryActivities(intent)
             .map { it.activityInfo.packageName }
             .distinct()
             .filter { it != context.packageName && it !in essentialPackages() && it !in homePackages() }
@@ -39,13 +39,13 @@ class AppCatalog(private val context: Context) {
     /** Launchers and the system UI never count as "app usage" and can never be limited. */
     fun homePackages(): Set<String> = homeCache ?: run {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        val homes = pm.queryIntentActivities(intent, 0).map { it.activityInfo.packageName }.toSet()
+        val homes = pm.queryActivities(intent).map { it.activityInfo.packageName }.toSet()
         (homes + setOf("com.android.systemui", context.packageName)).also { homeCache = it }
     }
 
     /** The phone, dialer and emergency apps: always reachable, never limitable. */
     fun essentialPackages(): Set<String> = essentialCache ?: run {
-        val dialers = pm.queryIntentActivities(Intent(Intent.ACTION_DIAL), 0).map { it.activityInfo.packageName }
+        val dialers = pm.queryActivities(Intent(Intent.ACTION_DIAL)).map { it.activityInfo.packageName }
         val defaultDialer = runCatching { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()
         (dialers + listOfNotNull(defaultDialer) + ALWAYS_ALLOWED).toSet().also { essentialCache = it }
     }
@@ -58,7 +58,7 @@ class AppCatalog(private val context: Context) {
     }
 
     fun label(packageName: String): String = labelCache.getOrPut(packageName) {
-        runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }
+        runCatching { pm.getApplicationLabel(pm.applicationInfo(packageName)).toString() }
             .getOrDefault(packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() })
     }
 
