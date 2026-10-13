@@ -92,7 +92,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/functions/package-lock.json
       - run: npm ci
-      - name: Lint (oxlint, type-aware)
+      - name: Lint with type information (oxlint)
         run: npm run lint
       - name: Build and unit test
         run: npm test
@@ -114,7 +114,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
-      - name: Lint the deploy scripts and tests (oxlint)
+      - name: Lint the functions, deploy scripts and tests (Biome)
         run: npm run lint
       - name: Security rules tests (Firestore and Storage emulators)
         run: npm run test:rules

@@ -67,7 +67,7 @@ test: test-app test-functions test-rules test-integration test-hosting test-depl
 test-app:
     ./gradlew testDebugUnitTest
 
-# Android lint, detekt, and oxlint on the backend
+# Android lint, detekt, and Biome and oxlint (type-aware) on the backend
 [group('test')]
 lint:
     ./gradlew lintDebug

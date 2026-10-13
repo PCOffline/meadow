@@ -21,7 +21,7 @@ export function writeAssetLinks() {
   const links = assetLinks(config);
   if (links) {
     mkdirSync(new URL("hosting/.well-known/", import.meta.url), { recursive: true });
-    writeFileSync(target, JSON.stringify(links, null, 2) + "\n");
+    writeFileSync(target, `${JSON.stringify(links, null, 2)}\n`);
     console.log(`hosting/.well-known/assetlinks.json (${links[0].target.sha256_cert_fingerprints.length} key(s))`);
   } else {
     rmSync(target, { force: true });
