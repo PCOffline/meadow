@@ -300,28 +300,35 @@ add each of these:
 ### 7.5 Publish releases
 
 The app and the backend have their own versions, both following
-[semantic versioning](https://semver.org) and both below 1.0.0 for now: the app's releases are
-tagged `v0.4.2`, the backend's deploys `backend-v0.7.0` (7.6). Each goes up only when it changed,
-by the commits that changed it:
+[semantic versioning](https://semver.org): the app's releases are tagged `v0.4.2`, the backend's
+deploys `backend-v0.7.0` (7.6). The latest tag is the source of truth: each new version is it,
+raised by one part. Both start at 0.1.0.
 
-| In a commit message | Means | 0.4.2 becomes |
-|---|---|---|
-| nothing | a fix | 0.4.3 |
-| `[minor]` | a new feature | 0.5.0 |
-| `[major]` or `[breaking]` | an incompatible change | 0.5.0 (below 1.0.0, SemVer raises the minor for these) |
+Automatic runs raise a version only when that part of Meadow changed, by the commits that changed
+it:
 
-Staying below 1.0.0 is one constant, `MAX_MAJOR` in `.github/scripts/plan_version.py`; raise it
-when Meadow is ready for 1.0.0. Both start at 0.1.0.
+| In a commit message | Means | 0.4.2 becomes | 1.4.2 becomes |
+|---|---|---|---|
+| nothing | a fix | 0.4.3 | 1.4.3 |
+| `[minor]` | a new feature | 0.5.0 | 1.5.0 |
+| `[major]` or `[breaking]` | an incompatible change | 0.5.0 | 2.0.0 |
+
+Below 1.0.0, an incompatible change raises the minor part, as SemVer has it for 0.x versions, so
+commits alone never take Meadow to 1.0.0. That's a choice made by hand: run Deliver and choose
+*major* (0.9.3 → 1.0.0). From then on, versions follow on from the new tag.
 
 **Automatically.** In **Settings → Secrets and variables → Actions → Variables**, add
 `AUTO_RELEASE` with the value `true`. From then on, every push to `main` that passes Build and
 changes the app publishes a release. Changes that don't touch the app (docs, the backend's code,
 workflows) don't make one, and `[skip release]` in the last commit's message skips one.
 
-**By hand.** Open **Actions → Deliver → Run workflow** on `main`, and choose which part of the
-version to raise under *Publish an APK*.
+**By hand.** Open **Actions → Deliver → Run workflow** on `main`. Under *Publish an APK* and
+*Deploy the backend*, choose which part of each version to raise (*patch*, *minor* or *major*),
+*auto* to read it from the commits as automatic runs do, or *none*. Choosing a part makes a new
+version even when nothing changed.
 
-**With a tag**, to pick the exact version (`just release 0.4.0` does the same):
+**With a tag**, to pick the exact version (`just release 0.4.0` does the same). It must be above
+the latest release:
 
 ```bash
 git tag v0.4.0
@@ -329,7 +336,7 @@ git push origin v0.4.0
 ```
 
 Each way, the signed APK appears on your fork's **Releases** page as `meadow-<version>.apk` when
-the workflow finishes. Versions must look like `0.1.2` and must go up with every release.
+the workflow finishes. Versions must look like `1.2.3` and must go up with every release.
 
 Release builds check for updates on the repository that built them, so copies installed from your
 fork update from your fork's releases. People can turn the checks off in Settings. If you
@@ -366,11 +373,11 @@ for the service account (**IAM → Service accounts → github-deploy → Keys �
 its contents as the secret `FIREBASE_SERVICE_ACCOUNT`, and leave the two `GCP_` variables out.
 Many organisations block key creation by default; the keyless way avoids that.
 
-Without `AUTO_DEPLOY`, deploy by hand from **Actions → Deliver → Run workflow** (tick *Deploy
-the backend*), or from your computer as in step 4. `[skip deploy]` in a commit message skips one
+Without `AUTO_DEPLOY`, deploy by hand from **Actions → Deliver → Run workflow** (choose how to
+raise the version under *Deploy the backend*), or from your computer as in step 4. `[skip deploy]` in a commit message skips one
 automatic deploy. Each deploy of a changed backend is tagged with its version (`backend-v0.7.0`,
 raised as in 7.5), and the next deploys only when `backend/` or `legal/` changed since. A deploy
-by hand of an unchanged backend deploys the same version again.
+by hand with *auto* of an unchanged backend deploys the same version again.
 
 A deploy removes functions that are no longer in the code without asking, as `firebase deploy
 --force` does.

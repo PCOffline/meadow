@@ -3,17 +3,19 @@ name: Deliver
 # Deploys the backend to Firebase, then publishes a signed APK as a GitHub release. The app's
 # updater reads these releases, so every release must be signed with the same key.
 #
-# The two are versioned separately with semantic versioning, below 1.0.0 for now: the backend's
-# deploys are tagged backend-v0.x.y, the app's releases v0.x.y (.github/scripts/plan_version.py).
+# The two are versioned separately with semantic versioning: the backend's deploys are tagged
+# backend-vX.Y.Z, the app's releases vX.Y.Z, each raised from its latest tag
+# (.github/scripts/plan_version.py).
 # Automatically, once Build passes on main:
 # - deploys when the repository variable AUTO_DEPLOY is "true" and backend/ or legal/ changed since
 #   the last deploy. A commit message with [skip deploy] skips one.
 # - releases when AUTO_RELEASE is "true" and the app changed since the last release. It waits for
 #   the deploy, so a new app never meets an old backend. [skip release] skips one.
 # Each raises its patch version; [minor] in a commit that changed it raises the minor, and [major]
-# or [breaking] too while below 1.0.0, as SemVer has it for 0.x versions.
-# By hand: Actions → Deliver → Run workflow on main, choosing what to do.
-# By tag: pushing a tag like v0.4.0 releases exactly that version of the app (no deploy).
+# or [breaking] the major, except below 1.0.0, where it raises the minor (SemVer's rule for 0.x).
+# By hand: Actions → Deliver → Run workflow on main, choosing for each which part to raise
+# (major included, which is how a version leaves 0.x), or auto to read it from the commits.
+# By tag: pushing a tag like v1.2.0 releases exactly that version of the app (no deploy).
 on:
   workflow_run:
     workflows: [Build]
@@ -24,13 +26,14 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Deploy the backend to Firebase
-        type: boolean
-        default: true
-      release:
-        description: Publish an APK, raising this part of the app's version (major raises the minor below 1.0.0)
+        description: Deploy the backend, raising this part of its version (auto reads it from the commits, or redeploys an unchanged backend as it is)
         type: choice
-        options: [none, patch, minor, major]
+        options: [none, auto, patch, minor, major]
+        default: auto
+      release:
+        description: Publish an APK, raising this part of the app's version (auto reads it from the commits)
+        type: choice
+        options: [none, auto, patch, minor, major]
         default: none
 
 permissions:
@@ -54,7 +57,7 @@ jobs:
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_repository.full_name == github.repository) ||
-      (github.event_name == 'workflow_dispatch' && inputs.deploy)
+      (github.event_name == 'workflow_dispatch' && inputs.deploy != 'none')
     runs-on: ubuntu-latest
     permissions:
       contents: write # tags the deployed version
@@ -76,6 +79,7 @@ jobs:
         id: plan
         env:
           EVENT: ${{ github.event_name }}
+          BUMP: ${{ inputs.deploy }}
         run: python3 .github/scripts/plan_version.py backend
       - name: Say what's happening
         env:

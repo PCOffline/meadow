@@ -3,7 +3,6 @@ import subprocess
 import tempfile
 import unittest
 
-import plan_version
 from plan_version import plan
 
 
@@ -79,15 +78,39 @@ class PlanVersionTest(unittest.TestCase):
         self.assertEqual("0.3.5", self.auto("app", sha)["version"])
         self.assertEqual("0.3.0", self.auto("backend", sha)["version"])
 
-    def test_stays_below_1_0_0(self):
+    def test_commits_alone_never_leave_0_x(self):
         self.commit("app/a.kt")
         self.git("tag", "v0.9.3")
         planned = self.auto("app", self.commit("app/a.kt", "Drop the old sync [breaking]"))
         self.assertEqual("0.10.0", planned["version"])
-        self.assertIn("while below 1.0.0", planned["reason"])
-        self.assertEqual("0.10.0", plan("app", "workflow_dispatch", "", self.git("rev-parse", "HEAD"), "major")["version"])
-        with self.assertRaises(SystemExit):
-            plan("app", "push", "v1.0.0", self.git("rev-parse", "HEAD"), "")
+        self.assertIn("kept below 1.0.0", planned["reason"])
+
+    def test_major_chosen_by_hand_leaves_0_x_and_later_versions_follow_the_tag(self):
+        self.commit("app/a.kt")
+        self.git("tag", "v0.9.3")
+        sha = self.commit("app/a.kt")
+        self.assertEqual("1.0.0", plan("app", "workflow_dispatch", "", sha, "major")["version"])
+        self.git("tag", "v1.0.0")
+        self.assertEqual("1.0.1", self.auto("app", self.commit("app/a.kt", "Fix"))["version"])
+        self.git("tag", "v1.0.1")
+        self.assertEqual("2.0.0", self.auto("app", self.commit("app/a.kt", "New sync [breaking]"))["version"])
+
+    def test_every_part_can_be_chosen_by_hand_for_either(self):
+        self.commit("app/a.kt")
+        self.commit("backend/f.ts")
+        self.git("tag", "v0.3.4")
+        self.git("tag", "backend-v0.2.7")
+        sha = self.git("rev-parse", "HEAD")
+        for part, app, backend in (("patch", "0.3.5", "0.2.8"), ("minor", "0.4.0", "0.3.0"), ("major", "1.0.0", "1.0.0")):
+            # Even with nothing changed: choosing a part is asking for a new version.
+            self.assertEqual(app, plan("app", "workflow_dispatch", "", sha, part)["version"])
+            self.assertEqual(backend, plan("backend", "workflow_dispatch", "", sha, part)["version"])
+        self.assertEqual("backend-v1.0.0", plan("backend", "workflow_dispatch", "", sha, "major")["tag"])
+
+    def test_a_first_version_chosen_as_major_is_1_0_0(self):
+        sha = self.commit("app/a.kt")
+        self.assertEqual("1.0.0", plan("app", "workflow_dispatch", "", sha, "major")["version"])
+        self.assertEqual("0.1.0", plan("app", "workflow_dispatch", "", sha, "minor")["version"])
 
     def test_versions_compare_as_numbers(self):
         self.commit("app/a.kt")
@@ -102,7 +125,9 @@ class PlanVersionTest(unittest.TestCase):
         self.assertEqual("true", self.auto("app", sha)["ship"])
         self.git("tag", "v0.1.0", sha)
         self.assertEqual("false", self.auto("app", sha)["ship"])
-        self.assertEqual("false", plan("app", "workflow_dispatch", "", sha, "patch")["ship"])
+        self.assertEqual("false", plan("app", "workflow_dispatch", "", sha, "")["ship"])
+        # By hand with auto, an app that didn't change isn't released again either.
+        self.assertEqual("false", plan("app", "workflow_dispatch", "", self.commit("backend/f.ts"), "")["ship"])
 
     def test_a_backend_deploy_by_hand_redeploys_the_same_version(self):
         sha = self.commit("backend/f.ts")
@@ -111,23 +136,19 @@ class PlanVersionTest(unittest.TestCase):
             {"ship": "true", "version": "0.2.1", "tag": "", "reason": "redeploying backend-v0.2.1, unchanged since"},
             plan("backend", "workflow_dispatch", "", sha, ""),
         )
+        self.assertEqual(
+            "0.2.2",
+            plan("backend", "workflow_dispatch", "", sha, "patch")["version"],
+        )
 
-    def test_a_pushed_tag_releases_that_app_version(self):
+    def test_a_pushed_tag_releases_that_app_version_if_it_is_above_the_latest(self):
         sha = self.commit("app/a.kt")
         self.assertEqual("0.5.0", plan("app", "push", "v0.5.0", sha, "")["version"])
-        with self.assertRaises(SystemExit):
-            plan("app", "push", "v0.5", sha, "")
-
-    def test_the_ceiling_is_one_constant(self):
-        self.commit("app/a.kt")
-        self.git("tag", "v0.9.3")
-        sha = self.commit("app/a.kt", "[major]")
-        original = plan_version.MAX_MAJOR
-        try:
-            plan_version.MAX_MAJOR = 1
-            self.assertEqual("1.0.0", self.auto("app", sha)["version"])
-        finally:
-            plan_version.MAX_MAJOR = original
+        self.git("tag", "v0.5.0")
+        self.assertEqual("1.2.0", plan("app", "push", "v1.2.0", sha, "")["version"])
+        for bad in ("v0.5", "v0.5.0", "v0.4.9", "backend-v0.6.0"):
+            with self.assertRaises(SystemExit, msg=bad):
+                plan("app", "push", bad, sha, "")
 
 
 if __name__ == "__main__":

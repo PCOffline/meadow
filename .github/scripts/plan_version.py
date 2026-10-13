@@ -2,24 +2,27 @@
 
 The app and the backend are versioned separately, each with semantic versioning, because each
 ships on its own: the app as a GitHub release tagged v0.4.2, the backend as a deploy tagged
-backend-v0.7.0. A tag marks what was shipped, so the next run knows what changed since.
+backend-v0.7.0. The latest tag is the source of truth: every new version is the latest tag raised
+by one part, and the tag marks what was shipped, so the next run knows what changed since.
 
     python3 plan_version.py app|backend
 
 Writes `ship`, `version`, `tag` (empty when nothing new is tagged) and `reason` to $GITHUB_OUTPUT
 (or prints them when run by hand). Environment: EVENT (push, workflow_dispatch or workflow_run),
-REF_NAME, SHA, BUMP (patch, minor or major; empty to read it from the commit messages).
+REF_NAME, SHA, BUMP (patch, minor or major to choose the part; empty or auto to read it from the
+commit messages).
 
-- A pushed tag (v0.4.2) releases exactly that version of the app.
-- By hand: the app goes up by the chosen part; the backend deploys even when unchanged, as the
-  version it already has.
+- A pushed tag (v1.2.0) releases exactly that version of the app; it must be above the latest.
+- By hand, choosing a part: raises exactly that part, major included (0.9.3 → 1.0.0).
+- By hand, auto: as below, but the backend deploys even when unchanged, as the version it has.
 - Automatically, after Build passes on main: ships only when the component changed since its last
   tag, unless the last commit says [skip release] (app) or [skip deploy] (backend). Commits that
-  touch the component decide the bump: [major] or [breaking] for incompatible changes, [minor] for
+  touch the component decide the part: [major] or [breaking] for incompatible changes, [minor] for
   new features, anything else a patch.
 
-Meadow stays below 1.0.0 for now (MAX_MAJOR). Under SemVer's rule for 0.x versions, an
-incompatible change raises the minor part (0.4.2 → 0.5.0) instead of the major.
+Leaving 0.x is a choice made by hand. Until then, SemVer's rule for 0.x versions applies to
+automatic runs: an incompatible change raises the minor part (0.4.2 → 0.5.0). From 1.0.0 on,
+[major] and [breaking] raise the major.
 """
 import os
 import re
@@ -27,8 +30,8 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-MAX_MAJOR = 0
 FIRST_VERSION = (0, 1, 0)
+PARTS = ("patch", "minor", "major")
 
 Version = tuple[int, int, int]
 
@@ -66,10 +69,11 @@ def latest(component: Component) -> tuple[str, Version] | None:
     return max(tags, key=lambda t: t[1]) if tags else None  # type: ignore[return-value]
 
 
-def bumped(version: Version, part: str) -> tuple[Version, str]:
-    """[version] raised by [part], and the part actually raised: below 1.0.0, major becomes minor."""
+def bumped(version: Version, part: str, chosen: bool) -> tuple[Version, str]:
+    """[version] raised by [part], and the part actually raised. Below 1.0.0, only a part chosen
+    by hand leaves 0.x: a major change read from the commits raises the minor instead."""
     major, minor, patch = version
-    if part == "major" and major + 1 > MAX_MAJOR:
+    if part == "major" and major == 0 and not chosen:
         part = "minor"
     if part == "major":
         return (major + 1, 0, 0), part
@@ -99,14 +103,15 @@ def result(ship: bool, reason: str, version: str = "", tag: str = "") -> dict[st
 def plan(name: str, event: str, ref_name: str, sha: str, bump: str) -> dict[str, str]:
     component = COMPONENTS[name]
     last = latest(component)
+    chosen = bump in PARTS
 
     if event == "push":
         match = tag_pattern(component).match(ref_name)
         if name != "app" or not match:
-            raise SystemExit(f"::error::Tag {ref_name} must look like v0.1.2")
+            raise SystemExit(f"::error::Tag {ref_name} must look like v1.2.3")
         version: Version = tuple(map(int, match.groups()))  # type: ignore[assignment]
-        if version[0] > MAX_MAJOR:
-            raise SystemExit(f"::error::Meadow stays below {MAX_MAJOR + 1}.0.0 for now; tag {ref_name} is too high")
+        if last and version <= last[1]:
+            raise SystemExit(f"::error::Tag {ref_name} must be above the latest release, {last[0]}")
         return result(True, "tag pushed", text(version), ref_name)
 
     already = last is not None and is_ancestor(sha, last[0])
@@ -121,18 +126,23 @@ def plan(name: str, event: str, ref_name: str, sha: str, bump: str) -> dict[str,
         if last and not changed:
             return result(False, f"nothing in it changed since {last[0]}")
 
-    if name == "app" and already:
-        return result(False, f"{sha[:7]} is already in {last[0]}")  # type: ignore[index]
-    if name == "backend" and last and not changed:
-        # Asked for by hand: deploy again, as the version already deployed.
-        return result(True, f"redeploying {last[0]}, unchanged since", text(last[1]))
+    if not chosen:
+        if name == "app" and already:
+            return result(False, f"{sha[:7]} is already in {last[0]}")  # type: ignore[index]
+        if name == "app" and last and not changed:
+            return result(False, f"the app hasn't changed since {last[0]}")
+        if name == "backend" and last and not changed:
+            # Asked for by hand: deploy again, as the version already deployed.
+            return result(True, f"redeploying {last[0]}, unchanged since", text(last[1]))
 
     if not last:
-        return result(True, "first version", text(FIRST_VERSION), component.prefix + text(FIRST_VERSION))
+        first = (1, 0, 0) if bump == "major" else FIRST_VERSION
+        return result(True, "first version", text(first), component.prefix + text(first))
 
-    part = bump or bump_from_messages(git("log", "--format=%B%x00", since, "--", *component.paths))
-    version, raised = bumped(last[1], part)
-    reason = f"{raised} after {last[0]}" + (" (a major change, while below 1.0.0)" if raised != part else "")
+    part = bump if chosen else bump_from_messages(git("log", "--format=%B%x00", since, "--", *component.paths))
+    version, raised = bumped(last[1], part, chosen)
+    how = "chosen" if chosen else "from the commits"
+    reason = f"{raised} after {last[0]}, {how}" + (" (a major change, kept below 1.0.0)" if raised != part else "")
     return result(True, reason, text(version), component.prefix + text(version))
 
 
@@ -140,7 +150,7 @@ def main() -> None:
     if len(sys.argv) != 2 or sys.argv[1] not in COMPONENTS:
         raise SystemExit(f"Usage: {sys.argv[0]} {'|'.join(COMPONENTS)}")
     sha = os.environ.get("SHA") or git("rev-parse", "HEAD")
-    planned = plan(sys.argv[1], os.environ["EVENT"], os.environ.get("REF_NAME", ""), sha, os.environ.get("BUMP", ""))
+    planned = plan(sys.argv[1], os.environ["EVENT"], os.environ.get("REF_NAME", ""), sha, os.environ.get("BUMP", "").replace("auto", ""))
     planned["sha"] = sha
     lines = "".join(f"{key}={value}\n" for key, value in planned.items())
     if out := os.environ.get("GITHUB_OUTPUT"):
