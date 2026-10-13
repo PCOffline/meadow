@@ -69,11 +69,13 @@ then:
 ```bash
 cd backend
 npm ci && npm --prefix functions ci
-npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow
+npm run emulators
 ```
 
-Use `npx firebase`, not a standalone `firebase` binary: the standalone one bundles an older Node
-than the functions need.
+This starts them with demo people to sign in as, and keeps your data between runs (see
+[Developing against the emulators](self-hosting.md#developing-against-the-emulators)). If you
+start them by hand, use `npx firebase`, not a standalone `firebase` binary: the standalone one
+bundles an older Node than the functions need.
 
 Point a debug build at them. `10.0.2.2` is your computer as seen from an Android emulator; from a
 phone, use your computer's address on the local network:

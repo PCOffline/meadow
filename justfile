@@ -97,10 +97,10 @@ test-hosting:
 test-e2e:
     ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2
 
-# Run the whole backend locally (Auth, Firestore, Functions, Storage)
+# Run the whole backend locally, with demo people; data is kept between runs (`just emulators --fresh` starts over)
 [group('backend')]
-emulators:
-    cd backend && node build-functions.cjs && {{ firebase }} emulators:start --only auth,firestore,functions,storage --project demo-meadow
+emulators *args:
+    cd backend && npm run emulators -- {{ args }}
 
 # Deploy everything: rules, indexes, functions and hosting
 [group('backend')]

@@ -29,3 +29,4 @@ backend/hosting/.well-known/
 backend/.firebase/*.cache
 backend/functions/*.log
 __pycache__/
+backend/.emulator-data/
