@@ -93,11 +93,20 @@ describe("profiles", () => {
 
   test("a photo can only be your own upload, so no other server learns when your circle sees it", async () => {
     const me = doc(as("sam"), "users/sam");
-    const storage = "https://firebasestorage.googleapis.com/v0/b/meadow-1.firebasestorage.app/o";
+    // This project's default bucket, under either name Firebase gives it.
+    const storage = "https://firebasestorage.googleapis.com/v0/b/demo-meadow.firebasestorage.app/o";
     await assertSucceeds(updateDoc(me, { photoUrl: `${storage}/avatars%2Fsam?alt=media&token=0a1b-2c3d#v=1760000000000` }));
+    await assertSucceeds(updateDoc(me, { photoUrl: "https://firebasestorage.googleapis.com/v0/b/demo-meadow.appspot.com/o/avatars%2Fsam?alt=media" }));
     await assertSucceeds(updateDoc(me, { photoUrl: "http://10.0.2.2:9199/v0/b/demo-meadow.appspot.com/o/avatars%2Fsam?alt=media&token=1f" }));
     for (const url of [
       "https://example.com/a.jpg",
+      // Another project's bucket would log every view for whoever owns it.
+      "https://firebasestorage.googleapis.com/v0/b/evil-project.firebasestorage.app/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/evil-project.appspot.com/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/demo-meadow-evil.appspot.com/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/evil.demo-meadow.appspot.com/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/demo-meadow.evil.app/o/avatars%2Fsam?alt=media",
+      "http://127.0.0.1:9199/v0/b/evil-project.appspot.com/o/avatars%2Fsam?alt=media",
       `${storage}/avatars%2Fbee?alt=media&token=0a1b`,
       `${storage}/exports%2Fsam%2Fmeadow-1.json?alt=media`,
       `https://firebasestorage.googleapis.com.evil.dev/v0/b/x/o/avatars%2Fsam?alt=media`,
@@ -268,6 +277,18 @@ describe("requests, invites and links", () => {
     await assertFails(addDoc(alerts, { kind: "protection_off", lost: ["accessibility"], createdAt: serverTimestamp() }));
     await assertFails(addDoc(alerts, { kind: "anything", createdAt: serverTimestamp() }));
     await assertFails(addDoc(collection(as("bee"), "users/sam/alerts"), { kind: "protection_off", createdAt: serverTimestamp() }));
+  });
+
+  test("protection alerts are stamped now, and none come sooner than the backend would pass on", async () => {
+    const alerts = collection(as("sam"), "users/sam/alerts");
+    await assertFails(addDoc(alerts, { kind: "protection_off", createdAt: Timestamp.now() }));
+    await assertFails(addDoc(alerts, { kind: "protection_off" }));
+    const lastAlertAt = (ms) => env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "users/sam/private/account"), { lastAlertAt: Timestamp.fromMillis(ms) }));
+    await lastAlertAt(Date.now() - 30_000);
+    await assertFails(addDoc(alerts, { kind: "protection_off", createdAt: serverTimestamp() }));
+    await lastAlertAt(Date.now() - 3 * 60_000);
+    await assertSucceeds(addDoc(alerts, { kind: "protection_off", createdAt: serverTimestamp() }));
   });
 });
 
