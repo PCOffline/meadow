@@ -27,10 +27,19 @@ start() {
   "$TOOLS/sdkmanager" --install emulator platform-tools "$image" > /dev/null
   echo no | "$TOOLS/avdmanager" create avd --force --name "$AVD" --package "$image" --device "$PROFILE"
 
+  # Later steps call adb directly; the runner image doesn't put it on the PATH.
+  if [ -n "${GITHUB_PATH:-}" ]; then
+    echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+  fi
+
   nohup "$SDK/emulator/emulator" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot \
     -gpu swiftshader_indirect -camera-back none -camera-front none > emulator.log 2>&1 &
 
-  "$ADB" wait-for-device
+  if ! timeout 300 "$ADB" wait-for-device; then
+    echo "The emulator didn't start." >&2
+    tail -n 50 emulator.log >&2 || true
+    exit 1
+  fi
   local booted=""
   for _ in $(seq 1 120); do
     booted=$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)

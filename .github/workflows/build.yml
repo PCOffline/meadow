@@ -201,4 +201,5 @@ jobs:
           path: |
             app/build/reports/androidTests/
             backend/emulators.log
+            emulator.log
           if-no-files-found: ignore
