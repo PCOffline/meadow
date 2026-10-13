@@ -45,11 +45,19 @@ service cloud.firestore {
         && (old.weeklyMinutes == 0 || (next.weeklyMinutes > 0 && next.weeklyMinutes <= old.weeklyMinutes));
     }
 
+    // A photo is only ever your own upload in Meadow's Storage (or the emulators'). A link to
+    // anywhere else would tell that server whenever someone in your circle saw it.
+    function ownPhoto(url) {
+      return isString(url, 1000) && url.matches(
+        '(https://firebasestorage[.]googleapis[.]com|http://(10[.]0[.]2[.]2|127[.]0[.]0[.]1|localhost):9199)'
+        + '/v0/b/[a-z0-9._-]+/o/avatars%2F' + me() + '[?]alt=media(&token=[a-f0-9-]+)?(#v=[0-9]+)?');
+    }
+
     function validProfileEdit(d) {
       return (!('displayName' in changed()) || (d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 30))
         && (!('flower' in changed()) || isString(d.flower, 16))
         && (!('avatarColor' in changed()) || isString(d.avatarColor, 20))
-        && (!('photoUrl' in changed()) || d.photoUrl == null || isString(d.photoUrl, 1000))
+        && (!('photoUrl' in changed()) || d.photoUrl == null || ownPhoto(d.photoUrl))
         && (!('bio' in changed()) || isString(d.bio, 80));
     }
 

@@ -27,8 +27,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.readable
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -143,10 +146,26 @@ fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Colo
     }
 }
 
-/** Rolling hills with a scatter of tiny flowers, drawn behind screen headers. */
+/**
+ * Rolling hills with a scatter of tiny flowers, drawn behind screen headers. Given the [sky]
+ * behind them and the [text] drawn over them, the hills are shaded just enough to keep that text
+ * readable (4.5:1).
+ */
 @Composable
-fun MeadowHills(modifier: Modifier = Modifier) {
+fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? = null) {
     val garden = Garden.colors
+    val (backColor, frontColor) = remember(garden, sky, text) {
+        val back = garden.leaf.copy(alpha = 0.35f)
+        val front = garden.leaf.copy(alpha = 0.55f)
+        if (sky == null || text == null) {
+            back to front
+        } else {
+            // Dark text lightens the hills, light text darkens them.
+            val toward = if (text.luminance() > 0.5f) Color.Black else Color.White
+            val solidBack = readable(back.compositeOver(sky), listOf(text), toward = toward)
+            solidBack to readable(front.compositeOver(solidBack), listOf(text), toward = toward)
+        }
+    }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -155,13 +174,13 @@ fun MeadowHills(modifier: Modifier = Modifier) {
             cubicTo(w * 0.25f, h * 0.30f, w * 0.55f, h * 0.70f, w, h * 0.38f)
             lineTo(w, h); lineTo(0f, h); close()
         }
-        drawPath(back, garden.leaf.copy(alpha = 0.35f))
+        drawPath(back, backColor)
         val front = Path().apply {
             moveTo(0f, h * 0.78f)
             cubicTo(w * 0.3f, h * 0.55f, w * 0.7f, h * 0.95f, w, h * 0.68f)
             lineTo(w, h); lineTo(0f, h); close()
         }
-        drawPath(front, garden.leaf.copy(alpha = 0.55f))
+        drawPath(front, frontColor)
         val dots = listOf(0.08f to 0.82f, 0.21f to 0.72f, 0.37f to 0.80f, 0.63f to 0.86f, 0.78f to 0.74f, 0.91f to 0.80f)
         dots.forEachIndexed { i, (x, y) ->
             val color = garden.petals[i % garden.petals.size]

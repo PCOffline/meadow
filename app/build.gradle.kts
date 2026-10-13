@@ -1,4 +1,7 @@
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+
 plugins {
+    jacoco
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
@@ -71,6 +74,8 @@ android {
 
     buildTypes {
         debug {
+            // createDebugUnitTestCoverageReport measures the Robolectric tests; CI enforces a floor.
+            enableUnitTestCoverage = true
             // -Pmeadow.emulatorHost=10.0.2.2 points debug builds at the Firebase emulators (end-to-end tests).
             buildConfigField("String", "EMULATOR_HOST", "\"${findProperty("meadow.emulatorHost") ?: ""}\"")
             // -Pmeadow.trace=true logs every request to Firebase and its answer (see docs/debugging.md).
@@ -97,12 +102,29 @@ android {
     sourceSets["test"].kotlin.directories.add("src/sharedTest/java")
     sourceSets["androidTest"].kotlin.directories.add("src/sharedTest/java")
 
+    testCoverage {
+        jacocoVersion = libs.versions.jacoco.get()
+    }
+
+    lint {
+        // Findings in the CI log, not only in an HTML report nobody can download.
+        textReport = true
+        textOutput = file("stdout")
+        abortOnError = true
+        checkDependencies = true
+    }
+
     testOptions {
         // Robolectric tests see the merged resources and assets (strings, the legal documents).
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             // Robolectric loads a whole Android framework per test class.
             it.maxHeapSize = "3g"
+            // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
+            it.extensions.configure<JacocoTaskExtension> {
+                isIncludeNoLocationClasses = true
+                excludes = listOf("jdk.internal.*")
+            }
             it.testLogging {
                 events("failed")
                 exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

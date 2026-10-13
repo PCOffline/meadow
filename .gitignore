@@ -11,6 +11,7 @@
 app/google-services.json
 backend/functions/node_modules/
 backend/functions/lib/
+backend/coverage/
 backend/.firebaserc
 backend/firebase-debug.log
 backend/firestore-debug.log
@@ -27,3 +28,5 @@ backend/hosting/.well-known/
 
 backend/.firebase/*.cache
 backend/functions/*.log
+__pycache__/
+backend/.emulator-data/

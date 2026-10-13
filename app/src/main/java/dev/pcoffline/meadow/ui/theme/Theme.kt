@@ -46,6 +46,10 @@ data class GardenColors(
     val sky: Color,
     val wilted: Color,
     val cardTint: Color,
+    /** Bars and progress: [leaf], deepened (by night, lightened) to stand out from any surface (3:1). */
+    val growth: Color,
+    /** Highlighted bars and nearly-full progress: [petalPink], made to stand out the same way. */
+    val growthHigh: Color,
 ) {
     val petals: List<Color> get() = listOf(petalPink, petalLavender, petalHoney, petalPeach, petalSky)
 }
@@ -127,108 +131,180 @@ internal fun contrast(a: Color, b: Color): Float {
     return (light + 0.05f) / (dark + 0.05f)
 }
 
-/** Darkens [color] only as much as needed to be readable (WCAG AA) on every one of [backgrounds]. */
-internal fun readable(color: Color, backgrounds: List<Color>, min: Float = 4.5f): Color {
+/**
+ * What text colours aim for: WCAG's 4.5:1, plus headroom. Phones blend the edges of thin strokes
+ * into the background, so text in a colour at exactly 4.5:1 measures lower as drawn (on an
+ * emulated phone, a field label at 4.77:1 measured 4.2:1); Accessibility Scanner measures the same
+ * way.
+ */
+internal const val TEXT_TARGET = 5f
+
+/**
+ * Moves [color] towards [toward] (black by default) only as much as needed to reach [min]:1
+ * against every one of [backgrounds]: [TEXT_TARGET] for text, 3 for control edges and icons.
+ */
+internal fun readable(color: Color, backgrounds: List<Color>, min: Float = TEXT_TARGET, toward: Color = Color.Black): Color {
     var t = 0f
     while (t <= 1f) {
-        val candidate = lerp(color, Color.Black, t)
+        val candidate = lerp(color, toward, t)
         if (backgrounds.all { contrast(candidate, it) >= min }) return candidate
         t += 0.02f
     }
-    return Color.Black
+    return toward
 }
+
+/** Black or white, whichever reads better on [background]; one of them always reaches 4.5:1. */
+fun contentOn(background: Color): Color =
+    if (contrast(Color.Black, background) >= contrast(Color.White, background)) Color.Black else Color.White
 
 /** The Material colour scheme for a theme; internal so tests can check every one stays readable. */
 internal fun colorSchemeFor(theme: GardenTheme, dark: Boolean): androidx.compose.material3.ColorScheme =
     Seeds.getValue(theme).let { if (dark) darkScheme(it) else lightScheme(it) }
 
-/** Every surface is the theme's background, shaded towards its primary colour. */
-private fun lightSurfaces(s: Seed) = listOf(0.04f, 0.07f, 0.10f, 0.14f).map { lerp(s.background, s.primary, it) }
+/** The garden palette for a theme; internal so tests can check the colours used behind text. */
+internal fun gardenColorsFor(theme: GardenTheme, dark: Boolean): GardenColors = gardenColors(Seeds.getValue(theme), dark)
 
-private fun lightScheme(s: Seed) = lightColorScheme(
-    // Seeds are picked for charm; text and buttons are nudged darker where needed to stay readable.
-    primary = readable(s.primary, listOf(Color.White, s.background)),
-    onPrimary = Color.White,
-    primaryContainer = lerp(s.primary, Color.White, 0.78f),
-    onPrimaryContainer = lerp(s.primary, Color.Black, 0.6f),
-    secondary = readable(s.secondary, listOf(Color.White, s.background)),
-    onSecondary = Color.White,
-    secondaryContainer = lerp(s.secondary, Color.White, 0.8f),
-    onSecondaryContainer = lerp(s.secondary, Color.Black, 0.6f),
-    tertiary = readable(s.tertiary, listOf(Color.White, s.background)),
-    onTertiary = Color.White,
-    tertiaryContainer = lerp(s.tertiary, Color.White, 0.8f),
-    onTertiaryContainer = lerp(s.tertiary, Color.Black, 0.6f),
-    background = s.background,
-    onBackground = lerp(Ink, s.primary, 0.08f),
-    surface = s.background,
-    onSurface = lerp(Ink, s.primary, 0.08f),
-    surfaceVariant = lerp(s.background, s.primary, 0.12f),
-    onSurfaceVariant = readable(lerp(Color(0xFF6F675A), s.primary, 0.15f), listOf(s.background, lerp(s.background, s.primary, 0.14f))),
-    surfaceContainerLowest = lerp(s.background, Color.White, 0.7f),
-    surfaceContainerLow = lightSurfaces(s)[0],
-    surfaceContainer = lightSurfaces(s)[1],
-    surfaceContainerHigh = lightSurfaces(s)[2],
-    surfaceContainerHighest = lightSurfaces(s)[3],
-    outline = lerp(Color(0xFFB8AE9C), s.primary, 0.35f),
-    outlineVariant = lerp(s.background, s.primary, 0.22f),
-    error = readable(Color(0xFFC0634A), listOf(Color.White, s.background)),
-    onError = Color.White,
-    errorContainer = Color(0xFFF7DCD3),
-    onErrorContainer = Color(0xFF4D1A0E),
-)
+private val LightErrorContainer = Color(0xFFF7DCD3)
+private val DarkErrorContainer = Color(0xFF6E3324)
+
+private fun nightOf(s: Seed) = lerp(Color(0xFF1A1D1B), s.primary, 0.14f)
+
+private fun cardTintOf(s: Seed, dark: Boolean) =
+    if (dark) lerp(lerp(nightOf(s), s.primary, 0.08f), Color.White, 0.06f) else lerp(s.background, Color.White, 0.5f)
+
+private fun lightScheme(s: Seed): androidx.compose.material3.ColorScheme {
+    // Every surface is the theme's background, shaded towards its primary colour.
+    val surfaces = listOf(0.04f, 0.07f, 0.10f, 0.14f).map { lerp(s.background, s.primary, it) }
+    val lowest = lerp(s.background, Color.White, 0.7f)
+    val variant = lerp(s.background, s.primary, 0.12f)
+    val primaryContainer = lerp(s.primary, Color.White, 0.78f)
+    val secondaryContainer = lerp(s.secondary, Color.White, 0.8f)
+    val tertiaryContainer = lerp(s.tertiary, Color.White, 0.8f)
+    val backdrops = listOf(Color.White, s.background, lowest, variant, cardTintOf(s, dark = false), primaryContainer,
+        secondaryContainer, tertiaryContainer, LightErrorContainer) + surfaces
+    // Seeds are picked for charm; text, icons and edges are nudged darker where needed to stay readable.
+    fun text(color: Color) = readable(color, backdrops)
+    val ink = text(lerp(Ink, s.primary, 0.08f))
+    val inverse = lerp(Ink, s.primary, 0.1f)
+    return lightColorScheme(
+        primary = text(s.primary),
+        onPrimary = Color.White,
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = lerp(s.primary, Color.Black, 0.6f),
+        secondary = text(s.secondary),
+        onSecondary = Color.White,
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = lerp(s.secondary, Color.Black, 0.6f),
+        tertiary = text(s.tertiary),
+        onTertiary = Color.White,
+        tertiaryContainer = tertiaryContainer,
+        onTertiaryContainer = lerp(s.tertiary, Color.Black, 0.6f),
+        background = s.background,
+        onBackground = ink,
+        surface = s.background,
+        onSurface = ink,
+        surfaceVariant = variant,
+        onSurfaceVariant = text(lerp(Color(0xFF6F675A), s.primary, 0.15f)),
+        surfaceContainerLowest = lowest,
+        surfaceContainerLow = surfaces[0],
+        surfaceContainer = surfaces[1],
+        surfaceContainerHigh = surfaces[2],
+        surfaceContainerHighest = surfaces[3],
+        // Text fields, switches and segmented buttons are recognised by their edge (WCAG 1.4.11: 3:1).
+        outline = readable(lerp(Color(0xFFB8AE9C), s.primary, 0.35f), backdrops, min = 3f),
+        outlineVariant = lerp(s.background, s.primary, 0.22f),
+        error = text(Color(0xFFC0634A)),
+        onError = Color.White,
+        errorContainer = LightErrorContainer,
+        onErrorContainer = Color(0xFF4D1A0E),
+        // Snackbars.
+        inverseSurface = inverse,
+        inverseOnSurface = lerp(s.background, Color.White, 0.5f),
+        inversePrimary = readable(lerp(s.primary, Color.White, 0.45f), listOf(inverse), toward = Color.White),
+        surfaceTint = s.primary,
+    )
+}
 
 private fun darkScheme(s: Seed): androidx.compose.material3.ColorScheme {
-    val night = lerp(Color(0xFF1A1D1B), s.primary, 0.14f)
+    val night = nightOf(s)
+    val surfaces = listOf(0.06f to 0.03f, 0.08f to 0.05f, 0.10f to 0.08f, 0.12f to 0.11f)
+        .map { (tint, light) -> lerp(lerp(night, s.primary, tint), Color.White, light) }
+    val lowest = lerp(night, Color.Black, 0.3f)
+    val variant = lerp(lerp(night, s.primary, 0.2f), Color.White, 0.1f)
+    val primaryContainer = lerp(s.primary, Color.Black, 0.45f)
+    val secondaryContainer = lerp(s.secondary, Color.Black, 0.45f)
+    val tertiaryContainer = lerp(s.tertiary, Color.Black, 0.45f)
+    val backdrops = listOf(night, lowest, variant, cardTintOf(s, dark = true), primaryContainer, secondaryContainer,
+        tertiaryContainer, DarkErrorContainer) + surfaces
+    // At night, text is nudged lighter instead.
+    fun text(color: Color) = readable(color, backdrops, toward = Color.White)
+    val ink = text(NightInk)
     return darkColorScheme(
-        primary = lerp(s.primary, Color.White, 0.45f),
+        primary = text(lerp(s.primary, Color.White, 0.45f)),
         onPrimary = lerp(s.primary, Color.Black, 0.65f),
-        primaryContainer = lerp(s.primary, Color.Black, 0.45f),
+        primaryContainer = primaryContainer,
         onPrimaryContainer = lerp(s.primary, Color.White, 0.8f),
-        secondary = lerp(s.secondary, Color.White, 0.45f),
+        secondary = text(lerp(s.secondary, Color.White, 0.45f)),
         onSecondary = lerp(s.secondary, Color.Black, 0.65f),
-        secondaryContainer = lerp(s.secondary, Color.Black, 0.45f),
+        secondaryContainer = secondaryContainer,
         onSecondaryContainer = lerp(s.secondary, Color.White, 0.8f),
-        tertiary = lerp(s.tertiary, Color.White, 0.45f),
+        tertiary = text(lerp(s.tertiary, Color.White, 0.45f)),
         onTertiary = lerp(s.tertiary, Color.Black, 0.65f),
-        tertiaryContainer = lerp(s.tertiary, Color.Black, 0.45f),
+        tertiaryContainer = tertiaryContainer,
         onTertiaryContainer = lerp(s.tertiary, Color.White, 0.8f),
         background = night,
-        onBackground = NightInk,
+        onBackground = ink,
         surface = night,
-        onSurface = NightInk,
-        surfaceVariant = lerp(lerp(night, s.primary, 0.2f), Color.White, 0.1f),
-        onSurfaceVariant = Color(0xFFC3BBAC),
-        surfaceContainerLowest = lerp(night, Color.Black, 0.3f),
-        surfaceContainerLow = lerp(lerp(night, s.primary, 0.06f), Color.White, 0.03f),
-        surfaceContainer = lerp(lerp(night, s.primary, 0.08f), Color.White, 0.05f),
-        surfaceContainerHigh = lerp(lerp(night, s.primary, 0.10f), Color.White, 0.08f),
-        surfaceContainerHighest = lerp(lerp(night, s.primary, 0.12f), Color.White, 0.11f),
-        outline = lerp(Color(0xFF8B8578), s.primary, 0.3f),
+        onSurface = ink,
+        surfaceVariant = variant,
+        onSurfaceVariant = text(Color(0xFFC3BBAC)),
+        surfaceContainerLowest = lowest,
+        surfaceContainerLow = surfaces[0],
+        surfaceContainer = surfaces[1],
+        surfaceContainerHigh = surfaces[2],
+        surfaceContainerHighest = surfaces[3],
+        outline = readable(lerp(Color(0xFF8B8578), s.primary, 0.3f), backdrops, min = 3f, toward = Color.White),
         outlineVariant = lerp(night, lerp(s.primary, Color.White, 0.4f), 0.22f),
-        error = Color(0xFFF0A08B),
+        error = text(Color(0xFFF0A08B)),
         onError = Color(0xFF4D1A0E),
-        errorContainer = Color(0xFF6E3324),
+        errorContainer = DarkErrorContainer,
         onErrorContainer = Color(0xFFF7DCD3),
+        inverseSurface = NightInk,
+        inverseOnSurface = night,
+        inversePrimary = readable(s.primary, listOf(NightInk)),
+        surfaceTint = s.primary,
     )
 }
 
 private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
     val p = if (dark) s.petals.map { lerp(it, Color.White, 0.08f) } else s.petals
-    val background = if (dark) lerp(Color(0xFF1A1D1B), s.primary, 0.14f) else s.background
+    val background = if (dark) nightOf(s) else s.background
+    val leaf = if (dark) lerp(s.leaf, Color.Black, 0.08f) else s.leaf
+    val cardTint = cardTintOf(s, dark)
+    // Charts and progress carry meaning, so they need 3:1 against whatever they're drawn on (WCAG 1.4.11).
+    val scheme = if (dark) darkScheme(s) else lightScheme(s)
+    val surfaces = with(scheme) {
+        listOf(
+            background, surfaceVariant, surfaceContainerLowest, surfaceContainerLow, surfaceContainer, surfaceContainerHigh,
+            surfaceContainerHighest, primaryContainer, secondaryContainer, tertiaryContainer, errorContainer, cardTint,
+        )
+    }
+    fun visible(color: Color) = readable(color, surfaces, min = 3f, toward = if (dark) Color.White else Color.Black)
     return GardenColors(
         petalPink = p[0],
         petalLavender = p[1],
         petalHoney = p[2],
         petalPeach = p[3],
         petalSky = p[4],
-        leaf = if (dark) lerp(s.leaf, Color.Black, 0.08f) else s.leaf,
+        leaf = leaf,
         leafDark = if (dark) lerp(s.leaf, Color.White, 0.25f) else lerp(s.leaf, Color.Black, 0.3f),
         stem = lerp(s.leaf, Color.Black, 0.18f),
         soil = if (dark) Color(0xFF6B5B47) else Color(0xFFB9A285),
         sky = if (dark) lerp(background, Color.White, 0.04f) else lerp(background, Color(0xFFE6DCC8), 0.3f),
         wilted = if (dark) Color(0xFF7D7363) else Color(0xFFC2B49A),
-        cardTint = if (dark) lerp(lerp(background, s.primary, 0.08f), Color.White, 0.06f) else lerp(background, Color.White, 0.5f),
+        cardTint = cardTint,
+        growth = visible(leaf),
+        growthHigh = visible(p[0]),
     )
 }
 

@@ -396,9 +396,14 @@ Java 21 or newer and Node 24.
 ```bash
 cd backend
 npm ci && npm --prefix functions ci
-node build-functions.cjs
-npx firebase emulators:start --only auth,firestore,functions,storage --project demo-meadow
+npm run emulators              # or `just emulators`
 ```
+
+The first start adds demo people: Sam (with two Bumblebees, limits, a week of screen time, an
+open request and a chat), Bee, Robin and Kai. Sign in as `sam@meadow.test`, `bee@meadow.test`,
+`robin@meadow.test` or `kai@meadow.test` with the password `meadow-demo`. Everything you do is
+saved in `backend/.emulator-data/` when you stop the emulators (Ctrl+C) and comes back next
+time; `npm run emulators -- --fresh` starts over.
 
 In another terminal, point a debug build at them (`10.0.2.2` is your computer, as seen from an
 Android emulator):

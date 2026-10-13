@@ -119,7 +119,7 @@ export function updateInboxes(
 export async function existingInboxes(tx: Transaction, requestId: string, approverIds: string[]): Promise<string[]> {
   if (approverIds.length === 0) return [];
   const snaps = await tx.getAll(...approverIds.map((b) => inboxRef(b, requestId)));
-  return approverIds.filter((_, i) => snaps[i].exists);
+  return approverIds.filter((_, i) => snaps[i]?.exists === true);
 }
 
 export const createRequest = onCall(async (call) => {

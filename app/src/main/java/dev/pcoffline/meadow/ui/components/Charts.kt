@@ -30,7 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.luminance
+import dev.pcoffline.meadow.ui.theme.contentOn
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +67,7 @@ fun StalkBarChart(
             values.forEachIndexed { i, v ->
                 val barHeight = (v / max) * size.height * progress.value
                 val x = slot * i + (slot - barWidth) / 2f
-                val color = if (i == highlightIndex) garden.petalPink else garden.leaf
+                val color = if (i == highlightIndex) garden.growthHigh else garden.growth
                 drawRoundRect(
                     color = color.copy(alpha = 0.18f),
                     topLeft = Offset(x, 0f),
@@ -123,15 +123,15 @@ fun StalkBarChart(
     }
 }
 
-/** A soft progress bar; turns pink, then terracotta as it fills. */
+/** A soft progress bar; turns pink, then terracotta as it fills. Every fill stands out from its track (3:1). */
 @Composable
 fun GrowthBar(fraction: Float, modifier: Modifier = Modifier, height: Dp = 10.dp, color: Color? = null) {
     val garden = Garden.colors
     val f = fraction.coerceIn(0f, 1f)
     val fill = color ?: when {
         f >= 1f -> MaterialTheme.colorScheme.error
-        f >= 0.8f -> garden.petalPink
-        else -> garden.leaf
+        f >= 0.8f -> garden.growthHigh
+        else -> garden.growth
     }
     Box(
         modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(50))
@@ -172,11 +172,7 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
                                 contentAlignment = Alignment.Center,
                             ) {
                                 // Judged from the actual square, since the dark theme's green is light.
-                                Text(
-                                    labels[index],
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (fill.luminance() > 0.4f) Color(0xFF1A1C18) else Color.White,
-                                )
+                                Text(labels[index], style = MaterialTheme.typography.labelSmall, color = contentOn(fill))
                             }
                         }
                     }

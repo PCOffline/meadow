@@ -106,7 +106,7 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.secondary,
                         )
-                        GrowthBar(stats.leniency / 100f, color = Garden.colors.leaf, modifier = Modifier.padding(top = 6.dp))
+                        GrowthBar(stats.leniency / 100f, color = Garden.colors.growth, modifier = Modifier.padding(top = 6.dp))
                         Text(
                             stringResource(R.string.bee_stats_leniency_how),
                             style = MaterialTheme.typography.bodySmall,

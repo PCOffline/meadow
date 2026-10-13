@@ -1,4 +1,6 @@
 [versions]
+# Unit test coverage (AGP runs it). 0.8.14 is the first with Java 25 support.
+jacoco = "0.8.14"
 agp = "9.4.0"
 kotlin = "2.4.21"
 googleServices = "4.5.0"

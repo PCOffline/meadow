@@ -1,9 +1,10 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
-import { accountOf, accountRef, chats, db, heartbeats, loadPerson, notify, profileOf, users } from "./db";
+import { accountOf, accountRef, chats, db, heartbeats, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
 import { finishDueRemovals } from "./social";
 
@@ -108,8 +109,7 @@ export const expireRequests = onSchedule("every 5 minutes", async () => {
 });
 
 /** Hourly housekeeping: finish Bumblebee removals, notice quiet phones. */
-export const hourlyCare = onSchedule("every 60 minutes", async () => {
-  const now = Date.now();
+export async function housekeeping(now: number) {
   const migrated = await migrateProfiles();
 
   const removed = await finishDueRemovals(now);
@@ -133,5 +133,22 @@ export const hourlyCare = onSchedule("every 60 minutes", async () => {
     back.docs.forEach((d) => batch.update(d.ref, { staleNotified: false }));
     await batch.commit();
   }
-  logger.info("Hourly care done", { migrated, removed, quiet: quiet.size, recovered: back.size });
+  const done = { migrated, removed, quiet: quiet.size, recovered: back.size };
+  logger.info("Hourly care done", done);
+  return done;
+}
+
+export const hourlyCare = onSchedule("every 60 minutes", async () => {
+  await housekeeping(Date.now());
 });
+
+/**
+ * Emulator only, for integration tests: the emulators don't run schedules, so this runs the
+ * scheduled jobs on demand, as if it were [now]. It doesn't exist in a deployed project.
+ */
+export const runSchedulesForTests = isEmulator()
+  ? onCall(async (req) => {
+    const now = typeof req.data?.now === "number" ? req.data.now : Date.now();
+    return { expired: await expireStaleRequests(now), ...(await housekeeping(now)) };
+  })
+  : undefined;

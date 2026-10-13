@@ -53,6 +53,7 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.Avatar
+import dev.pcoffline.meadow.data.Photos
 import dev.pcoffline.meadow.ui.theme.AvatarColor
 import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -149,9 +150,10 @@ fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp
     val semantics = if (contentDescription != null) Modifier.clearAndSetSemantics { this.contentDescription = contentDescription } else Modifier
     Box(modifier.size(size).clip(CircleShape).background(circle).then(semantics), contentAlignment = Alignment.Center) {
         Text(avatar.emoji, fontSize = (size.value * 0.5f).sp)
-        if (avatar.photoUrl != null) {
+        val photo = remember(avatar.photoUrl) { Photos.safe(avatar.photoUrl) }
+        if (photo != null) {
             AsyncImage(
-                model = avatar.photoUrl,
+                model = photo,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
