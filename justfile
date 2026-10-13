@@ -47,14 +47,14 @@ install-local host="10.0.2.2":
 # Follow the app's log
 [group('app')]
 logs:
-    adb logcat -s MeadowTrace MeadowSync MeadowBackend MeadowFirestore MeadowSocial
+    adb logcat -s MeadowTrace MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian
 
 # Follow the app's log plus the Firestore SDK's own (trace builds; very verbose)
 [group('app')]
 logs-firestore:
     adb logcat -s MeadowTrace Firestore
 
-# Everything CI checks, except the end-to-end tests
+# Android lint and every test suite (CI also runs the end-to-end tests)
 [group('test')]
 check: lint test
 
