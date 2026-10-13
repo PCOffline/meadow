@@ -30,9 +30,14 @@ import kotlinx.coroutines.withContext
  * it also keeps the settings pages that could switch Meadow off out of reach.
  */
 class GuardianAccessibilityService : AccessibilityService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Background work: budget watchers and strict-mode reads; internal so tests can wait for it. */
+    internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var currentPackage: String? = null
     private var lastStrictCheck = 0L
+
+    /** The strict-mode read of the screen in progress, and a screen to read once it ends. */
+    private var strictJob: Job? = null
+    private var strictRecheck: String? = null
     private val activityCache = LruCache<String, Boolean>(256)
 
     /** Limited apps on screen besides the main one: the other split-screen half, a floating window. */
@@ -184,16 +189,37 @@ class GuardianAccessibilityService : AccessibilityService() {
     private fun checkStrict(pkg: String, force: Boolean) {
         val now = System.currentTimeMillis()
         if (!force && now - lastStrictCheck < 700) return
+        if (strictJob?.isActive == true) {
+            // One read at a time; the screen is read again as soon as this one ends.
+            strictRecheck = pkg
+            return
+        }
         lastStrictCheck = now
-        val root = rootInActiveWindow ?: return
+        // Reading the screen asks the app for every node, so it happens off the main thread.
+        strictJob = scope.launch {
+            val blocked = readsAsGuarded(pkg)
+            withContext(Dispatchers.Main) {
+                if (blocked) {
+                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    Toast.makeText(this@GuardianAccessibilityService, R.string.strict_mode_blocked, Toast.LENGTH_LONG).show()
+                }
+                strictJob = null
+                strictRecheck?.let {
+                    strictRecheck = null
+                    if (AppGraph.store.strictMode.value) checkStrict(it, force = true)
+                }
+            }
+        }
+    }
+
+    /** Whether the active window shows one of the screens strict mode keeps out of reach. */
+    private fun readsAsGuarded(pkg: String): Boolean {
+        val root = rootInActiveWindow ?: return false
         val text = StringBuilder()
         collectText(root, text, IntArray(1) { 600 })
         val screen = text.toString().lowercase()
-        if (StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase(), localWords = settingsWords)) {
-            performGlobalAction(GLOBAL_ACTION_BACK)
-            performGlobalAction(GLOBAL_ACTION_HOME)
-            Toast.makeText(this, R.string.strict_mode_blocked, Toast.LENGTH_LONG).show()
-        }
+        return StrictModeRules.shouldBlock(pkg, screen, appLabel = getString(R.string.app_name).lowercase(), localWords = settingsWords)
     }
 
     /** Settings' own words for "Force stop", "Uninstall" and so on, in the phone's language. */
