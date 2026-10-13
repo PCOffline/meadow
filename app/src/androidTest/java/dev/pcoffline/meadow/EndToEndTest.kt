@@ -1,11 +1,13 @@
 package dev.pcoffline.meadow
 
+import android.app.Activity
 import android.app.Application
 import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -17,7 +19,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
@@ -64,6 +72,27 @@ abstract class EndToEndTest {
         }.distinct().joinToString(" | ").replace('\n', ' ').take(1500)
     }.getOrElse { "(couldn't read the screen: $it)" }
 
+    /** Types into [field], then closes the keyboard, which could otherwise cover what's tapped next. */
+    protected fun typeInto(field: SemanticsMatcher, value: String) {
+        compose.onNode(field).performTextInput(value)
+        hideKeyboard()
+    }
+
+    private fun hideKeyboard() {
+        val ime = WindowInsetsCompat.Type.ime()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        fun onScreen(block: (Activity) -> Unit) = instrumentation.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull()?.let(block)
+        }
+        onScreen { WindowCompat.getInsetsController(it.window, it.window.decorView).hide(ime) }
+        compose.waitUntil(5_000) {
+            var open = false
+            onScreen { open = ViewCompat.getRootWindowInsets(it.window.decorView)?.isVisible(ime) == true }
+            !open
+        }
+        compose.waitForIdle()
+    }
+
     /** Snackbars sit over the bottom of the screen; taps there would land on them. */
     protected fun waitForSnackbarToGo(@StringRes id: Int, vararg args: Any) =
         compose.waitUntil(15_000) { compose.onAllNodesWithText(text(id, *args)).fetchSemanticsNodes().isEmpty() }
@@ -101,7 +130,7 @@ abstract class EndToEndTest {
         node(R.string.intro_next).performClick()
         node(R.string.intro_next).performClick()
         node(R.string.intro_begin).performClick()
-        compose.onNode(hasSetTextAction() and hasText(text(R.string.onboarding_name_label))).performTextInput(name)
+        typeInto(hasSetTextAction() and hasText(text(R.string.onboarding_name_label)), name)
         node(R.string.legal_agree).performScrollTo().performClick()
         node(R.string.onboarding_plant).performScrollTo().performClick()
         waitFor(R.string.setup_later)

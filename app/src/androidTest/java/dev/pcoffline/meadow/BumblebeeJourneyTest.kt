@@ -12,7 +12,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.auth.FirebaseAuth
@@ -66,7 +65,7 @@ class BumblebeeJourneyTest : EndToEndTest() {
             waitFor(R.string.circle_title)
             val joinField = hasSetTextAction() and hasText(text(R.string.join_link_placeholder))
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
-            compose.onNode(joinField).performTextInput("Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
+            typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
             node(R.string.join_link_button).performClick()
             waitForText(text(R.string.accept_invite_title, "Sam"))
             compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()

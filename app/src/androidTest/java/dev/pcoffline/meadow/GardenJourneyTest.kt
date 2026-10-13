@@ -36,7 +36,7 @@ class GardenJourneyTest : EndToEndTest() {
             node(R.string.intro_next).performClick()
             node(R.string.intro_next).performClick()
             node(R.string.intro_begin).performClick()
-            compose.onNode(hasSetTextAction() and hasText(text(R.string.onboarding_name_label))).performTextInput("Robin")
+            typeInto(hasSetTextAction() and hasText(text(R.string.onboarding_name_label)), "Robin")
             node(R.string.legal_agree).performScrollTo().performClick()
             node(R.string.onboarding_plant).performScrollTo().performClick()
 
@@ -54,7 +54,7 @@ class GardenJourneyTest : EndToEndTest() {
             waitForText("Robin", substring = true)
             compose.assertAccessible(compose.density)
             compose.onNodeWithContentDescription(text(R.string.profile_open)).performClick()
-            compose.onNode(hasSetTextAction() and hasText(text(R.string.profile_bio))).performTextInput("Growing calmer days")
+            typeInto(hasSetTextAction() and hasText(text(R.string.profile_bio)), "Growing calmer days")
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.profile_saved)
             waitForSnackbarToGo(R.string.profile_saved)
