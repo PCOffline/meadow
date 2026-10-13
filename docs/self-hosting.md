@@ -503,13 +503,14 @@ This takes effect at once, without deploying again, and later deploys keep it. T
 
 **The functions can't reach Firestore** (their log says `7 PERMISSION_DENIED: Missing or
 insufficient permissions`, and the app gets `INTERNAL`). The functions run as the Compute Engine
-default service account. Newer Google Cloud projects give it no roles, as with the Cloud Build
+default service account (`<project-number>-compute@developer.gserviceaccount.com`). Newer Google Cloud projects give it no roles, as with the Cloud Build
 role above. Grant it only what the functions use: Firestore, Storage (data exports),
 Authentication (deleting accounts), Cloud Messaging (notifications), and calling the functions
 from Firestore triggers and schedules:
 
 ```bash
-SA=<project-number>-compute@developer.gserviceaccount.com
+SA=$(gcloud run services describe createprofile --region=<region> --project=<project-id> \
+  --format='value(spec.template.spec.serviceAccountName)')
 for role in roles/datastore.user roles/storage.objectAdmin roles/firebaseauth.admin \
   roles/firebasecloudmessaging.admin roles/eventarc.eventReceiver roles/run.invoker; do
   gcloud projects add-iam-policy-binding <project-id> --member="serviceAccount:$SA" \
