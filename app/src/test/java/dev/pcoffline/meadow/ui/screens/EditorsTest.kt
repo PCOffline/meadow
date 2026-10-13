@@ -111,7 +111,7 @@ class EditorsTest : ScreenTest() {
     }
 
     @Test
-    fun `the same hours every day: presets, adding hours and resting all day`() {
+    fun `the same hours every day - presets, adding hours and resting all day`() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow.ALL_DAY))
         show { ScheduleEditor(schedule) { schedule = it } }
         compose.onNodeWithText(text(R.string.schedule_every_day)).assertIsSelected()
@@ -135,7 +135,7 @@ class EditorsTest : ScreenTest() {
     }
 
     @Test
-    fun `per weekday: changing one day leaves the others as they were`() {
+    fun `per weekday, changing one day leaves the others as they were`() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 21 * 60)))
         show { ScheduleEditor(schedule) { schedule = it } }
         node(R.string.schedule_per_day).performClick()
