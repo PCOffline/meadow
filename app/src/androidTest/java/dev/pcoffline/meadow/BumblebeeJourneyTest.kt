@@ -61,9 +61,9 @@ class BumblebeeJourneyTest : EndToEndTest() {
             startAsGuest("Bee")
             val me = FirebaseAuth.getInstance().currentUser!!.uid
 
-            // The invite, pasted into the circle screen.
+            // The invite, pasted into the circle screen (below the fold, so scrolled to first).
             node(R.string.tab_circle).performClick()
-            waitFor(R.string.circle_join_title)
+            waitFor(R.string.circle_title)
             val joinField = hasSetTextAction() and hasText(text(R.string.join_link_placeholder))
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
             compose.onNode(joinField).performTextInput("Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
