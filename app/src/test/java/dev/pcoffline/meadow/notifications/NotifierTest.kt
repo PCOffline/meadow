@@ -81,6 +81,39 @@ class NotifierTest {
         assertEquals(0, posted())
     }
 
+    private fun chatPush(to: String?): Map<String, String> = buildMap {
+        put("type", "chat")
+        put("chatId", "chat-1")
+        put("title", "Bee")
+        put("body", "Hello")
+        if (to != null) put("to", to)
+    }
+
+    @Test
+    fun `a push for the signed-in account is shown`() {
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = "sam")
+        assertEquals(1, posted())
+        assertEquals("Bee", shadowOf(manager).allNotifications.single().extras.getCharSequence("android.title").toString())
+    }
+
+    @Test
+    fun `a push for an account that used to be signed in here is dropped`() {
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = "alex")
+        assertEquals(0, posted())
+    }
+
+    @Test
+    fun `a push arriving while signed out is dropped`() {
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = null)
+        assertEquals(0, posted())
+    }
+
+    @Test
+    fun `a push that doesn't say who it is for is dropped`() {
+        notifier.fromPush(chatPush(to = null), signedInUid = "sam")
+        assertEquals(0, posted())
+    }
+
     @Test
     fun `an update is offered once with a way to open settings`() {
         notifier.updateAvailable("1.2.0")
