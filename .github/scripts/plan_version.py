@@ -63,9 +63,14 @@ def tag_pattern(component: Component) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(component.prefix)}(\d+)\.(\d+)\.(\d+)$")
 
 
-def latest(component: Component) -> tuple[str, Version] | None:
+def latest(component: Component, exclude: str = "") -> tuple[str, Version] | None:
+    """The highest version tag of [component], leaving out [exclude]."""
     pattern = tag_pattern(component)
-    tags = [(t, tuple(map(int, m.groups()))) for t in git("tag", "--list", f"{component.prefix}*").split() if (m := pattern.match(t))]
+    tags = [
+        (t, tuple(map(int, m.groups())))
+        for t in git("tag", "--list", f"{component.prefix}*").split()
+        if t != exclude and (m := pattern.match(t))
+    ]
     return max(tags, key=lambda t: t[1]) if tags else None  # type: ignore[return-value]
 
 
@@ -110,6 +115,8 @@ def plan(name: str, event: str, ref_name: str, sha: str, bump: str) -> dict[str,
         if name != "app" or not match:
             raise SystemExit(f"::error::Tag {ref_name} must look like v1.2.3")
         version: Version = tuple(map(int, match.groups()))  # type: ignore[assignment]
+        # The checkout already has the pushed tag: compare with the releases before it.
+        last = latest(component, exclude=ref_name)
         if last and version <= last[1]:
             raise SystemExit(f"::error::Tag {ref_name} must be above the latest release, {last[0]}")
         return result(True, "tag pushed", text(version), ref_name)
