@@ -116,7 +116,8 @@ Collections appear on their own as people use the app.
 2. Choose a location. `US-CENTRAL1`, `US-EAST1` and `US-WEST1` include a free allowance; other
    regions are billed from the first byte, but Meadow stores very little.
 3. Choose **Start in production mode** and **Create**. This makes the default bucket,
-   `<project-id>.firebasestorage.app`.
+   `<project-id>.firebasestorage.app`. Profile photos must live there (or in an older project's
+   `<project-id>.appspot.com`): the Firestore rules refuse photo links to any other bucket.
 
 Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which only lets
 people read and write their own photo and their own export files, and sets the bucket's lifecycle

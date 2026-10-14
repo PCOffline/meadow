@@ -14,6 +14,7 @@ interface Person {
 
 export const errors = {
   signIn: "Please sign in first.",
+  signInAgain: "For your safety, please sign out and sign in again, then try once more.",
   noProfile: "That person hasn't set up Meadow yet.",
   generic: "Something in that didn't look right. Please check it and try again.",
   needsEmail: "Add an email to your account first, so your garden can't get lost.",
@@ -24,6 +25,7 @@ export const errors = {
   codeRequired: "Enter your friend's code.",
   codeUnknown: "No one has that code. Could you double-check it?",
   ownCode: "That's your own code. 🌼",
+  tooManyCodes: "You've tried a lot of friend codes today. Please try again tomorrow, or send an invite link instead. 🐝",
   alreadyBumblebee: (name: string) => `${name} is already your Bumblebee.`,
   alreadyInvited: (name: string) => `You've already invited ${name}.`,
   inviteGone: "That invite isn't around anymore.",

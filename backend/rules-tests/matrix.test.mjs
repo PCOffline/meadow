@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import {
-  collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, where,
+  collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where,
 } from "firebase/firestore";
 
 let env;
@@ -149,7 +149,7 @@ describe("writing someone else's data", () => {
       for (const who of PEOPLE.filter((p) => p !== "sam")) {
         const data = path.includes("limits")
           ? { packageName: "com.new", appName: "New", dailyMinutes: 10, weeklyMinutes: 0 }
-          : path.includes("alerts") ? { kind: "protection_off", createdAt: Timestamp.now() } : { totalMinutes: 1 };
+          : path.includes("alerts") ? { kind: "protection_off", createdAt: serverTimestamp() } : { totalMinutes: 1 };
         if (await allowed(setDoc(doc(dbOf(who), path), data))) wrong.push(`${who} created ${path}`);
       }
     }
