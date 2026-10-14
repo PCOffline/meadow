@@ -1,0 +1,40 @@
+# detekt checks the app's Kotlin for likely bugs: coroutine misuse, wrong exception handling,
+# needless work in hot paths. Style is left to Android lint and review, so the style, naming,
+# complexity and comments rule sets are off.
+config:
+  validation: true
+
+style:
+  active: false
+naming:
+  active: false
+complexity:
+  active: false
+comments:
+  active: false
+
+exceptions:
+  # Catching Exception after re-throwing CancellationException is how the app turns any failure
+  # into a message (see runCatchingCancellable); the coroutine rules below catch the bad cases.
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: false
+
+coroutines:
+  # Dispatchers are fine to name directly in an app without dependency injection.
+  InjectDispatcher:
+    active: false
+  SuspendFunSwallowedCancellation:
+    active: true
+  SuspendFunWithCoroutineScopeReceiver:
+    active: true
+
+potential-bugs:
+  # Every finding should be an error worth fixing.
+  CastNullableToNonNullableType:
+    active: true
+  DontDowncastCollectionTypes:
+    active: true
+  ElseCaseInsteadOfExhaustiveWhen:
+    active: false

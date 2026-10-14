@@ -34,6 +34,8 @@ jobs:
           else
             echo "No GOOGLE_SERVICES_JSON secret; building without a backend"
           fi
+      - name: Static analysis (detekt, likely bugs only)
+        run: .github/scripts/detekt.sh
       - name: Build, unit test and lint
         run: ./gradlew assembleDebug assembleRelease createDebugUnitTestCoverageReport lintDebug --stacktrace
       - name: Unit test coverage floor
@@ -70,6 +72,8 @@ jobs:
           ./actionlint -color
       - name: Check shell scripts (shellcheck)
         run: find . -name '*.sh' -not -path '*/node_modules/*' -print0 | xargs -0 -r shellcheck
+      - name: Check the Python scripts (ruff)
+        run: pipx run ruff==0.17.0 check .github/scripts docs/art
       - name: Check the CI Python scripts
         run: |
           python3 -m py_compile .github/scripts/*.py
@@ -88,6 +92,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/functions/package-lock.json
       - run: npm ci
+      - name: Lint with type information (oxlint)
+        run: npm run lint
       - name: Build and unit test
         run: npm test
 
@@ -108,6 +114,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - name: Lint the functions, deploy scripts and tests (Biome)
+        run: npm run lint
       - name: Security rules tests (Firestore and Storage emulators)
         run: npm run test:rules
       - name: Hosted legal pages
