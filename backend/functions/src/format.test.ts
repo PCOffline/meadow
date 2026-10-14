@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatIdFor, formatMinutes, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, summarize } from "./format";
+import { chatIdFor, formatMinutes, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, storedAppName, summarize } from "./format";
 
 test("formats minutes like the app does", () => {
   assert.equal(formatMinutes(0), "0m");
@@ -40,4 +40,14 @@ test("invite tokens are long and URL-safe", () => {
 
 test("chat ids don't depend on who starts", () => {
   assert.equal(chatIdFor("b", "a"), chatIdFor("a", "b"));
+});
+
+test("app names come from the stored limit, never from what the phone says", () => {
+  const limit = (data: Record<string, unknown>) => ({ get: (field: string) => data[field] });
+  assert.equal(storedAppName(limit({ appName: "Instagram" }), "com.instagram.android"), "Instagram");
+  // No limit, or one without a usable name: the package name, which can't be dressed up.
+  assert.equal(storedAppName(null, "com.instagram.android"), "com.instagram.android");
+  assert.equal(storedAppName(limit({}), "com.instagram.android"), "com.instagram.android");
+  assert.equal(storedAppName(limit({ appName: " " }), "com.instagram.android"), "com.instagram.android");
+  assert.equal(storedAppName(limit({ appName: 42 }), "com.instagram.android"), "com.instagram.android");
 });
