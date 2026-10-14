@@ -297,6 +297,28 @@ describe("chats", () => {
     await assertSucceeds(updateDoc(chat, { "lastRead.sam": serverTimestamp() }));
   });
 
+  test("once the two part ways, the chat is closed: read-only for them, still shut to everyone else", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "chats/bee_sam/messages/m1"), { senderId: "bee", text: "Hi", kind: "text", createdAt: Timestamp.now() });
+      await updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { closed: true });
+    });
+    const message = (sender) => ({ senderId: sender, text: "Still there?", kind: "text", createdAt: serverTimestamp() });
+    for (const uid of ["sam", "bee"]) {
+      await assertSucceeds(getDoc(doc(as(uid), "chats/bee_sam")));
+      await assertSucceeds(getDoc(doc(as(uid), "chats/bee_sam/messages/m1")));
+      await assertFails(addDoc(collection(as(uid), "chats/bee_sam/messages"), message(uid)));
+      await assertFails(updateDoc(doc(as(uid), "chats/bee_sam"), { lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: uid }));
+      await assertFails(updateDoc(doc(as(uid), "chats/bee_sam"), { [`lastRead.${uid}`]: serverTimestamp() }));
+      await assertFails(updateDoc(doc(as(uid), "chats/bee_sam"), { closed: false }));
+    }
+    await assertFails(getDoc(doc(as("stranger"), "chats/bee_sam")));
+    await assertFails(getDoc(doc(as("stranger"), "chats/bee_sam/messages/m1")));
+
+    // Joining up again opens it.
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { closed: false }));
+    await assertSucceeds(addDoc(collection(as("bee"), "chats/bee_sam/messages"), message("bee")));
+  });
+
   test("you can't put words in the other person's mouth or mark their messages read", async () => {
     await env.withSecurityRulesDisabled((ctx) =>
       updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { lastMessage: "Hello", lastSenderId: "bee", lastMessageAt: Timestamp.now() }));
