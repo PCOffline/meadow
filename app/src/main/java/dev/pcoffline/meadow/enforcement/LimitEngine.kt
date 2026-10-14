@@ -9,6 +9,7 @@ import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.usage.AppCatalog
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
+import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /** Where one limited app stands right now. */
@@ -188,12 +189,13 @@ class LimitEngine(
         val today = Days.today()
         val windows = schedule.windowsOn(today.dayOfWeek.value)
         return insideHours[windows] ?: run {
-            val start = Days.startMillis(today)
+            val zone = ZoneId.systemDefault()
             val totals = HashMap<String, Long>()
             for (w in windows) {
-                val from = start + w.from * AppBudget.MINUTE
+                val from = TimeWindow.edge(today, w.from, zone).toInstant().toEpochMilli()
                 if (from >= measuredAt) continue
-                tracker.usageBetween(from, minOf(start + w.to * AppBudget.MINUTE, measuredAt))
+                val to = TimeWindow.edge(today, w.to, zone).toInstant().toEpochMilli()
+                tracker.usageBetween(from, minOf(to, measuredAt))
                     .forEach { (p, ms) -> totals[p] = totals[p].orZero() + ms }
             }
             totals.also { insideHours = insideHours + (windows to it) }
