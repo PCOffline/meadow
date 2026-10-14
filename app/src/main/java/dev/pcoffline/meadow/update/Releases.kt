@@ -81,7 +81,4 @@ object Releases {
             pageUrl = release.pageUrl,
         )
     }
-
-    /** Android versionCode for a version name, matching the release build's calculation. */
-    fun versionCode(version: Version): Int = version.major * 1_000_000 + version.minor * 1_000 + version.patch
 }

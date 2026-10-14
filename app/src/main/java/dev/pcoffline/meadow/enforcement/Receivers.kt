@@ -8,10 +8,20 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.work.SyncWorker
 
+/** Starts the guardian again after the phone restarts or Meadow is updated. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Exported for the system's broadcasts, so any app could also call it directly with
+        // another action. Only the two the manifest declares, both sent only by the system, count.
+        if (!handles(intent.action)) return
         GuardianService.start(context)
         SyncWorker.schedule(context)
+    }
+
+    companion object {
+        private val ACTIONS = setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED)
+
+        internal fun handles(action: String?): Boolean = action in ACTIONS
     }
 }
 

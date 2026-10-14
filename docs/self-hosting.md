@@ -314,7 +314,8 @@ add each of these:
 The app and the backend have their own versions, both following
 [semantic versioning](https://semver.org): the app's releases are tagged `v0.4.2`, the backend's
 deploys `backend-v0.7.0` (7.6). The latest tag is the source of truth: each new version is it,
-raised by one part. Both start at 0.1.0.
+raised by one part. Both start at 0.1.0. The app's minor and patch parts stay below 1000: Android's
+version code is major × 1,000,000 + minor × 1,000 + patch, and the build stops at 1000.
 
 Automatic runs raise a version only when that part of Meadow changed, by the commits that changed
 it:
