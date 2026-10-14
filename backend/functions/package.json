@@ -11,7 +11,8 @@
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions,firestore",
     "logs": "firebase functions:log",
-    "test": "npm run build && node --test --experimental-test-coverage --test-coverage-include=lib/copy.js --test-coverage-include=lib/format.js --test-coverage-include=lib/schedule.js --test-coverage-include=lib/schemas.js --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=95 \"lib/**/*.test.js\""
+    "test": "npm run build && node --test --experimental-test-coverage --test-coverage-include=lib/copy.js --test-coverage-include=lib/format.js --test-coverage-include=lib/schedule.js --test-coverage-include=lib/schemas.js --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=95 \"lib/**/*.test.js\"",
+    "lint": "oxlint --type-aware --deny-warnings src"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",
@@ -20,6 +21,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
     "typescript": "^7.0.2"
   }
 }
