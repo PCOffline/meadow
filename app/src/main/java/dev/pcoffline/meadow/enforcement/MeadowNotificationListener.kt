@@ -9,16 +9,27 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import dev.pcoffline.meadow.AppGraph
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Keeps resting apps quiet: their notifications are hidden as they arrive and their media is
  * paused, so a resting app can't be used from the shade, a media player or a floating window.
+ *
+ * Callbacks arrive on the main thread, but working out whether an app is resting can read the
+ * usage log, so that work runs on [scope] instead.
  */
 class MeadowNotificationListener : NotificationListenerService() {
 
+    /** Where budgets are checked and notifications hidden; internal so tests can wait for it. */
+    internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     override fun onListenerConnected() {
         instance = this
-        sweep()
+        scope.launch { sweep() }
     }
 
     override fun onListenerDisconnected() {
@@ -27,13 +38,18 @@ class MeadowNotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         if (instance === this) instance = null
+        scope.cancel()
         super.onDestroy()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName == packageName || !resting(sbn.packageName)) return
-        quiet(sbn)
-        pauseMedia(this, setOf(sbn.packageName))
+        val pkg = sbn.packageName
+        if (pkg == packageName || !hasLimit(pkg)) return
+        scope.launch {
+            if (!resting(pkg)) return@launch
+            quiet(sbn)
+            pauseMedia(this@MeadowNotificationListener, setOf(pkg))
+        }
     }
 
     /** Hides what every resting app is showing right now. */
@@ -52,7 +68,10 @@ class MeadowNotificationListener : NotificationListenerService() {
         runCatching { cancelNotification(sbn.key) }.onFailure { Log.w(TAG, "Could not hide a notification", it) }
     }
 
-    private fun resting(pkg: String): Boolean = AppGraph.engine.budget(pkg)?.exhausted == true
+    /** Only apps with a stored limit can rest; checked without the engine's lock or the usage log. */
+    private fun hasLimit(pkg: String): Boolean = AppGraph.store.limits.value.any { it.packageName == pkg }
+
+    private fun resting(pkg: String): Boolean = hasLimit(pkg) && AppGraph.engine.budget(pkg)?.exhausted == true
 
     companion object {
         private const val TAG = "MeadowListener"
