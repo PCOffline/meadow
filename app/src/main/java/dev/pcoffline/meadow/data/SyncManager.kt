@@ -9,9 +9,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -90,19 +91,10 @@ class SyncManager(
         var appearanceSynced = false
         // The name card plus the owner-only account (who looks after whom, settings, status).
         combine(backend.user(uid).tracedSnapshots(), backend.account(uid).tracedSnapshots()) { doc, accountDoc -> doc to accountDoc }
-            .catch { e ->
-                // Without this the app would wait forever. A profile already shown stays, so
-                // limits keep working; the cause is logged for whoever runs the backend.
-                Log.w(TAG, "Profile listener failed", e)
-                if (_profile.value !is ProfileState.Ready) {
-                    _profile.value = ProfileState.Unavailable(e)
-                    auth.finishCreatingProfile()
-                }
-            }
-            .collect { (doc, accountDoc) ->
+            .onEach { (doc, accountDoc) ->
                 if (!doc.exists()) {
                     if (!doc.metadata.isFromCache && !leaving) _profile.value = ProfileState.Missing
-                    return@collect
+                    return@onEach
                 }
                 val account = if (accountDoc.exists()) accountDoc.toAccount() else Account()
                 val profile = doc.toProfile(accountDoc)
@@ -131,28 +123,41 @@ class SyncManager(
                     scope.launch { runCatchingCancellable { AppGraph.emergency.flushPending() } }
                 }
             }
+            .relisten("Profile listener") { e ->
+                // Without this the app would wait forever. A profile already shown stays, so
+                // limits keep working, and the listener tries again until it's back.
+                if (_profile.value !is ProfileState.Ready) {
+                    _profile.value = ProfileState.Unavailable(e)
+                    auth.finishCreatingProfile()
+                }
+            }
+            .collect()
     }
 
     private suspend fun syncLimits(uid: String) {
-        backend.user(uid).collection("limits").observe().collect { snapshot ->
+        // Stored in onEach, before relisten, so a snapshot that can't be stored is retried like a
+        // dropped listener rather than ending sync.
+        backend.user(uid).collection("limits").tracedSnapshots().onEach { snapshot ->
             // An empty answer from a cold cache must not wipe commitments we already hold. One that
             // comes from this phone's own pending write (the last limit removed offline) is real.
             if (snapshot.isEmpty && snapshot.metadata.isFromCache && !snapshot.metadata.hasPendingWrites() &&
                 store.limits.value.isNotEmpty()
-            ) return@collect
+            ) return@onEach
             store.setLimits(snapshot.documents.map { it.toLimit() }.filter { it.packageName.isNotBlank() })
-        }
+        }.relisten("Limits listener").collect()
     }
 
     private suspend fun syncGrants(uid: String) {
         val since = Days.key(Days.today().minusDays(7))
         backend.user(uid).collection("grants")
             .whereGreaterThanOrEqualTo("dayKey", since)
-            .observe()
-            .collect { snapshot ->
-                if (snapshot.isEmpty && snapshot.metadata.isFromCache && store.grants.value.isNotEmpty()) return@collect
+            .tracedSnapshots()
+            .onEach { snapshot ->
+                if (snapshot.isEmpty && snapshot.metadata.isFromCache && store.grants.value.isNotEmpty()) return@onEach
                 store.setGrants(snapshot.documents.map { it.toGrant() })
             }
+            .relisten("Grants listener")
+            .collect()
     }
 
     /** Registers this phone for pushes and records its installation ID on the account. */

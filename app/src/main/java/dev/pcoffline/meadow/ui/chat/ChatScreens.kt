@@ -61,11 +61,12 @@ import dev.pcoffline.meadow.data.ChatMessage
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.UserProfile
-import dev.pcoffline.meadow.data.runCatchingCancellable
 import dev.pcoffline.meadow.ui.components.EmptyState
+import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.relativeTime
+import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -139,9 +140,7 @@ class ChatViewModel(private val chatId: String) : ViewModel() {
     val chat: StateFlow<LoadedChat?> = AppGraph.chats.chat(chatId).map { LoadedChat(it) }.stateWhileVisible(this, null)
     val messages: StateFlow<List<ChatMessage>> = AppGraph.chats.messages(chatId).stateWhileVisible(this, emptyList())
 
-    fun send(text: String) {
-        viewModelScope.launch { runCatchingCancellable { AppGraph.chats.send(chatId, text) } }
-    }
+    suspend fun send(text: String) = AppGraph.chats.send(chatId, text)
 
     fun markRead() {
         viewModelScope.launch { AppGraph.chats.markRead(chatId) }
@@ -157,14 +156,23 @@ fun ChatScreen(
 ) {
     val loaded by viewModel.chat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
-    LaunchedEffect(messages.size) { viewModel.markRead() }
-    ChatContent(profile, loaded?.chat, messages, loading = loaded == null, onSend = viewModel::send, onBack = onBack)
+    val sending = rememberAction()
+    ChatContent(
+        profile, loaded?.chat, messages, loading = loaded == null,
+        sending = sending.busy,
+        error = sending.error,
+        onSend = { text, sent -> sending.run(onSuccess = sent) { viewModel.send(text) } },
+        onSeen = viewModel::markRead,
+        onBack = onBack,
+    )
 }
 
 /**
  * A conversation, drawn from plain state (also used for previews and screenshots).
- * [requestCard] shows a request message (with whether you asked it); by default it follows the
- * live request.
+ * [onSend] gets the draft and a callback to run once it's sent, which clears the draft; until then
+ * (and if sending fails, shown as [error]) the draft stays. Sending is off while [sending].
+ * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
+ * message (with whether you asked it); by default it follows the live request.
  */
 @Composable
 fun ChatContent(
@@ -172,17 +180,25 @@ fun ChatContent(
     chat: Chat?,
     messages: List<ChatMessage>,
     loading: Boolean = false,
-    onSend: (String) -> Unit = {},
+    sending: Boolean = false,
+    error: String? = null,
+    onSend: (text: String, sent: () -> Unit) -> Unit = { _, sent -> sent() },
+    onSeen: () -> Unit = {},
     onBack: () -> Unit = {},
     requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    // Keyed on the newest message, not the count: only the latest 300 are loaded, so once a
+    // chat has that many a new message leaves the count as it was.
+    val latestId = messages.lastOrNull()?.id
+    LaunchedEffect(latestId) { onSeen() }
+
     // Opens at the latest message straight away. Later ones scroll into view only if you're
     // already at the bottom or sent it yourself, so reading back isn't interrupted.
     var opened by remember { mutableStateOf(false) }
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(latestId) {
         if (messages.isEmpty()) return@LaunchedEffect
         val last = messages.size - 1 + if (chat == null && !loading) 1 else 0
         if (!opened) {
@@ -211,6 +227,7 @@ fun ChatContent(
                 }
             }
         }
+        ErrorNote(error, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = draft,
@@ -225,10 +242,11 @@ fun ChatContent(
             Spacer(Modifier.width(8.dp))
             FilledIconButton(
                 onClick = {
-                    onSend(draft)
-                    draft = ""
+                    val text = draft
+                    // Anything typed while it was sending stays.
+                    onSend(text) { if (draft == text) draft = "" }
                 },
-                enabled = draft.isNotBlank() && chat != null,
+                enabled = draft.isNotBlank() && chat != null && !sending,
             ) { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.action_send)) }
         }
     }
