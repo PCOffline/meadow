@@ -3,8 +3,8 @@ package dev.pcoffline.meadow.a11y
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
-import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.SemanticsActions
@@ -108,49 +108,43 @@ private val ROBOLECTRIC = Build.FINGERPRINT == "robolectric"
 private fun dialogProblems(root: SemanticsNode): List<String> {
     // The window's own fade-in isn't something Compose waits for.
     SystemClock.sleep(WINDOW_SETTLE_MS)
-    clearWindowsAbove(root)
     val shot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         ?: throw AssertionError("Couldn't take a screenshot to measure a dialog")
     val screen = shot.copy(Bitmap.Config.ARGB_8888, false).asImageBitmap()
-    return TextContrast.problems(root, screen) { Rect(it.positionOnScreen, it.size.toSize()) }
+    val problems = TextContrast.problems(root, screen) { Rect(it.positionOnScreen, it.size.toSize()) }
+    return if (problems.isEmpty()) problems else listOf(whatWasMeasured(root, shot)) + problems
 }
 
 /**
- * A screenshot shows whatever is on top, so another app's window over the dialog (a slow
- * emulator's "System UI isn't responding", say) would be measured as the dialog's colours. Such
- * windows are closed first; one that won't close fails the test by name instead.
+ * What a failed dialog measurement looked at: the screenshot (kept on the device, under
+ * [SHOT_DIR], for CI to collect), where the dialog was and every window on screen.
  */
-private fun clearWindowsAbove(dialog: SemanticsNode) {
-    val instrumentation = InstrumentationRegistry.getInstrumentation()
-    val automation = instrumentation.uiAutomation
+private fun whatWasMeasured(dialog: SemanticsNode, shot: Bitmap): String {
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
     automation.serviceInfo = automation.serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS }
-    val ours = instrumentation.targetContext.packageName
-    val position = dialog.positionOnScreen
-    val area = android.graphics.Rect(
-        position.x.toInt(), position.y.toInt(),
-        position.x.toInt() + dialog.size.width, position.y.toInt() + dialog.size.height,
-    )
-    fun inTheWay(): List<String> {
-        val windows = automation.windows.map { it to it.root?.packageName?.toString() }
-        val top = windows.filter { (_, app) -> app == ours }.maxOfOrNull { (window, _) -> window.layer } ?: return emptyList()
-        return windows.filter { (window, app) ->
-            val bounds = android.graphics.Rect().also(window::getBoundsInScreen)
-            window.layer > top && app != ours && android.graphics.Rect.intersects(bounds, area) &&
-                window.type in setOf(AccessibilityWindowInfo.TYPE_APPLICATION, AccessibilityWindowInfo.TYPE_SYSTEM)
-        }.map { (window, app) -> "\"${window.title ?: "an untitled window"}\" (${app ?: "unknown app"})" }
+    val windows = automation.windows.joinToString("; ") { window ->
+        val bounds = android.graphics.Rect().also(window::getBoundsInScreen)
+        "${window.title} (${window.root?.packageName}, type ${window.type}, layer ${window.layer}) at $bounds"
     }
-    if (inTheWay().isEmpty()) return
-    automation.executeShellCommand("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS").close()
-    val deadline = SystemClock.uptimeMillis() + CLOSE_WAIT_MS
-    while (SystemClock.uptimeMillis() < deadline) {
-        SystemClock.sleep(WINDOW_SETTLE_MS)
-        if (inTheWay().isEmpty()) return
+    val file = "$SHOT_DIR/dialog-${SystemClock.uptimeMillis()}.png"
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val png = java.io.ByteArrayOutputStream().also { shot.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        shell("mkdir -p $SHOT_DIR")
+        val (output, input) = automation.executeShellCommandRw("dd of=$file")
+        ParcelFileDescriptor.AutoCloseOutputStream(input).use { it.write(png) }
+        ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
     }
-    throw AssertionError("Can't measure the dialog: ${inTheWay().joinToString()} is on top of it")
+    return "Measured a ${shot.width}×${shot.height} screenshot ($file), dialog at ${dialog.positionOnScreen} " +
+        "sized ${dialog.size}; windows: $windows"
+}
+
+private fun shell(command: String) {
+    val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+    ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
 }
 
 private const val WINDOW_SETTLE_MS = 400L
-private const val CLOSE_WAIT_MS = 5_000L
+private const val SHOT_DIR = "/data/local/tmp/meadow-contrast"
 
 private fun isDialog(node: SemanticsNode): Boolean = SemanticsProperties.IsDialog in node.config || node.children.any(::isDialog)
 
