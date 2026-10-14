@@ -363,7 +363,7 @@ push to `main` that passes Build and changes `backend/` or `legal/`. When a rele
 the same run, it waits for the deploy, so a new app never meets an old backend.
 
 GitHub needs permission to deploy to your project. The safer way stores no key: GitHub signs in
-with Workload Identity Federation, and only workflows on your fork's `main` can. With
+with Workload Identity Federation, and only the Deliver workflow on your fork's `main` can. With
 [gcloud](https://cloud.google.com/sdk/docs/install) signed in as the project's owner, run:
 
 ```bash
@@ -372,8 +372,11 @@ just deploy-access <project-id> <owner>/<repo>
 ```
 
 Use the repository name exactly as GitHub shows it, for example `PCOffline/meadow`. The script
-creates a `github-deploy` service account with the roles a deploy needs, and prints the
-variables to add under **Settings → Secrets and variables → Actions → Variables**:
+creates a `github-deploy` service account with the roles a deploy needs. It may act as the
+functions' service account only, not as any other in the project, and the sign-in also checks
+the repository's numeric ID (for a public repository), so another repository later given the same
+name can't deploy. It prints the variables to add under **Settings → Secrets and variables →
+Actions → Variables**:
 
 | Variable | Value |
 |---|---|
