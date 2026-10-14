@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { initializeApp, deleteApp } from "firebase/app";
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInAnonymously, signInWithEmailAndPassword } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
-import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
+import { arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
 import { getBytes, ref as storageRef } from "firebase/storage";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
@@ -299,6 +299,37 @@ describe("managing Bumblebees is your own business", () => {
     await bee.call("stepDown", { approveeUid: sam.uid });
     assert.equal((await outbox(sam.uid, "approver_left")).length, 1);
     assert.equal((await outbox(other.uid)).length, 0);
+    await rejects(bee.call("stepDown", { approveeUid: sam.uid }), "failed-precondition");
+  });
+
+  test("a removal can be cancelled even if the Bumblebee's profile is gone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    // As if deleting Bee's account had only got part of the way.
+    await admin((db) => deleteDoc(doc(db, `users/${bee.uid}`)));
+
+    await sam.call("cancelRemoval", { approverUid: bee.uid });
+    assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).pendingRemovals[bee.uid], undefined);
+    assert.equal(await read(`users/${bee.uid}`), undefined, "nothing of Bee's is brought back");
+  });
+
+  test("a Bumblebee can step down from someone whose account is gone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // As if deleting Sam's account had failed to take Sam off Bee's list.
+    await admin(async (db) => {
+      await deleteDoc(doc(db, `users/${sam.uid}/private/account`));
+      await deleteDoc(doc(db, `users/${sam.uid}`));
+    });
+
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, []);
+    assert.equal(await read(`users/${sam.uid}/private/account`), undefined, "nothing of Sam's is brought back");
+    assert.equal(await read(`users/${sam.uid}`), undefined);
     await rejects(bee.call("stepDown", { approveeUid: sam.uid }), "failed-precondition");
   });
 
@@ -606,6 +637,35 @@ describe("scheduled jobs", () => {
     assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
     assert.equal((await outbox(bee.uid, "approver_left")).length, 1);
     assert.equal((await outbox(other.uid)).length, 0, "other Bumblebees are never told");
+  });
+
+  test("a Bumblebee whose account was only partly deleted can still be removed", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // As if deleting Bee's account had failed to take Bee off Sam's list.
+    await admin(async (db) => {
+      await deleteDoc(doc(db, `users/${bee.uid}/private/account`));
+      await deleteDoc(doc(db, `users/${bee.uid}`));
+    });
+
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    await runSchedules(sam, hours(25));
+    assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approverIds, [], "Sam's garden isn't locked by a ghost");
+    assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
+    assert.equal(await read(`users/${bee.uid}/private/account`), undefined, "nothing of Bee's is brought back");
+    assert.equal(await read(`users/${bee.uid}`), undefined);
+  });
+
+  test("a removal that fails for any other reason is kept for the next run", async () => {
+    // A removal the backend can't read the people of fails every time, standing in for a
+    // passing Firestore error.
+    const id = `broken-${Date.now()}`;
+    await admin((db) => setDoc(doc(db, `removals/${id}`), { ownerUid: 42, beeUid: 7, effectiveAt: Timestamp.fromMillis(Date.now() - 1000) }));
+    const sam = await person("Sam");
+    await runSchedules(sam, hours(1));
+    assert.ok(await read(`removals/${id}`), "not dropped");
+    await admin((db) => deleteDoc(doc(db, `removals/${id}`)));
   });
 
   test("a quiet phone is reported once, vaguely, and only to that garden's Bumblebees", async () => {
