@@ -55,13 +55,18 @@ class NotifierTest {
 
     @Test
     fun `five minutes and one minute left are each mentioned once`() {
+        // Every reminder for an app shares one notification, so each is cleared before the next check.
         notifier.maybeWarn(budget(usedMinutes = 25.5)) // 4.5 minutes left
-        notifier.maybeWarn(budget(usedMinutes = 26.0))
         assertEquals(1, posted())
-        notifier.maybeWarn(budget(usedMinutes = 29.5)) // Under a minute left: a new reminder replaces it.
-        notifier.maybeWarn(budget(usedMinutes = 29.8))
+        manager.cancelAll()
+        notifier.maybeWarn(budget(usedMinutes = 26.0))
+        assertEquals(0, posted())
+        notifier.maybeWarn(budget(usedMinutes = 29.5)) // Under a minute left: a new reminder.
         assertEquals(1, posted())
         assertEquals(true, shadowOf(manager).allNotifications.single().extras.getCharSequence("android.title")!!.contains("Demo"))
+        manager.cancelAll()
+        notifier.maybeWarn(budget(usedMinutes = 29.8))
+        assertEquals(0, posted())
     }
 
     @Test
