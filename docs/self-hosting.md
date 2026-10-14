@@ -12,7 +12,7 @@ time.
 - [4. Deploy the backend](#4-deploy-the-backend)
 - [5. Let links open the app](#5-let-links-open-the-app)
 - [6. Build the app on your computer](#6-build-the-app-on-your-computer)
-- [7. Build and release with GitHub Actions](#7-build-and-release-with-github-actions)
+- [7. Build, deploy and release with GitHub Actions](#7-build-deploy-and-release-with-github-actions)
 - [8. Keeping your copy up to date](#8-keeping-your-copy-up-to-date)
 - [Developing against the emulators](#developing-against-the-emulators)
 - [Troubleshooting](#troubleshooting)
@@ -50,7 +50,7 @@ You need:
 - The **Firebase CLI**: `npm install -g firebase-tools`, then `firebase login`.
 
 If you use [mise](https://mise.jdx.dev), `mise install` in the repository sets up the same Node,
-Java and Firebase CLI versions as CI (see `mise.toml`).
+Java and just versions as CI (see `mise.toml`); install the Firebase CLI as above.
 
 Commands below are for Linux or macOS. On Windows, use WSL.
 
@@ -118,8 +118,9 @@ Collections appear on their own as people use the app.
 3. Choose **Start in production mode** and **Create**. This makes the default bucket,
    `<project-id>.firebasestorage.app`.
 
-Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which only lets
-people read and write their own photo and their own export files, and sets the bucket's lifecycle
+Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which lets
+people change only their own photo, lets their Bumblebees and the people they look after see it,
+and keeps each export file to its owner, and sets the bucket's lifecycle
 rule.
 
 ### 2.6 Cloud Messaging
@@ -175,7 +176,8 @@ The deploy:
 - uploads the Firestore rules and creates the indexes;
 - uploads the Storage rules, then sets the bucket's lifecycle rule (`backend/apply-lifecycle.cjs`,
   from `backend/storage-lifecycle.json`): data exports are deleted as soon as the app downloads
-  them, and the rule deletes any never downloaded after a day, as the privacy notice promises;
+  them, and the rule deletes any never downloaded once it is a day old (Cloud Storage applies
+  lifecycle rules within about a day of that, so within two days at most);
 - compiles the functions (`backend/build-functions.cjs`) and deploys them to the region in
   `backend/functions/.env` (see below),
   along with two scheduled jobs: `expireRequests` every 5 minutes and `hourlyCare` every hour;
@@ -302,7 +304,8 @@ add each of these:
 The app and the backend have their own versions, both following
 [semantic versioning](https://semver.org): the app's releases are tagged `v0.4.2`, the backend's
 deploys `backend-v0.7.0` (7.6). The latest tag is the source of truth: each new version is it,
-raised by one part. Both start at 0.1.0.
+raised by one part. Without tags, both start at 0.1.0; a fork that keeps upstream's tags carries on
+from them.
 
 Automatic runs raise a version only when that part of Meadow changed, by the commits that changed
 it:
