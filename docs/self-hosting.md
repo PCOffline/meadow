@@ -464,15 +464,61 @@ gcloud artifacts repositories create gcf-artifacts --repository-format=docker \
 ```
 
 **`Failed to set the IAM Policy on the Service`.** Callable functions must be public, because the
-app calls them directly (each function still checks who's signed in). Google Cloud organizations
-made since 2024 forbid that by default with the *Domain restricted sharing* policy
-(`iam.allowedPolicyMemberDomains`). An organization admin can override it for this project only:
+app calls them directly (each function still checks who's signed in; the trigger and scheduled
+functions stay private). Google Cloud organizations made since 2024, such as one that comes with
+Google Workspace, forbid that by default with the *Domain restricted sharing* policy. The deploy
+then can't make them public, and every call fails with `UNAUTHENTICATED`.
+
+Override the policy for this project only. Being the project's Owner isn't enough: organization
+policies are set on the organization, which needs the *Organization Policy Administrator* role
+there. In the [Google Cloud console](https://console.cloud.google.com):
+
+1. In the project picker at the top, pick your **organization**, not the project. Open
+   **IAM & Admin → IAM → Grant access**, enter your account, pick the role
+   **Organization Policy Administrator**, and save. If you can't, ask a Google Workspace super
+   admin to do it.
+2. Switch the picker back to your project. Open **IAM & Admin → Organization policies** and find
+   **Domain restricted sharing** (`iam.allowedPolicyMemberDomains`). Choose **Manage policy**,
+   then **Override parent's policy**, policy enforcement **Replace**, **Add a rule**, policy values
+   **Allow All**, and **Set policy**.
+3. If **Restrict allowed policy members in IAM allow policies**
+   (`iam.managed.allowedPolicyMembers`) is enforced too, override it the same way, with
+   enforcement **Off**.
+
+The same as step 2, from the command line once you have the role:
+`gcloud org-policies reset iam.allowedPolicyMemberDomains --project=<project-id>`.
+
+Wait two minutes, then make the callable functions public. From `backend/`:
 
 ```bash
-gcloud org-policies reset iam.allowedPolicyMemberDomains --project=<project-id>
+for f in $(grep -rhoE "export const \w+ = onCall" functions/src | awk '{print $3}'); do
+  gcloud functions add-invoker-policy-binding "$f" --gen2 --member=allUsers \
+    --region=<region> --project=<project-id>
+done
 ```
 
-This needs the *Organization Policy Administrator* role on the organization. Then deploy again.
+This takes effect at once, without deploying again, and later deploys keep it. To check one:
+`gcloud run services get-iam-policy createprofile --region=<region> --project=<project-id>` lists
+`allUsers` with `roles/run.invoker`.
+
+**The functions can't reach Firestore** (their log says `7 PERMISSION_DENIED: Missing or
+insufficient permissions`, and the app gets `INTERNAL`). The functions run as the Compute Engine
+default service account (`<project-number>-compute@developer.gserviceaccount.com`). Newer Google Cloud projects give it no roles, as with the Cloud Build
+role above. Grant it only what the functions use: Firestore, Storage (data exports),
+Authentication (deleting accounts), Cloud Messaging (notifications), and calling the functions
+from Firestore triggers and schedules:
+
+```bash
+SA=$(gcloud run services describe createprofile --region=<region> --project=<project-id> \
+  --format='value(spec.template.spec.serviceAccountName)')
+for role in roles/datastore.user roles/storage.objectAdmin roles/firebaseauth.admin \
+  roles/firebasecloudmessaging.admin roles/eventarc.eventReceiver roles/run.invoker; do
+  gcloud projects add-iam-policy-binding <project-id> --member="serviceAccount:$SA" \
+    --role="$role" --condition=None
+done
+```
+
+It takes effect within a minute, without deploying again.
 
 **`Firebase Storage has not been set up` or `could not find the default bucket`.** Do step 2.5,
 then deploy again.
@@ -496,9 +542,13 @@ the cause on screen and in the log (see [Debugging Meadow](debugging.md)). Witho
   built with a different `MEADOW_REGION` than the functions were deployed with: check
   **Functions** in the console for the region, set the same one in `backend/functions/.env`, and
   build the app again. Otherwise, deploy the functions again.
-- `PERMISSION_DENIED` from a Cloud Function: it can't be called from the internet, usually
-  because the deploy couldn't make it public: see *Failed to set the IAM Policy* below.
-- `INTERNAL` from a Cloud Function: it crashed; `firebase functions:log` shows why.
+- `UNAUTHENTICATED` or `PERMISSION_DENIED` from a Cloud Function, right after signing in (the app
+  asks you to sign in again; a trace build adds `Cloud Function failed: UNAUTHENTICATED`): Google
+  Cloud refused the call before it reached Meadow, because the functions aren't public. See
+  *Failed to set the IAM Policy* above.
+- `INTERNAL` from a Cloud Function: it crashed; `firebase functions:log` shows why. If the log
+  says `PERMISSION_DENIED: Missing or insufficient permissions`, see *The functions can't reach
+  Firestore* above.
 
 If instead the app says you seem to be offline, or the loader says it's taking longer than usual,
 the phone can't reach Firebase. Check its connection.
