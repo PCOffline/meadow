@@ -188,6 +188,8 @@ data class Chat(
     val lastMessageAtMillis: Long,
     val lastSenderId: String?,
     val lastReadMillis: Map<String, Long>,
+    /** The two parted ways: the chat is read-only and no longer carries their names or pictures. */
+    val closed: Boolean = false,
 ) {
     fun otherId(me: String) = participants.firstOrNull { it != me } ?: me
     fun otherName(me: String) = names[otherId(me)] ?: "Friend"

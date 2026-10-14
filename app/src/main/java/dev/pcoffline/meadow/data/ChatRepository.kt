@@ -13,10 +13,11 @@ class ChatRepository(private val backend: Backend) {
         chats.whereArrayContains("participants", uid)
             .orderBy("lastMessageAt", Query.Direction.DESCENDING)
             .observe()
-            .map { snapshot -> snapshot.documents.map { it.toChat() } }
+            .map { snapshot -> listed(snapshot.documents.map { it.toChat() }) }
 
+    /** Null when the chat is gone or closed. Its old messages stay readable. */
     fun chat(chatId: String): Flow<Chat?> =
-        chats.document(chatId).observe().map { if (it.exists()) it.toChat() else null }
+        chats.document(chatId).observe().map { if (it.exists()) openOrNull(it.toChat()) else null }
 
     fun messages(chatId: String): Flow<List<ChatMessage>> =
         chats.document(chatId).collection("messages")
@@ -60,5 +61,10 @@ class ChatRepository(private val backend: Backend) {
 
     companion object {
         fun chatIdFor(a: String, b: String): String = listOf(a, b).sorted().joinToString("_")
+
+        /** Closed chats (the two parted ways) aren't listed. */
+        fun listed(chats: List<Chat>): List<Chat> = chats.filterNot { it.closed }
+
+        fun openOrNull(chat: Chat): Chat? = chat.takeUnless { it.closed }
     }
 }
