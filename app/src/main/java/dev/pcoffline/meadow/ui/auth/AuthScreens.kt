@@ -347,7 +347,8 @@ private fun SignInOptions(
     onPassword: suspend (email: String, password: String) -> Unit,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    // Not saveable: saved state is written to disk and kept in the task, no place for a password.
+    var password by remember { mutableStateOf("") }
     var usePassword by rememberSaveable { mutableStateOf(false) }
     var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
     val action = rememberAction()

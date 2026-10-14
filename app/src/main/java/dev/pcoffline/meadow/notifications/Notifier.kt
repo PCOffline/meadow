@@ -164,6 +164,28 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         )
     }
 
+    /**
+     * Android needs a yes before installing an update, and Meadow isn't on screen to ask for it.
+     * Tapping opens Android's [confirm]ation.
+     */
+    fun confirmUpdate(confirm: Intent) {
+        post(
+            UPDATE_ID,
+            NotificationCompat.Builder(context, CH_UPDATES)
+                .setSmallIcon(R.drawable.ic_flower)
+                .setContentTitle(context.getString(R.string.notify_update_confirm_title))
+                .setContentText(context.getString(R.string.notify_update_confirm_body))
+                .setAutoCancel(true)
+                .setContentIntent(
+                    PendingIntent.getActivity(
+                        context, UPDATE_ID, confirm,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    ),
+                )
+                .build(),
+        )
+    }
+
     fun cancel(id: Int) = manager.cancel(id)
 
     private fun openApp(link: String?, requestCode: Int): PendingIntent {
