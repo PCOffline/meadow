@@ -168,20 +168,30 @@ export async function postToChat(
 }
 
 /**
+ * The data of a push to `uid`. It names its recipient in `to`, so a phone that has since been
+ * signed in to another account (and still holds the old installation ID) drops it.
+ */
+export function pushPayload(uid: string, data: Record<string, string>): Record<string, string> {
+  return { ...data, to: uid };
+}
+
+/**
  * Sends a data-only push to every device of each user; the app builds the notification itself
- * so it can add actions like "Say yes". Phones no longer registered are cleaned up. Never throws.
+ * so it can add actions like "Say yes". Each user gets their own message, addressed to them.
+ * Phones no longer registered are cleaned up. Never throws.
  *
- * In the emulator every push is also written to `_testOutbox`, so integration tests can check
- * exactly who was told what.
+ * In the emulator every push is also written to `_testOutbox`, with the exact data sent in
+ * `sent`, so integration tests can check exactly who was told what.
  */
 export async function notify(uids: string[], data: Record<string, string>): Promise<void> {
   await Promise.all(
     [...new Set(uids)].map(async (uid) => {
       try {
-        if (isEmulator()) await db().collection("_testOutbox").add({ to: uid, ...data, at: FieldValue.serverTimestamp() });
+        const payload = pushPayload(uid, data);
+        if (isEmulator()) await db().collection("_testOutbox").add({ ...payload, sent: payload, at: FieldValue.serverTimestamp() });
         const fids = accountOf(await accountRef(uid).get()).pushIds;
         if (fids.length === 0) return;
-        const result = await getMessaging().sendEachForMulticast({ fids, data, android: { priority: "high" } });
+        const result = await getMessaging().sendEachForMulticast({ fids, data: payload, android: { priority: "high" } });
         const dead = fids.filter((_, i) => result.responses[i]?.error?.code === "messaging/installation-id-not-registered");
         if (dead.length) await accountRef(uid).update({ pushIds: FieldValue.arrayRemove(...dead) });
       } catch (e) {

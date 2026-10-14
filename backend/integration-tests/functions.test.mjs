@@ -2,8 +2,8 @@
 // Functions and Storage emulators. Run with `npm run test:integration`.
 //
 // Pushes can't be delivered in the emulator, so `notify()` also records each one in
-// `_testOutbox`. That lets these tests check exactly who was told what, and that nobody
-// else was.
+// `_testOutbox`, with the exact data sent in `sent`. That lets these tests check exactly who
+// was told what, and that nobody else was.
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { initializeApp, deleteApp } from "firebase/app";
@@ -440,6 +440,17 @@ describe("requests", () => {
     assert.equal(copy.minutes, 15);
     const [push] = await outbox(bee.uid, "request_new");
     assert.match(push.body, /Used 45m of 1h today/);
+  });
+
+  test("each Bumblebee's push names them as its recipient, so a phone signed in to someone else drops it", async () => {
+    const { sam, bee, other } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    for (const who of [bee, other]) {
+      const [push] = await outbox(who.uid, "request_new");
+      assert.equal(push.sent.to, who.uid);
+      assert.equal(push.sent.requestId, requestId);
+      assert.equal(push.sent.type, "request_new");
+    }
   });
 
   test("one open request per app, whatever kind", async () => {

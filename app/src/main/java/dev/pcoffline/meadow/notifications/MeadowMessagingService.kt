@@ -8,7 +8,9 @@ import dev.pcoffline.meadow.data.Trace
 class MeadowMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         Trace.log { "push received: ${message.data}" }
-        if (message.data.isNotEmpty()) AppGraph.notifier.fromPush(message.data)
+        if (message.data.isEmpty()) return
+        val signedInUid = if (AppGraph.backendReady) AppGraph.backend.uid else null
+        AppGraph.notifier.fromPush(message.data, signedInUid)
     }
 
     override fun onRegistered(installationId: String) {

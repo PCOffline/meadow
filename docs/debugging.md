@@ -33,6 +33,7 @@ adb logcat -s MeadowTrace
 | `✗ listener doc users/abc failed` | The server refused or failed the read, with the reason. |
 | `→ upload avatars/abc (48213 bytes)` / `→ download exports/abc/…` | Storage transfers. |
 | `push registered as …` / `push received: {…}` | Push registration and each push. |
+| `push dropped: not for the signed-in account` | A push whose `to` isn't the account signed in now (or nobody is), so it isn't shown. |
 
 On screen, error messages in a trace build also show the technical cause underneath, such as
 `Firestore: PERMISSION_DENIED …`. Normal builds only tell people what they can act on (offline,
