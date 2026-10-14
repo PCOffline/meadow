@@ -3,6 +3,7 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
+import { inChunks } from "./chunks";
 import { pushes } from "./copy";
 import { accountOf, accountRef, chats, db, heartbeats, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
@@ -114,18 +115,22 @@ export async function housekeeping(now: number) {
 
   const removed = await finishDueRemovals(now);
 
-  // Only phones not yet reported, so ones that stay quiet for good don't crowd out new ones.
+  // Only phones not yet looked at, oldest first. Every one looked at is marked, even a garden
+  // nobody looks after, so quiet phones that are never reported don't crowd out new ones. The
+  // mark is cleared below once the phone checks in again.
   const cutoff = Timestamp.fromMillis(now - STALE_HEARTBEAT_MS);
   const quiet = await heartbeats().where("staleNotified", "==", false).where("at", "<", cutoff).limit(400).get();
-  for (const doc of quiet.docs) {
-    const approverIds = accountOf(await accountRef(doc.id).get()).approverIds;
-    if (approverIds.length === 0) continue;
-    if ((await users().doc(doc.id).collection("limits").limit(1).get()).empty) continue;
-    const profile = await users().doc(doc.id).get();
-    if (!profile.exists) continue;
+  await inChunks(quiet.docs, async (doc) => {
+    const [account, limits, profile] = await Promise.all([
+      accountRef(doc.id).get(),
+      users().doc(doc.id).collection("limits").limit(1).get(),
+      users().doc(doc.id).get(),
+    ]);
     await doc.ref.update({ staleNotified: true });
+    const approverIds = accountOf(account).approverIds;
+    if (approverIds.length === 0 || limits.empty || !profile.exists) return;
     await notify(approverIds, { type: "alert", uid: doc.id, ...pushes.quietPhone(profileOf(profile)) });
-  }
+  });
 
   const back = await heartbeats().where("staleNotified", "==", true).where("at", ">=", cutoff).limit(400).get();
   if (!back.empty) {
@@ -138,7 +143,7 @@ export async function housekeeping(now: number) {
   return done;
 }
 
-export const hourlyCare = onSchedule("every 60 minutes", async () => {
+export const hourlyCare = onSchedule({ schedule: "every 60 minutes", timeoutSeconds: 540 }, async () => {
   await housekeeping(Date.now());
 });
 
