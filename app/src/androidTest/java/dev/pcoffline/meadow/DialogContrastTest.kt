@@ -23,6 +23,9 @@ import dev.pcoffline.meadow.a11y.contrastProblems
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.enforcement.RestContent
+import dev.pcoffline.meadow.showcase.DemoGarden
+import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.legal.TermsUpdateDialog
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
@@ -34,8 +37,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Dialogs, on a phone: what answering a request asks, and every dialog's text measured in every
- * theme, by day and by night, from a screenshot. Robolectric can't capture dialog windows (and
+ * Dialogs, on a phone: what answering a request asks, that the block screen's dialogs stay with
+ * their app, and every dialog's text measured in every theme, by day and by night, from a
+ * screenshot. Robolectric can't capture dialog windows (and
  * doesn't settle with these open), so this runs on the emulator; it needs no backend.
  */
 @RunWith(AndroidJUnit4::class)
@@ -51,7 +55,7 @@ class DialogContrastTest {
             // A fresh composition per look, so a dialog opened in one look doesn't carry over.
             key(look) {
                 MeadowTheme(look.first, look.second) {
-                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
+                    SnackbarScope { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() } }
                 }
             }
         }
@@ -79,7 +83,7 @@ class DialogContrastTest {
 
     @Test
     fun sayingYesAsksFirstAndOffersToGiveLess() {
-        compose.setContent { MeadowTheme { RequestCard(request, myUid = "bee") } }
+        compose.setContent { MeadowTheme { SnackbarScope { RequestCard(request, myUid = "bee") } } }
         compose.onNodeWithText(text(R.string.request_say_yes)).performClick()
         inDialog(text(R.string.request_decide_yes_title, "Sam")).assertExists()
         inDialog(text(R.string.request_decide_less)).assertExists()
@@ -93,7 +97,7 @@ class DialogContrastTest {
 
     @Test
     fun notTodayHasNoMinutesOnlyAKindWord() {
-        compose.setContent { MeadowTheme { RequestCard(request, myUid = "bee") } }
+        compose.setContent { MeadowTheme { SnackbarScope { RequestCard(request, myUid = "bee") } } }
         compose.onNodeWithText(text(R.string.request_not_today)).performClick()
         inDialog(text(R.string.request_decide_no_title)).assertExists()
         inDialog(text(R.string.request_decide_note)).assertExists()
@@ -101,7 +105,19 @@ class DialogContrastTest {
     }
 
     @Test
-    fun updatedTerms() = sweep { TermsUpdateDialog(onAccept = {}) }
+    fun aDialogLeftOpenOnTheBlockScreenDoesNotCarryOverToTheNextApp() {
+        // The block screen is reused when another app's time runs out (onNewIntent).
+        var pkg by mutableStateOf("demo.tiktok")
+        compose.setContent { MeadowTheme { RestContent(pkg, DemoGarden.rest) } }
+        compose.onNodeWithText(text(R.string.rest_ask)).performClick()
+        inDialog(text(R.string.ask_title)).assertExists()
+        pkg = "demo.instagram"
+        compose.waitForIdle()
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
+    }
+
+    @Test
+    fun updatedTerms()= sweep { TermsUpdateDialog(onAccept = {}) }
 
     @Test
     fun sayingYes() = sweep(open = { compose.onNodeWithText(app.getString(R.string.request_say_yes)).performClick() }) {

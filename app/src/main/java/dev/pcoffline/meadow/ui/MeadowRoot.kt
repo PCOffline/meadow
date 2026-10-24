@@ -118,6 +118,12 @@ fun MeadowRoot(pendingRoute: MutableStateFlow<String?>) {
         BackendMissingScreen()
         return
     }
+    // Onboarding and the sign-in link dialog show their snackbars here; the tabs have their own.
+    SnackbarScope { MeadowScreens(pendingRoute) }
+}
+
+@Composable
+private fun MeadowScreens(pendingRoute: MutableStateFlow<String?>) {
     val state by AppGraph.sync.profile.collectAsStateWithLifecycle()
     val creating by AppGraph.auth.creatingProfile.collectAsStateWithLifecycle()
     val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
@@ -302,7 +308,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
             }
         }
         askFor?.let { AskForTimeDialog(packageName = it, onDismiss = { askFor = null }) }
-        StrictGate(profile.strictMode, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
+        if (strictGateCovers(destination)) StrictGate(profile.strictMode, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
         if (accountConfirmed && acceptedTerms < LegalDoc.CURRENT_VERSION) {
             TermsUpdateDialog(onAccept = { scope.launch { AppGraph.profiles.acceptTerms(LegalDoc.CURRENT_VERSION) } })
         }
@@ -311,6 +317,12 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         }
     }
 }
+
+/**
+ * Whether the strict gate covers [destination]: every screen but Troubleshoot, which the gate
+ * opens to help fix what's missing and so mustn't hide.
+ */
+internal fun strictGateCovers(destination: NavDestination?): Boolean = destination?.hasRoute<TroubleshootRoute>() != true
 
 /** The bottom tab bar, with counts for new requests, invites and messages. */
 @Composable
