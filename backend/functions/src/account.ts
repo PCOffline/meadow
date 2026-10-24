@@ -1,6 +1,6 @@
 /** Data rights: download everything Meadow holds about you, or delete it for good. */
 import { getAuth } from "firebase-admin/auth";
-import { DocumentData, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { type DocumentData, FieldValue, GrpcStatus, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
@@ -24,7 +24,7 @@ function plain(value: unknown): unknown {
 }
 
 const docs = async (query: FirebaseFirestore.Query) =>
-  (await query.get()).docs.map((d) => ({ id: d.id, ...(plain(d.data()) as object) }));
+  (await query.get()).docs.map((d) => Object.assign({ id: d.id }, plain(d.data())));
 
 /**
  * Everything Meadow stores about the caller, as one JSON file in their private Storage folder.
@@ -79,7 +79,7 @@ export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
   const cleanup = db().bulkWriter();
   cleanup.onWriteError((error) => {
     // A document someone else removed meanwhile is already as clean as it gets.
-    if (error.code === 5 /* NOT_FOUND */) return false;
+    if (error.code === GrpcStatus.NOT_FOUND) return false;
     return error.failedAttempts < 3;
   });
   for (const query of [
