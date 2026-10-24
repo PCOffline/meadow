@@ -257,8 +257,20 @@ This part is optional. It needs a fork (step 1).
 GitHub pauses workflows on new forks. Open your fork's **Actions** tab and click **I understand my
 workflows, go ahead and enable them**.
 
-Then open **Settings → Actions → General → Workflow permissions** and choose **Read and write
-permissions**, so the Deliver workflow can publish releases. Save.
+Leave **Settings → Actions → General → Workflow permissions** on **Read repository contents and
+packages permissions**. Each workflow asks for exactly what it needs: Build only reads, Deliver
+may tag and publish releases, and Screenshots may commit images.
+
+If **Settings → Actions → General → Actions permissions** limits which actions may run, allow
+actions by GitHub and verified creators, and add this one to the list of allowed actions (Build and
+Screenshots start their Android emulator with it):
+
+```
+reactivecircus/android-emulator-runner@*
+```
+
+Every workflow pins its actions to a commit, so a changed tag can't change what runs; Dependabot
+proposes updates weekly.
 
 ### 7.2 What the workflows do
 
@@ -328,7 +340,7 @@ workflows) don't make one, and `[skip release]` in the last commit's message ski
 version even when nothing changed.
 
 **With a tag**, to pick the exact version (`just release 0.4.0` does the same). It must be above
-the latest release:
+the latest release, on a commit that is on `main` and passed Build:
 
 ```bash
 git tag v0.4.0
@@ -336,7 +348,9 @@ git push origin v0.4.0
 ```
 
 Each way, the signed APK appears on your fork's **Releases** page as `meadow-<version>.apk` when
-the workflow finishes. Versions must look like `1.2.3` and must go up with every release.
+the workflow finishes. Versions must look like `1.2.3` and must go up with every release. Every
+installed copy updates to a new release, so Deliver only releases commits on `main` that passed
+Build, and runs the tests before the signing key is on the runner.
 
 Release builds check for updates on the repository that built them, so copies installed from your
 fork update from your fork's releases. People can turn the checks off in Settings. If you
@@ -565,7 +579,9 @@ battery optimisation for it (Meadow's *Troubleshoot* screen walks through it, in
 steps some phone makers add).
 
 **Deliver fails at *Add Firebase config* or *Add signing key*.** A secret is missing or
-misspelled; see step 7.4. If it fails at *Publish* with a permissions error, see step 7.1.
+misspelled; see step 7.4. If it fails at *Publish* with a permissions error, check that your
+organization's Actions settings (if the fork belongs to one) let workflows use the permissions they
+ask for.
 
 **Deliver fails at *Sign in to Google Cloud*.** For keyless sign-in, check that
 `GCP_WORKLOAD_IDENTITY_PROVIDER` is the full name the setup script printed and that the script
