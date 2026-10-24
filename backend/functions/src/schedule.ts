@@ -25,7 +25,7 @@ export const ScheduleSchema = z.object(
 
 /** Sorted, overlapping windows joined. */
 function merge(windows: Window[]): Window[] {
-  const sorted = [...windows].sort((a, b) => a.from - b.from);
+  const sorted = windows.toSorted((a, b) => a.from - b.from);
   const out: Window[] = [];
   for (const w of sorted) {
     const last = out[out.length - 1];
