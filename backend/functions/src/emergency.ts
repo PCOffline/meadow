@@ -5,8 +5,8 @@ import { accountOf, accountRef, consumeRate, db, notify, parse, postToChat, prof
 
 // Emergency state lives in the owner-only account document; the record of each unlock in
 // users/{uid}/emergencies, which Bumblebees may read since they're told about every unlock.
-import { chatIdFor } from "./format";
-import { EmergencyInput } from "./schemas";
+import { chatIdFor, storedAppName } from "./format";
+import { EmergencyInput, isPackageName } from "./schemas";
 
 /** Emergency unlocks skip approval, so they're rationed and always reported to Bumblebees. */
 export const EMERGENCY_ALLOWANCE = 3;
@@ -47,8 +47,8 @@ export const emergencyUnlock = onCall(async (req) => {
   const uid = requireAuth(req);
   const input = parse(EmergencyInput, req.data);
   const { minutes, reason } = input;
+  // Null lifts every limit, whatever app the phone names.
   const packageName = input.packageName || null;
-  const appName = input.appName || null;
   const now = Date.now();
   const offline = input.startedAt != null;
   const startedAt = input.startedAt == null ? now : Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, input.startedAt));
@@ -59,8 +59,14 @@ export const emergencyUnlock = onCall(async (req) => {
   // A retried report (the reply was lost) reuses its id, so it's recorded and announced once.
   const emergencyRef = input.reportId ? userRef.collection("emergencies").doc(input.reportId) : userRef.collection("emergencies").doc();
 
+  const limitRef = packageName && isPackageName(packageName) ? userRef.collection("limits").doc(packageName) : null;
+
   const outcome = await db().runTransaction(async (tx) => {
-    const [profileSnap, snap, existing] = await Promise.all([tx.get(userRef), tx.get(stateRef), tx.get(emergencyRef)]);
+    const [profileSnap, snap, existing, limit] = await Promise.all([
+      tx.get(userRef), tx.get(stateRef), tx.get(emergencyRef), limitRef ? tx.get(limitRef) : Promise.resolve(null),
+    ]);
+    // Bumblebees are told the name the limit was planted under, not one the phone makes up.
+    const appName = packageName ? storedAppName(limit, packageName) : null;
     const currentUntil = (snap.get("emergencyUntil") as Timestamp | undefined)?.toMillis() ?? 0;
     if (existing.exists) return { duplicate: true as const, until: currentUntil };
     const user = { ...profileOf(profileSnap), approverIds: accountOf(snap).approverIds };
@@ -92,13 +98,14 @@ export const emergencyUnlock = onCall(async (req) => {
     return {
       duplicate: false as const,
       user,
+      appName,
       until,
       remaining: Math.max(0, EMERGENCY_ALLOWANCE - uses.length - 1),
       overAllowance: overAllowance || !honoured,
     };
   });
   if (outcome.duplicate) return { until: outcome.until, remaining: 0 };
-  const { user, until, remaining, overAllowance } = outcome;
+  const { user, appName, until, remaining, overAllowance } = outcome;
 
   const headline = emergencyHeadline(user, offline, overAllowance);
   const scope = emergencyScope(appName, minutes);

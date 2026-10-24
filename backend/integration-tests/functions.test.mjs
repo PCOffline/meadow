@@ -620,6 +620,38 @@ describe("requests", () => {
     assert.equal(limit.dailyMinutes, 20);
   });
 
+  test("Bumblebees are told the app the request is really about, whatever name the phone gives", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", {
+      type: "remove_limit", packageName: "com.insta", appName: "Calculator", dayKey: today(),
+    });
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.title, /removing the limit on Instagram/);
+    assert.doesNotMatch(push.title + push.body, /Calculator/);
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).appName, "Instagram");
+    assert.equal((await read(`requests/${requestId}`)).appName, "Instagram");
+    const chatId = [sam.uid, bee.uid].sort().join("_");
+    const notes = await admin(async (db) => (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.get("text")));
+    assert.ok(notes.some((t) => /removing the limit on Instagram/.test(t)), notes.join(" | "));
+    assert.ok(notes.every((t) => !/Calculator/.test(t)), notes.join(" | "));
+
+    // A yes to a new limit keeps the app's name, too.
+    await bee.call("decideRequest", { requestId, approve: false });
+    const change = await sam.call("createRequest", {
+      type: "change_limit", packageName: "com.insta", appName: "Calculator", dailyMinutes: 60, weeklyMinutes: 0, dayKey: today(),
+    });
+    await bee.call("decideRequest", { requestId: change.requestId, approve: true });
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).appName, "Instagram");
+  });
+
+  test("saveLimit keeps a limit's name; only a new limit takes the phone's", async () => {
+    const { sam } = await gardenWithLimit();
+    await sam.call("saveLimit", { packageName: "com.insta", appName: "Calculator", dailyMinutes: 20, weeklyMinutes: 0 });
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).appName, "Instagram");
+    await sam.call("saveLimit", { packageName: "com.tok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 });
+    assert.equal((await read(`users/${sam.uid}/limits/com.tok`)).appName, "TikTok");
+  });
+
   test("asking needs a Bumblebee and an existing limit", async () => {
     const lonely = await person("Lonely");
     await rejects(lonely.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() }), "failed-precondition");
@@ -728,6 +760,38 @@ describe("emergency unlocks", () => {
     await rejects(sam.call("emergencyUnlock", { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() }),
       "resource-exhausted");
     assert.equal((await outbox(bee.uid, "emergency")).length, 6);
+  });
+
+  test("Bumblebees are told what was really unlocked, whatever name the phone gives", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), {
+      packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0,
+    }));
+    const unlockAgain = () => admin((db) => updateDoc(doc(db, `users/${sam.uid}/private/account`), { emergencyUntil: null }));
+    const seen = [];
+    const expectPush = async (pattern) => {
+      const body = (await outbox(bee.uid, "emergency")).map((p) => p.body).find((b) => !seen.includes(b));
+      seen.push(body);
+      assert.match(body, pattern);
+      assert.doesNotMatch(body, /Maps/);
+    };
+
+    // No app named: every limit is lifted, and that's what Bumblebees read.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need maps to find the vet", packageName: null, appName: "Maps" });
+    await expectPush(/Lifted all limits for 15 minutes/);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).emergencyPackage, null);
+    await unlockAgain();
+    // One app: its limit's own name.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need it for a real reason", packageName: "com.insta", appName: "Maps" });
+    await expectPush(/Lifted Instagram for 15 minutes/);
+    await unlockAgain();
+    // An app without a limit: its package name.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need it for a real reason", packageName: "com.other", appName: "Maps" });
+    await expectPush(/Lifted com\.other for 15 minutes/);
+    const records = await admin(async (db) => (await getDocs(collection(db, `users/${sam.uid}/emergencies`))).docs.map((d) => d.get("appName")));
+    assert.deepEqual(records.sort(), ["Instagram", "com.other", null].sort());
   });
 });
 
