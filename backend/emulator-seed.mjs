@@ -85,7 +85,7 @@ export async function seed({ domain = "meadow.test", host = "127.0.0.1" } = {}) 
       type: "extra_time", ...INSTAGRAM, minutes: 15, message: "Finishing a message to my sister", dayKey: dayKey(0),
       approverIds: [bee.uid], usedMinutes: 24, allowedMinutes: 30,
     });
-    const chatId = [sam.uid, bee.uid].sort().join("_");
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
     await addDoc(collection(bee.db, `chats/${chatId}/messages`), {
       senderId: bee.uid, kind: "text", text: "Proud of you this week 🌼", createdAt: serverTimestamp(),
     });

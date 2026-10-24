@@ -93,7 +93,8 @@ def text(version: Version) -> str:
 
 
 def is_ancestor(sha: str, tag: str) -> bool:
-    return subprocess.run(["git", "merge-base", "--is-ancestor", sha, tag], capture_output=True).returncode == 0
+    # Exit code 1 means "not an ancestor", so a non-zero exit isn't an error here.
+    return subprocess.run(["git", "merge-base", "--is-ancestor", sha, tag], capture_output=True, check=False).returncode == 0
 
 
 def result(ship: bool, reason: str, version: str = "", tag: str = "") -> dict[str, str]:

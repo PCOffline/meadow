@@ -129,7 +129,7 @@ describe("profiles", () => {
     assert.equal(profile.displayName, "Sam");
     assert.equal(profile.flower, "🐝");
     // The public profile is only a name card.
-    assert.deepEqual(Object.keys(profile).sort(), ["avatarColor", "bio", "createdAt", "displayName", "flower", "photoUrl"]);
+    assert.deepEqual(Object.keys(profile).toSorted(), ["avatarColor", "bio", "createdAt", "displayName", "flower", "photoUrl"]);
 
     const account = await read(`users/${sam.uid}/private/account`);
     assert.deepEqual(account.approverIds, []);
@@ -168,7 +168,7 @@ describe("profiles", () => {
     const bee = await person("Bee");
     await link(sam, bee);
     await admin((db) => updateDoc(doc(db, `users/${sam.uid}`), { displayName: "Sammy", flower: "🦔", avatarColor: "honey" }));
-    const chatId = [sam.uid, bee.uid].sort().join("_");
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
     await eventually(async () => {
       const chat = await read(`chats/${chatId}`);
       assert.equal(chat.names[sam.uid], "Sammy");
@@ -193,8 +193,8 @@ describe("invite links", () => {
     assert.deepEqual(await bee.call("acceptInviteLink", { token }), { ownerName: "Sam" });
     assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approverIds, [bee.uid]);
     assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, [sam.uid]);
-    const chat = await read(`chats/${[sam.uid, bee.uid].sort().join("_")}`);
-    assert.deepEqual([...chat.participants].sort(), [sam.uid, bee.uid].sort());
+    const chat = await read(`chats/${[sam.uid, bee.uid].toSorted().join("_")}`);
+    assert.deepEqual(chat.participants.toSorted(), [sam.uid, bee.uid].toSorted());
 
     assert.equal((await outbox(sam.uid, "invite_accepted")).length, 1);
     assert.equal((await outbox(bee.uid)).length, 0);
@@ -522,7 +522,7 @@ describe("chat and alerts", () => {
     const sam = await person("Sam");
     const bee = await person("Bee");
     await link(sam, bee);
-    const chatId = [sam.uid, bee.uid].sort().join("_");
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
     await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
       senderId: sam.uid, kind: "text", text: "Hello bee", createdAt: serverTimestamp(),
     }));
@@ -578,7 +578,7 @@ describe("your data", () => {
     assert.equal(await read(`users/${sam.uid}/private/account`), undefined);
     assert.equal(await read(`friendCodes/${code}`), undefined);
     assert.equal(await read(`heartbeats/${sam.uid}`), undefined);
-    assert.equal(await read(`chats/${[sam.uid, bee.uid].sort().join("_")}`), undefined);
+    assert.equal(await read(`chats/${[sam.uid, bee.uid].toSorted().join("_")}`), undefined);
     assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, []);
     assert.deepEqual((await read(`users/${friend.uid}/private/account`)).approverIds, [bystander.uid]);
 
