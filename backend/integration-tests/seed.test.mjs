@@ -28,11 +28,11 @@ test("the demo people are seeded with a circle, limits, usage, a request and a c
 
   await admin(async (db) => {
     const account = async (p) => (await getDoc(doc(db, `users/${p.uid}/private/account`))).data();
-    assert.deepEqual((await account(sam)).approverIds.sort(), [bee.uid, robin.uid].sort());
+    assert.deepEqual((await account(sam)).approverIds.toSorted(), [bee.uid, robin.uid].toSorted());
     assert.deepEqual((await account(sam)).approveeIds, [robin.uid]);
     assert.deepEqual((await account(kai)).approverIds, []);
 
-    const limits = (p) => getDocs(collection(db, `users/${p.uid}/limits`)).then((s) => s.docs.map((d) => d.id).sort());
+    const limits = (p) => getDocs(collection(db, `users/${p.uid}/limits`)).then((s) => s.docs.map((d) => d.id).toSorted());
     assert.deepEqual(await limits(sam), ["com.google.android.youtube", "com.instagram.android"]);
     assert.equal((await getDocs(collection(db, `users/${sam.uid}/usage`))).size, 7);
 
@@ -42,8 +42,8 @@ test("the demo people are seeded with a circle, limits, usage, a request and a c
     // Robin wasn't asked, so Robin's inbox is empty.
     assert.equal((await getDocs(collection(db, `users/${robin.uid}/inbox`))).size, 0);
 
-    const chatId = [sam.uid, bee.uid].sort().join("_");
-    const kinds = (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.get("kind")).sort();
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
+    const kinds = (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.get("kind")).toSorted();
     assert.deepEqual(kinds, ["request", "system", "text"]); // "Bee is now your Bumblebee", the ask, and a word.
   });
 });
