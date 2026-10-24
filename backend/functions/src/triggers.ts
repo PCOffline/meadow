@@ -12,12 +12,12 @@ import { finishDueRemovals } from "./social";
 const ALERT_COOLDOWN_MS = 2 * 60_000;
 const STALE_HEARTBEAT_MS = 6 * 60 * 60_000;
 
-/** Pushes new chat messages to the other person. */
+/** Pushes new chat messages to the other person, while the chat is open. */
 export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data?.data();
   if (message?.kind !== "text") return;
   const chat = await chats().doc(event.params.chatId).get();
-  if (!chat.exists) return;
+  if (!chat.exists || chat.get("closed") === true) return;
   const participants = (chat.get("participants") as string[] | undefined) ?? [];
   const names = (chat.get("names") as Record<string, string> | undefined) ?? {};
   const avatars = (chat.get("avatars") as Record<string, { flower?: string }> | undefined) ?? {};
@@ -51,7 +51,10 @@ export const onProtectionAlert = onDocumentCreated("users/{uid}/alerts/{alertId}
   await notify(person.account.approverIds, { type: "alert", uid: person.uid, ...pushes.protectionOff(person.profile) });
 });
 
-/** Keeps names and avatars in chats up to date when someone edits their profile. */
+/**
+ * Keeps names and avatars in open chats up to date when someone edits their profile. A closed
+ * chat (the two parted ways) never gets them again.
+ */
 export const onProfileUpdated = onDocumentUpdated("users/{uid}", async (event) => {
   const before = event.data?.before;
   const after = event.data?.after;
@@ -60,17 +63,17 @@ export const onProfileUpdated = onDocumentUpdated("users/{uid}", async (event) =
   if (fields.every((f) => before.get(f) === after.get(f))) return;
   const uid = event.params.uid;
   const profile = profileOf(after);
-  const writer = db().bulkWriter();
-  for (const chat of (await chats().where("participants", "array-contains", uid).get()).docs) {
+  const chatsOfTheirs = (await chats().where("participants", "array-contains", uid).get()).docs;
+  // Each in a transaction, so a chat closing meanwhile isn't handed the new name and picture.
+  await Promise.all(chatsOfTheirs.map((chat) => db().runTransaction(async (tx) => {
+    const fresh = await tx.get(chat.ref);
     // A chat deleted meanwhile (its other person left Meadow) needs no update.
-    void writer
-      .update(chat.ref, {
-        [`names.${uid}`]: profile.displayName,
-        [`avatars.${uid}`]: { flower: profile.flower, color: profile.avatarColor, photo: profile.photoUrl },
-      })
-      .catch((e) => logger.warn("Chat profile update failed", { chat: chat.id, error: String(e) }));
-  }
-  await writer.close();
+    if (!fresh.exists || fresh.get("closed") === true) return;
+    tx.update(chat.ref, {
+      [`names.${uid}`]: profile.displayName,
+      [`avatars.${uid}`]: { flower: profile.flower, color: profile.avatarColor, photo: profile.photoUrl },
+    });
+  }).catch((e) => logger.warn("Chat profile update failed", { chat: chat.id, error: String(e) }))));
 });
 
 /**
