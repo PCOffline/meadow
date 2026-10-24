@@ -36,7 +36,7 @@ export const emergencyUnlock = onCall(async (req) => {
   const packageName = input.packageName || null;
   const now = Date.now();
   const offline = input.startedAt != null;
-  const startedAt = offline ? Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, input.startedAt!)) : now;
+  const startedAt = input.startedAt == null ? now : Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, input.startedAt));
   // An offline unlock that was ended early on the phone must not come back to life here.
   const endedAt = offline && input.endedAt != null ? Math.max(startedAt, input.endedAt) : Infinity;
   const userRef = users().doc(uid);

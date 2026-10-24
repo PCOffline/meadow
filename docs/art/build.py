@@ -91,10 +91,10 @@ def flower(x: float, y: float, size: float, petal: str, stem: str, delay: float,
     """A swaying flower whose stem starts at (x, y)."""
     head_y = y - size * 2.2
     parts = [
-        f'<path d="M{x},{y} C{x - size * .3},{y - size} {x + size * .3},{y - size * 1.5} {x},{head_y}" '
-        f'stroke="{stem}" stroke-width="{max(2, size * .14):.1f}" fill="none" stroke-linecap="round"/>',
-        f'<ellipse cx="{x + size * .38}" cy="{y - size * .9}" rx="{size * .34}" ry="{size * .14}" fill="{stem}" '
-        f'transform="rotate(-30 {x + size * .38} {y - size * .9})"/>',
+        (f'<path d="M{x},{y} C{x - size * .3},{y - size} {x + size * .3},{y - size * 1.5} {x},{head_y}" '
+        f'stroke="{stem}" stroke-width="{max(2, size * .14):.1f}" fill="none" stroke-linecap="round"/>'),
+        (f'<ellipse cx="{x + size * .38}" cy="{y - size * .9}" rx="{size * .34}" ry="{size * .14}" fill="{stem}" '
+        f'transform="rotate(-30 {x + size * .38} {y - size * .9})"/>'),
     ]
     for i in range(petals):
         angle = 360 / petals * i
@@ -159,11 +159,11 @@ def banner(dark: bool) -> str:
     hills = ("#2F472B", "#3B5636", "#263B23") if dark else ("#C4DBB4", "#9CC08E", "#86AE79")
     stem = "#6E8F63" if dark else "#5B7F55"
     body = [
-        f'<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{sky[0]}"/>'
+        (f'<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{sky[0]}"/>'
         f'<stop offset="1" stop-color="{sky[1]}"/></linearGradient>'
         f'<radialGradient id="halo"><stop offset="0" stop-color="{"#F3EEE2" if dark else "#FBE3A6"}"/>'
         f'<stop offset="1" stop-color="{"#F3EEE2" if dark else "#FBE3A6"}" stop-opacity="0"/></radialGradient>'
-        '<clipPath id="frame"><rect width="1280" height="420" rx="28"/></clipPath></defs>',
+        '<clipPath id="frame"><rect width="1280" height="420" rx="28"/></clipPath></defs>'),
         '<g clip-path="url(#frame)">',
         f'<rect width="{w}" height="{h}" fill="url(#sky)"/>',
     ]
