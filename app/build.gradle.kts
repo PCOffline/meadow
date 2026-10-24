@@ -23,6 +23,9 @@ val firebaseProjectId: String? = if (hasFirebaseConfig) {
     null
 }
 val inviteHost = firebaseProjectId?.let { "$it.web.app" } ?: "invites.meadow.invalid"
+// Passwordless sign-in links arrive on the project's other default Hosting domain: Firebase only
+// sends them through a custom domain if one is given, and a default domain can't be.
+val authLinkHost = firebaseProjectId?.let { "$it.firebaseapp.com" } ?: "auth.meadow.invalid"
 
 // Release builds take their version from the git tag (-Pmeadow.version=1.2.3), so the in-app
 // updater can compare it with GitHub releases. versionCode must grow with every release.
@@ -57,8 +60,9 @@ android {
         buildConfigField("String", "FUNCTIONS_REGION", "\"$functionsRegion\"")
         buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/meadow"}\"")
         manifestPlaceholders["inviteHost"] = inviteHost
-        // Passwordless sign-in links arrive on the same Hosting domain as invite links.
+        manifestPlaceholders["authLinkHost"] = authLinkHost
         buildConfigField("String", "LINK_HOST", "\"$inviteHost\"")
+        buildConfigField("String", "AUTH_LINK_HOST", "\"$authLinkHost\"")
     }
 
     signingConfigs {

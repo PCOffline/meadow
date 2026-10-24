@@ -92,7 +92,7 @@ cd meadow
    - **Anonymous.** Turn it on. Save. People can then try Meadow before adding an email.
 3. On the **Settings** tab, open **Authorized domains** and check that `<project-id>.web.app`
    and `<project-id>.firebaseapp.com` are listed. They are by default. Sign-in links go through
-   the first one.
+   the second one, and land on the first.
 4. Optional: on the **Templates** tab you can change the sender name and the wording of the
    sign-in and password-reset emails.
 
@@ -221,8 +221,10 @@ old region and fail with "Meadow isn't available right now".
 
 ## 5. Let links open the app
 
-Invite links (`https://<project-id>.web.app/i/…`) and sign-in links open straight in Meadow once
-Android trusts your web address for the app. That trust is per signing key.
+Invite links (`https://<project-id>.web.app/i/…`) and sign-in links
+(`https://<project-id>.firebaseapp.com/__/auth/links…`) open straight in Meadow once Android trusts
+both addresses for the app. They serve the same Hosting site, so one file covers both. That trust
+is per signing key.
 
 1. Find the **SHA-256** fingerprint of each key you sign with:
    - The debug key, used by `assembleDebug`: run `./gradlew signingReport` and look under
@@ -234,7 +236,7 @@ Android trusts your web address for the app. That trust is per signing key.
 3. Replace the list under `"sha256"` in `backend/app-links.json` with your fingerprints. The one
    already there belongs to the original project and won't match your keys.
 4. Publish them: `cd backend && firebase deploy --only hosting`. This writes
-   `https://<project-id>.web.app/.well-known/assetlinks.json`.
+   `/.well-known/assetlinks.json` on both addresses.
 
 Without this step, invite links still work through the web page's *Open in Meadow* button, but
 sign-in links open in the browser, which then asks to open them on the phone.

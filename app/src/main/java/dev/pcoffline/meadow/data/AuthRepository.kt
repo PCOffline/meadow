@@ -84,7 +84,11 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         _anonymous.value = false
     }
 
-    /** Emails a one-time sign-in link: no password needed. */
+    /**
+     * Emails a one-time sign-in link: no password needed. The link goes through the project's
+     * firebaseapp.com domain, which opens the app ([BuildConfig.AUTH_LINK_HOST]). Firebase refuses
+     * a default Hosting domain as a custom link domain, so none is set.
+     */
     suspend fun sendSignInLink(email: String) {
         val address = email.trim()
         if (address.isBlank()) throw FriendlyException(R.string.error_email_required)
@@ -92,7 +96,6 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
             .setUrl("https://${BuildConfig.LINK_HOST}/signed-in")
             .setHandleCodeInApp(true)
             .setAndroidPackageName(BuildConfig.APPLICATION_ID, false, null)
-            .setLinkDomain(BuildConfig.LINK_HOST)
             .build()
         backend.auth.sendSignInLinkToEmail(address, settings).await()
         store.pendingLinkEmail = address
