@@ -13,6 +13,7 @@ import dev.pcoffline.meadow.MainActivity
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.LocalStore
+import dev.pcoffline.meadow.data.Trace
 import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.enforcement.BlockActivity
 import dev.pcoffline.meadow.ui.durationText
@@ -119,8 +120,16 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         )
     }
 
-    /** Builds a notification from a data-only push. Titles and bodies come from the backend's copy.ts. */
-    fun fromPush(data: Map<String, String>) {
+    /**
+     * Builds a notification from a data-only push. Titles and bodies come from the backend's copy.ts.
+     * Only a push addressed (in `to`) to [signedInUid] is shown: one for an account that used to be
+     * signed in on this phone, or arriving while nobody is, is dropped.
+     */
+    fun fromPush(data: Map<String, String>, signedInUid: String?) {
+        if (signedInUid == null || data["to"] != signedInUid) {
+            Trace.log { "push dropped: not for the signed-in account" }
+            return
+        }
         val type = data["type"] ?: return
         val title = data["title"] ?: context.getString(R.string.app_name)
         val body = data["body"].orEmpty()

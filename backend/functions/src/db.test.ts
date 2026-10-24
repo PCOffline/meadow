@@ -3,7 +3,17 @@ import assert from "node:assert/strict";
 import type { DocumentSnapshot } from "firebase-admin/firestore";
 import { type CallableRequest, HttpsError } from "firebase-functions/v2/https";
 import { errors } from "./copy";
-import { MISSING_PROFILE, postToChat, profileOf, RECENT_SIGN_IN_MS, requireRecentSignIn } from "./db";
+import { MISSING_PROFILE, postToChat, profileOf, pushPayload, RECENT_SIGN_IN_MS, requireRecentSignIn } from "./db";
+
+test("a push names who it is for, so another account on the same phone can drop it", () => {
+  assert.deepEqual(pushPayload("sam", { type: "chat", title: "Bee", body: "hi" }), {
+    type: "chat", title: "Bee", body: "hi", to: "sam",
+  });
+});
+
+test("the push's own data can't change who it is for", () => {
+  assert.equal(pushPayload("sam", { type: "alert", to: "someone-else" }).to, "sam");
+});
 
 const now = 1_760_000_000_000;
 const signedIn = (provider: string, authTime?: number) =>
