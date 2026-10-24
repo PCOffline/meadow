@@ -21,6 +21,8 @@ const DAY_MS = 24 * 60 * 60_000;
 /** Invites by code and invite links together. */
 const INVITES_PER_DAY = 20;
 const REMOVALS_PER_DAY = 10;
+/** Friend codes looked up, found or not, so codes can't be guessed by trying them all. */
+export const CODE_LOOKUPS_PER_DAY = 30;
 
 /** Creates the caller's profile and claims a unique friend code. Safe to call twice. */
 export const createProfile = onCall(async (req) => {
@@ -154,7 +156,13 @@ export const sendInvite = onCall(async (req) => {
   requireEmailAccount(req);
   const { friendCode } = parse(InviteByCodeInput, req.data);
 
-  const codeSnap = await friendCodes().doc(friendCode).get();
+  // Counted before looking, and kept even when no one has the code.
+  const codeSnap = await db().runTransaction(async (tx) => {
+    const commitRate = await consumeRate(tx, uid, "codeLookup", CODE_LOOKUPS_PER_DAY, DAY_MS, errors.tooManyCodes);
+    const snap = await tx.get(friendCodes().doc(friendCode));
+    commitRate();
+    return snap;
+  });
   if (!codeSnap.exists) throw new HttpsError("not-found", errors.codeUnknown);
   const targetUid = codeSnap.get("uid") as string;
   if (targetUid === uid) throw new HttpsError("invalid-argument", errors.ownCode);

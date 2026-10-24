@@ -160,6 +160,25 @@ async function rejects(promise, code, messagePart) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * Calls a function as `uid` with a hand-made sign-in token, to test claims a real sign-in
+ * can't produce (such as one from an hour ago). The Functions emulator doesn't check signatures.
+ */
+async function callAs(fn, uid, { provider = "password", signedInAgoMs = 0 } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const part = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const token = [part({ alg: "none", typ: "JWT" }), part({
+    iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: uid, user_id: uid, iat: now, exp: now + 3600,
+    auth_time: now - Math.floor(signedInAgoMs / 1000), firebase: { sign_in_provider: provider, identities: {} },
+  }), ""].join(".");
+  const response = await fetch(`http://127.0.0.1:5001/${PROJECT}/${REGION}/${fn}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ data: {} }),
+  });
+  return { status: response.status, body: await response.json() };
+}
+
 describe("profiles", () => {
   test("createProfile writes a name card, a private account and a friend code", async () => {
     const sam = await person("Sam", { flower: "🐝" });
@@ -305,6 +324,15 @@ describe("friend codes", () => {
     const sam = await person("Sam");
     await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(sam) }), "invalid-argument");
     await rejects(sam.call("sendInvite", { friendCode: "ZZZZZZ" }), "not-found");
+  });
+
+  test("codes can't be guessed: every lookup counts, found or not", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    for (let i = 0; i < 30; i++) await rejects(sam.call("sendInvite", { friendCode: `ZZZZ${i}` }), "not-found");
+    // Even a real code isn't looked up any more today, so nobody learns whether it exists.
+    await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(bee) }), "resource-exhausted", /friend codes today/);
+    assert.equal((await outbox(bee.uid, "invite")).length, 0);
   });
 });
 
@@ -714,6 +742,26 @@ describe("emergency unlocks", () => {
     assert.equal(offline.remaining, 0);
   });
 
+  test("reports are rate limited, and the account keeps only the latest unlock times", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Far more unlocks on record than anyone could make, as an older version may have stored.
+    const old = Array.from({ length: 25 }, (_, i) => Timestamp.fromMillis(Date.now() - (i + 1) * 3600_000));
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}/private/account`), { emergencyUses: old }));
+
+    for (let i = 0; i < 6; i++) {
+      const report = { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() - (i + 1) * 60_000 };
+      assert.equal((await sam.call("emergencyUnlock", report)).remaining, 0);
+    }
+    const uses = (await read(`users/${sam.uid}/private/account`)).emergencyUses.map((t) => t.toMillis());
+    assert.equal(uses.length, 20);
+    assert.deepEqual(uses, [...uses].sort((a, b) => a - b));
+    await rejects(sam.call("emergencyUnlock", { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() }),
+      "resource-exhausted");
+    assert.equal((await outbox(bee.uid, "emergency")).length, 6);
+  });
+
   test("Bumblebees are told what was really unlocked, whatever name the phone gives", async () => {
     const sam = await person("Sam");
     const bee = await person("Bee");
@@ -816,6 +864,27 @@ describe("your data", () => {
     assert.equal((await outbox(friend.uid, "approver_left")).length, 1);
     assert.equal((await outbox(bystander.uid)).length, 0);
     await assert.rejects(signInWithEmailAndPassword(sam.auth, sam.email, "petals-and-bees"));
+  });
+
+  test("deleting an account needs a recent sign-in, so a stolen token alone can't do it", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const stale = await callAs("deleteAccount", sam.uid, { signedInAgoMs: 60 * 60_000 });
+    assert.equal(stale.status, 401);
+    assert.equal(stale.body.error.status, "UNAUTHENTICATED");
+    assert.match(stale.body.error.message, /sign in again/);
+    assert.ok(await read(`users/${sam.uid}`));
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, [sam.uid]);
+    assert.equal((await outbox(bee.uid, "approver_left")).length, 0);
+    assert.equal((await callAs("deleteAccount", sam.uid, { signedInAgoMs: 60_000 })).status, 200);
+    assert.equal(await read(`users/${sam.uid}`), undefined);
+  });
+
+  test("a garden without an email, which has no way to sign in again, can still be deleted", async () => {
+    const anon = await person("Anon", { anonymous: true });
+    assert.equal((await callAs("deleteAccount", anon.uid, { provider: "anonymous", signedInAgoMs: 24 * 3600_000 })).status, 200);
+    assert.equal(await read(`users/${anon.uid}`), undefined);
   });
 });
 

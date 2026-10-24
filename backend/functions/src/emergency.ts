@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, emergencyHeadline, emergencyScope, errors, pushes } from "./copy";
-import { accountOf, accountRef, db, notify, parse, postToChat, profileOf, requireAuth, users } from "./db";
+import { accountOf, accountRef, consumeRate, db, notify, parse, postToChat, profileOf, requireAuth, users } from "./db";
 
 // Emergency state lives in the owner-only account document; the record of each unlock in
 // users/{uid}/emergencies, which Bumblebees may read since they're told about every unlock.
@@ -12,6 +12,13 @@ import { EmergencyInput, isPackageName } from "./schemas";
 export const EMERGENCY_ALLOWANCE = 3;
 export const EMERGENCY_WINDOW_MS = 30 * 24 * 60 * 60_000;
 const MAX_OFFLINE_AGE_MS = 7 * 24 * 60 * 60_000;
+/**
+ * Unlocks recorded a day, offline reports included. The app makes at most four a month, so only a
+ * modified one meets this; without it, it could post and push to every Bumblebee without end.
+ */
+export const EMERGENCY_REPORTS_PER_DAY = 6;
+/** Unlock times kept on the account. Only whether the allowance is used up matters. */
+export const MAX_STORED_USES = 20;
 
 /** Start times of unlocks within the rolling window. */
 export function recentUses(raw: unknown, now: number): number[] {
@@ -22,11 +29,19 @@ export function recentUses(raw: unknown, now: number): number[] {
 }
 
 /**
+ * The unlock times to store after one more at `startedAt`: the most recent ones, oldest first.
+ * Offline unlocks can be reported late, so they're put in order before the oldest are dropped.
+ */
+export function withUse(uses: number[], startedAt: number): number[] {
+  return [...uses, startedAt].sort((a, b) => a - b).slice(-MAX_STORED_USES);
+}
+
+/**
  * Lifts limits right away for up to an hour. With `startedAt` it records an unlock the phone
  * already took while offline; that one is recorded even beyond the allowance, since it happened.
  * Phones allow one offline unlock per window, and so does this: any further "offline" report is
  * recorded and told to Bumblebees, but lifts nothing. Otherwise a modified app could unlock
- * forever by claiming to be offline.
+ * forever by claiming to be offline. Reports are rate limited (EMERGENCY_REPORTS_PER_DAY).
  */
 export const emergencyUnlock = onCall(async (req) => {
   const uid = requireAuth(req);
@@ -59,11 +74,13 @@ export const emergencyUnlock = onCall(async (req) => {
     const overAllowance = uses.length >= EMERGENCY_ALLOWANCE;
     if (overAllowance && !offline) throw new HttpsError("resource-exhausted", errors.emergencyUsedUp(EMERGENCY_ALLOWANCE));
     if (!offline && currentUntil > now) throw new HttpsError("failed-precondition", errors.emergencyActive);
+    const commitRate = await consumeRate(tx, uid, "emergency", EMERGENCY_REPORTS_PER_DAY, 24 * 60 * 60_000);
     const lastOffline = (snap.get("offlineEmergencyAt") as Timestamp | undefined)?.toMillis() ?? 0;
     const honoured = !offline || now - lastOffline > EMERGENCY_WINDOW_MS;
     const until = honoured ? Math.min(startedAt + minutes * 60_000, endedAt) : Math.min(now, endedAt);
+    commitRate();
     tx.update(stateRef, {
-      emergencyUses: [...uses, startedAt].map((ms) => Timestamp.fromMillis(ms)),
+      emergencyUses: withUse(uses, startedAt).map((ms) => Timestamp.fromMillis(ms)),
       emergencyUntil: Timestamp.fromMillis(honoured ? Math.max(until, currentUntil) : currentUntil),
       emergencyPackage: honoured ? packageName : (snap.get("emergencyPackage") ?? null),
       ...(offline && honoured ? { offlineEmergencyAt: Timestamp.fromMillis(now) } : {}),
