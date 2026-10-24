@@ -1,9 +1,9 @@
 /** Firestore and FCM plumbing shared by every function. */
-import { getFirestore, FieldPath, FieldValue, DocumentSnapshot, DocumentReference, SetOptions, DocumentData, Transaction } from "firebase-admin/firestore";
+import { getFirestore, FieldPath, FieldValue, type DocumentSnapshot, type DocumentReference, type SetOptions, type DocumentData, type Transaction } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
-import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
-import { z } from "zod";
+import type { z } from "zod";
 import { errors } from "./copy";
 
 export const db = () => getFirestore();
@@ -108,10 +108,11 @@ export async function consumeRates(
   const next: Record<string, { count: number; since: number }> = {};
   for (const { key, max, windowMs, message } of limits) {
     const entry = snap.get(new FieldPath(key)) as { count?: number; since?: number } | undefined;
-    const fresh = !entry || typeof entry.since !== "number" || now - entry.since >= windowMs;
+    const since = entry?.since;
+    const fresh = typeof since !== "number" || now - since >= windowMs;
     const count = fresh ? 0 : (entry?.count ?? 0);
     if (count >= max) throw new HttpsError("resource-exhausted", message ?? errors.slowDown);
-    next[key] = { count: count + 1, since: fresh ? now : entry!.since! };
+    next[key] = { count: count + 1, since: fresh ? now : since };
   }
   // Returned rather than written here, because a transaction must do all its reads first.
   return () => tx.set(ref, next, { merge: true });
@@ -162,7 +163,7 @@ export function ensureChat(writer: Writer, a: Person, b: Person, id: string): vo
   writer.set(
     chats().doc(id),
     {
-      participants: [a.uid, b.uid].sort(),
+      participants: [a.uid, b.uid].toSorted(),
       names: { [a.uid]: a.profile.displayName, [b.uid]: b.profile.displayName },
       avatars: { [a.uid]: avatar(a), [b.uid]: avatar(b) },
     },

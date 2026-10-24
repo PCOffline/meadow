@@ -67,10 +67,13 @@ test: test-app test-functions test-rules test-integration test-hosting test-depl
 test-app:
     ./gradlew testDebugUnitTest
 
-# Android lint
+# Android lint, detekt, and Biome and oxlint (type-aware) on the backend
 [group('test')]
 lint:
     ./gradlew lintDebug
+    .github/scripts/detekt.sh
+    cd backend/functions && npm run lint
+    cd backend && npm run lint
 
 # Cloud Functions unit tests
 [group('test')]
