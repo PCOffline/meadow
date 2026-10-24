@@ -25,7 +25,7 @@ Latest stable versions as of 12 October 2026.
 | Android Gradle plugin | 8.10.1 | 9.4.0 | Built-in Kotlin: the `org.jetbrains.kotlin.android` plugin must go. Kotlin sources in extra source sets are added with `kotlin`, not `java`. Unit tests only exist for the tested build type, so `testReleaseUnitTest` is gone. `jvmTarget` defaults to `targetCompatibility` |
 | Kotlin (compose, serialization plugins) | 2.3.21 | 2.4.21 | Needs AGP ≥ 9.1 (R8). K1 removed; no source changes found |
 | compileSdk | 35 | 37 | Required by Compose 1.12, Coil 3.6 and the markdown renderer 0.42+. Needs AGP ≥ 9.2 |
-| targetSdk | 35 | 35 | Not a dependency; moving to 36 is a separate, behaviour-tested change (see *Later*) |
+| targetSdk | 35 | 36 | Not a dependency; moved separately (see *Done since*) |
 | androidx.core | core-ktx 1.16.0 | core 1.19.1 | `core-ktx` is now empty; the extensions moved into `core` |
 | activity-compose | 1.10.1 | 1.13.0 | Back handling rebuilt on NavigationEvent, compatible with `BackHandler` and `OnBackPressedCallback` |
 | lifecycle | 2.9.0 | 2.11.0 | None used |
@@ -40,7 +40,7 @@ Latest stable versions as of 12 October 2026.
 | Coil | 3.2.0 | 3.6.3 | Needs Kotlin 2.4 and compileSdk 37; 3.6.3 fixes R8 with AGP 9.4 |
 | konfetti-compose | 2.0.4 | 2.0.5 | `Shape.DrawableShape` now takes a `CoreImage`; drawables go through `ImageUtil.loadDrawable`. Fixes an idling-resource timeout in instrumentation tests |
 | multiplatform-markdown-renderer-m3 | 0.34.0 | 0.45.0 | Only `Markdown(content, modifier)` is used; removed APIs don't apply |
-| org.jetbrains:markdown (tests) | 0.7.3 | 0.7.16 | Parser fixes |
+| org.jetbrains:markdown (tests) | 0.7.3 | 0.7.17 | Parser fixes |
 | Robolectric | 4.14.1 | 4.17 | Deprecated symbols removed (only `shadowOf` used). SDK 36+ needs Java 21; tests stay on SDK 34 |
 | androidx.test core / ext / runner / orchestrator | 1.6.1 / 1.2.1 / 1.6.2 / 1.5.1 | 1.7.0 / 1.3.0 / 1.7.0 / 1.6.1 | None used |
 | JUnit | 4.13.2 | 4.13.2 | Latest JUnit 4 |
@@ -93,11 +93,15 @@ integration and end-to-end tests) is green after each.
 
 - **Installation IDs instead of FCM tokens:** the app registers with `FirebaseMessaging.register()`
   and the backend sends with `sendEachForMulticast({ fids })`.
+- **targetSdk 36 (Android 16):** nothing in the app depends on what Android 16 changes for apps
+  that target it: it's already edge-to-edge without an opt-out, handles back only through
+  `OnBackPressedCallback` and `BackHandler` (no `onBackPressed` or `KEYCODE_BACK`), locks no
+  orientation, aspect ratio or resizability, and uses neither `elegantTextHeight` nor
+  `scheduleAtFixedRate`. The changes for all apps (JobScheduler quotas, intent redirection
+  hardening) apply whatever the target.
 
 ## Later
 
-- **targetSdk 36:** required by Google Play since 2026-08-31, only if Meadow is published there.
-  The app is already edge-to-edge and uses predictive back; test on an API 36 emulator first.
 - **Node 26:** once firebase-tools lists `nodejs26` and Cloud Functions makes it GA.
 - **Material icons:** the extended set is frozen; switch to Material Symbols drawables when
   convenient.

@@ -12,6 +12,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.usage.activityInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -83,7 +84,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         val key = "$pkg/$className"
         activityCache.get(key)?.let { return it }
         val isActivity = try {
-            packageManager.getActivityInfo(ComponentName(pkg, className), PackageManager.MATCH_ALL)
+            packageManager.activityInfo(ComponentName(pkg, className), PackageManager.MATCH_ALL)
             true
         } catch (_: PackageManager.NameNotFoundException) {
             false

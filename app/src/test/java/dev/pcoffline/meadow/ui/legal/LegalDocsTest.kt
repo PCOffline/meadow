@@ -8,6 +8,7 @@ import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 import org.intellij.markdown.parser.MarkdownParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -82,5 +83,50 @@ class LegalDocsTest {
                 assertTrue("${doc.asset}: $destination", destination.startsWith("https://"))
             }
         }
+    }
+
+    @Test
+    fun `the licences name every library the app ships`() {
+        val root = dir.parentFile!!
+        // Catalog aliases (androidx-work-runtime) are written as accessors (libs.androidx.work.runtime).
+        val groups = File(root, "gradle/libs.versions.toml").readLines().mapNotNull { line ->
+            Regex("""^([\w-]+)\s*=\s*\{\s*group\s*=\s*"([^"]+)"""").find(line)?.destructured
+        }.associate { (alias, group) -> alias.replace('-', '.') to group }
+        val shipped = Regex("""^\s*implementation\((?:platform\()?libs\.([\w.]+)\)""", RegexOption.MULTILINE)
+            .findAll(File(root, "app/build.gradle.kts").readText())
+            .map { groups.getValue(it.groupValues[1]) }
+            .toSet()
+        val licences = read(LegalDoc.LICENSES)
+        shipped.forEach { group ->
+            val name = NAMES.entries.firstOrNull { group.startsWith(it.key) }?.value
+            assertNotNull("Add $group to licenses.md and to NAMES", name)
+            assertTrue("licenses.md names $name ($group)", name!! in licences)
+        }
+        TRANSITIVE.forEach { assertTrue("licenses.md names $it", it in licences) }
+    }
+
+    private companion object {
+        /** Who each group of direct dependencies is credited as in licenses.md. */
+        val NAMES = mapOf(
+            "androidx." to "Android Jetpack",
+            "com.google.firebase" to "Firebase Android SDKs",
+            "org.jetbrains.kotlinx" to "kotlinx.coroutines, kotlinx.serialization",
+            "io.coil-kt" to "Coil",
+            "nl.dionsegijn" to "Konfetti",
+            "com.mikepenz" to "Multiplatform Markdown Renderer",
+        )
+
+        /** Libraries the direct dependencies bring along. */
+        val TRANSITIVE = listOf(
+            "JetBrains Markdown", // the Markdown renderer's parser
+            "kotlinx.collections.immutable", // the Markdown renderer
+            "Okio", // Coil
+            "OkHttp", // Coil's network loader and Cloud Functions for Firebase
+            "Accompanist Drawable Painter", // Coil's Compose integration
+            "gRPC Java", // Cloud Firestore
+            "Protocol Buffers", // Cloud Firestore
+            "RE2/J", // Cloud Firestore
+            "Reactive Streams", // Cloud Functions for Firebase
+        )
     }
 }

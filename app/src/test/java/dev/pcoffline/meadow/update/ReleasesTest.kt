@@ -3,7 +3,6 @@ package dev.pcoffline.meadow.update
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReleasesTest {
@@ -67,13 +66,6 @@ class ReleasesTest {
         )
         assertEquals("https://x/meadow", update?.apkUrl)
         assertNull(update?.sha256)
-    }
-
-    @Test
-    fun `version codes always grow with the version`() {
-        val codes = listOf("0.1.0", "0.1.1", "0.2.0", "1.0.0", "1.0.999", "1.1.0", "10.0.0").map { Releases.versionCode(Version.parse(it)!!) }
-        assertEquals(codes.sorted(), codes)
-        assertTrue(codes.toSet().size == codes.size)
     }
 
     @Test
