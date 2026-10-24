@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatIdFor, formatMinutes, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, summarize } from "./format";
+import { chatIdFor, formatMinutes, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, summarize, withPhotoToken } from "./format";
 
 test("formats minutes like the app does", () => {
   assert.equal(formatMinutes(0), "0m");
@@ -40,4 +40,11 @@ test("invite tokens are long and URL-safe", () => {
 
 test("chat ids don't depend on who starts", () => {
   assert.equal(chatIdFor("b", "a"), chatIdFor("a", "b"));
+});
+
+test("a photo link gets a new token, keeping everything else", () => {
+  const base = "https://firebasestorage.googleapis.com/v0/b/meadow.appspot.com/o/avatars%2Fsam?alt=media";
+  assert.equal(withPhotoToken(`${base}&token=old-123#v=5`, "new-456"), `${base}&token=new-456#v=5`);
+  assert.equal(withPhotoToken(`${base}&token=old-123`, "new-456"), `${base}&token=new-456`);
+  assert.equal(withPhotoToken(base, "new-456"), base);
 });

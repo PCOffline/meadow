@@ -49,6 +49,18 @@ class ModelsTest {
     }
 
     @Test
+    fun `closed chats aren't listed and open as closed`() {
+        val open = Chat(
+            id = "a_b", participants = listOf("a", "b"), names = mapOf("a" to "Sam", "b" to "Bee"), avatars = emptyMap(),
+            lastMessage = "Hi", lastMessageAtMillis = 1L, lastSenderId = "a", lastReadMillis = emptyMap(),
+        )
+        val closed = open.copy(id = "a_c", participants = listOf("a", "c"), names = emptyMap(), closed = true)
+        assertEquals(listOf(open), ChatRepository.listed(listOf(open, closed)))
+        assertEquals(open, ChatRepository.openOrNull(open))
+        assertNull(ChatRepository.openOrNull(closed))
+    }
+
+    @Test
     fun `day keys sort like dates`() {
         val today = Days.today()
         assertTrue(Days.key(today.minusDays(1)) < Days.key(today))

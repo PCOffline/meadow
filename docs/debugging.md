@@ -50,7 +50,7 @@ The trace contains people's data (names, messages, limits). Release builds never
 flag only applies to debug builds.
 
 Without trace mode, failures the app hides from people are still logged:
-`adb logcat -s MeadowSync MeadowBackend MeadowFirestore MeadowSocial`.
+`adb logcat -s MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian`.
 
 ## Android Studio
 

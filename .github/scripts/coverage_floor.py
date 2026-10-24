@@ -41,11 +41,10 @@ def check(packages: dict[str, dict[str, list[int]]], lines: float, branches: flo
     """Returns the report lines and the failures."""
     report = [f"{'package':60} {'lines':>7} {'branches':>9}"]
     overall = {"LINE": [0, 0], "BRANCH": [0, 0]}
-    for name in sorted(packages):
-        p = packages[name]
-        for kind in overall:
-            overall[kind][0] += p[kind][0]
-            overall[kind][1] += p[kind][1]
+    for name, p in sorted(packages.items()):
+        for kind, total in overall.items():
+            total[0] += p[kind][0]
+            total[1] += p[kind][1]
         report.append(f"{name:60} {percent(*p['LINE']):6.1f}% {percent(*p['BRANCH']):8.1f}%")
     line_pct, branch_pct = percent(*overall["LINE"]), percent(*overall["BRANCH"])
     report.append(f"{'all':60} {line_pct:6.1f}% {branch_pct:8.1f}%")

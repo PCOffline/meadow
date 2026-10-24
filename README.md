@@ -43,6 +43,7 @@ arrive at five minutes and one minute left.
 Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee
 gets a chat with you, and your requests appear in it as cards they can answer with one tap.
+When someone stops being your Bumblebee, your chat with them closes.
 
 <p align="center">
   <img src="docs/images/screen-circle.png" alt="Your circle: two Bumblebees, and a friend whose garden you look after" width="250">
@@ -122,13 +123,14 @@ The `justfile` has a shortcut for each of these and for building, installing and
 | What | Command |
 |---|---|
 | App unit, screen and accessibility tests | `./gradlew testDebugUnitTest` |
-| Lint | `./gradlew lintDebug` |
+| Lint | `./gradlew lintDebug`, `.github/scripts/detekt.sh`, and `npm run lint` in `backend/` and `backend/functions/` |
 | Cloud Functions unit tests | `cd backend/functions && npm test` |
 | Security rules (Firestore and Storage) | `cd backend && npm ci && npm run test:rules` |
 | Cloud Functions on the emulators | `cd backend && npm ci && npm --prefix functions ci && npm run test:integration` |
 | Hosted legal pages | `cd backend && npm run test:hosting` |
+| Deploy scripts | `cd backend && npm run test:deploy` |
 | End to end, on an Android emulator | Start the Firebase emulators (`npm run emulators` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2` |
-| CI scripts and workflows | `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`, plus `actionlint` and `shellcheck` |
+| CI scripts and workflows | `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`, plus `actionlint`, `shellcheck` and `ruff check` |
 
 Building and testing need Java 21 or newer (CI uses 25) and Node 24; `mise install` sets both up.
 CI runs everything on every pull request and every push to `main`. To see every request the app

@@ -4,8 +4,8 @@
 #   .github/scripts/setup-deploy-access.sh <firebase-project-id> <github-owner/repo>
 #
 # Creates a "github-deploy" service account with the roles a Firebase deploy needs, and lets only
-# workflows on the repository's main branch act as it. Safe to run again. Needs gcloud, signed in
-# as a project owner. Prints the repository variables to set at the end.
+# the Deliver workflow on the repository's main branch act as it. Safe to run again. Needs gcloud,
+# signed in as a project owner, and curl. Prints the repository variables to set at the end.
 set -euo pipefail
 
 if [ $# -ne 2 ]; then
@@ -30,8 +30,6 @@ ROLES=(
   roles/artifactregistry.admin
   roles/datastore.indexAdmin
   roles/serviceusage.serviceUsageConsumer
-  # To deploy functions that run as the project's default service accounts.
-  roles/iam.serviceAccountUser
 )
 
 echo "Turning on the APIs that keyless sign-in needs"
@@ -49,6 +47,17 @@ for role in "${ROLES[@]}"; do
   gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$ACCOUNT" \
     --role "$role" --condition None --quiet > /dev/null
 done
+
+# Functions run as the Compute Engine default service account, and the deploy must be allowed to
+# use it: that account only, not every service account in the project.
+NUMBER="$(gcloud projects describe "$PROJECT" --format 'value(projectNumber)')"
+RUNTIME="$NUMBER-compute@developer.gserviceaccount.com"
+echo "Letting it deploy functions that run as $RUNTIME"
+gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" --project "$PROJECT" \
+  --member "serviceAccount:$ACCOUNT" --role roles/iam.serviceAccountUser > /dev/null
+# Earlier versions of this script granted it on the whole project.
+gcloud projects remove-iam-policy-binding "$PROJECT" --member "serviceAccount:$ACCOUNT" \
+  --role roles/iam.serviceAccountUser --condition None --quiet > /dev/null 2>&1 || true
 
 # The deploy also sets the Storage bucket's lifecycle rule (backend/apply-lifecycle.cjs), so it
 # may manage the default bucket: that bucket only, not every bucket in the project.
@@ -74,8 +83,17 @@ if ! gcloud iam workload-identity-pools describe "$POOL" --project "$PROJECT" --
     --display-name "GitHub Actions"
 fi
 
-# Only this repository's main branch may sign in: pull requests and other branches can't deploy.
+# Only the Deliver workflow on this repository's main branch may sign in: pull requests, other
+# branches and other workflows can't deploy. The repository's numeric ID also pins it, so a
+# repository created later under the same name couldn't either.
+REPO_ID="$(curl -sSf "https://api.github.com/repos/$REPO" | sed -n 's/^  "id": \([0-9]*\),$/\1/p' || true)"
 CONDITION="assertion.repository == '$REPO' && assertion.ref == 'refs/heads/main'"
+CONDITION="$CONDITION && assertion.workflow_ref == '$REPO/.github/workflows/deliver.yml@refs/heads/main'"
+if [ -n "$REPO_ID" ]; then
+  CONDITION="$CONDITION && assertion.repository_id == '$REPO_ID'"
+else
+  echo "Couldn't look up $REPO on GitHub (private?), so its numeric ID isn't checked." >&2
+fi
 if ! gcloud iam workload-identity-pools providers describe "$PROVIDER" --project "$PROJECT" \
   --location global --workload-identity-pool "$POOL" > /dev/null 2>&1; then
   echo "Creating the GitHub provider"
