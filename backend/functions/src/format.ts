@@ -32,6 +32,14 @@ export const randomInviteToken = (): string => randomString(TOKEN_ALPHABET, INVI
 
 export const chatIdFor = (a: string, b: string): string => [a, b].toSorted().join("_");
 
+/**
+ * The same photo link with a new download token. A link without one (read through the Storage
+ * rules instead) comes back unchanged.
+ */
+export function withPhotoToken(url: string, token: string): string {
+  return url.replace(/([?&]token=)[^&#]*/, `$1${token}`);
+}
+
 export function inviteUrl(projectId: string, token: string): string {
   return `https://${projectId}.web.app/i/${token}`;
 }

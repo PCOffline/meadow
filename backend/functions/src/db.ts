@@ -128,8 +128,18 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
 
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
-export function profileOf(snap: DocumentSnapshot): Profile {
-  if (!snap.exists) throw new HttpsError("not-found", errors.noProfile);
+/**
+ * The neutral name card shown for someone whose profile is gone, such as an account whose
+ * deletion only got part of the way.
+ */
+export const MISSING_PROFILE: Readonly<Profile> = { displayName: "Friend", flower: "🌼", avatarColor: "leaf", photoUrl: null };
+
+/** Reads a name card. A missing one is refused, unless [orMissing] asks for the neutral one instead. */
+export function profileOf(snap: DocumentSnapshot, { orMissing = false } = {}): Profile {
+  if (!snap.exists) {
+    if (orMissing) return { ...MISSING_PROFILE };
+    throw new HttpsError("not-found", errors.noProfile);
+  }
   const d = snap.data() ?? {};
   return {
     displayName: typeof d.displayName === "string" ? d.displayName : "Friend",
@@ -144,11 +154,14 @@ export function accountOf(snap: DocumentSnapshot): Account {
   return { approverIds: list(d.approverIds), approveeIds: list(d.approveeIds), pushIds: list(d.pushIds) };
 }
 
-/** Reads someone's profile and account, inside a transaction when given one. */
-export async function loadPerson(uid: string, tx?: Transaction): Promise<Person> {
+/**
+ * Reads someone's profile and account, inside a transaction when given one. [orMissing] stands
+ * in the neutral name card for a missing profile, so someone half gone can still be let go of.
+ */
+export async function loadPerson(uid: string, tx?: Transaction, { orMissing = false } = {}): Promise<Person> {
   const read = (ref: DocumentReference) => (tx ? tx.get(ref) : ref.get());
   const [profile, account] = await Promise.all([read(users().doc(uid)), read(accountRef(uid))]);
-  return { uid, profile: profileOf(profile), account: accountOf(account) };
+  return { uid, profile: profileOf(profile, { orMissing }), account: accountOf(account) };
 }
 
 export function projectId(): string {
@@ -157,13 +170,17 @@ export function projectId(): string {
 
 type Writer = { set(ref: DocumentReference, data: DocumentData, options: SetOptions): unknown };
 
-/** Creates or refreshes the 1:1 chat between two people, with their names and avatars. */
+/**
+ * Creates or refreshes the 1:1 chat between two people, with their names and avatars. A chat
+ * closed when they parted ways opens again.
+ */
 export function ensureChat(writer: Writer, a: Person, b: Person, id: string): void {
   const avatar = (p: Person) => ({ flower: p.profile.flower, color: p.profile.avatarColor, photo: p.profile.photoUrl });
   writer.set(
     chats().doc(id),
     {
       participants: [a.uid, b.uid].toSorted(),
+      closed: false,
       names: { [a.uid]: a.profile.displayName, [b.uid]: b.profile.displayName },
       avatars: { [a.uid]: avatar(a), [b.uid]: avatar(b) },
     },
@@ -171,21 +188,31 @@ export function ensureChat(writer: Writer, a: Person, b: Person, id: string): vo
   );
 }
 
-/** Adds a message to a chat (if it exists) and bumps the chat summary. */
+/**
+ * Adds a message to a chat (if it exists and is open) and bumps the chat summary. Only the note
+ * saying how two people parted ways goes into a closed chat ([evenIfClosed]). Never throws: it
+ * runs once what it describes has already happened, which a failure here mustn't make look failed.
+ */
 export async function postToChat(
   chatId: string,
   message: { senderId: string; kind: "text" | "request" | "system"; text: string; requestId?: string },
+  { evenIfClosed = false } = {},
 ): Promise<void> {
-  const chatRef = chats().doc(chatId);
-  if (!(await chatRef.get()).exists) return;
-  const batch = db().batch();
-  batch.set(chatRef.collection("messages").doc(), { ...message, createdAt: FieldValue.serverTimestamp() });
-  batch.update(chatRef, {
-    lastMessage: message.text.slice(0, 140),
-    lastMessageAt: FieldValue.serverTimestamp(),
-    lastSenderId: message.senderId,
-  });
-  await batch.commit();
+  try {
+    const chatRef = chats().doc(chatId);
+    const chat = await chatRef.get();
+    if (!chat.exists || (chat.get("closed") === true && !evenIfClosed)) return;
+    const batch = db().batch();
+    batch.set(chatRef.collection("messages").doc(), { ...message, createdAt: FieldValue.serverTimestamp() });
+    batch.update(chatRef, {
+      lastMessage: message.text.slice(0, 140),
+      lastMessageAt: FieldValue.serverTimestamp(),
+      lastSenderId: message.senderId,
+    });
+    await batch.commit();
+  } catch (e) {
+    logger.warn("Chat note failed", { chatId, error: String(e) });
+  }
 }
 
 /**

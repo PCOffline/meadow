@@ -1,6 +1,7 @@
 import { type DocumentData, type DocumentReference, FieldValue, Timestamp, type Transaction, type UpdateData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
+import { inChunks } from "./chunks";
 import { chatNotes, errors, pushes } from "./copy";
 import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
 import { chatIdFor, formatMinutes, type RequestType, summarize } from "./format";
@@ -203,15 +204,15 @@ export async function expireStaleRequests(now: number): Promise<number> {
     .where("createdAt", "<", Timestamp.fromMillis(now - REQUEST_TTL_MS))
     .limit(400)
     .get();
-  for (const d of stale.docs) {
-    await db().runTransaction(async (tx) => {
+  // Each request settles in its own transaction, touching only its own documents.
+  await inChunks(stale.docs, (d) =>
+    db().runTransaction(async (tx) => {
       const snap = await tx.get(d.ref);
       if (snap.get("status") !== "pending") return;
       const inboxes = await existingInboxes(tx, d.id, (snap.get("approverIds") as string[] | undefined) ?? []);
       tx.update(d.ref, { status: "expired", decidedAt: FieldValue.serverTimestamp() });
       updateInboxes(tx, d.id, inboxes, "expired");
-    }).catch((e) => logger.warn("Could not expire request", { id: d.id, error: String(e) }));
-  }
+    }).catch((e) => logger.warn("Could not expire request", { id: d.id, error: String(e) })));
   return stale.size;
 }
 
