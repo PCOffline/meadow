@@ -30,7 +30,7 @@ adb logcat -s MeadowTrace
 | `✗ call createProfile failed after 95 ms` | Its error, with the code (`NOT_FOUND`, `PERMISSION_DENIED`…) in the stack trace. |
 | `⇢ listen doc users/abc` | The app started listening to a document or collection. |
 | `⇠ doc users/abc: exists=true fromCache=false pendingWrites=false data={…}` | Each snapshot. `fromCache=true` means the server hasn't answered yet. |
-| `✗ listener doc users/abc failed` | The server refused or failed the read, with the reason. |
+| `✗ listener doc users/abc failed` | The server refused or failed the read, with the reason. The app listens again after a pause: 1 s, doubling up to a minute. |
 | `→ upload avatars/abc (48213 bytes)` / `→ download exports/abc/…` | Storage transfers. |
 | `push registered as …` / `push received: {…}` | Push registration and each push. |
 | `push dropped: not for the signed-in account` | A push whose `to` isn't the account signed in now (or nobody is), so it isn't shown. |
@@ -50,7 +50,7 @@ The trace contains people's data (names, messages, limits). Release builds never
 flag only applies to debug builds.
 
 Without trace mode, failures the app hides from people are still logged:
-`adb logcat -s MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian`.
+`adb logcat -s Meadow MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian`.
 
 ## Android Studio
 

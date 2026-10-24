@@ -26,6 +26,7 @@ class ChatRepository(private val backend: Backend) {
             .observe()
             .map { snapshot -> snapshot.documents.map { it.toMessage() } }
 
+    /** Sends [text]; throws if the server refuses it. Offline, it's queued and counts as sent ([awaitWrite]). */
     suspend fun send(chatId: String, text: String) {
         val uid = backend.requireUid()
         val body = text.trim()
@@ -51,7 +52,7 @@ class ChatRepository(private val backend: Backend) {
                 "lastRead.$uid" to FieldValue.serverTimestamp(),
             ),
         )
-        batch.commit()
+        batch.commit().awaitWrite()
     }
 
     suspend fun markRead(chatId: String) {

@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow
 
 import android.app.Application
+import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -28,6 +29,7 @@ import dev.pcoffline.meadow.update.Updater
 import dev.pcoffline.meadow.usage.AppCatalog
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,7 +39,10 @@ object AppGraph {
     lateinit var app: Application
         private set
 
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Work on [scope] that fails is logged; uncaught, it would crash the whole app. */
+    private val logFailures = CoroutineExceptionHandler { _, e -> Log.e(TAG, "Background work failed", e) }
+
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + logFailures)
 
     /** False when the app was built without a google-services.json. */
     var backendReady = false
@@ -85,6 +90,8 @@ object AppGraph {
             }
         }
     }
+
+    private const val TAG = "Meadow"
 
     /** Points Firebase at the local emulators, for end-to-end tests. Never set in release builds. */
     private fun useEmulators(application: Application, host: String) {
