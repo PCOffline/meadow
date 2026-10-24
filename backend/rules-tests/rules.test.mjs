@@ -182,9 +182,33 @@ describe("limits", () => {
     await assertFails(deleteDoc(ref));
   });
 
+  test("with Bumblebees an app keeps its name, so a request can't pass it off as another", async () => {
+    await seed();
+    const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    // Even a stricter (or unchanged) limit can't rename the app.
+    await assertFails(setDoc(ref, { ...limit(20, 300), appName: "Calculator" }));
+    await assertFails(setDoc(ref, { ...limit(30, 300), appName: "Calculator" }));
+    await assertFails(updateDoc(ref, { appName: "Calculator" }));
+    await assertSucceeds(setDoc(ref, limit(20, 300)));
+  });
+
+  test("limits hold nothing but the limit", async () => {
+    await seed();
+    const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    await assertSucceeds(setDoc(ref, { ...limit(20, 300), updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { ...limit(20, 300), label: "Calculator" }));
+    await assertFails(updateDoc(ref, { label: "Calculator" }));
+    const tok = doc(as("sam"), "users/sam/limits/com.tok");
+    await assertFails(setDoc(tok, { ...limit(15), packageName: "com.tok", label: "Calculator" }));
+    await assertSucceeds(setDoc(tok, { ...limit(15), packageName: "com.tok", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+    await seed({ samHasBee: false });
+    await assertFails(setDoc(ref, { ...limit(90, 0), label: "Calculator" }));
+  });
+
   test("without Bumblebees you can change anything", async () => {
     await seed({ samHasBee: false });
     const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    await assertSucceeds(setDoc(ref, { ...limit(30, 300), appName: "Insta" }));
     await assertSucceeds(setDoc(ref, limit(90, 0)));
     await assertSucceeds(deleteDoc(ref));
   });

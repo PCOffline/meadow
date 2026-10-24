@@ -60,6 +60,15 @@ export function limitText(daily: number, weekly: number, schedule?: Schedule | n
   return parts.length ? parts.join(", ").replace(/, ([^,]*)$/, " and $1") : "no limit";
 }
 
+/**
+ * The name a stored limit was planted under, or the package name when there's none. Bumblebees
+ * read it, so it never comes from what a phone says about a request or an unlock.
+ */
+export function storedAppName(limit: { get(field: string): unknown } | null, packageName: string): string {
+  const name = limit?.get("appName");
+  return typeof name === "string" && name.trim() !== "" ? name : packageName;
+}
+
 /** Lower-case phrase describing what was asked, e.g. "15 more minutes on Instagram". */
 export function summarize(r: RequestSummary): string {
   const app = r.appName ?? "an app";
