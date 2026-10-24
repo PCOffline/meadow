@@ -178,7 +178,8 @@ The deploy:
 - uploads the Storage rules, then sets the bucket's lifecycle rule (`backend/apply-lifecycle.cjs`,
   from `backend/storage-lifecycle.json`): data exports are deleted as soon as the app downloads
   them, and the rule deletes any never downloaded once it is a day old (Cloud Storage applies
-  lifecycle rules within about a day of that, so within two days at most);
+  lifecycle rules within about a day of that, so within two days at most). It replaces only
+  Meadow's own rule (a delete rule for `exports/`) and keeps any other rules on the bucket;
 - compiles the functions (`backend/build-functions.cjs`) and deploys them to the region in
   `backend/functions/.env` (see below),
   along with two scheduled jobs: `expireRequests` every 5 minutes and `hourlyCare` every hour;
@@ -198,7 +199,8 @@ storage costs at zero.
 - **Firestore → Rules** shows Meadow's rules, and **Firestore → Indexes** lists four indexes.
   They show *Building* for a few minutes, then *Enabled*.
 - **Storage → Rules** shows Meadow's rules, and the bucket's **Lifecycle** tab (in the Google
-  Cloud console) has one rule: delete objects under `exports/` after 1 day.
+  Cloud console) has Meadow's rule, delete objects under `exports/` after 1 day, next to any
+  rules you added yourself.
 - `https://<project-id>.web.app/privacy` opens the privacy notice.
 
 **The functions region** is set in one place, `backend/functions/.env`:
