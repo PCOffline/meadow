@@ -17,7 +17,9 @@ name: Deliver
 # (major included, which is how a version leaves 0.x), or auto to read it from the commits.
 # By tag: pushing a tag like v1.2.0 releases exactly that version of the app (no deploy).
 on:
-  workflow_run:
+  # Runs with this repository's secrets after Build. The jobs only act on pushes to this
+  # repository's main (see their conditions), never on pull requests or forks.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [Build]
     types: [completed]
     branches: [main]
@@ -36,13 +38,8 @@ on:
         options: [none, auto, patch, minor, major]
         default: none
 
-permissions:
-  contents: read
-
-# One delivery at a time, so two quick merges can't deploy out of order or claim the same version.
-concurrency:
-  group: deliver
-  cancel-in-progress: false
+# Each job asks for only what it needs.
+permissions: {}
 
 env:
   # The commit that passed Build, or the one this run was started on.
@@ -59,6 +56,12 @@ jobs:
         github.event.workflow_run.head_repository.full_name == github.repository) ||
       (github.event_name == 'workflow_dispatch' && inputs.deploy != 'none')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # One deploy at a time, so two quick merges can't deploy out of order or claim the same
+    # version. On the job, so runs that skip it never queue behind (or cancel) one that doesn't.
+    concurrency:
+      group: deliver-deploy
+      cancel-in-progress: false
     permissions:
       contents: write # tags the deployed version
       id-token: write # signs in to Google Cloud without a stored key (Workload Identity Federation)
@@ -67,14 +70,17 @@ jobs:
     steps:
       - name: Only deploy from main
         if: github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch
+        env:
+          MAIN: ${{ github.event.repository.default_branch }}
         run: |
-          echo "::error::Run this workflow on ${{ github.event.repository.default_branch }}"
+          echo "::error::Run this workflow on $MAIN"
           exit 1
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.SHA }}
           # The whole history and tags, to find the last deployed version and what changed since.
           fetch-depth: 0
+          persist-credentials: false
       - name: Choose the backend version
         id: plan
         env:
@@ -108,8 +114,10 @@ jobs:
             echo "::error::Set GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT, or the FIREBASE_SERVICE_ACCOUNT secret (docs/self-hosting.md, 7.6)"
             exit 1
           fi
-      - uses: actions/setup-node@v7
-        if: steps.plan.outputs.ship == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.plan.outputs.ship == 'true' # zizmor: ignore[cache-poisoning]
+        # Caches speed up the deploy. Runs here are on main, which can only read caches saved by
+        # main's own runs (GitHub scopes caches by branch), never ones a pull request saved.
         with:
           node-version: 24
           cache: npm
@@ -122,13 +130,13 @@ jobs:
         run: npm ci && npm --prefix functions ci
       - name: Sign in to Google Cloud (Workload Identity Federation)
         if: steps.plan.outputs.ship == 'true' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       - name: Sign in to Google Cloud (service account key)
         if: steps.plan.outputs.ship == 'true' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER == ''
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       - name: Deploy
@@ -142,11 +150,10 @@ jobs:
       - name: Tag the deployed version
         if: steps.plan.outputs.ship == 'true' && steps.plan.outputs.tag != ''
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.plan.outputs.tag }}
-        # Tags pushed with this token don't start another Deliver run.
-        run: |
-          git tag "$TAG" "$SHA"
-          git push origin "refs/tags/$TAG"
+        # Tags made with this token don't start another Deliver run.
+        run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$SHA" > /dev/null
 
   release:
     name: Release the APK
@@ -161,19 +168,27 @@ jobs:
           github.event.workflow_run.event == 'push' &&
           github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: deliver-release
+      cancel-in-progress: false
     permissions:
       contents: write # creates the release and its tag
+      actions: read # checks that Build passed on the commit
     steps:
       - name: Only release from main
         if: github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch
+        env:
+          MAIN: ${{ github.event.repository.default_branch }}
         run: |
-          echo "::error::Run this workflow on ${{ github.event.repository.default_branch }}"
+          echo "::error::Run this workflow on $MAIN"
           exit 1
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.SHA }}
           # The whole history and tags, to find the last release and what changed since.
           fetch-depth: 0
+          persist-credentials: false
       - name: Choose the version
         id: plan
         env:
@@ -186,13 +201,32 @@ jobs:
         env:
           REASON: ${{ steps.plan.outputs.reason }}
         run: echo "::notice::No release, because $REASON"
-      - uses: actions/setup-java@v6
+      # Every install updates to a release, so only commits that are on main and passed Build
+      # are released. Automatic runs start from a passing Build on main already.
+      - name: Only release what passed Build on main
+        if: steps.plan.outputs.ship == 'true' && github.event_name != 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAIN: ${{ github.event.repository.default_branch }}
+        run: |
+          if ! git merge-base --is-ancestor "$SHA" "origin/$MAIN"; then
+            echo "::error::$SHA isn't on $MAIN. Release only commits that are on $MAIN."
+            exit 1
+          fi
+          passed=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --commit "$SHA" --status success --limit 1 --json databaseId --jq length)
+          if [ "$passed" = 0 ]; then
+            echo "::error::Build hasn't passed on $SHA. Wait for it to pass, then try again."
+            exit 1
+          fi
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         if: steps.plan.outputs.ship == 'true'
         with:
           distribution: temurin
           java-version: 25
-      - uses: gradle/actions/setup-gradle@v6
-        if: steps.plan.outputs.ship == 'true'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        if: steps.plan.outputs.ship == 'true' # zizmor: ignore[cache-poisoning]
+        # Caches speed up the release build. Runs here are on main, which can only read caches saved by
+        # main's own runs (GitHub scopes caches by branch), never ones a pull request saved.
       - name: Add Firebase config
         if: steps.plan.outputs.ship == 'true'
         env:
@@ -203,26 +237,31 @@ jobs:
             exit 1
           fi
           echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+      # Tests run before the signing key is on the runner, so test code never sees it.
+      - name: Test
+        if: steps.plan.outputs.ship == 'true'
+        run: ./gradlew testDebugUnitTest --stacktrace
       - name: Add signing key
         if: steps.plan.outputs.ship == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.MEADOW_KEYSTORE_BASE64 }}
+          MEADOW_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::error::Add the MEADOW_KEYSTORE_BASE64, MEADOW_KEYSTORE_PASSWORD, MEADOW_KEY_ALIAS and MEADOW_KEY_PASSWORD secrets before releasing"
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-          echo "MEADOW_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-      - name: Test and build
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$MEADOW_KEYSTORE_PATH"
+      - name: Build the signed APK
         if: steps.plan.outputs.ship == 'true'
         env:
           VERSION: ${{ steps.plan.outputs.version }}
+          MEADOW_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
           MEADOW_KEYSTORE_PASSWORD: ${{ secrets.MEADOW_KEYSTORE_PASSWORD }}
           MEADOW_KEY_ALIAS: ${{ secrets.MEADOW_KEY_ALIAS }}
           MEADOW_KEY_PASSWORD: ${{ secrets.MEADOW_KEY_PASSWORD }}
         # Copies built from a fork look for updates on that fork's releases.
-        run: ./gradlew testDebugUnitTest assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
+        run: ./gradlew assembleRelease -Pmeadow.version="$VERSION" -Pmeadow.updateRepo="$GITHUB_REPOSITORY" --stacktrace
       - name: Publish
         if: steps.plan.outputs.ship == 'true'
         env:

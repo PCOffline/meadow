@@ -153,5 +153,10 @@ release version:
         echo "Commit or stash your changes first" >&2
         exit 1
     fi
+    git fetch --quiet origin main
+    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+        echo "Release from main as it is on GitHub: check out main and pull first" >&2
+        exit 1
+    fi
     git tag "v{{ version }}"
     git push origin "v{{ version }}"
