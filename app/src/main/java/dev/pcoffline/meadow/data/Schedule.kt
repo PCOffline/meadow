@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.data
 import kotlinx.serialization.Serializable
 import java.time.Duration
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /** Allowed hours on one day, in minutes since midnight: 10:00–16:00 is TimeWindow(600, 960). */
@@ -19,6 +20,17 @@ data class TimeWindow(val from: Int, val to: Int) {
     companion object {
         const val MINUTES_IN_DAY = 1440
         val ALL_DAY = TimeWindow(0, MINUTES_IN_DAY)
+
+        /**
+         * When the clock in [zone] first reads [minute] on [day] (1440 is the next midnight). On a
+         * day the clocks change, a skipped time is the moment they skip it, and a repeated time is
+         * the first time it comes round.
+         */
+        fun edge(day: LocalDate, minute: Int, zone: ZoneId): ZonedDateTime {
+            val local = day.atStartOfDay().plusMinutes(minute.toLong())
+            val transition = zone.rules.getTransition(local)
+            return if (transition?.isGap == true) transition.instant.atZone(zone) else local.atZone(zone)
+        }
     }
 }
 
@@ -47,19 +59,19 @@ data class Schedule(val days: Map<Int, List<TimeWindow>> = emptyMap()) {
         if (allows(at)) {
             var window = windowsOn(day.dayOfWeek.value).first { it.contains(minute) }
             repeat(7) {
-                if (window.to < TimeWindow.MINUTES_IN_DAY) return Duration.between(at, startOf(day, at).plusMinutes(window.to.toLong()))
+                if (window.to < TimeWindow.MINUTES_IN_DAY) return Duration.between(at, edgeAfter(at, day, window.to))
                 day = day.plusDays(1)
                 window = windowsOn(day.dayOfWeek.value).firstOrNull { it.from == 0 }
-                    ?: return Duration.between(at, startOf(day, at))
+                    ?: return Duration.between(at, edgeAfter(at, day, 0))
             }
             return null
         }
         windowsOn(day.dayOfWeek.value).firstOrNull { it.from > minute }
-            ?.let { return Duration.between(at, startOf(day, at).plusMinutes(it.from.toLong())) }
+            ?.let { return Duration.between(at, edgeAfter(at, day, it.from)) }
         repeat(7) {
             day = day.plusDays(1)
             windowsOn(day.dayOfWeek.value).firstOrNull()
-                ?.let { return Duration.between(at, startOf(day, at).plusMinutes(it.from.toLong())) }
+                ?.let { return Duration.between(at, edgeAfter(at, day, it.from)) }
         }
         return null
     }
@@ -104,6 +116,8 @@ data class Schedule(val days: Map<Int, List<TimeWindow>> = emptyMap()) {
 
         private fun minuteOf(at: ZonedDateTime) = at.hour * 60 + at.minute
 
-        private fun startOf(day: LocalDate, at: ZonedDateTime) = day.atStartOfDay(at.zone)
+        /** The next time after [at] the clock reads [minute] on [day]: when that hour repeats, maybe its second time. */
+        private fun edgeAfter(at: ZonedDateTime, day: LocalDate, minute: Int): ZonedDateTime =
+            TimeWindow.edge(day, minute, at.zone).let { if (it.isAfter(at)) it else it.withLaterOffsetAtOverlap() }
     }
 }

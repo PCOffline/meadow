@@ -7,6 +7,8 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Duration
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
@@ -16,6 +18,14 @@ class ScheduleTest {
     private fun monday(hour: Int, minute: Int = 0) = ZonedDateTime.of(2026, 10, 12, hour, minute, 0, 0, ZoneOffset.UTC)
 
     private val untilTen = Schedule.everyDay(TimeWindow(0, 22 * 60))
+
+    private val berlin = ZoneId.of("Europe/Berlin")
+
+    /** Clocks in Berlin went forward at 02:00 on Sunday 29 March 2026: there was no 02:00–03:00. */
+    private fun springForward(hour: Int, minute: Int = 0) = ZonedDateTime.of(2026, 3, 29, hour, minute, 0, 0, berlin)
+
+    /** Clocks in Berlin go back at 03:00 on Sunday 25 October 2026: 02:00–03:00 comes round twice. */
+    private fun fallBack(hour: Int, minute: Int = 0) = ZonedDateTime.of(2026, 10, 25, hour, minute, 0, 0, berlin)
 
     @Test
     fun `allowed hours are checked against the time of day`() {
@@ -42,6 +52,41 @@ class ScheduleTest {
         val lateNights = Schedule.everyDay(TimeWindow(0, 60), TimeWindow(20 * 60, TimeWindow.MINUTES_IN_DAY))
         assertEquals(Duration.ofHours(2), lateNights.untilChange(monday(23)))
         assertNull(Schedule().untilChange(monday(12)))
+    }
+
+    @Test
+    fun `the time until hours change follows the clock on the days it changes`() {
+        val officeHours = Schedule.everyDay(TimeWindow(10 * 60, 16 * 60))
+        // A 23-hour day: an hour less to wait, but 21:00 is still an hour from 22:00.
+        assertEquals(Duration.ofHours(1), untilTen.untilChange(springForward(21)))
+        assertEquals(Duration.ofHours(9), officeHours.untilChange(springForward(0)))
+        // A 25-hour day: an hour more to wait, but 21:00 is still an hour from 22:00.
+        assertEquals(Duration.ofHours(1), untilTen.untilChange(fallBack(21)))
+        assertEquals(Duration.ofHours(11), officeHours.untilChange(fallBack(0)))
+    }
+
+    @Test
+    fun `hours ending in a skipped or repeated hour end when the clock first passes them`() {
+        val untilHalfTwo = Schedule.everyDay(TimeWindow(0, 2 * 60 + 30))
+        // 02:30 is skipped: the hours end when the clock jumps from 02:00 to 03:00.
+        assertEquals(Duration.ofHours(1), untilHalfTwo.untilChange(springForward(1)))
+        assertFalse(untilHalfTwo.allows(springForward(3)))
+        // 02:30 comes twice: the hours end the first time, and again the second.
+        assertEquals(Duration.ofMinutes(90), untilHalfTwo.untilChange(fallBack(1)))
+        val repeated = fallBack(2, 15).withLaterOffsetAtOverlap()
+        assertTrue(untilHalfTwo.allows(repeated))
+        assertEquals(Duration.ofMinutes(15), untilHalfTwo.untilChange(repeated))
+    }
+
+    @Test
+    fun `window edges are times on the clock`() {
+        val fallBackDay = LocalDate.of(2026, 10, 25)
+        assertEquals(fallBack(22), TimeWindow.edge(fallBackDay, 22 * 60, berlin))
+        assertEquals(fallBack(2, 30), TimeWindow.edge(fallBackDay, 2 * 60 + 30, berlin))
+        assertEquals(ZonedDateTime.of(2026, 10, 26, 0, 0, 0, 0, berlin), TimeWindow.edge(fallBackDay, TimeWindow.MINUTES_IN_DAY, berlin))
+        val springForwardDay = LocalDate.of(2026, 3, 29)
+        assertEquals(springForward(22), TimeWindow.edge(springForwardDay, 22 * 60, berlin))
+        assertEquals(springForward(3), TimeWindow.edge(springForwardDay, 2 * 60 + 30, berlin))
     }
 
     @Test
