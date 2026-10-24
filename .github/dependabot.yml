@@ -1,0 +1,32 @@
+# Weekly pull requests that keep dependencies and the pinned actions current. Each ecosystem's
+# updates come grouped in one pull request; security updates still arrive on their own.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      gradle:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      backend:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /backend/functions
+    schedule:
+      interval: weekly
+    groups:
+      functions:
+        patterns: ['*']
