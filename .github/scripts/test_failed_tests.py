@@ -14,9 +14,9 @@ RESULTS = """<?xml version="1.0"?>
     <failure>org.junit.AssumptionViolatedException: Build with -Pmeadow.showcase</failure>
   </testcase>
   <testcase name="crashes" classname="dev.pcoffline.meadow.ui.screens.RenderedContrastTest">
-    <error>%s</error>
+    <error>{}</error>
   </testcase>
-</testsuite>""" % "\n".join(f"line {i}" for i in range(40))
+</testsuite>""".format("\n".join(f"line {i}" for i in range(40)))
 
 
 HANG = """<?xml version="1.0"?>

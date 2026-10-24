@@ -1,9 +1,9 @@
-import { FieldValue, Timestamp, Transaction } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { chatNotes, errors, pushes } from "./copy";
 import {
-  accountOf, accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, Person,
+  accountOf, accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
   postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken } from "./format";
