@@ -160,6 +160,25 @@ async function rejects(promise, code, messagePart) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * Calls a function as `uid` with a hand-made sign-in token, to test claims a real sign-in
+ * can't produce (such as one from an hour ago). The Functions emulator doesn't check signatures.
+ */
+async function callAs(fn, uid, { provider = "password", signedInAgoMs = 0 } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const part = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const token = [part({ alg: "none", typ: "JWT" }), part({
+    iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: uid, user_id: uid, iat: now, exp: now + 3600,
+    auth_time: now - Math.floor(signedInAgoMs / 1000), firebase: { sign_in_provider: provider, identities: {} },
+  }), ""].join(".");
+  const response = await fetch(`http://127.0.0.1:5001/${PROJECT}/${REGION}/${fn}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ data: {} }),
+  });
+  return { status: response.status, body: await response.json() };
+}
+
 describe("profiles", () => {
   test("createProfile writes a name card, a private account and a friend code", async () => {
     const sam = await person("Sam", { flower: "🐝" });
@@ -305,6 +324,15 @@ describe("friend codes", () => {
     const sam = await person("Sam");
     await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(sam) }), "invalid-argument");
     await rejects(sam.call("sendInvite", { friendCode: "ZZZZZZ" }), "not-found");
+  });
+
+  test("codes can't be guessed: every lookup counts, found or not", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    for (let i = 0; i < 30; i++) await rejects(sam.call("sendInvite", { friendCode: `ZZZZ${i}` }), "not-found");
+    // Even a real code isn't looked up any more today, so nobody learns whether it exists.
+    await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(bee) }), "resource-exhausted", /friend codes today/);
+    assert.equal((await outbox(bee.uid, "invite")).length, 0);
   });
 });
 
@@ -592,6 +620,38 @@ describe("requests", () => {
     assert.equal(limit.dailyMinutes, 20);
   });
 
+  test("Bumblebees are told the app the request is really about, whatever name the phone gives", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", {
+      type: "remove_limit", packageName: "com.insta", appName: "Calculator", dayKey: today(),
+    });
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.title, /removing the limit on Instagram/);
+    assert.doesNotMatch(push.title + push.body, /Calculator/);
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).appName, "Instagram");
+    assert.equal((await read(`requests/${requestId}`)).appName, "Instagram");
+    const chatId = [sam.uid, bee.uid].sort().join("_");
+    const notes = await admin(async (db) => (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.get("text")));
+    assert.ok(notes.some((t) => /removing the limit on Instagram/.test(t)), notes.join(" | "));
+    assert.ok(notes.every((t) => !/Calculator/.test(t)), notes.join(" | "));
+
+    // A yes to a new limit keeps the app's name, too.
+    await bee.call("decideRequest", { requestId, approve: false });
+    const change = await sam.call("createRequest", {
+      type: "change_limit", packageName: "com.insta", appName: "Calculator", dailyMinutes: 60, weeklyMinutes: 0, dayKey: today(),
+    });
+    await bee.call("decideRequest", { requestId: change.requestId, approve: true });
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).appName, "Instagram");
+  });
+
+  test("saveLimit keeps a limit's name; only a new limit takes the phone's", async () => {
+    const { sam } = await gardenWithLimit();
+    await sam.call("saveLimit", { packageName: "com.insta", appName: "Calculator", dailyMinutes: 20, weeklyMinutes: 0 });
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).appName, "Instagram");
+    await sam.call("saveLimit", { packageName: "com.tok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 });
+    assert.equal((await read(`users/${sam.uid}/limits/com.tok`)).appName, "TikTok");
+  });
+
   test("asking needs a Bumblebee and an existing limit", async () => {
     const lonely = await person("Lonely");
     await rejects(lonely.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() }), "failed-precondition");
@@ -692,6 +752,58 @@ describe("emergency unlocks", () => {
     const offline = await sam.call("emergencyUnlock", { minutes: 15, reason: "Was offline at the time", startedAt: Date.now() - 60_000 });
     assert.equal(offline.remaining, 0);
   });
+
+  test("reports are rate limited, and the account keeps only the latest unlock times", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Far more unlocks on record than anyone could make, as an older version may have stored.
+    const old = Array.from({ length: 25 }, (_, i) => Timestamp.fromMillis(Date.now() - (i + 1) * 3600_000));
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}/private/account`), { emergencyUses: old }));
+
+    for (let i = 0; i < 6; i++) {
+      const report = { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() - (i + 1) * 60_000 };
+      assert.equal((await sam.call("emergencyUnlock", report)).remaining, 0);
+    }
+    const uses = (await read(`users/${sam.uid}/private/account`)).emergencyUses.map((t) => t.toMillis());
+    assert.equal(uses.length, 20);
+    assert.deepEqual(uses, [...uses].sort((a, b) => a - b));
+    await rejects(sam.call("emergencyUnlock", { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() }),
+      "resource-exhausted");
+    assert.equal((await outbox(bee.uid, "emergency")).length, 6);
+  });
+
+  test("Bumblebees are told what was really unlocked, whatever name the phone gives", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), {
+      packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0,
+    }));
+    const unlockAgain = () => admin((db) => updateDoc(doc(db, `users/${sam.uid}/private/account`), { emergencyUntil: null }));
+    const seen = [];
+    const expectPush = async (pattern) => {
+      const body = (await outbox(bee.uid, "emergency")).map((p) => p.body).find((b) => !seen.includes(b));
+      seen.push(body);
+      assert.match(body, pattern);
+      assert.doesNotMatch(body, /Maps/);
+    };
+
+    // No app named: every limit is lifted, and that's what Bumblebees read.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need maps to find the vet", packageName: null, appName: "Maps" });
+    await expectPush(/Lifted all limits for 15 minutes/);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).emergencyPackage, null);
+    await unlockAgain();
+    // One app: its limit's own name.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need it for a real reason", packageName: "com.insta", appName: "Maps" });
+    await expectPush(/Lifted Instagram for 15 minutes/);
+    await unlockAgain();
+    // An app without a limit: its package name.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need it for a real reason", packageName: "com.other", appName: "Maps" });
+    await expectPush(/Lifted com\.other for 15 minutes/);
+    const records = await admin(async (db) => (await getDocs(collection(db, `users/${sam.uid}/emergencies`))).docs.map((d) => d.get("appName")));
+    assert.deepEqual(records.sort(), ["Instagram", "com.other", null].sort());
+  });
 });
 
 describe("chat and alerts", () => {
@@ -763,6 +875,27 @@ describe("your data", () => {
     assert.equal((await outbox(friend.uid, "approver_left")).length, 1);
     assert.equal((await outbox(bystander.uid)).length, 0);
     await assert.rejects(signInWithEmailAndPassword(sam.auth, sam.email, "petals-and-bees"));
+  });
+
+  test("deleting an account needs a recent sign-in, so a stolen token alone can't do it", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const stale = await callAs("deleteAccount", sam.uid, { signedInAgoMs: 60 * 60_000 });
+    assert.equal(stale.status, 401);
+    assert.equal(stale.body.error.status, "UNAUTHENTICATED");
+    assert.match(stale.body.error.message, /sign in again/);
+    assert.ok(await read(`users/${sam.uid}`));
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, [sam.uid]);
+    assert.equal((await outbox(bee.uid, "approver_left")).length, 0);
+    assert.equal((await callAs("deleteAccount", sam.uid, { signedInAgoMs: 60_000 })).status, 200);
+    assert.equal(await read(`users/${sam.uid}`), undefined);
+  });
+
+  test("a garden without an email, which has no way to sign in again, can still be deleted", async () => {
+    const anon = await person("Anon", { anonymous: true });
+    assert.equal((await callAs("deleteAccount", anon.uid, { provider: "anonymous", signedInAgoMs: 24 * 3600_000 })).status, 200);
+    assert.equal(await read(`users/${anon.uid}`), undefined);
   });
 });
 

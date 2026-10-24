@@ -15,6 +15,8 @@ export const EMERGENCY_MINUTES = [15, 30, 60];
 const id = z.string().trim().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const note = z.string().trim().max(280).default("");
 const packageName = z.string().trim().regex(/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/, errors.whichApp).max(200);
+/** Whether `s` is a package name, and so safe to use as a limit's document id. */
+export const isPackageName = (s: string): boolean => packageName.safeParse(s).success;
 const appName = z.string().trim().max(100).nullish();
 const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, errors.badDate);
 export const inviteToken = z.string().trim().regex(new RegExp(`^[A-Za-z0-9]{${INVITE_TOKEN_LENGTH}}$`), errors.linkGone);
@@ -76,6 +78,7 @@ export const EmergencyInput = z.object({
   minutes: z.number().int().refine((m) => EMERGENCY_MINUTES.includes(m), errors.emergencyMinutes),
   reason: z.string().trim().min(10, errors.emergencyReason).max(280),
   packageName: z.string().trim().max(200).nullish(),
+  // Ignored: Bumblebees are told the name the limit was planted under (see emergencyUnlock).
   appName: z.string().trim().max(100).nullish(),
   // Set only when reporting an unlock the phone already took while offline.
   startedAt: z.number().int().positive().nullish(),

@@ -7,7 +7,7 @@ import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
 import {
   accountRef, chats, consumeRate, db, friendCodes, heartbeats, inboxRef, inviteLinks, invites, loadPerson, notify, rateLimits,
-  removals, requests, requireAuth, users,
+  removals, requests, requireAuth, requireRecentSignIn, users,
 } from "./db";
 
 const EXPORTS_PER_DAY = 5;
@@ -68,10 +68,12 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
 
 /**
  * Deletes the caller's account and everything tied to it. The people directly affected (their
- * Bumblebees, and the friends they looked after) are told; no one else is.
+ * Bumblebees, and the friends they looked after) are told; no one else is. Needs a sign-in from
+ * the last few minutes (see [requireRecentSignIn]).
  */
 export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
   const uid = requireAuth(req);
+  requireRecentSignIn(req);
   const me = await loadPerson(uid).catch(() => null);
   const userRef = users().doc(uid);
 

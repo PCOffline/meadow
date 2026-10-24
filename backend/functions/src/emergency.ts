@@ -1,17 +1,24 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, emergencyHeadline, emergencyScope, errors, pushes } from "./copy";
-import { accountOf, accountRef, db, notify, parse, postToChat, profileOf, requireAuth, users } from "./db";
+import { accountOf, accountRef, consumeRate, db, notify, parse, postToChat, profileOf, requireAuth, users } from "./db";
 
 // Emergency state lives in the owner-only account document; the record of each unlock in
 // users/{uid}/emergencies, which Bumblebees may read since they're told about every unlock.
-import { chatIdFor } from "./format";
-import { EmergencyInput } from "./schemas";
+import { chatIdFor, storedAppName } from "./format";
+import { EmergencyInput, isPackageName } from "./schemas";
 
 /** Emergency unlocks skip approval, so they're rationed and always reported to Bumblebees. */
 export const EMERGENCY_ALLOWANCE = 3;
 export const EMERGENCY_WINDOW_MS = 30 * 24 * 60 * 60_000;
 const MAX_OFFLINE_AGE_MS = 7 * 24 * 60 * 60_000;
+/**
+ * Unlocks recorded a day, offline reports included. The app makes at most four a month, so only a
+ * modified one meets this; without it, it could post and push to every Bumblebee without end.
+ */
+export const EMERGENCY_REPORTS_PER_DAY = 6;
+/** Unlock times kept on the account. Only whether the allowance is used up matters. */
+export const MAX_STORED_USES = 20;
 
 /** Start times of unlocks within the rolling window. */
 export function recentUses(raw: unknown, now: number): number[] {
@@ -22,18 +29,26 @@ export function recentUses(raw: unknown, now: number): number[] {
 }
 
 /**
+ * The unlock times to store after one more at `startedAt`: the most recent ones, oldest first.
+ * Offline unlocks can be reported late, so they're put in order before the oldest are dropped.
+ */
+export function withUse(uses: number[], startedAt: number): number[] {
+  return [...uses, startedAt].sort((a, b) => a - b).slice(-MAX_STORED_USES);
+}
+
+/**
  * Lifts limits right away for up to an hour. With `startedAt` it records an unlock the phone
  * already took while offline; that one is recorded even beyond the allowance, since it happened.
  * Phones allow one offline unlock per window, and so does this: any further "offline" report is
  * recorded and told to Bumblebees, but lifts nothing. Otherwise a modified app could unlock
- * forever by claiming to be offline.
+ * forever by claiming to be offline. Reports are rate limited (EMERGENCY_REPORTS_PER_DAY).
  */
 export const emergencyUnlock = onCall(async (req) => {
   const uid = requireAuth(req);
   const input = parse(EmergencyInput, req.data);
   const { minutes, reason } = input;
+  // Null lifts every limit, whatever app the phone names.
   const packageName = input.packageName || null;
-  const appName = input.appName || null;
   const now = Date.now();
   const offline = input.startedAt != null;
   const startedAt = input.startedAt == null ? now : Math.min(now, Math.max(now - MAX_OFFLINE_AGE_MS, input.startedAt));
@@ -44,8 +59,14 @@ export const emergencyUnlock = onCall(async (req) => {
   // A retried report (the reply was lost) reuses its id, so it's recorded and announced once.
   const emergencyRef = input.reportId ? userRef.collection("emergencies").doc(input.reportId) : userRef.collection("emergencies").doc();
 
+  const limitRef = packageName && isPackageName(packageName) ? userRef.collection("limits").doc(packageName) : null;
+
   const outcome = await db().runTransaction(async (tx) => {
-    const [profileSnap, snap, existing] = await Promise.all([tx.get(userRef), tx.get(stateRef), tx.get(emergencyRef)]);
+    const [profileSnap, snap, existing, limit] = await Promise.all([
+      tx.get(userRef), tx.get(stateRef), tx.get(emergencyRef), limitRef ? tx.get(limitRef) : Promise.resolve(null),
+    ]);
+    // Bumblebees are told the name the limit was planted under, not one the phone makes up.
+    const appName = packageName ? storedAppName(limit, packageName) : null;
     const currentUntil = (snap.get("emergencyUntil") as Timestamp | undefined)?.toMillis() ?? 0;
     if (existing.exists) return { duplicate: true as const, until: currentUntil };
     const user = { ...profileOf(profileSnap), approverIds: accountOf(snap).approverIds };
@@ -53,11 +74,13 @@ export const emergencyUnlock = onCall(async (req) => {
     const overAllowance = uses.length >= EMERGENCY_ALLOWANCE;
     if (overAllowance && !offline) throw new HttpsError("resource-exhausted", errors.emergencyUsedUp(EMERGENCY_ALLOWANCE));
     if (!offline && currentUntil > now) throw new HttpsError("failed-precondition", errors.emergencyActive);
+    const commitRate = await consumeRate(tx, uid, "emergency", EMERGENCY_REPORTS_PER_DAY, 24 * 60 * 60_000);
     const lastOffline = (snap.get("offlineEmergencyAt") as Timestamp | undefined)?.toMillis() ?? 0;
     const honoured = !offline || now - lastOffline > EMERGENCY_WINDOW_MS;
     const until = honoured ? Math.min(startedAt + minutes * 60_000, endedAt) : Math.min(now, endedAt);
+    commitRate();
     tx.update(stateRef, {
-      emergencyUses: [...uses, startedAt].map((ms) => Timestamp.fromMillis(ms)),
+      emergencyUses: withUse(uses, startedAt).map((ms) => Timestamp.fromMillis(ms)),
       emergencyUntil: Timestamp.fromMillis(honoured ? Math.max(until, currentUntil) : currentUntil),
       emergencyPackage: honoured ? packageName : (snap.get("emergencyPackage") ?? null),
       ...(offline && honoured ? { offlineEmergencyAt: Timestamp.fromMillis(now) } : {}),
@@ -75,13 +98,14 @@ export const emergencyUnlock = onCall(async (req) => {
     return {
       duplicate: false as const,
       user,
+      appName,
       until,
       remaining: Math.max(0, EMERGENCY_ALLOWANCE - uses.length - 1),
       overAllowance: overAllowance || !honoured,
     };
   });
   if (outcome.duplicate) return { until: outcome.until, remaining: 0 };
-  const { user, until, remaining, overAllowance } = outcome;
+  const { user, appName, until, remaining, overAllowance } = outcome;
 
   const headline = emergencyHeadline(user, offline, overAllowance);
   const scope = emergencyScope(appName, minutes);

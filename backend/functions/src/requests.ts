@@ -4,7 +4,7 @@ import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
 import { chatNotes, errors, pushes } from "./copy";
 import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
-import { chatIdFor, formatMinutes, type RequestType, summarize } from "./format";
+import { chatIdFor, formatMinutes, type RequestType, storedAppName, summarize } from "./format";
 import { isScheduleStricter, normalize, type Schedule } from "./schedule";
 import { CreateRequestInput, DecideRequestInput, RequestIdInput, SaveLimitInput } from "./schemas";
 
@@ -154,7 +154,8 @@ export const createRequest = onCall(async (call) => {
       requesterName: me.profile.displayName,
       type: input.type,
       packageName: input.packageName,
-      appName: input.appName || (limit.get("appName") as string),
+      // Bumblebees decide by this name, so it comes from the limit, never from the phone's say-so.
+      appName: storedAppName(limit, input.packageName),
       minutes: input.type === "extra_time" ? input.minutes : 0,
       dailyMinutes: input.type === "change_limit" ? input.dailyMinutes : 0,
       weeklyMinutes: input.type === "change_limit" ? input.weeklyMinutes : 0,
@@ -353,7 +354,8 @@ export const saveLimit = onCall(async (call) => {
     }
     tx.set(ref, {
       packageName: input.packageName,
-      appName: input.appName || snap.get("appName") || input.packageName,
+      // A limit keeps the name it was planted under; only a new one takes the phone's.
+      appName: snap.exists ? storedAppName(snap, input.packageName) : input.appName || input.packageName,
       dailyMinutes: input.dailyMinutes,
       weeklyMinutes: input.weeklyMinutes,
       schedule: schedule ?? FieldValue.delete(),

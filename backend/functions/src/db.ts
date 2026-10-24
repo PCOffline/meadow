@@ -67,31 +67,51 @@ export function requireEmailAccount(req: CallableRequest<unknown>): void {
   }
 }
 
+/** How long a sign-in counts as recent, for steps that can't be undone. */
+export const RECENT_SIGN_IN_MS = 5 * 60_000;
+
+/**
+ * Steps that can't be undone need a fresh sign-in, so a stolen sign-in token alone can't take
+ * them. Accounts without an email have nothing to sign in again with; they're let through, or
+ * they could never leave.
+ */
+export function requireRecentSignIn(req: CallableRequest<unknown>, now = Date.now()): void {
+  const token = req.auth?.token;
+  if (token?.firebase?.sign_in_provider === "anonymous") return;
+  const authTime = token?.auth_time;
+  if (typeof authTime !== "number" || now - authTime * 1000 > RECENT_SIGN_IN_MS) {
+    throw new HttpsError("unauthenticated", errors.signInAgain);
+  }
+}
+
 /**
  * Counts one use of `key` for `uid` inside a transaction, refusing once `max` uses fall in the
- * current window. Reading the counter also serialises a person's concurrent calls, so duplicate
- * checks made in the same transaction can't be raced by a double tap.
+ * current window (with `message`, or a general "slow down"). Reading the counter also serialises
+ * a person's concurrent calls, so duplicate checks made in the same transaction can't be raced by
+ * a double tap.
  */
-export async function consumeRate(tx: Transaction, uid: string, key: string, max: number, windowMs: number): Promise<() => void> {
-  return consumeRates(tx, uid, [{ key, max, windowMs }]);
+export async function consumeRate(
+  tx: Transaction, uid: string, key: string, max: number, windowMs: number, message?: string,
+): Promise<() => void> {
+  return consumeRates(tx, uid, [{ key, max, windowMs, message }]);
 }
 
 /** [consumeRate] for several counters at once, written together. */
 export async function consumeRates(
   tx: Transaction,
   uid: string,
-  limits: { key: string; max: number; windowMs: number }[],
+  limits: { key: string; max: number; windowMs: number; message?: string }[],
 ): Promise<() => void> {
   const ref = rateLimits().doc(uid);
   const snap = await tx.get(ref);
   const now = Date.now();
   const next: Record<string, { count: number; since: number }> = {};
-  for (const { key, max, windowMs } of limits) {
+  for (const { key, max, windowMs, message } of limits) {
     const entry = snap.get(new FieldPath(key)) as { count?: number; since?: number } | undefined;
     const since = entry?.since;
     const fresh = typeof since !== "number" || now - since >= windowMs;
     const count = fresh ? 0 : (entry?.count ?? 0);
-    if (count >= max) throw new HttpsError("resource-exhausted", errors.slowDown);
+    if (count >= max) throw new HttpsError("resource-exhausted", message ?? errors.slowDown);
     next[key] = { count: count + 1, since: fresh ? now : since };
   }
   // Returned rather than written here, because a transaction must do all its reads first.
