@@ -47,14 +47,14 @@ install-local host="10.0.2.2":
 # Follow the app's log
 [group('app')]
 logs:
-    adb logcat -s MeadowTrace MeadowSync MeadowBackend MeadowFirestore MeadowSocial
+    adb logcat -s MeadowTrace MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian
 
 # Follow the app's log plus the Firestore SDK's own (trace builds; very verbose)
 [group('app')]
 logs-firestore:
     adb logcat -s MeadowTrace Firestore
 
-# Everything CI checks, except the end-to-end tests
+# Android lint and every test suite (CI also runs the end-to-end tests)
 [group('test')]
 check: lint test
 
@@ -67,10 +67,13 @@ test: test-app test-functions test-rules test-integration test-hosting test-depl
 test-app:
     ./gradlew testDebugUnitTest
 
-# Android lint
+# Android lint, detekt, and Biome and oxlint (type-aware) on the backend
 [group('test')]
 lint:
     ./gradlew lintDebug
+    .github/scripts/detekt.sh
+    cd backend/functions && npm run lint
+    cd backend && npm run lint
 
 # Cloud Functions unit tests
 [group('test')]
