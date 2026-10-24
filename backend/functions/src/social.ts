@@ -1,11 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
 import {
-  accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
+  accountOf, accountRef, chats, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
   postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
 } from "./db";
-import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken } from "./format";
+import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken, withPhotoToken } from "./format";
 import {
   CancelRemovalInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
   RespondInviteInput, StepDownInput,
@@ -18,6 +21,8 @@ const DAY_MS = 24 * 60 * 60_000;
 /** Invites by code and invite links together. */
 const INVITES_PER_DAY = 20;
 const REMOVALS_PER_DAY = 10;
+/** Friend codes looked up, found or not, so codes can't be guessed by trying them all. */
+export const CODE_LOOKUPS_PER_DAY = 30;
 
 /** Creates the caller's profile and claims a unique friend code. Safe to call twice. */
 export const createProfile = onCall(async (req) => {
@@ -151,7 +156,13 @@ export const sendInvite = onCall(async (req) => {
   requireEmailAccount(req);
   const { friendCode } = parse(InviteByCodeInput, req.data);
 
-  const codeSnap = await friendCodes().doc(friendCode).get();
+  // Counted before looking, and kept even when no one has the code.
+  const codeSnap = await db().runTransaction(async (tx) => {
+    const commitRate = await consumeRate(tx, uid, "codeLookup", CODE_LOOKUPS_PER_DAY, DAY_MS, errors.tooManyCodes);
+    const snap = await tx.get(friendCodes().doc(friendCode));
+    commitRate();
+    return snap;
+  });
   if (!codeSnap.exists) throw new HttpsError("not-found", errors.codeUnknown);
   const targetUid = codeSnap.get("uid") as string;
   if (targetUid === uid) throw new HttpsError("invalid-argument", errors.ownCode);
@@ -218,28 +229,63 @@ export const cancelInvite = onCall(async (req) => {
 /**
  * Ends a Bumblebee relationship. Only the person on the other side is told: who looks after
  * whom is nobody else's business.
+ *
+ * Unless they still look after each other the other way round, their chat closes: neither can
+ * write in it any more, and it no longer carries their names and pictures, nor gets new ones.
+ * Each person's photo gets a new link too, so the one the other kept stops working.
  */
 export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "bee"): Promise<void> {
-  const [owner, bee] = await Promise.all([loadPerson(ownerUid), loadPerson(beeUid)]);
+  // Someone whose account was only partly deleted can still be let go of.
+  const evenIfGone = { orMissing: true };
+  const [owner, bee] = await Promise.all([loadPerson(ownerUid, undefined, evenIfGone), loadPerson(beeUid, undefined, evenIfGone)]);
   if (!owner.account.approverIds.includes(beeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
+  const parting = !owner.account.approveeIds.includes(beeUid);
+  const chatId = chatIdFor(ownerUid, beeUid);
+  const chatRef = chats().doc(chatId);
 
   const batch = db().batch();
   batch.update(accountRef(ownerUid), {
     approverIds: FieldValue.arrayRemove(beeUid),
     [`pendingRemovals.${beeUid}`]: FieldValue.delete(),
   });
-  batch.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
+  if ((await accountRef(beeUid).get()).exists) batch.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
   batch.delete(removals().doc(removalId(ownerUid, beeUid)));
+  if (parting && (await chatRef.get()).exists) {
+    batch.update(chatRef, { closed: true, names: FieldValue.delete(), avatars: FieldValue.delete() });
+  }
   await batch.commit();
 
-  const chatId = chatIdFor(ownerUid, beeUid);
+  if (parting) await Promise.all([renewPhotoLink(ownerUid), renewPhotoLink(beeUid)]);
   if (endedBy === "owner") {
-    await postToChat(chatId, { senderId: ownerUid, kind: "system", text: chatNotes.removedBumblebee(owner.profile, bee.profile) });
+    await postToChat(chatId, { senderId: ownerUid, kind: "system", text: chatNotes.removedBumblebee(owner.profile, bee.profile) }, { evenIfClosed: true });
     await notify([beeUid], { type: "approver_left", uid: ownerUid, ...pushes.removedBumblebee(owner.profile) });
   } else {
     const remaining = owner.account.approverIds.filter((id) => id !== beeUid).length;
-    await postToChat(chatId, { senderId: beeUid, kind: "system", text: chatNotes.steppedDown(bee.profile, owner.profile) });
+    await postToChat(chatId, { senderId: beeUid, kind: "system", text: chatNotes.steppedDown(bee.profile, owner.profile) }, { evenIfClosed: true });
     await notify([ownerUid], { type: "approver_left", ...pushes.steppedDown(bee.profile, remaining) });
+  }
+}
+
+/**
+ * A photo link carries a download token that works for whoever holds it, whatever the Storage
+ * rules say. Gives the photo a new token and puts the new link on the profile, from where it
+ * reaches the person's open chats. Never throws: the relationship has already ended.
+ */
+async function renewPhotoLink(uid: string): Promise<void> {
+  try {
+    const file = getStorage().bucket().file(`avatars/${uid}`);
+    if (!(await file.exists())[0]) return;
+    const token = randomUUID();
+    await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    const profileRef = users().doc(uid);
+    await db().runTransaction(async (tx) => {
+      const url = (await tx.get(profileRef)).get("photoUrl");
+      if (typeof url !== "string") return;
+      const renewed = withPhotoToken(url, token);
+      if (renewed !== url) tx.update(profileRef, { photoUrl: renewed });
+    });
+  } catch (e) {
+    logger.warn("Photo link renewal failed", { uid, error: String(e) });
   }
 }
 
@@ -255,7 +301,7 @@ export const removeApprover = onCall(async (req) => {
   const { approverUid } = parse(RemoveBumblebeeInput, req.data);
   const effectiveAt = Date.now() + REMOVAL_DELAY_MS;
   const { owner, bee } = await db().runTransaction(async (tx) => {
-    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx)]);
+    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx, { orMissing: true })]);
     if (!owner.account.approverIds.includes(approverUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
     const existing = await tx.get(removals().doc(removalId(uid, approverUid)));
     if (existing.exists) throw new HttpsError("already-exists", errors.removalPending);
@@ -277,7 +323,7 @@ export const cancelRemoval = onCall(async (req) => {
   const uid = requireAuth(req);
   const { approverUid } = parse(CancelRemovalInput, req.data);
   const { owner, bee } = await db().runTransaction(async (tx) => {
-    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx)]);
+    const [owner, bee] = await Promise.all([loadPerson(uid, tx), loadPerson(approverUid, tx, { orMissing: true })]);
     const ref = removals().doc(removalId(uid, approverUid));
     if (!(await tx.get(ref)).exists) throw new HttpsError("failed-precondition", errors.noRemoval);
     tx.delete(ref);
@@ -289,6 +335,9 @@ export const cancelRemoval = onCall(async (req) => {
   return { ok: true };
 });
 
+/** Whether [partWays] failed because the two had already parted, rather than for some other reason. */
+export const alreadyParted = (e: unknown): boolean => e instanceof HttpsError && e.code === "failed-precondition";
+
 /** Ends the removals whose day has passed. Called by the hourly housekeeping. */
 export async function finishDueRemovals(now: number): Promise<number> {
   const due = await removals().where("effectiveAt", "<=", Timestamp.fromMillis(now)).limit(200).get();
@@ -297,7 +346,12 @@ export async function finishDueRemovals(now: number): Promise<number> {
     const beeUid = doc.get("beeUid") as string;
     try {
       await partWays(ownerUid, beeUid, "owner");
-    } catch {
+    } catch (e) {
+      if (!alreadyParted(e)) {
+        // Most likely a passing problem: the next run tries again, rather than drop the removal.
+        logger.warn("Removal not finished yet", { ownerUid, beeUid, error: String(e) });
+        continue;
+      }
       // Already parted another way (stepped down, account deleted): just tidy up.
       await doc.ref.delete();
       await accountRef(ownerUid).update({ [`pendingRemovals.${beeUid}`]: FieldValue.delete() }).catch(() => undefined);
@@ -306,10 +360,20 @@ export async function finishDueRemovals(now: number): Promise<number> {
   return due.size;
 }
 
-/** A Bumblebee stops looking after someone's garden. */
+/**
+ * A Bumblebee stops looking after someone's garden. If that person's account is gone (its
+ * deletion only got part of the way), they're just taken off the Bumblebee's own list.
+ */
 export const stepDown = onCall(async (req) => {
   const uid = requireAuth(req);
   const { approveeUid } = parse(StepDownInput, req.data);
-  await partWays(approveeUid, uid, "bee");
+  const ownerGone = await db().runTransaction(async (tx) => {
+    const [ownerAccount, mine] = await Promise.all([tx.get(accountRef(approveeUid)), tx.get(accountRef(uid))]);
+    if (ownerAccount.exists) return false;
+    if (!accountOf(mine).approveeIds.includes(approveeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
+    tx.update(accountRef(uid), { approveeIds: FieldValue.arrayRemove(approveeUid) });
+    return true;
+  });
+  if (!ownerGone) await partWays(approveeUid, uid, "bee");
   return { ok: true };
 });

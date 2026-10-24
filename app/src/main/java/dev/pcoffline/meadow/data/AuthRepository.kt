@@ -84,7 +84,11 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         _anonymous.value = false
     }
 
-    /** Emails a one-time sign-in link: no password needed. */
+    /**
+     * Emails a one-time sign-in link: no password needed. The link goes through the project's
+     * firebaseapp.com domain, which opens the app ([BuildConfig.AUTH_LINK_HOST]). Firebase refuses
+     * a default Hosting domain as a custom link domain, so none is set.
+     */
     suspend fun sendSignInLink(email: String) {
         val address = email.trim()
         if (address.isBlank()) throw FriendlyException(R.string.error_email_required)
@@ -92,7 +96,6 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
             .setUrl("https://${BuildConfig.LINK_HOST}/signed-in")
             .setHandleCodeInApp(true)
             .setAndroidPackageName(BuildConfig.APPLICATION_ID, false, null)
-            .setLinkDomain(BuildConfig.LINK_HOST)
             .build()
         backend.auth.sendSignInLinkToEmail(address, settings).await()
         store.pendingLinkEmail = address
@@ -178,26 +181,42 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         )
     }
 
-    /** Stops this phone getting the account's pushes, then signs out. Never waits long offline. */
+    /**
+     * Stops this phone getting the account's pushes, then signs out. Each step has its own time
+     * limit, so offline the server write can't stop the steps on the phone, and none waits long.
+     */
     suspend fun signOut() {
         val uid = backend.uid
         if (uid != null) {
-            runCatchingCancellable {
-                withTimeoutOrNull(SIGN_OUT_TIMEOUT_MS) {
-                    val installations = FirebaseInstallations.getInstance()
-                    val installationId = installations.id.await()
-                    backend.account(uid).update("pushIds", FieldValue.arrayRemove(installationId)).awaitWrite(SIGN_OUT_TIMEOUT_MS)
-                    FirebaseMessaging.getInstance().unregister().await()
-                    // A fresh ID for whoever signs in next, so pushes still addressed to this one
-                    // (if removing it above didn't reach the server) can't reach them.
-                    installations.delete().await()
-                }
-            }
+            val installations = FirebaseInstallations.getInstance()
+            var installationId: String? = null
+            runEachBriefly(
+                SIGN_OUT_STEP_TIMEOUT_MS,
+                { installationId = installations.id.await() },
+                // Best effort: offline it may not reach the server. Pushes still sent to this ID
+                // name this account as their recipient, so the app drops them for anyone else.
+                { installationId?.let { backend.account(uid).update("pushIds", FieldValue.arrayRemove(it)).await() } },
+                { FirebaseMessaging.getInstance().unregister().await() },
+                // A fresh ID for whoever signs in next, so pushes still addressed to this one
+                // (if removing it above didn't reach the server) can't reach them.
+                { installations.delete().await() },
+            )
         }
         backend.auth.signOut()
     }
 
     private companion object {
-        const val SIGN_OUT_TIMEOUT_MS = 4_000L
+        const val SIGN_OUT_STEP_TIMEOUT_MS = 4_000L
+    }
+}
+
+/**
+ * Runs [steps] in turn, giving each at most [timeoutMs] and carrying on past one that fails or
+ * runs out of time, so a step that can't finish (a server write while offline) never stops the
+ * ones after it.
+ */
+internal suspend fun runEachBriefly(timeoutMs: Long, vararg steps: suspend () -> Unit) {
+    for (step in steps) {
+        runCatchingCancellable { withTimeoutOrNull(timeoutMs) { step() } }
     }
 }

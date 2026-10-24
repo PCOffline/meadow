@@ -21,7 +21,8 @@ service cloud.firestore {
     function isString(v, max) { return v is string && v.size() <= max; }
 
     function validLimit(d, pkg) {
-      return d.packageName == pkg
+      return d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'createdAt', 'updatedAt'])
+        && d.packageName == pkg
         && isString(d.appName, 100)
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
         && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
@@ -46,11 +47,14 @@ service cloud.firestore {
     }
 
     // A photo is only ever your own upload in Meadow's Storage (or the emulators'). A link to
-    // anywhere else would tell that server whenever someone in your circle saw it.
+    // anywhere else, another project's bucket included, would tell that server whenever someone
+    // in your circle saw it. The sign-in token's audience is this project's ID, which names its
+    // default bucket (older projects' end in appspot.com).
     function ownPhoto(url) {
+      let bucket = request.auth.token.aud + '[.](firebasestorage[.]app|appspot[.]com)';
       return isString(url, 1000) && url.matches(
         '(https://firebasestorage[.]googleapis[.]com|http://(10[.]0[.]2[.]2|127[.]0[.]0[.]1|localhost):9199)'
-        + '/v0/b/[a-z0-9._-]+/o/avatars%2F' + me() + '[?]alt=media(&token=[a-f0-9-]+)?(#v=[0-9]+)?');
+        + '/v0/b/' + bucket + '/o/avatars%2F' + me() + '[?]alt=media(&token=[a-f0-9-]+)?(#v=[0-9]+)?');
     }
 
     function validProfileEdit(d) {
@@ -99,10 +103,12 @@ service cloud.firestore {
         allow read: if signedIn() && (me() == uid || isApproverOf(uid));
         allow create: if signedIn() && me() == uid && validLimit(request.resource.data, pkg);
         // Allowed hours can't be compared here, so with Bumblebees they change through the
-        // backend's saveLimit, which checks they only got stricter.
+        // backend's saveLimit, which checks they only got stricter. The app's name stays as it
+        // was: Bumblebees read it in requests, and a new one could pass one app off as another.
         allow update: if signedIn() && me() == uid && validLimit(request.resource.data, pkg)
           && (hasNoApprovers(uid)
-              || (isStricter(resource.data, request.resource.data) && sameSchedule(resource.data, request.resource.data)));
+              || (isStricter(resource.data, request.resource.data) && sameSchedule(resource.data, request.resource.data)
+                  && request.resource.data.appName == resource.data.appName));
         allow delete: if signedIn() && me() == uid && hasNoApprovers(uid);
       }
 
@@ -124,11 +130,15 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // "Meadow may not be protecting me": no detail about which setting changed.
+      // "Meadow may not be protecting me": no detail about which setting changed. The backend
+      // tells Bumblebees at most once every two minutes (lastAlertAt), so alerts sooner than
+      // that are refused here rather than each waking a function.
       match /alerts/{alertId} {
         allow create: if signedIn() && me() == uid
           && request.resource.data.keys().hasOnly(['kind', 'createdAt'])
-          && request.resource.data.kind == 'protection_off';
+          && request.resource.data.kind == 'protection_off'
+          && request.resource.data.createdAt == request.time
+          && request.time > account(uid).get('lastAlertAt', timestamp.value(0)) + duration.value(2, 'm');
         allow read, update, delete: if false;
       }
     }
@@ -175,16 +185,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // A chat opens when someone becomes a Bumblebee. When the two part ways (and don't still
+    // look after each other the other way round), the backend closes it: it keeps their old
+    // messages, readable by the two of them, but loses their names and pictures, and nobody
+    // can write in it until they join up again. It's deleted with either person's account.
     match /chats/{chatId} {
-      function participant() {
-        return signedIn() && me() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-      }
+      function chat() { return get(/databases/$(database)/documents/chats/$(chatId)).data; }
+      function participant() { return signedIn() && me() in chat().participants; }
+      function isOpen() { return !chat().get('closed', false); }
 
       allow read: if signedIn() && me() in resource.data.participants;
       allow create, delete: if false;
-      // Each person updates only their own side: the summary of a message they just sent, and
-      // when they last read the chat.
+      // Each person updates only their own side of an open chat: the summary of a message they
+      // just sent, and when they last read the chat.
       allow update: if signedIn() && me() in resource.data.participants
+        && !resource.data.get('closed', false)
         && changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastRead'])
         && (!changed().hasAny(['lastMessage', 'lastMessageAt', 'lastSenderId'])
             || (request.resource.data.lastSenderId == me()
@@ -195,7 +210,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if participant();
-        allow create: if participant()
+        allow create: if participant() && isOpen()
           && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
           && request.resource.data.senderId == me()
           && request.resource.data.kind == 'text'

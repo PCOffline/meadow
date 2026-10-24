@@ -1,9 +1,10 @@
 import { type DocumentData, type DocumentReference, FieldValue, Timestamp, type Transaction, type UpdateData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
+import { inChunks } from "./chunks";
 import { chatNotes, errors, pushes } from "./copy";
 import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
-import { chatIdFor, formatMinutes, type RequestType, summarize } from "./format";
+import { chatIdFor, formatMinutes, type RequestType, storedAppName, summarize } from "./format";
 import { isScheduleStricter, normalize, type Schedule } from "./schedule";
 import { CreateRequestInput, DecideRequestInput, RequestIdInput, SaveLimitInput } from "./schemas";
 
@@ -153,7 +154,8 @@ export const createRequest = onCall(async (call) => {
       requesterName: me.profile.displayName,
       type: input.type,
       packageName: input.packageName,
-      appName: input.appName || (limit.get("appName") as string),
+      // Bumblebees decide by this name, so it comes from the limit, never from the phone's say-so.
+      appName: storedAppName(limit, input.packageName),
       minutes: input.type === "extra_time" ? input.minutes : 0,
       dailyMinutes: input.type === "change_limit" ? input.dailyMinutes : 0,
       weeklyMinutes: input.type === "change_limit" ? input.weeklyMinutes : 0,
@@ -203,15 +205,15 @@ export async function expireStaleRequests(now: number): Promise<number> {
     .where("createdAt", "<", Timestamp.fromMillis(now - REQUEST_TTL_MS))
     .limit(400)
     .get();
-  for (const d of stale.docs) {
-    await db().runTransaction(async (tx) => {
+  // Each request settles in its own transaction, touching only its own documents.
+  await inChunks(stale.docs, (d) =>
+    db().runTransaction(async (tx) => {
       const snap = await tx.get(d.ref);
       if (snap.get("status") !== "pending") return;
       const inboxes = await existingInboxes(tx, d.id, (snap.get("approverIds") as string[] | undefined) ?? []);
       tx.update(d.ref, { status: "expired", decidedAt: FieldValue.serverTimestamp() });
       updateInboxes(tx, d.id, inboxes, "expired");
-    }).catch((e) => logger.warn("Could not expire request", { id: d.id, error: String(e) }));
-  }
+    }).catch((e) => logger.warn("Could not expire request", { id: d.id, error: String(e) })));
   return stale.size;
 }
 
@@ -352,7 +354,8 @@ export const saveLimit = onCall(async (call) => {
     }
     tx.set(ref, {
       packageName: input.packageName,
-      appName: input.appName || snap.get("appName") || input.packageName,
+      // A limit keeps the name it was planted under; only a new one takes the phone's.
+      appName: snap.exists ? storedAppName(snap, input.packageName) : input.appName || input.packageName,
       dailyMinutes: input.dailyMinutes,
       weeklyMinutes: input.weeklyMinutes,
       schedule: schedule ?? FieldValue.delete(),

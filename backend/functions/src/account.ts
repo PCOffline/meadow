@@ -7,7 +7,7 @@ import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
 import {
   accountRef, chats, consumeRate, db, friendCodes, heartbeats, inboxRef, inviteLinks, invites, loadPerson, notify, rateLimits,
-  removals, requests, requireAuth, users,
+  removals, requests, requireAuth, requireRecentSignIn, users,
 } from "./db";
 
 const EXPORTS_PER_DAY = 5;
@@ -35,29 +35,44 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
   const uid = requireAuth(req);
   await db().runTransaction(async (tx) => (await consumeRate(tx, uid, "export", EXPORTS_PER_DAY, 24 * 60 * 60_000))());
   const userRef = users().doc(uid);
-  const [profile, account] = await Promise.all([userRef.get(), accountRef(uid).get()]);
-  // Phone IDs are plumbing, not the person's data (fcmTokens: from app versions before pushIds).
-  const { pushIds: _ids, fcmTokens: _tokens, ...accountData } = account.data() ?? {};
-  const myChats = await chats().where("participants", "array-contains", uid).get();
-  const conversations = await Promise.all(
-    myChats.docs.map(async (chat) => ({
+  // Every read is independent, so they all run at once.
+  const conversationsOf = async () => Promise.all(
+    (await chats().where("participants", "array-contains", uid).get()).docs.map(async (chat) => ({
       id: chat.id,
       with: (chat.get("participants") as string[]).filter((p) => p !== uid),
       messages: await docs(chat.ref.collection("messages").orderBy("createdAt")),
     })),
   );
+  const [
+    profile, account, limits, extraTime, sharedUsage, emergencyUnlocks, requestsYouMade, requestsYouWereAsked,
+    invitesYouSent, invitesYouGot, conversations,
+  ] = await Promise.all([
+    userRef.get(),
+    accountRef(uid).get(),
+    docs(userRef.collection("limits")),
+    docs(userRef.collection("grants")),
+    docs(userRef.collection("usage")),
+    docs(userRef.collection("emergencies")),
+    docs(requests().where("requesterId", "==", uid)),
+    docs(userRef.collection("inbox")),
+    docs(invites().where("fromUid", "==", uid)),
+    docs(invites().where("toUid", "==", uid)),
+    conversationsOf(),
+  ]);
+  // Phone IDs are plumbing, not the person's data (fcmTokens: from app versions before pushIds).
+  const { pushIds: _ids, fcmTokens: _tokens, ...accountData } = account.data() ?? {};
   const data = {
     exportedAt: new Date().toISOString(),
     profile: plain(profile.data() ?? {}),
     account: plain(accountData),
-    limits: await docs(userRef.collection("limits")),
-    extraTime: await docs(userRef.collection("grants")),
-    sharedUsage: await docs(userRef.collection("usage")),
-    emergencyUnlocks: await docs(userRef.collection("emergencies")),
-    requestsYouMade: await docs(requests().where("requesterId", "==", uid)),
-    requestsYouWereAsked: await docs(userRef.collection("inbox")),
-    invitesYouSent: await docs(invites().where("fromUid", "==", uid)),
-    invitesYouGot: await docs(invites().where("toUid", "==", uid)),
+    limits,
+    extraTime,
+    sharedUsage,
+    emergencyUnlocks,
+    requestsYouMade,
+    requestsYouWereAsked,
+    invitesYouSent,
+    invitesYouGot,
     conversations,
   };
   const path = exportPath(uid, Date.now());
@@ -68,10 +83,12 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
 
 /**
  * Deletes the caller's account and everything tied to it. The people directly affected (their
- * Bumblebees, and the friends they looked after) are told; no one else is.
+ * Bumblebees, and the friends they looked after) are told; no one else is. Needs a sign-in from
+ * the last few minutes (see [requireRecentSignIn]).
  */
 export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
   const uid = requireAuth(req);
+  requireRecentSignIn(req);
   const me = await loadPerson(uid).catch(() => null);
   const userRef = users().doc(uid);
 

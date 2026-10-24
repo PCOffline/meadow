@@ -93,11 +93,20 @@ describe("profiles", () => {
 
   test("a photo can only be your own upload, so no other server learns when your circle sees it", async () => {
     const me = doc(as("sam"), "users/sam");
-    const storage = "https://firebasestorage.googleapis.com/v0/b/meadow-1.firebasestorage.app/o";
+    // This project's default bucket, under either name Firebase gives it.
+    const storage = "https://firebasestorage.googleapis.com/v0/b/demo-meadow.firebasestorage.app/o";
     await assertSucceeds(updateDoc(me, { photoUrl: `${storage}/avatars%2Fsam?alt=media&token=0a1b-2c3d#v=1760000000000` }));
+    await assertSucceeds(updateDoc(me, { photoUrl: "https://firebasestorage.googleapis.com/v0/b/demo-meadow.appspot.com/o/avatars%2Fsam?alt=media" }));
     await assertSucceeds(updateDoc(me, { photoUrl: "http://10.0.2.2:9199/v0/b/demo-meadow.appspot.com/o/avatars%2Fsam?alt=media&token=1f" }));
     for (const url of [
       "https://example.com/a.jpg",
+      // Another project's bucket would log every view for whoever owns it.
+      "https://firebasestorage.googleapis.com/v0/b/evil-project.firebasestorage.app/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/evil-project.appspot.com/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/demo-meadow-evil.appspot.com/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/evil.demo-meadow.appspot.com/o/avatars%2Fsam?alt=media",
+      "https://firebasestorage.googleapis.com/v0/b/demo-meadow.evil.app/o/avatars%2Fsam?alt=media",
+      "http://127.0.0.1:9199/v0/b/evil-project.appspot.com/o/avatars%2Fsam?alt=media",
       `${storage}/avatars%2Fbee?alt=media&token=0a1b`,
       `${storage}/exports%2Fsam%2Fmeadow-1.json?alt=media`,
       `https://firebasestorage.googleapis.com.evil.dev/v0/b/x/o/avatars%2Fsam?alt=media`,
@@ -182,9 +191,33 @@ describe("limits", () => {
     await assertFails(deleteDoc(ref));
   });
 
+  test("with Bumblebees an app keeps its name, so a request can't pass it off as another", async () => {
+    await seed();
+    const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    // Even a stricter (or unchanged) limit can't rename the app.
+    await assertFails(setDoc(ref, { ...limit(20, 300), appName: "Calculator" }));
+    await assertFails(setDoc(ref, { ...limit(30, 300), appName: "Calculator" }));
+    await assertFails(updateDoc(ref, { appName: "Calculator" }));
+    await assertSucceeds(setDoc(ref, limit(20, 300)));
+  });
+
+  test("limits hold nothing but the limit", async () => {
+    await seed();
+    const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    await assertSucceeds(setDoc(ref, { ...limit(20, 300), updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { ...limit(20, 300), label: "Calculator" }));
+    await assertFails(updateDoc(ref, { label: "Calculator" }));
+    const tok = doc(as("sam"), "users/sam/limits/com.tok");
+    await assertFails(setDoc(tok, { ...limit(15), packageName: "com.tok", label: "Calculator" }));
+    await assertSucceeds(setDoc(tok, { ...limit(15), packageName: "com.tok", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+    await seed({ samHasBee: false });
+    await assertFails(setDoc(ref, { ...limit(90, 0), label: "Calculator" }));
+  });
+
   test("without Bumblebees you can change anything", async () => {
     await seed({ samHasBee: false });
     const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    await assertSucceeds(setDoc(ref, { ...limit(30, 300), appName: "Insta" }));
     await assertSucceeds(setDoc(ref, limit(90, 0)));
     await assertSucceeds(deleteDoc(ref));
   });
@@ -269,6 +302,18 @@ describe("requests, invites and links", () => {
     await assertFails(addDoc(alerts, { kind: "anything", createdAt: serverTimestamp() }));
     await assertFails(addDoc(collection(as("bee"), "users/sam/alerts"), { kind: "protection_off", createdAt: serverTimestamp() }));
   });
+
+  test("protection alerts are stamped now, and none come sooner than the backend would pass on", async () => {
+    const alerts = collection(as("sam"), "users/sam/alerts");
+    await assertFails(addDoc(alerts, { kind: "protection_off", createdAt: Timestamp.now() }));
+    await assertFails(addDoc(alerts, { kind: "protection_off" }));
+    const lastAlertAt = (ms) => env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "users/sam/private/account"), { lastAlertAt: Timestamp.fromMillis(ms) }));
+    await lastAlertAt(Date.now() - 30_000);
+    await assertFails(addDoc(alerts, { kind: "protection_off", createdAt: serverTimestamp() }));
+    await lastAlertAt(Date.now() - 3 * 60_000);
+    await assertSucceeds(addDoc(alerts, { kind: "protection_off", createdAt: serverTimestamp() }));
+  });
 });
 
 describe("chats", () => {
@@ -295,6 +340,28 @@ describe("chats", () => {
     await assertFails(updateDoc(chat, { lastSenderId: "bee" }));
     await assertFails(updateDoc(chat, { participants: ["sam", "stranger"] }));
     await assertSucceeds(updateDoc(chat, { "lastRead.sam": serverTimestamp() }));
+  });
+
+  test("once the two part ways, the chat is closed: read-only for them, still shut to everyone else", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "chats/bee_sam/messages/m1"), { senderId: "bee", text: "Hi", kind: "text", createdAt: Timestamp.now() });
+      await updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { closed: true });
+    });
+    const message = (sender) => ({ senderId: sender, text: "Still there?", kind: "text", createdAt: serverTimestamp() });
+    for (const uid of ["sam", "bee"]) {
+      await assertSucceeds(getDoc(doc(as(uid), "chats/bee_sam")));
+      await assertSucceeds(getDoc(doc(as(uid), "chats/bee_sam/messages/m1")));
+      await assertFails(addDoc(collection(as(uid), "chats/bee_sam/messages"), message(uid)));
+      await assertFails(updateDoc(doc(as(uid), "chats/bee_sam"), { lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: uid }));
+      await assertFails(updateDoc(doc(as(uid), "chats/bee_sam"), { [`lastRead.${uid}`]: serverTimestamp() }));
+      await assertFails(updateDoc(doc(as(uid), "chats/bee_sam"), { closed: false }));
+    }
+    await assertFails(getDoc(doc(as("stranger"), "chats/bee_sam")));
+    await assertFails(getDoc(doc(as("stranger"), "chats/bee_sam/messages/m1")));
+
+    // Joining up again opens it.
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { closed: false }));
+    await assertSucceeds(addDoc(collection(as("bee"), "chats/bee_sam/messages"), message("bee")));
   });
 
   test("you can't put words in the other person's mouth or mark their messages read", async () => {

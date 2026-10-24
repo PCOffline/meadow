@@ -29,6 +29,7 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.ui.Badges
 import dev.pcoffline.meadow.ui.MeadowTabBar
+import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
@@ -114,7 +115,7 @@ class ShowcaseTest {
             MeadowTheme(theme, mode) {
                 SystemBars()
                 CompositionLocalProvider(LocalSkyHour provides hour) {
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { SnackbarScope(content) }
                 }
             }
         }
@@ -163,7 +164,7 @@ class ShowcaseTest {
                 SystemBars()
                 CompositionLocalProvider(LocalSkyHour provides hour) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        WithTabs(Tab.GARDEN) { GardenContent(DemoGarden.robin, DemoGarden.garden) }
+                        SnackbarScope { WithTabs(Tab.GARDEN) { GardenContent(DemoGarden.robin, DemoGarden.garden) } }
                     }
                 }
             }

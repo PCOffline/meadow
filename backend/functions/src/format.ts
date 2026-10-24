@@ -32,6 +32,14 @@ export const randomInviteToken = (): string => randomString(TOKEN_ALPHABET, INVI
 
 export const chatIdFor = (a: string, b: string): string => [a, b].toSorted().join("_");
 
+/**
+ * The same photo link with a new download token. A link without one (read through the Storage
+ * rules instead) comes back unchanged.
+ */
+export function withPhotoToken(url: string, token: string): string {
+  return url.replace(/([?&]token=)[^&#]*/, `$1${token}`);
+}
+
 export function inviteUrl(projectId: string, token: string): string {
   return `https://${projectId}.web.app/i/${token}`;
 }
@@ -50,6 +58,15 @@ export function limitText(daily: number, weekly: number, schedule?: Schedule | n
   const hours = describeSchedule(schedule);
   if (hours) parts.push(hours);
   return parts.length ? parts.join(", ").replace(/, ([^,]*)$/, " and $1") : "no limit";
+}
+
+/**
+ * The name a stored limit was planted under, or the package name when there's none. Bumblebees
+ * read it, so it never comes from what a phone says about a request or an unlock.
+ */
+export function storedAppName(limit: { get(field: string): unknown } | null, packageName: string): string {
+  const name = limit?.get("appName");
+  return typeof name === "string" && name.trim() !== "" ? name : packageName;
 }
 
 /** Lower-case phrase describing what was asked, e.g. "15 more minutes on Instagram". */

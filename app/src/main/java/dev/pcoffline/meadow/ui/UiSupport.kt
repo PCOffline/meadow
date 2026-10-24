@@ -4,14 +4,21 @@ import android.content.Context
 import android.os.SystemClock
 import android.text.format.DateUtils
 import android.util.Log
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.FirebaseNetworkException
@@ -28,7 +35,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-val LocalSnackbar = staticCompositionLocalOf { SnackbarHostState() }
+/**
+ * Where snackbars go. Every screen must sit under one that is drawn ([SnackbarScope], or a
+ * Scaffold's host): with no default, a screen outside one fails at once instead of its messages
+ * silently never showing.
+ */
+val LocalSnackbar = staticCompositionLocalOf<SnackbarHostState> {
+    error("No snackbar host here: wrap the content in SnackbarScope or provide LocalSnackbar")
+}
+
+/** Provides [LocalSnackbar] to [content] and shows its snackbars along the bottom, clear of the bars and keyboard. */
+@Composable
+fun SnackbarScope(content: @Composable () -> Unit) {
+    val snackbar = remember { SnackbarHostState() }
+    CompositionLocalProvider(LocalSnackbar provides snackbar) {
+        Box(Modifier.fillMaxSize()) {
+            content()
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).safeDrawingPadding())
+        }
+    }
+}
 
 /** Plays a shower of petals (and a little haptic tap) for happy moments. */
 val LocalCelebrate = staticCompositionLocalOf<() -> Unit> { {} }

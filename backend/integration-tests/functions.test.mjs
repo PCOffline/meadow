@@ -2,15 +2,15 @@
 // Functions and Storage emulators. Run with `npm run test:integration`.
 //
 // Pushes can't be delivered in the emulator, so `notify()` also records each one in
-// `_testOutbox`. That lets these tests check exactly who was told what, and that nobody
-// else was.
+// `_testOutbox`, with the exact data sent in `sent`. That lets these tests check exactly who
+// was told what, and that nobody else was.
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { initializeApp, deleteApp } from "firebase/app";
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInAnonymously, signInWithEmailAndPassword } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
-import { arrayUnion, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
-import { getBytes, ref as storageRef } from "firebase/storage";
+import { arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
+import { getBytes, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
 
@@ -63,6 +63,44 @@ async function readFile(path) {
   return text;
 }
 
+const BUCKETS = [`${PROJECT}.appspot.com`, `${PROJECT}.firebasestorage.app`];
+
+/**
+ * Gives `uid` a profile photo, as the app does: uploaded to avatars/{uid}, with its download
+ * link on the profile. Uploaded to both possible default buckets (see readFile); returns each
+ * bucket's download token.
+ */
+async function uploadPhoto(uid) {
+  const tokens = {};
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    for (const bucket of BUCKETS) {
+      const ref = storageRef(ctx.storage(`gs://${bucket}`), `avatars/${uid}`);
+      await uploadBytes(ref, new Uint8Array([137, 80, 78, 71]), { contentType: "image/png" });
+      const url = await getDownloadURL(ref);
+      tokens[bucket] = new URL(url).searchParams.get("token");
+      if (bucket === BUCKETS[0]) await updateDoc(doc(ctx.firestore(), `users/${uid}`), { photoUrl: `${url}#v=1` });
+    }
+  });
+  return tokens;
+}
+
+/**
+ * Every download token of `uid`'s photo, per bucket. Read straight from the Storage emulator,
+ * since the SDK only ever shows the first one.
+ */
+async function photoTokens(uid) {
+  const tokens = {};
+  for (const bucket of BUCKETS) {
+    const res = await fetch(`http://127.0.0.1:9199/v0/b/${bucket}/o/${encodeURIComponent(`avatars/${uid}`)}`, {
+      headers: { Authorization: "Bearer owner" },
+    });
+    tokens[bucket] = res.ok ? String((await res.json()).downloadTokens ?? "").split(",") : [];
+  }
+  return tokens;
+}
+
+const tokenIn = (url) => new URL(url).searchParams.get("token");
+
 /** A signed-in person with their own app instance, able to call functions. */
 async function person(name, { anonymous = false, profile = true, flower = "🌼" } = {}) {
   const app = initializeApp({ projectId: PROJECT, apiKey: "fake-api-key" }, `${name}-${++counter}`);
@@ -94,6 +132,11 @@ async function outbox(uid, type) {
   });
 }
 
+/** How many alerts were sent about `uid`, to anyone. */
+async function alertsAbout(uid) {
+  return admin(async (db) => (await getDocs(query(collection(db, "_testOutbox"), where("type", "==", "alert"), where("uid", "==", uid)))).size);
+}
+
 /** Waits for a background trigger to have its effect. */
 async function eventually(check, { timeout = 15_000 } = {}) {
   const start = Date.now();
@@ -116,6 +159,25 @@ async function rejects(promise, code, messagePart) {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Calls a function as `uid` with a hand-made sign-in token, to test claims a real sign-in
+ * can't produce (such as one from an hour ago). The Functions emulator doesn't check signatures.
+ */
+async function callAs(fn, uid, { provider = "password", signedInAgoMs = 0 } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const part = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const token = [part({ alg: "none", typ: "JWT" }), part({
+    iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: uid, user_id: uid, iat: now, exp: now + 3600,
+    auth_time: now - Math.floor(signedInAgoMs / 1000), firebase: { sign_in_provider: provider, identities: {} },
+  }), ""].join(".");
+  const response = await fetch(`http://127.0.0.1:5001/${PROJECT}/${REGION}/${fn}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ data: {} }),
+  });
+  return { status: response.status, body: await response.json() };
+}
 
 describe("profiles", () => {
   test("createProfile writes a name card, a private account and a friend code", async () => {
@@ -263,6 +325,15 @@ describe("friend codes", () => {
     await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(sam) }), "invalid-argument");
     await rejects(sam.call("sendInvite", { friendCode: "ZZZZZZ" }), "not-found");
   });
+
+  test("codes can't be guessed: every lookup counts, found or not", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    for (let i = 0; i < 30; i++) await rejects(sam.call("sendInvite", { friendCode: `ZZZZ${i}` }), "not-found");
+    // Even a real code isn't looked up any more today, so nobody learns whether it exists.
+    await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(bee) }), "resource-exhausted", /friend codes today/);
+    assert.equal((await outbox(bee.uid, "invite")).length, 0);
+  });
 });
 
 describe("managing Bumblebees is your own business", () => {
@@ -302,6 +373,37 @@ describe("managing Bumblebees is your own business", () => {
     await rejects(bee.call("stepDown", { approveeUid: sam.uid }), "failed-precondition");
   });
 
+  test("a removal can be cancelled even if the Bumblebee's profile is gone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    // As if deleting Bee's account had only got part of the way.
+    await admin((db) => deleteDoc(doc(db, `users/${bee.uid}`)));
+
+    await sam.call("cancelRemoval", { approverUid: bee.uid });
+    assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).pendingRemovals[bee.uid], undefined);
+    assert.equal(await read(`users/${bee.uid}`), undefined, "nothing of Bee's is brought back");
+  });
+
+  test("a Bumblebee can step down from someone whose account is gone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // As if deleting Sam's account had failed to take Sam off Bee's list.
+    await admin(async (db) => {
+      await deleteDoc(doc(db, `users/${sam.uid}/private/account`));
+      await deleteDoc(doc(db, `users/${sam.uid}`));
+    });
+
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, []);
+    assert.equal(await read(`users/${sam.uid}/private/account`), undefined, "nothing of Sam's is brought back");
+    assert.equal(await read(`users/${sam.uid}`), undefined);
+    await rejects(bee.call("stepDown", { approveeUid: sam.uid }), "failed-precondition");
+  });
+
   test("nobody can remove someone else's Bumblebee", async () => {
     const sam = await person("Sam");
     const bee = await person("Bee");
@@ -309,6 +411,103 @@ describe("managing Bumblebees is your own business", () => {
     await link(sam, bee);
     await rejects(stranger.call("removeApprover", { approverUid: bee.uid }), "failed-precondition");
     assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approverIds, [bee.uid]);
+  });
+});
+
+describe("parting ways closes the chat", () => {
+  const chatIdOf = (a, b) => [a.uid, b.uid].sort().join("_");
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  test("the chat keeps its messages but loses names and pictures, and nothing new reaches it", async () => {
+    const sam = await person("Sam");
+    const [bee, other] = [await person("Bee"), await person("Other")];
+    await link(sam, bee);
+    await link(sam, other);
+    await bee.call("stepDown", { approveeUid: sam.uid });
+
+    const chatId = chatIdOf(sam, bee);
+    const chat = await read(`chats/${chatId}`);
+    assert.equal(chat.closed, true);
+    assert.deepEqual([...chat.participants].sort(), [sam.uid, bee.uid].sort(), "both can still read their history");
+    assert.equal(chat.names, undefined);
+    assert.equal(chat.avatars, undefined);
+    const notes = await admin(async (db) => (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.data()));
+    assert.ok(notes.some((m) => m.kind === "system" && m.senderId === bee.uid), "the parting note is still posted");
+
+    // A message slipped in by other means isn't pushed.
+    await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
+      senderId: sam.uid, kind: "text", text: "Still there?", createdAt: serverTimestamp(),
+    }));
+    // A new name reaches the chats that are still open, but not the closed one.
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}`), { displayName: "Sammy", flower: "🦔" }));
+    await eventually(async () => assert.equal((await read(`chats/${chatIdOf(sam, other)}`)).names[sam.uid], "Sammy"));
+    await pause(2_000);
+    const closed = await read(`chats/${chatId}`);
+    assert.equal(closed.names, undefined);
+    assert.equal(closed.avatars, undefined);
+    assert.equal((await outbox(bee.uid, "chat")).length, 0);
+  });
+
+  test("becoming a Bumblebee again opens it again", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    await sam.call("runSchedulesForTests", { now: Date.now() + 25 * 3600_000 });
+    assert.equal((await read(`chats/${chatIdOf(sam, bee)}`)).closed, true);
+
+    await link(sam, bee);
+    const chat = await read(`chats/${chatIdOf(sam, bee)}`);
+    assert.equal(chat.closed, false);
+    assert.equal(chat.names[sam.uid], "Sam");
+    assert.equal(chat.names[bee.uid], "Bee");
+  });
+
+  test("people who still look after each other the other way keep their chat", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await link(bee, sam);
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    const chat = await read(`chats/${chatIdOf(sam, bee)}`);
+    assert.equal(chat.closed, false);
+    assert.equal(chat.names[sam.uid], "Sam");
+  });
+
+  test("each person's photo gets a new link, so the one the other kept stops working", async () => {
+    const sam = await person("Sam");
+    const [bee, other] = [await person("Bee"), await person("Other")];
+    await link(sam, bee);
+    await link(sam, other);
+    const [samBefore, beeBefore] = [await uploadPhoto(sam.uid), await uploadPhoto(bee.uid)];
+    const samUrl = (await read(`users/${sam.uid}`)).photoUrl;
+    await eventually(async () => assert.equal((await read(`chats/${chatIdOf(sam, other)}`)).avatars[sam.uid].photo, samUrl));
+
+    await bee.call("stepDown", { approveeUid: sam.uid });
+
+    // In production the new token replaces the old one. The Storage emulator adds it alongside
+    // instead, so only the new one is checked here.
+    for (const [who, before] of [[sam, samBefore], [bee, beeBefore]]) {
+      const profileUrl = (await read(`users/${who.uid}`)).photoUrl;
+      const token = tokenIn(profileUrl);
+      assert.ok(!Object.values(before).includes(token), `${who.name}'s profile links a new token`);
+      const tokens = await photoTokens(who.uid);
+      assert.ok(BUCKETS.some((b) => tokens[b].includes(token)), `${who.name}'s photo has the new token`);
+      assert.ok(profileUrl.endsWith("#v=1"));
+    }
+    // Sam's open chat with Other gets the new link; the closed one never had it.
+    const renewedUrl = (await read(`users/${sam.uid}`)).photoUrl;
+    await eventually(async () => assert.equal((await read(`chats/${chatIdOf(sam, other)}`)).avatars[sam.uid].photo, renewedUrl));
+    assert.equal((await read(`chats/${chatIdOf(sam, bee)}`)).avatars, undefined);
+  });
+
+  test("parting ways without a photo leaves the profile alone", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    assert.equal((await read(`users/${sam.uid}`)).photoUrl, null);
+    assert.equal((await read(`users/${bee.uid}`)).photoUrl, null);
   });
 });
 
@@ -421,6 +620,38 @@ describe("requests", () => {
     assert.equal(limit.dailyMinutes, 20);
   });
 
+  test("Bumblebees are told the app the request is really about, whatever name the phone gives", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", {
+      type: "remove_limit", packageName: "com.insta", appName: "Calculator", dayKey: today(),
+    });
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.title, /removing the limit on Instagram/);
+    assert.doesNotMatch(push.title + push.body, /Calculator/);
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).appName, "Instagram");
+    assert.equal((await read(`requests/${requestId}`)).appName, "Instagram");
+    const chatId = [sam.uid, bee.uid].sort().join("_");
+    const notes = await admin(async (db) => (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.get("text")));
+    assert.ok(notes.some((t) => /removing the limit on Instagram/.test(t)), notes.join(" | "));
+    assert.ok(notes.every((t) => !/Calculator/.test(t)), notes.join(" | "));
+
+    // A yes to a new limit keeps the app's name, too.
+    await bee.call("decideRequest", { requestId, approve: false });
+    const change = await sam.call("createRequest", {
+      type: "change_limit", packageName: "com.insta", appName: "Calculator", dailyMinutes: 60, weeklyMinutes: 0, dayKey: today(),
+    });
+    await bee.call("decideRequest", { requestId: change.requestId, approve: true });
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).appName, "Instagram");
+  });
+
+  test("saveLimit keeps a limit's name; only a new limit takes the phone's", async () => {
+    const { sam } = await gardenWithLimit();
+    await sam.call("saveLimit", { packageName: "com.insta", appName: "Calculator", dailyMinutes: 20, weeklyMinutes: 0 });
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).appName, "Instagram");
+    await sam.call("saveLimit", { packageName: "com.tok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 });
+    assert.equal((await read(`users/${sam.uid}/limits/com.tok`)).appName, "TikTok");
+  });
+
   test("asking needs a Bumblebee and an existing limit", async () => {
     const lonely = await person("Lonely");
     await rejects(lonely.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() }), "failed-precondition");
@@ -440,6 +671,17 @@ describe("requests", () => {
     assert.equal(copy.minutes, 15);
     const [push] = await outbox(bee.uid, "request_new");
     assert.match(push.body, /Used 45m of 1h today/);
+  });
+
+  test("each Bumblebee's push names them as its recipient, so a phone signed in to someone else drops it", async () => {
+    const { sam, bee, other } = await gardenWithLimit();
+    const { requestId } = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    for (const who of [bee, other]) {
+      const [push] = await outbox(who.uid, "request_new");
+      assert.equal(push.sent.to, who.uid);
+      assert.equal(push.sent.requestId, requestId);
+      assert.equal(push.sent.type, "request_new");
+    }
   });
 
   test("one open request per app, whatever kind", async () => {
@@ -509,6 +751,58 @@ describe("emergency unlocks", () => {
     // An unlock taken offline is still recorded, beyond the allowance.
     const offline = await sam.call("emergencyUnlock", { minutes: 15, reason: "Was offline at the time", startedAt: Date.now() - 60_000 });
     assert.equal(offline.remaining, 0);
+  });
+
+  test("reports are rate limited, and the account keeps only the latest unlock times", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Far more unlocks on record than anyone could make, as an older version may have stored.
+    const old = Array.from({ length: 25 }, (_, i) => Timestamp.fromMillis(Date.now() - (i + 1) * 3600_000));
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}/private/account`), { emergencyUses: old }));
+
+    for (let i = 0; i < 6; i++) {
+      const report = { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() - (i + 1) * 60_000 };
+      assert.equal((await sam.call("emergencyUnlock", report)).remaining, 0);
+    }
+    const uses = (await read(`users/${sam.uid}/private/account`)).emergencyUses.map((t) => t.toMillis());
+    assert.equal(uses.length, 20);
+    assert.deepEqual(uses, [...uses].sort((a, b) => a - b));
+    await rejects(sam.call("emergencyUnlock", { minutes: 15, reason: "Claims to have been offline", startedAt: Date.now() }),
+      "resource-exhausted");
+    assert.equal((await outbox(bee.uid, "emergency")).length, 6);
+  });
+
+  test("Bumblebees are told what was really unlocked, whatever name the phone gives", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), {
+      packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0,
+    }));
+    const unlockAgain = () => admin((db) => updateDoc(doc(db, `users/${sam.uid}/private/account`), { emergencyUntil: null }));
+    const seen = [];
+    const expectPush = async (pattern) => {
+      const body = (await outbox(bee.uid, "emergency")).map((p) => p.body).find((b) => !seen.includes(b));
+      seen.push(body);
+      assert.match(body, pattern);
+      assert.doesNotMatch(body, /Maps/);
+    };
+
+    // No app named: every limit is lifted, and that's what Bumblebees read.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need maps to find the vet", packageName: null, appName: "Maps" });
+    await expectPush(/Lifted all limits for 15 minutes/);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).emergencyPackage, null);
+    await unlockAgain();
+    // One app: its limit's own name.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need it for a real reason", packageName: "com.insta", appName: "Maps" });
+    await expectPush(/Lifted Instagram for 15 minutes/);
+    await unlockAgain();
+    // An app without a limit: its package name.
+    await sam.call("emergencyUnlock", { minutes: 15, reason: "Need it for a real reason", packageName: "com.other", appName: "Maps" });
+    await expectPush(/Lifted com\.other for 15 minutes/);
+    const records = await admin(async (db) => (await getDocs(collection(db, `users/${sam.uid}/emergencies`))).docs.map((d) => d.get("appName")));
+    assert.deepEqual(records.sort(), ["Instagram", "com.other", null].sort());
   });
 });
 
@@ -582,6 +876,27 @@ describe("your data", () => {
     assert.equal((await outbox(bystander.uid)).length, 0);
     await assert.rejects(signInWithEmailAndPassword(sam.auth, sam.email, "petals-and-bees"));
   });
+
+  test("deleting an account needs a recent sign-in, so a stolen token alone can't do it", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const stale = await callAs("deleteAccount", sam.uid, { signedInAgoMs: 60 * 60_000 });
+    assert.equal(stale.status, 401);
+    assert.equal(stale.body.error.status, "UNAUTHENTICATED");
+    assert.match(stale.body.error.message, /sign in again/);
+    assert.ok(await read(`users/${sam.uid}`));
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, [sam.uid]);
+    assert.equal((await outbox(bee.uid, "approver_left")).length, 0);
+    assert.equal((await callAs("deleteAccount", sam.uid, { signedInAgoMs: 60_000 })).status, 200);
+    assert.equal(await read(`users/${sam.uid}`), undefined);
+  });
+
+  test("a garden without an email, which has no way to sign in again, can still be deleted", async () => {
+    const anon = await person("Anon", { anonymous: true });
+    assert.equal((await callAs("deleteAccount", anon.uid, { provider: "anonymous", signedInAgoMs: 24 * 3600_000 })).status, 200);
+    assert.equal(await read(`users/${anon.uid}`), undefined);
+  });
 });
 
 describe("scheduled jobs", () => {
@@ -606,6 +921,35 @@ describe("scheduled jobs", () => {
     assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
     assert.equal((await outbox(bee.uid, "approver_left")).length, 1);
     assert.equal((await outbox(other.uid)).length, 0, "other Bumblebees are never told");
+  });
+
+  test("a Bumblebee whose account was only partly deleted can still be removed", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // As if deleting Bee's account had failed to take Bee off Sam's list.
+    await admin(async (db) => {
+      await deleteDoc(doc(db, `users/${bee.uid}/private/account`));
+      await deleteDoc(doc(db, `users/${bee.uid}`));
+    });
+
+    await sam.call("removeApprover", { approverUid: bee.uid });
+    await runSchedules(sam, hours(25));
+    assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approverIds, [], "Sam's garden isn't locked by a ghost");
+    assert.equal(await read(`removals/${sam.uid}_${bee.uid}`), undefined);
+    assert.equal(await read(`users/${bee.uid}/private/account`), undefined, "nothing of Bee's is brought back");
+    assert.equal(await read(`users/${bee.uid}`), undefined);
+  });
+
+  test("a removal that fails for any other reason is kept for the next run", async () => {
+    // A removal the backend can't read the people of fails every time, standing in for a
+    // passing Firestore error.
+    const id = `broken-${Date.now()}`;
+    await admin((db) => setDoc(doc(db, `removals/${id}`), { ownerUid: 42, beeUid: 7, effectiveAt: Timestamp.fromMillis(Date.now() - 1000) }));
+    const sam = await person("Sam");
+    await runSchedules(sam, hours(1));
+    assert.ok(await read(`removals/${id}`), "not dropped");
+    await admin((db) => deleteDoc(doc(db, `removals/${id}`)));
   });
 
   test("a quiet phone is reported once, vaguely, and only to that garden's Bumblebees", async () => {
@@ -634,11 +978,46 @@ describe("scheduled jobs", () => {
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
   });
 
-  test("a garden without Bumblebees or limits raises no alarm", async () => {
+  test("a garden without Bumblebees or limits raises no alarm, and stops being looked at", async () => {
     const sam = await person("Sam");
     await admin((db) => setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.now(), staleNotified: false }));
     await runSchedules(sam, hours(7));
+    assert.equal(await alertsAbout(sam.uid), 0);
+    // Marked as looked at, so it leaves the quiet list instead of coming back every hour.
+    assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, true);
+
+    // Back in touch: it may be looked at again next time it goes quiet.
+    await admin((db) => setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.fromMillis(hours(9)), staleNotified: true }));
+    await runSchedules(sam, hours(10));
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
+  });
+
+  test("quiet phones nobody looks after don't crowd out a garden with Bumblebees", async () => {
+    // Older than Sam's, so the oldest-first scan reaches them first: no Bumblebees, no limits,
+    // or no profile at all (anyone signed in may write their own heartbeat).
+    const [loner, unlimited] = [await person("Loner"), await person("Unlimited")];
+    await link(unlimited, await person("Bee"));
+    const nobody = `nobody-${Date.now()}`;
+    const earlier = Timestamp.fromMillis(Date.now() - 3600_000);
+    await admin(async (db) => {
+      for (const uid of [loner.uid, unlimited.uid, nobody]) {
+        await setDoc(doc(db, `heartbeats/${uid}`), { at: earlier, staleNotified: false });
+      }
+    });
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin(async (db) => {
+      await setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
+      await setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.now(), staleNotified: false });
+    });
+
+    await runSchedules(sam, hours(7));
+    for (const uid of [loner.uid, unlimited.uid, nobody]) {
+      assert.equal((await read(`heartbeats/${uid}`)).staleNotified, true, `${uid} leaves the quiet list`);
+      assert.equal(await alertsAbout(uid), 0);
+    }
+    assert.equal((await outbox(bee.uid, "alert")).filter((a) => a.uid === sam.uid).length, 1);
   });
 
   test("unanswered requests expire on schedule, even if nobody looks", async () => {

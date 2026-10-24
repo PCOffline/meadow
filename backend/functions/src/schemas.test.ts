@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CreateRequestInput, DecideRequestInput, EmergencyInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
-  RequestIdInput, SaveLimitInput,
+  isPackageName, RequestIdInput, SaveLimitInput,
 } from "./schemas";
 
 const firstError = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues[0]?.message;
@@ -86,4 +86,9 @@ test("emergency unlocks need a real reason and a set length", () => {
   assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home" }).success);
   assert.equal(firstError(EmergencyInput.safeParse({ minutes: 45, reason: "Need maps to get home" })), "Pick 15, 30 or 60 minutes.");
   assert.equal(firstError(EmergencyInput.safeParse({ minutes: 15, reason: "pls" })), "Please say briefly what the emergency is.");
+});
+
+test("only package names are looked up as limits", () => {
+  assert.ok(isPackageName("com.instagram.android"));
+  for (const bad of ["", "com/instagram", "..", "com..insta", "Maps app"]) assert.equal(isPackageName(bad), false, bad);
 });

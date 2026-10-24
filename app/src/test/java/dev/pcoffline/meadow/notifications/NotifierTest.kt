@@ -55,13 +55,18 @@ class NotifierTest {
 
     @Test
     fun `five minutes and one minute left are each mentioned once`() {
+        // Every reminder for an app shares one notification, so each is cleared before the next check.
         notifier.maybeWarn(budget(usedMinutes = 25.5)) // 4.5 minutes left
-        notifier.maybeWarn(budget(usedMinutes = 26.0))
         assertEquals(1, posted())
-        notifier.maybeWarn(budget(usedMinutes = 29.5)) // Under a minute left: a new reminder replaces it.
-        notifier.maybeWarn(budget(usedMinutes = 29.8))
+        manager.cancelAll()
+        notifier.maybeWarn(budget(usedMinutes = 26.0))
+        assertEquals(0, posted())
+        notifier.maybeWarn(budget(usedMinutes = 29.5)) // Under a minute left: a new reminder.
         assertEquals(1, posted())
         assertEquals(true, shadowOf(manager).allNotifications.single().extras.getCharSequence("android.title")!!.contains("Demo"))
+        manager.cancelAll()
+        notifier.maybeWarn(budget(usedMinutes = 29.8))
+        assertEquals(0, posted())
     }
 
     @Test
@@ -78,6 +83,39 @@ class NotifierTest {
     fun `no reminders during an emergency unlock or once time is up`() {
         notifier.maybeWarn(budget(usedMinutes = 27.0, emergencyUntil = System.currentTimeMillis() + 60_000))
         notifier.maybeWarn(budget(usedMinutes = 30.0))
+        assertEquals(0, posted())
+    }
+
+    private fun chatPush(to: String?): Map<String, String> = buildMap {
+        put("type", "chat")
+        put("chatId", "chat-1")
+        put("title", "Bee")
+        put("body", "Hello")
+        if (to != null) put("to", to)
+    }
+
+    @Test
+    fun `a push for the signed-in account is shown`() {
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = "sam")
+        assertEquals(1, posted())
+        assertEquals("Bee", shadowOf(manager).allNotifications.single().extras.getCharSequence("android.title").toString())
+    }
+
+    @Test
+    fun `a push for an account that used to be signed in here is dropped`() {
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = "alex")
+        assertEquals(0, posted())
+    }
+
+    @Test
+    fun `a push arriving while signed out is dropped`() {
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = null)
+        assertEquals(0, posted())
+    }
+
+    @Test
+    fun `a push that doesn't say who it is for is dropped`() {
+        notifier.fromPush(chatPush(to = null), signedInUid = "sam")
         assertEquals(0, posted())
     }
 

@@ -67,31 +67,51 @@ export function requireEmailAccount(req: CallableRequest<unknown>): void {
   }
 }
 
+/** How long a sign-in counts as recent, for steps that can't be undone. */
+export const RECENT_SIGN_IN_MS = 5 * 60_000;
+
+/**
+ * Steps that can't be undone need a fresh sign-in, so a stolen sign-in token alone can't take
+ * them. Accounts without an email have nothing to sign in again with; they're let through, or
+ * they could never leave.
+ */
+export function requireRecentSignIn(req: CallableRequest<unknown>, now = Date.now()): void {
+  const token = req.auth?.token;
+  if (token?.firebase?.sign_in_provider === "anonymous") return;
+  const authTime = token?.auth_time;
+  if (typeof authTime !== "number" || now - authTime * 1000 > RECENT_SIGN_IN_MS) {
+    throw new HttpsError("unauthenticated", errors.signInAgain);
+  }
+}
+
 /**
  * Counts one use of `key` for `uid` inside a transaction, refusing once `max` uses fall in the
- * current window. Reading the counter also serialises a person's concurrent calls, so duplicate
- * checks made in the same transaction can't be raced by a double tap.
+ * current window (with `message`, or a general "slow down"). Reading the counter also serialises
+ * a person's concurrent calls, so duplicate checks made in the same transaction can't be raced by
+ * a double tap.
  */
-export async function consumeRate(tx: Transaction, uid: string, key: string, max: number, windowMs: number): Promise<() => void> {
-  return consumeRates(tx, uid, [{ key, max, windowMs }]);
+export async function consumeRate(
+  tx: Transaction, uid: string, key: string, max: number, windowMs: number, message?: string,
+): Promise<() => void> {
+  return consumeRates(tx, uid, [{ key, max, windowMs, message }]);
 }
 
 /** [consumeRate] for several counters at once, written together. */
 export async function consumeRates(
   tx: Transaction,
   uid: string,
-  limits: { key: string; max: number; windowMs: number }[],
+  limits: { key: string; max: number; windowMs: number; message?: string }[],
 ): Promise<() => void> {
   const ref = rateLimits().doc(uid);
   const snap = await tx.get(ref);
   const now = Date.now();
   const next: Record<string, { count: number; since: number }> = {};
-  for (const { key, max, windowMs } of limits) {
+  for (const { key, max, windowMs, message } of limits) {
     const entry = snap.get(new FieldPath(key)) as { count?: number; since?: number } | undefined;
     const since = entry?.since;
     const fresh = typeof since !== "number" || now - since >= windowMs;
     const count = fresh ? 0 : (entry?.count ?? 0);
-    if (count >= max) throw new HttpsError("resource-exhausted", errors.slowDown);
+    if (count >= max) throw new HttpsError("resource-exhausted", message ?? errors.slowDown);
     next[key] = { count: count + 1, since: fresh ? now : since };
   }
   // Returned rather than written here, because a transaction must do all its reads first.
@@ -108,8 +128,18 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
 
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
-export function profileOf(snap: DocumentSnapshot): Profile {
-  if (!snap.exists) throw new HttpsError("not-found", errors.noProfile);
+/**
+ * The neutral name card shown for someone whose profile is gone, such as an account whose
+ * deletion only got part of the way.
+ */
+export const MISSING_PROFILE: Readonly<Profile> = { displayName: "Friend", flower: "🌼", avatarColor: "leaf", photoUrl: null };
+
+/** Reads a name card. A missing one is refused, unless [orMissing] asks for the neutral one instead. */
+export function profileOf(snap: DocumentSnapshot, { orMissing = false } = {}): Profile {
+  if (!snap.exists) {
+    if (orMissing) return { ...MISSING_PROFILE };
+    throw new HttpsError("not-found", errors.noProfile);
+  }
   const d = snap.data() ?? {};
   return {
     displayName: typeof d.displayName === "string" ? d.displayName : "Friend",
@@ -124,11 +154,14 @@ export function accountOf(snap: DocumentSnapshot): Account {
   return { approverIds: list(d.approverIds), approveeIds: list(d.approveeIds), pushIds: list(d.pushIds) };
 }
 
-/** Reads someone's profile and account, inside a transaction when given one. */
-export async function loadPerson(uid: string, tx?: Transaction): Promise<Person> {
+/**
+ * Reads someone's profile and account, inside a transaction when given one. [orMissing] stands
+ * in the neutral name card for a missing profile, so someone half gone can still be let go of.
+ */
+export async function loadPerson(uid: string, tx?: Transaction, { orMissing = false } = {}): Promise<Person> {
   const read = (ref: DocumentReference) => (tx ? tx.get(ref) : ref.get());
   const [profile, account] = await Promise.all([read(users().doc(uid)), read(accountRef(uid))]);
-  return { uid, profile: profileOf(profile), account: accountOf(account) };
+  return { uid, profile: profileOf(profile, { orMissing }), account: accountOf(account) };
 }
 
 export function projectId(): string {
@@ -137,13 +170,17 @@ export function projectId(): string {
 
 type Writer = { set(ref: DocumentReference, data: DocumentData, options: SetOptions): unknown };
 
-/** Creates or refreshes the 1:1 chat between two people, with their names and avatars. */
+/**
+ * Creates or refreshes the 1:1 chat between two people, with their names and avatars. A chat
+ * closed when they parted ways opens again.
+ */
 export function ensureChat(writer: Writer, a: Person, b: Person, id: string): void {
   const avatar = (p: Person) => ({ flower: p.profile.flower, color: p.profile.avatarColor, photo: p.profile.photoUrl });
   writer.set(
     chats().doc(id),
     {
       participants: [a.uid, b.uid].toSorted(),
+      closed: false,
       names: { [a.uid]: a.profile.displayName, [b.uid]: b.profile.displayName },
       avatars: { [a.uid]: avatar(a), [b.uid]: avatar(b) },
     },
@@ -151,38 +188,58 @@ export function ensureChat(writer: Writer, a: Person, b: Person, id: string): vo
   );
 }
 
-/** Adds a message to a chat (if it exists) and bumps the chat summary. */
+/**
+ * Adds a message to a chat (if it exists and is open) and bumps the chat summary. Only the note
+ * saying how two people parted ways goes into a closed chat ([evenIfClosed]). Never throws: it
+ * runs once what it describes has already happened, which a failure here mustn't make look failed.
+ */
 export async function postToChat(
   chatId: string,
   message: { senderId: string; kind: "text" | "request" | "system"; text: string; requestId?: string },
+  { evenIfClosed = false } = {},
 ): Promise<void> {
-  const chatRef = chats().doc(chatId);
-  if (!(await chatRef.get()).exists) return;
-  const batch = db().batch();
-  batch.set(chatRef.collection("messages").doc(), { ...message, createdAt: FieldValue.serverTimestamp() });
-  batch.update(chatRef, {
-    lastMessage: message.text.slice(0, 140),
-    lastMessageAt: FieldValue.serverTimestamp(),
-    lastSenderId: message.senderId,
-  });
-  await batch.commit();
+  try {
+    const chatRef = chats().doc(chatId);
+    const chat = await chatRef.get();
+    if (!chat.exists || (chat.get("closed") === true && !evenIfClosed)) return;
+    const batch = db().batch();
+    batch.set(chatRef.collection("messages").doc(), { ...message, createdAt: FieldValue.serverTimestamp() });
+    batch.update(chatRef, {
+      lastMessage: message.text.slice(0, 140),
+      lastMessageAt: FieldValue.serverTimestamp(),
+      lastSenderId: message.senderId,
+    });
+    await batch.commit();
+  } catch (e) {
+    logger.warn("Chat note failed", { chatId, error: String(e) });
+  }
+}
+
+/**
+ * The data of a push to `uid`. It names its recipient in `to`, so a phone that has since been
+ * signed in to another account (and still holds the old installation ID) drops it.
+ */
+export function pushPayload(uid: string, data: Record<string, string>): Record<string, string> {
+  return { ...data, to: uid };
 }
 
 /**
  * Sends a data-only push to every device of each user; the app builds the notification itself
- * so it can add actions like "Say yes". Phones no longer registered are cleaned up. Never throws.
+ * so it can add actions like "Say yes". Each user gets their own message, addressed to them.
+ * Phones no longer registered are cleaned up. Never throws.
  *
- * In the emulator every push is also written to `_testOutbox`, so integration tests can check
- * exactly who was told what.
+ * In the emulator every push is also written to `_testOutbox`, with the exact data sent in
+ * `sent`, so integration tests can check exactly who was told what.
  */
 export async function notify(uids: string[], data: Record<string, string>): Promise<void> {
   await Promise.all(
     [...new Set(uids)].map(async (uid) => {
       try {
-        if (isEmulator()) await db().collection("_testOutbox").add({ to: uid, ...data, at: FieldValue.serverTimestamp() });
+        const payload = pushPayload(uid, data);
+        if (isEmulator()) await db().collection("_testOutbox").add({ ...payload, sent: payload, at: FieldValue.serverTimestamp() });
         const fids = accountOf(await accountRef(uid).get()).pushIds;
         if (fids.length === 0) return;
-        const result = await getMessaging().sendEachForMulticast({ fids, data, android: { priority: "high" } });
+        const result = await getMessaging().sendEachForMulticast({ fids, data: payload, android: { priority: "high" } });
         const dead = fids.filter((_, i) => result.responses[i]?.error?.code === "messaging/installation-id-not-registered");
         if (dead.length) await accountRef(uid).update({ pushIds: FieldValue.arrayRemove(...dead) });
       } catch (e) {

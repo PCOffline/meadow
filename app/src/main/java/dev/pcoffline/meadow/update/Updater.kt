@@ -11,16 +11,20 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.FriendlyException
+import dev.pcoffline.meadow.notifications.Notifier
 import dev.pcoffline.meadow.usage.packageArchiveInfo
 import dev.pcoffline.meadow.usage.packageInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +54,12 @@ sealed interface UpdateState {
  * GitHub's published SHA-256 and must be signed with the same key as the installed app;
  * Android's installer enforces the signature too and always asks before installing.
  */
-class Updater(private val context: Context) {
+class Updater(
+    private val context: Context,
+    private val notifier: () -> Notifier = { AppGraph.notifier },
+    /** How long to wait for Android's answer once the update is handed over. */
+    private val installTimeoutMs: Long = INSTALL_TIMEOUT_MS,
+) {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
@@ -111,7 +120,7 @@ class Updater(private val context: Context) {
         try {
             val apk = withContext(Dispatchers.IO) { download(update) }
             withContext(Dispatchers.IO) { verify(apk, update) }
-            _state.value = UpdateState.Installing(update)
+            installing(update)
             withContext(Dispatchers.IO) { commit(apk) }
         } catch (e: FriendlyException) {
             _state.value = UpdateState.Failed(context.getString(e.messageRes, *e.formatArgs), update)
@@ -126,9 +135,45 @@ class Updater(private val context: Context) {
         }
     }
 
+    @Volatile private var installTimeout: Job? = null
+
+    /**
+     * The update is with Android's installer. Its answer may never come (the confirmation was never
+     * seen, or the person walked away from it), so after a while the update is offered again rather
+     * than waiting for ever, which would also keep [check] from looking for anything newer.
+     */
+    internal fun installing(update: AvailableUpdate) {
+        _state.value = UpdateState.Installing(update)
+        installTimeout?.cancel()
+        installTimeout = AppGraph.scope.launch {
+            delay(installTimeoutMs)
+            _state.compareAndSet(UpdateState.Installing(update), UpdateState.Available(update))
+        }
+    }
+
+    /**
+     * Called by [InstallResultReceiver] when Android needs the person to confirm the install. Since
+     * Android 10 an app may only open the confirmation itself while it's on screen; otherwise it
+     * waits in a notification that opens it when tapped.
+     */
+    internal fun onConfirmNeeded(confirm: Intent?, inForeground: Boolean = appInForeground()) {
+        if (confirm == null) {
+            onInstallResult(false, null)
+            return
+        }
+        confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opened = inForeground && runCatching { context.startActivity(confirm) }.isSuccess
+        if (!opened) notifier().confirmUpdate(confirm)
+    }
+
+    private fun appInForeground(): Boolean =
+        ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+
     /** Called by [InstallResultReceiver] when Android finishes (or gives up on) the install. */
     internal fun onInstallResult(success: Boolean, message: String?) {
         val update = (state.value as? UpdateState.Installing)?.update
+        installTimeout?.cancel()
+        notifier().cancel(Notifier.UPDATE_ID)
         updatesDir().deleteRecursively()
         if (!success) {
             _state.value = UpdateState.Failed(message ?: context.getString(R.string.update_failed_install), update)
@@ -247,6 +292,9 @@ class Updater(private val context: Context) {
     }
 
     companion object {
+        /** Long enough to read and answer Android's confirmation. */
+        const val INSTALL_TIMEOUT_MS = 2 * 60_000L
+
         fun sha256(file: File): String {
             val digest = MessageDigest.getInstance("SHA-256")
             file.inputStream().use { input ->
@@ -274,7 +322,7 @@ class InstallResultReceiver : BroadcastReceiver() {
                 } else {
                     @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_INTENT)
                 }
-                confirm?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                AppGraph.updater.onConfirmNeeded(confirm)
             }
             PackageInstaller.STATUS_SUCCESS -> AppGraph.updater.onInstallResult(true, null)
             else -> AppGraph.updater.onInstallResult(
