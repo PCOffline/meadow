@@ -1,12 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions/v2";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
 import {
-  accountOf, accountRef, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
+  accountOf, accountRef, chats, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
   postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
 } from "./db";
-import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken } from "./format";
+import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken, withPhotoToken } from "./format";
 import {
   CancelRemovalInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
   RespondInviteInput, StepDownInput,
@@ -219,12 +221,19 @@ export const cancelInvite = onCall(async (req) => {
 /**
  * Ends a Bumblebee relationship. Only the person on the other side is told: who looks after
  * whom is nobody else's business.
+ *
+ * Unless they still look after each other the other way round, their chat closes: neither can
+ * write in it any more, and it no longer carries their names and pictures, nor gets new ones.
+ * Each person's photo gets a new link too, so the one the other kept stops working.
  */
 export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner" | "bee"): Promise<void> {
   // Someone whose account was only partly deleted can still be let go of.
   const evenIfGone = { orMissing: true };
   const [owner, bee] = await Promise.all([loadPerson(ownerUid, undefined, evenIfGone), loadPerson(beeUid, undefined, evenIfGone)]);
   if (!owner.account.approverIds.includes(beeUid)) throw new HttpsError("failed-precondition", errors.notBumblebees);
+  const parting = !owner.account.approveeIds.includes(beeUid);
+  const chatId = chatIdFor(ownerUid, beeUid);
+  const chatRef = chats().doc(chatId);
 
   const batch = db().batch();
   batch.update(accountRef(ownerUid), {
@@ -233,16 +242,42 @@ export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner
   });
   if ((await accountRef(beeUid).get()).exists) batch.update(accountRef(beeUid), { approveeIds: FieldValue.arrayRemove(ownerUid) });
   batch.delete(removals().doc(removalId(ownerUid, beeUid)));
+  if (parting && (await chatRef.get()).exists) {
+    batch.update(chatRef, { closed: true, names: FieldValue.delete(), avatars: FieldValue.delete() });
+  }
   await batch.commit();
 
-  const chatId = chatIdFor(ownerUid, beeUid);
+  if (parting) await Promise.all([renewPhotoLink(ownerUid), renewPhotoLink(beeUid)]);
   if (endedBy === "owner") {
-    await postToChat(chatId, { senderId: ownerUid, kind: "system", text: chatNotes.removedBumblebee(owner.profile, bee.profile) });
+    await postToChat(chatId, { senderId: ownerUid, kind: "system", text: chatNotes.removedBumblebee(owner.profile, bee.profile) }, { evenIfClosed: true });
     await notify([beeUid], { type: "approver_left", uid: ownerUid, ...pushes.removedBumblebee(owner.profile) });
   } else {
     const remaining = owner.account.approverIds.filter((id) => id !== beeUid).length;
-    await postToChat(chatId, { senderId: beeUid, kind: "system", text: chatNotes.steppedDown(bee.profile, owner.profile) });
+    await postToChat(chatId, { senderId: beeUid, kind: "system", text: chatNotes.steppedDown(bee.profile, owner.profile) }, { evenIfClosed: true });
     await notify([ownerUid], { type: "approver_left", ...pushes.steppedDown(bee.profile, remaining) });
+  }
+}
+
+/**
+ * A photo link carries a download token that works for whoever holds it, whatever the Storage
+ * rules say. Gives the photo a new token and puts the new link on the profile, from where it
+ * reaches the person's open chats. Never throws: the relationship has already ended.
+ */
+async function renewPhotoLink(uid: string): Promise<void> {
+  try {
+    const file = getStorage().bucket().file(`avatars/${uid}`);
+    if (!(await file.exists())[0]) return;
+    const token = randomUUID();
+    await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    const profileRef = users().doc(uid);
+    await db().runTransaction(async (tx) => {
+      const url = (await tx.get(profileRef)).get("photoUrl");
+      if (typeof url !== "string") return;
+      const renewed = withPhotoToken(url, token);
+      if (renewed !== url) tx.update(profileRef, { photoUrl: renewed });
+    });
+  } catch (e) {
+    logger.warn("Photo link renewal failed", { uid, error: String(e) });
   }
 }
 

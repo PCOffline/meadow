@@ -150,13 +150,17 @@ export function projectId(): string {
 
 type Writer = { set(ref: DocumentReference, data: DocumentData, options: SetOptions): unknown };
 
-/** Creates or refreshes the 1:1 chat between two people, with their names and avatars. */
+/**
+ * Creates or refreshes the 1:1 chat between two people, with their names and avatars. A chat
+ * closed when they parted ways opens again.
+ */
 export function ensureChat(writer: Writer, a: Person, b: Person, id: string): void {
   const avatar = (p: Person) => ({ flower: p.profile.flower, color: p.profile.avatarColor, photo: p.profile.photoUrl });
   writer.set(
     chats().doc(id),
     {
       participants: [a.uid, b.uid].toSorted(),
+      closed: false,
       names: { [a.uid]: a.profile.displayName, [b.uid]: b.profile.displayName },
       avatars: { [a.uid]: avatar(a), [b.uid]: avatar(b) },
     },
@@ -165,16 +169,19 @@ export function ensureChat(writer: Writer, a: Person, b: Person, id: string): vo
 }
 
 /**
- * Adds a message to a chat (if it exists) and bumps the chat summary. Never throws: it runs
- * once what it describes has already happened, which a failure here mustn't make look failed.
+ * Adds a message to a chat (if it exists and is open) and bumps the chat summary. Only the note
+ * saying how two people parted ways goes into a closed chat ([evenIfClosed]). Never throws: it
+ * runs once what it describes has already happened, which a failure here mustn't make look failed.
  */
 export async function postToChat(
   chatId: string,
   message: { senderId: string; kind: "text" | "request" | "system"; text: string; requestId?: string },
+  { evenIfClosed = false } = {},
 ): Promise<void> {
   try {
     const chatRef = chats().doc(chatId);
-    if (!(await chatRef.get()).exists) return;
+    const chat = await chatRef.get();
+    if (!chat.exists || (chat.get("closed") === true && !evenIfClosed)) return;
     const batch = db().batch();
     batch.set(chatRef.collection("messages").doc(), { ...message, createdAt: FieldValue.serverTimestamp() });
     batch.update(chatRef, {

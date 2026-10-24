@@ -142,11 +142,14 @@ class PlanVersionTest(unittest.TestCase):
         )
 
     def test_a_pushed_tag_releases_that_app_version_if_it_is_above_the_latest(self):
+        # As in Deliver, the checkout already has the tag that was pushed.
         sha = self.commit("app/a.kt")
-        self.assertEqual("0.5.0", plan("app", "push", "v0.5.0", sha, "")["version"])
         self.git("tag", "v0.5.0")
+        self.assertEqual("0.5.0", plan("app", "push", "v0.5.0", sha, "")["version"])
+        self.git("tag", "v1.2.0")
         self.assertEqual("1.2.0", plan("app", "push", "v1.2.0", sha, "")["version"])
-        for bad in ("v0.5", "v0.5.0", "v0.4.9", "backend-v0.6.0"):
+        self.git("tag", "v0.4.9")
+        for bad in ("v0.5", "v0.4.9", "backend-v0.6.0"):
             with self.assertRaises(SystemExit, msg=bad):
                 plan("app", "push", bad, sha, "")
 
