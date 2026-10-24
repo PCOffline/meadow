@@ -14,7 +14,7 @@ const STALE_HEARTBEAT_MS = 6 * 60 * 60_000;
 /** Pushes new chat messages to the other person, while the chat is open. */
 export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data?.data();
-  if (!message || message.kind !== "text") return;
+  if (message?.kind !== "text") return;
   const chat = await chats().doc(event.params.chatId).get();
   if (!chat.exists || chat.get("closed") === true) return;
   const participants = (chat.get("participants") as string[] | undefined) ?? [];
@@ -133,7 +133,7 @@ export async function housekeeping(now: number) {
   const back = await heartbeats().where("staleNotified", "==", true).where("at", ">=", cutoff).limit(400).get();
   if (!back.empty) {
     const batch = db().batch();
-    back.docs.forEach((d) => batch.update(d.ref, { staleNotified: false }));
+    for (const d of back.docs) batch.update(d.ref, { staleNotified: false });
     await batch.commit();
   }
   const done = { migrated, removed, quiet: quiet.size, recovered: back.size };
