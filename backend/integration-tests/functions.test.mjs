@@ -94,6 +94,11 @@ async function outbox(uid, type) {
   });
 }
 
+/** How many alerts were sent about `uid`, to anyone. */
+async function alertsAbout(uid) {
+  return admin(async (db) => (await getDocs(query(collection(db, "_testOutbox"), where("type", "==", "alert"), where("uid", "==", uid)))).size);
+}
+
 /** Waits for a background trigger to have its effect. */
 async function eventually(check, { timeout = 15_000 } = {}) {
   const start = Date.now();
@@ -634,11 +639,46 @@ describe("scheduled jobs", () => {
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
   });
 
-  test("a garden without Bumblebees or limits raises no alarm", async () => {
+  test("a garden without Bumblebees or limits raises no alarm, and stops being looked at", async () => {
     const sam = await person("Sam");
     await admin((db) => setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.now(), staleNotified: false }));
     await runSchedules(sam, hours(7));
+    assert.equal(await alertsAbout(sam.uid), 0);
+    // Marked as looked at, so it leaves the quiet list instead of coming back every hour.
+    assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, true);
+
+    // Back in touch: it may be looked at again next time it goes quiet.
+    await admin((db) => setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.fromMillis(hours(9)), staleNotified: true }));
+    await runSchedules(sam, hours(10));
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
+  });
+
+  test("quiet phones nobody looks after don't crowd out a garden with Bumblebees", async () => {
+    // Older than Sam's, so the oldest-first scan reaches them first: no Bumblebees, no limits,
+    // or no profile at all (anyone signed in may write their own heartbeat).
+    const [loner, unlimited] = [await person("Loner"), await person("Unlimited")];
+    await link(unlimited, await person("Bee"));
+    const nobody = `nobody-${Date.now()}`;
+    const earlier = Timestamp.fromMillis(Date.now() - 3600_000);
+    await admin(async (db) => {
+      for (const uid of [loner.uid, unlimited.uid, nobody]) {
+        await setDoc(doc(db, `heartbeats/${uid}`), { at: earlier, staleNotified: false });
+      }
+    });
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin(async (db) => {
+      await setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
+      await setDoc(doc(db, `heartbeats/${sam.uid}`), { at: Timestamp.now(), staleNotified: false });
+    });
+
+    await runSchedules(sam, hours(7));
+    for (const uid of [loner.uid, unlimited.uid, nobody]) {
+      assert.equal((await read(`heartbeats/${uid}`)).staleNotified, true, `${uid} leaves the quiet list`);
+      assert.equal(await alertsAbout(uid), 0);
+    }
+    assert.equal((await outbox(bee.uid, "alert")).filter((a) => a.uid === sam.uid).length, 1);
   });
 
   test("unanswered requests expire on schedule, even if nobody looks", async () => {
