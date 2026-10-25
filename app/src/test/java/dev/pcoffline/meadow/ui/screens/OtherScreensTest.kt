@@ -106,6 +106,15 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `a greyed-out switch is explained where it happens, with a way to App info`() {
+        show { SetupScreen(onDone = {}) }
+        // The garden keeper and notification access are the two Android holds back.
+        assertEquals(2, compose.onAllNodesWithText(text(R.string.setup_restricted_action)).fetchSemanticsNodes().size)
+        assertEquals(2, compose.onAllNodesWithText(text(R.string.setup_restricted_hint)).fetchSemanticsNodes().size)
+        assertAccessible()
+    }
+
+    @Test
     fun `settings show privacy choices, legal documents and a careful delete`() {
         val opened = mutableListOf<LegalDoc>()
         val shy = DemoGarden.robin.copy(privacy = Privacy(shareUsage = false))
