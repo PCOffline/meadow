@@ -9,8 +9,12 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -18,6 +22,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -26,6 +31,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import com.google.firebase.auth.FirebaseAuth
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
@@ -108,15 +114,41 @@ abstract class EndToEndTest {
         }
     }
 
-    protected fun waitForBackend(path: String, timeout: Long = 20_000, check: (JSONObject) -> Boolean) {
+    /** The fields of each document in a collection, read straight from the Firestore emulator. */
+    protected fun backendDocs(collection: String): List<JSONObject> {
+        val documents = JSONObject(emulatorGet(8080, "v1/projects/demo-meadow/databases/(default)/documents/$collection?pageSize=300"))
+            .optJSONArray("documents") ?: JSONArray()
+        return (0 until documents.length()).map { documents.getJSONObject(it).getJSONObject("fields") }
+    }
+
+    protected fun waitForBackend(path: String, timeout: Long = 20_000, check: (JSONObject) -> Boolean) =
+        waitUntilBackend(path, timeout, { backendDoc(path) }) { check(it!!) }
+
+    protected fun waitForBackendDocs(collection: String, timeout: Long = 20_000, check: (List<JSONObject>) -> Boolean) =
+        waitUntilBackend(collection, timeout, { backendDocs(collection) }, check)
+
+    private fun <T> waitUntilBackend(path: String, timeout: Long, read: () -> T, check: (T) -> Boolean) {
         val end = System.currentTimeMillis() + timeout
-        while (!runCatching { check(backendDoc(path)!!) }.getOrDefault(false)) {
+        while (!runCatching { check(read()) }.getOrDefault(false)) {
             if (System.currentTimeMillis() > end) {
-                throw AssertionError("$path never changed. Now: ${runCatching { backendDoc(path) }.getOrNull()}. On screen: ${screenText()}")
+                throw AssertionError("$path never changed. Now: ${runCatching(read).getOrNull()}. On screen: ${screenText()}")
             }
             Thread.sleep(250)
         }
     }
+
+    /** A GET to one of the emulators (port [port]) with owner rights, returning the body. */
+    protected fun emulatorGet(port: Int, path: String): String {
+        val connection = (URL("http://${BuildConfig.EMULATOR_HOST}:$port/$path").openConnection() as HttpURLConnection)
+            .apply { setRequestProperty("Authorization", "Bearer owner") }
+        return try {
+            connection.inputStream.bufferedReader().readText()
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    protected fun JSONObject.string(field: String): String? = optJSONObject(field)?.optString("stringValue")
 
     /** The strings in a Firestore REST array field (empty when the array is). */
     protected fun JSONObject.strings(field: String): List<String> {
@@ -136,5 +168,31 @@ abstract class EndToEndTest {
         waitFor(R.string.setup_later)
         compose.onAllNodesWithText(text(R.string.setup_later)).onFirst().performScrollTo().performClick()
         waitForText(name, substring = true)
+    }
+
+    /**
+     * Becomes [friend]'s Bumblebee by pasting their invite link on the circle screen (below the
+     * fold, so scrolled to first) and saying yes. Returns the uid of the person on this phone.
+     */
+    protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
+        val token = friend.call("createInviteLink")!!["token"] as String
+        val me = FirebaseAuth.getInstance().currentUser!!.uid
+        node(R.string.tab_circle).performClick()
+        waitFor(R.string.circle_title)
+        val joinField = hasSetTextAction() and hasText(text(R.string.join_link_placeholder))
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
+        typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
+        node(R.string.join_link_button).performClick()
+        waitForText(text(R.string.accept_invite_title, friendName))
+        compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()
+        waitForBackend("users/${friend.uid}/private/account") { it.strings("approverIds") == listOf(me) }
+        return me
+    }
+
+    /** From the circle screen, opens the garden of the person called [name]. */
+    protected fun openGardenOf(name: String) {
+        val garden = hasText(name, substring = true) and hasClickAction()
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(garden)
+        compose.onNode(garden).performClick()
     }
 }
