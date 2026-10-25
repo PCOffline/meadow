@@ -51,7 +51,6 @@ import androidx.compose.ui.res.stringResource
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
-import dev.pcoffline.meadow.enforcement.GuardianAccessibilityService
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.enforcement.MeadowNotificationListener
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -200,7 +199,7 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
     }
 }
 
-private enum class Disclosure(@StringRes val body: Int) {
+internal enum class Disclosure(@StringRes val body: Int) {
     USAGE(R.string.disclosure_usage),
     KEEPER(R.string.disclosure_keeper),
     LISTENER(R.string.disclosure_listener);
@@ -214,15 +213,9 @@ private enum class Disclosure(@StringRes val body: Int) {
             Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}")),
             Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
         )
-        KEEPER -> listOfNotNull(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
-                    .putExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName(context, GuardianAccessibilityService::class.java).flattenToString())
-            } else {
-                null
-            },
-            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
-        )
+        // Android keeps the page for one accessibility service to itself (a system-only
+        // permission), so the list is as close as an app can get.
+        KEEPER -> listOf(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         LISTENER -> listOfNotNull(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
