@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -30,6 +31,7 @@ import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.home.GardenState
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
+import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.minutesText
@@ -44,7 +46,13 @@ import org.robolectric.annotation.Config
 class LimitFlowTest : ScreenTest() {
     private val pkg = "com.instagram.android"
 
-    private fun editor(state: LimitEditorState) = show { LimitEditor(pkg, state.copy(appName = "Instagram", loaded = true), onDone = {}) }
+    // With the top bar, as LimitEditorScreen shows it: the bar carries the screen's heading.
+    private fun editor(state: LimitEditorState) = show {
+        Column {
+            BackTopBar(text(R.string.limit_editor_existing), onBack = {})
+            LimitEditor(pkg, state.copy(appName = "Instagram", loaded = true), onDone = {})
+        }
+    }
 
     private fun shows(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
 

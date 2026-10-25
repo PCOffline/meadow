@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
@@ -125,7 +127,9 @@ class MainScreensTest : ScreenTest() {
         show { StatsContent(DemoGarden.stats.copy(stats = withPhone), onOpenApp = { opened += it }) }
         compose.onNodeWithText("YouTube").performScrollTo().performClick()
         assertEquals(listOf("demo.youtube"), opened)
-        compose.onNodeWithText("Maps").performScrollTo().assertHasNoClickAction()
+        // Further down a lazy list: scrolled to, so it's composed at all.
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Maps"))
+        compose.onNodeWithText("Maps").assertHasNoClickAction()
         assertAccessible()
     }
 
