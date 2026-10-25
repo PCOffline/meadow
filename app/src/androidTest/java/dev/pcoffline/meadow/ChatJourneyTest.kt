@@ -75,7 +75,7 @@ class ChatJourneyTest : EndToEndTest() {
             runBlocking { AppGraph.backend.call("stepDown", mapOf("approveeUid" to sam.uid)) }
             waitFor(R.string.chat_closed_title)
             compose.onNodeWithContentDescription(text(R.string.action_send)).assertIsNotEnabled()
-            compose.onNode(hasSetTextAction()).assertIsNotEnabled()
+            compose.onNode(hasText(text(R.string.chat_placeholder))).assertIsNotEnabled()
             for (said in listOf("Thanks for looking after me", "Written in a tunnel")) {
                 compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(said))
                 waitForText(said)
