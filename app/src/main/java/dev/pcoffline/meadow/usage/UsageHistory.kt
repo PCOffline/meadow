@@ -80,8 +80,9 @@ class UsageHistory(
         runCatching { file.writeText(Json.encodeToString<Map<String, Map<String, Long>>>(cache)) }
     }
 
-    private companion object {
+    companion object {
+        /** How far back history is kept; Growth doesn't page past it. */
         const val KEEP_DAYS = 120L
-        const val CATALOG_FRESH_MS = 60_000L
+        private const val CATALOG_FRESH_MS = 60_000L
     }
 }

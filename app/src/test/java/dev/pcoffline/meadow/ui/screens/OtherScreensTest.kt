@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -128,6 +130,20 @@ class OtherScreensTest : ScreenTest() {
         // The delete dialog (it needs DELETE typed first) is checked on a device in GardenJourneyTest:
         // its text field never lets Robolectric's Compose go idle.
         assertAccessible()
+    }
+
+    @Test
+    fun `the profile card says "Edit your profile" once`() {
+        show { SettingsScreen(DemoGarden.robin.copy(bio = ""), onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
+        // Shown as the card's text without a bio, so the arrow stays quiet.
+        node(R.string.profile_open).assertExists()
+        compose.onAllNodesWithContentDescription(text(R.string.profile_open)).assertCountEquals(0)
+    }
+
+    @Test
+    fun `with a bio, the profile card's arrow says where it leads`() {
+        show { SettingsScreen(DemoGarden.robin.copy(bio = "Gardening, slowly"), onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
+        compose.onAllNodesWithContentDescription(text(R.string.profile_open)).assertCountEquals(1)
     }
 
     @Test

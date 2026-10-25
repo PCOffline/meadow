@@ -257,7 +257,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
                         )
                     }
-                    composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }) }
+                    composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }, onOpenApp = { nav.navigate(LimitRoute(it)) }) }
                     composable<RequestsRoute> {
                         RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
                     }

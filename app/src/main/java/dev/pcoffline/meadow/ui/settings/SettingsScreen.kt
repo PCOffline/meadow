@@ -225,7 +225,8 @@ private fun ProfileCard(profile: UserProfile, onOpenProfile: () -> Unit) {
             }
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.profile_open),
+                // Without a bio the card already says "Edit your profile"; once is enough.
+                contentDescription = if (profile.bio.isBlank()) null else stringResource(R.string.profile_open),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

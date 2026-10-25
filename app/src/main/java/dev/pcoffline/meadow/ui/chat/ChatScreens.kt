@@ -46,6 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,37 +101,45 @@ fun ChatListScreen(
         }
         LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
             items(list.orEmpty(), key = { it.id }) { chat ->
-                val unread = chat.isUnread(profile.uid)
-                ListItem(
-                    headlineContent = {
-                        Text(chat.otherName(profile.uid), fontWeight = if (unread) FontWeight.Bold else FontWeight.SemiBold)
-                    },
-                    supportingContent = {
-                        Text(
-                            chat.lastMessage.ifBlank { stringResource(R.string.chats_say_hello) },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    },
-                    leadingContent = { PersonAvatar(chat.otherAvatar(profile.uid)) },
-                    trailingContent = {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(relativeTime(chat.lastMessageAtMillis), style = MaterialTheme.typography.labelSmall)
-                            if (unread) {
-                                Box(
-                                    Modifier.padding(top = 4.dp).size(10.dp).clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.secondary),
-                                )
-                            }
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.animateItem().clickable { onOpenChat(chat.id) }.padding(horizontal = 8.dp),
-                )
+                ChatRow(chat, profile.uid, onOpen = { onOpenChat(chat.id) }, Modifier.animateItem())
             }
         }
     }
+}
+
+/** One conversation in the list; an unread one is bolder and says so to a screen reader too. */
+@Composable
+internal fun ChatRow(chat: Chat, uid: String, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val unread = chat.isUnread(uid)
+    ListItem(
+        headlineContent = {
+            Text(chat.otherName(uid), fontWeight = if (unread) FontWeight.Bold else FontWeight.SemiBold)
+        },
+        supportingContent = {
+            Text(
+                chat.lastMessage.ifBlank { stringResource(R.string.chats_say_hello) },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        },
+        leadingContent = { PersonAvatar(chat.otherAvatar(uid)) },
+        trailingContent = {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(relativeTime(chat.lastMessageAtMillis), style = MaterialTheme.typography.labelSmall)
+                if (unread) {
+                    val unreadLabel = stringResource(R.string.chats_unread)
+                    Box(
+                        Modifier.semantics { contentDescription = unreadLabel }
+                            .padding(top = 4.dp).size(10.dp).clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary),
+                    )
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = modifier.clickable(onClick = onOpen).padding(horizontal = 8.dp),
+    )
 }
 
 /** A chat once loaded; [chat] is null when it's closed (the friendship ended). */

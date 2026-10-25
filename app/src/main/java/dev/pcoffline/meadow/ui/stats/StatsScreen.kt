@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +68,7 @@ import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.stateWhileVisible
+import dev.pcoffline.meadow.usage.UsageHistory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -83,9 +85,20 @@ import java.time.temporal.ChronoUnit
 enum class Period { DAY, WEEK, MONTH }
 
 /** Which stretch of time is shown: [offset] periods back from the current one. */
-data class Selection(val period: Period = Period.WEEK, val offset: Int = 0)
+data class Selection(val period: Period = Period.WEEK, val offset: Int = 0) {
+    /** The first and last day of this stretch, counted from [today]. */
+    fun range(today: LocalDate): Pair<LocalDate, LocalDate> = when (period) {
+        Period.DAY -> today.plusDays(offset.toLong()).let { it to it }
+        Period.WEEK -> Days.weekStart(today).plusWeeks(offset.toLong()).let { it to it.plusDays(6) }
+        Period.MONTH -> today.withDayOfMonth(1).plusMonths(offset.toLong()).let { it to it.plusMonths(1).minusDays(1) }
+    }
 
-data class AppTime(val packageName: String, val label: String, val ms: Long, val limit: AppLimit?)
+    /** History older than [UsageHistory.KEEP_DAYS] is gone, so there's nothing earlier to show. */
+    fun hasEarlier(today: LocalDate): Boolean = range(today).first.isAfter(today.minusDays(UsageHistory.KEEP_DAYS))
+}
+
+/** [canLimit] is false for the phone, settings and apps since uninstalled, which can't be limited. */
+data class AppTime(val packageName: String, val label: String, val ms: Long, val limit: AppLimit?, val canLimit: Boolean = true)
 
 data class PeriodStats(
     val selection: Selection,
@@ -122,18 +135,17 @@ class StatsViewModel : ViewModel() {
     }
 
     fun shift(by: Int) {
-        selection.value = selection.value.let { it.copy(offset = (it.offset + by).coerceAtMost(0)) }
+        val current = selection.value
+        if (by < 0 && !current.hasEarlier(Days.today())) return
+        selection.value = current.copy(offset = (current.offset + by).coerceAtMost(0))
     }
 
     private fun load(sel: Selection): PeriodStats {
         val today = Days.today()
-        val (from, to) = when (sel.period) {
-            Period.DAY -> today.plusDays(sel.offset.toLong()).let { it to it }
-            Period.WEEK -> Days.weekStart(today).plusWeeks(sel.offset.toLong()).let { it to it.plusDays(6) }
-            Period.MONTH -> today.withDayOfMonth(1).plusMonths(sel.offset.toLong()).let { it to it.plusMonths(1).minusDays(1) }
-        }
+        val (from, to) = sel.range(today)
         val history = AppGraph.history
         val days = history.range(from, to)
+        val limitable = AppGraph.catalog.launchablePackages()
         val perApp = HashMap<String, Long>()
         days.forEach { (_, apps) -> apps.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0L) + ms } }
         val previousFrom = if (sel.period == Period.MONTH) from.minusMonths(1) else from.minusDays(ChronoUnit.DAYS.between(from, to) + 1)
@@ -157,7 +169,7 @@ class StatsViewModel : ViewModel() {
             to = to,
             days = days.map { (d, apps) -> d to apps.values.sum() },
             apps = perApp.entries.sortedByDescending { it.value }.take(25)
-                .map { AppTime(it.key, AppGraph.catalog.label(it.key), it.value, limit = null) },
+                .map { AppTime(it.key, AppGraph.catalog.label(it.key), it.value, limit = null, canLimit = it.key in limitable) },
             totalMs = perApp.values.sum(),
             previousTotalMs = previous,
         )
@@ -165,14 +177,20 @@ class StatsViewModel : ViewModel() {
 }
 
 @Composable
-fun StatsScreen(onOpenSetup: () -> Unit, viewModel: StatsViewModel = viewModel { StatsViewModel() }) {
+fun StatsScreen(onOpenSetup: () -> Unit, onOpenApp: (String) -> Unit, viewModel: StatsViewModel = viewModel { StatsViewModel() }) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    StatsContent(state, onSelect = viewModel::select, onShift = viewModel::shift, onOpenSetup = onOpenSetup)
+    StatsContent(state, onSelect = viewModel::select, onShift = viewModel::shift, onOpenSetup = onOpenSetup, onOpenApp = onOpenApp)
 }
 
 /** The statistics, drawn from plain state (also used for previews and screenshots). */
 @Composable
-fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: (Int) -> Unit = {}, onOpenSetup: () -> Unit = {}) {
+fun StatsContent(
+    state: StatsUiState,
+    onSelect: (Period) -> Unit = {},
+    onShift: (Int) -> Unit = {},
+    onOpenSetup: () -> Unit = {},
+    onOpenApp: (String) -> Unit = {},
+) {
     var sharing by rememberSaveable { mutableStateOf(false) }
     val res = LocalResources.current
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -214,16 +232,17 @@ fun StatsContent(state: StatsUiState, onSelect: (Period) -> Unit = {}, onShift: 
                 action = { Button(onClick = onOpenSetup) { Text(stringResource(R.string.stats_no_access_action)) } },
             )
         } else {
-            StatsBody(state, onShift)
+            StatsBody(state, onShift, onOpenApp)
         }
     }
 }
 
 @Composable
-private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit) {
+private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit, onOpenApp: (String) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PeriodNavigator(
             title = periodTitle(state.selection, state.stats),
+            canGoBack = state.selection.hasEarlier(Days.today()),
             canGoForward = state.selection.offset < 0,
             onBack = { onShift(-1) },
             onForward = { onShift(1) },
@@ -239,7 +258,7 @@ private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit) {
             label = "period",
         ) { selection ->
             val stats = state.stats?.takeIf { it.selection == selection }
-            if (stats == null) Loading() else PeriodContent(stats)
+            if (stats == null) Loading() else PeriodContent(stats, onOpenApp)
         }
     }
 }
@@ -263,7 +282,7 @@ private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
 }
 
 @Composable
-private fun PeriodContent(s: PeriodStats) {
+private fun PeriodContent(s: PeriodStats, onOpenApp: (String) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Summary(s) }
         if (s.selection.period != Period.DAY) item { Chart(s) }
@@ -272,15 +291,15 @@ private fun PeriodContent(s: PeriodStats) {
             item { EmptyState("🌾", stringResource(R.string.stats_quiet_title), stringResource(R.string.stats_quiet_body)) }
         }
         val max = s.apps.firstOrNull()?.ms ?: 1L
-        items(s.apps, key = { it.packageName }) { app -> AppRow(app, max, s.totalMs, Modifier.animateItem()) }
+        items(s.apps, key = { it.packageName }) { app -> AppRow(app, max, s.totalMs, { onOpenApp(app.packageName) }.takeIf { app.canLimit }, Modifier.animateItem()) }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-private fun PeriodNavigator(title: String, canGoForward: Boolean, onBack: () -> Unit, onForward: () -> Unit) {
+private fun PeriodNavigator(title: String, canGoBack: Boolean, canGoForward: Boolean, onBack: () -> Unit, onForward: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = canGoBack) {
             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = stringResource(R.string.stats_earlier))
         }
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -363,8 +382,16 @@ private fun Chart(s: PeriodStats) {
 }
 
 @Composable
-private fun AppRow(app: AppTime, max: Long, total: Long, modifier: Modifier) {
-    Row(modifier.padding(horizontal = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun AppRow(app: AppTime, max: Long, total: Long, onOpen: (() -> Unit)?, modifier: Modifier) {
+    // Seeing where the time went is the moment to act on it: a tap opens the app's limit.
+    val action = stringResource(if (app.limit != null) R.string.stats_open_limit else R.string.stats_plant_limit)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClickLabel = action, onClick = onOpen) else Modifier)
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         AppIcon(app.packageName, size = 36.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
