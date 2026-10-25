@@ -353,7 +353,8 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: Tab, select
         onClick = onClick,
         icon = {
             BadgedBox(badge = { if (count > 0) Badge { Text(count.toString()) } }) {
-                Icon(tab.icon, contentDescription = label, modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale })
+                // The label below already names the tab; naming the icon too made TalkBack say it twice.
+                Icon(tab.icon, contentDescription = null, modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale })
             }
         },
         label = { Text(label) },
