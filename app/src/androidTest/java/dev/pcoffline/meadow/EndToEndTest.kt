@@ -187,6 +187,9 @@ abstract class EndToEndTest {
         waitForText(text(R.string.accept_invite_title, friendName))
         compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()
         waitForBackend("users/${friend.uid}/private/account") { it.strings("approverIds") == listOf(me) }
+        // The welcome snackbar covers the bottom of whatever screen comes next, until it goes.
+        waitForText(text(R.string.accept_invite_done, friendName))
+        waitForSnackbarToGo(R.string.accept_invite_done, friendName)
         return me
     }
 
