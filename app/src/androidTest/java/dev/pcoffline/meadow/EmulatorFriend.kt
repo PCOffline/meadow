@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import dev.pcoffline.meadow.data.Backend
+import dev.pcoffline.meadow.ui.legal.LegalDoc
 import java.util.concurrent.TimeUnit
 
 /**
@@ -52,7 +53,7 @@ class EmulatorFriend private constructor(private val firebase: FirebaseApp, val 
             val email = "${name.lowercase()}-${System.currentTimeMillis()}@example.com"
             val user = await(FirebaseAuth.getInstance(firebase).createUserWithEmailAndPassword(email, PASSWORD)).user!!
             return EmulatorFriend(firebase, user.uid, email).also {
-                it.call("createProfile", mapOf("displayName" to name, "flower" to flower, "termsVersion" to 1))
+                it.call("createProfile", mapOf("displayName" to name, "flower" to flower, "termsVersion" to LegalDoc.CURRENT_VERSION))
             }
         }
     }

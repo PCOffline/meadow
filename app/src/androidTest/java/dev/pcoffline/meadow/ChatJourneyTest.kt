@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import dev.pcoffline.meadow.EmulatorFriend.Companion.await
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.WRITE_TIMEOUT_MS
@@ -55,17 +58,18 @@ class ChatJourneyTest : EndToEndTest() {
             await(db.disableNetwork())
             val input = hasSetTextAction() and hasText(text(R.string.chat_placeholder))
             typeInto(input, "Written in a tunnel")
-            compose.onNodeWithContentDescription(text(R.string.action_send)).performClick()
-            waitForText("Written in a tunnel")
-            waitFor(R.string.chat_sending)
-            compose.waitUntil(WRITE_TIMEOUT_MS + 10_000) { compose.onAllNodes(input).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithContentDescription(text(R.string.action_send)).assertIsEnabled().performClick()
+            val bubble = hasText("Written in a tunnel") and !hasSetTextAction()
+            waitShowing("the message sent offline", db, chatId) { compose.onAllNodes(bubble).fetchSemanticsNodes().isNotEmpty() }
+            waitShowing("it marked as sending", db, chatId) { compose.onAllNodesWithText(text(R.string.chat_sending)).fetchSemanticsNodes().isNotEmpty() }
+            waitShowing("the box cleared", db, chatId, WRITE_TIMEOUT_MS + 10_000) { compose.onAllNodes(input).fetchSemanticsNodes().isNotEmpty() }
 
             // Back online, it reaches the server as this person's message.
             await(db.enableNetwork())
             waitForBackendDocs("chats/$chatId/messages") { messages ->
                 messages.any { it.string("text") == "Written in a tunnel" && it.string("senderId") == me }
             }
-            compose.waitUntil(20_000) { compose.onAllNodesWithText(text(R.string.chat_sending)).fetchSemanticsNodes().isEmpty() }
+            waitShowing("it sent", db, chatId) { compose.onAllNodesWithText(text(R.string.chat_sending)).fetchSemanticsNodes().isEmpty() }
 
             // Stepping down (as from another of this person's phones) closes the open chat.
             runBlocking { AppGraph.backend.call("stepDown", mapOf("approveeUid" to sam.uid)) }
@@ -76,6 +80,19 @@ class ChatJourneyTest : EndToEndTest() {
                 compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(said))
                 waitForText(said)
             }
+        }
+    }
+
+    /** Waits for [condition]; if it never holds, says what's on screen and in this phone's copy of the chat. */
+    private fun waitShowing(what: String, db: FirebaseFirestore, chatId: String, timeout: Long = 20_000, condition: () -> Boolean) {
+        try {
+            compose.waitUntil(timeout, condition)
+        } catch (e: ComposeTimeoutException) {
+            val onPhone = runCatching {
+                await(db.collection("chats/$chatId/messages").get(Source.CACHE)).documents
+                    .map { "${it.getString("text")} (pending=${it.metadata.hasPendingWrites()})" }
+            }.getOrElse { "unreadable: $it" }
+            throw AssertionError("Never saw $what. On screen: ${screenText()}. Messages on the phone: $onPhone", e)
         }
     }
 }

@@ -72,6 +72,7 @@ abstract class EndToEndTest {
         compose.onAllNodes(isRoot()).fetchSemanticsNodes().flatMap { root ->
             fun walk(node: SemanticsNode): List<String> =
                 node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
+                    listOfNotNull(node.config.getOrNull(SemanticsProperties.EditableText)?.text?.takeIf { it.isNotEmpty() }?.let { "[typed: $it]" }) +
                     node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
                     node.children.flatMap(::walk)
             walk(root)

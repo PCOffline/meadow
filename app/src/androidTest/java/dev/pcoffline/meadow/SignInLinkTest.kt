@@ -46,9 +46,10 @@ class SignInLinkTest : EndToEndTest() {
             assertEquals(MainActivity::class.java.name, app.packageManager.queryActivities(open).single().activityInfo.name)
             app.startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
+            // Signed in to Sam's garden; on a phone new to Meadow, setup comes next.
             waitFor(R.string.link_done)
-            waitForText("Sam", substring = true)
             assertEquals(sam.uid, FirebaseAuth.getInstance().currentUser?.uid)
+            waitFor(R.string.setup_later)
         }
     }
 
