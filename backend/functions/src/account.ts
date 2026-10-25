@@ -77,7 +77,14 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
   };
   const path = exportPath(uid, Date.now());
   const json = JSON.stringify(data, null, 2);
-  await getStorage().bucket().file(path).save(json, { contentType: "application/json", resumable: false });
+  // Each export has a path of its own, so "only if it doesn't exist yet" always holds. Saying so
+  // makes the upload safe to repeat, and the library then retries a dropped connection (EPIPE,
+  // reset) instead of failing the export. A 412 means an earlier attempt already landed.
+  await getStorage().bucket().file(path)
+    .save(json, { contentType: "application/json", resumable: false, preconditionOpts: { ifGenerationMatch: 0 } })
+    .catch((e: { code?: number }) => {
+      if (e.code !== 412) throw e;
+    });
   return { path, bytes: Buffer.byteLength(json) };
 });
 
