@@ -27,6 +27,10 @@ updates:
     directory: /backend/functions
     schedule:
       interval: weekly
+    ignore:
+      # The functions run on Node 24 (engines in package.json); newer types would allow APIs it lacks.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       functions:
         patterns: ['*']
