@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -111,6 +112,11 @@ class BlockActivity : ComponentActivity() {
         packageState.value = intent.getStringExtra(EXTRA_PACKAGE)
     }
 
+    override fun onResume() {
+        super.onResume()
+        packageState.value?.let { markShown(it) }
+    }
+
     private fun goHome() {
         startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()
@@ -123,6 +129,17 @@ class BlockActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PACKAGE = "package"
+
+        /** The app the screen last showed for, and when (elapsed realtime). */
+        @Volatile private var lastShown: Pair<String, Long>? = null
+
+        internal fun markShown(packageName: String) {
+            lastShown = packageName to SystemClock.elapsedRealtime()
+        }
+
+        /** Whether the screen has shown for [packageName] since [since] (elapsed realtime). */
+        fun shownSince(packageName: String, since: Long): Boolean =
+            lastShown?.let { (pkg, at) -> pkg == packageName && at >= since } == true
 
         fun launch(context: Context, packageName: String) {
             val intent = Intent(context, BlockActivity::class.java)
