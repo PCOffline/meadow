@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -85,13 +86,16 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
     }
     val left = profile?.emergenciesLeft
     val usedUp = left == 0
-    val reasonOk = reason.trim().length >= EmergencyRepository.MIN_REASON_LENGTH
+    val missing = (EmergencyRepository.MIN_REASON_LENGTH - reason.trim().length).coerceAtLeast(0)
+    val reasonOk = missing == 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.emergency_dialog_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // First, so a failed unlock is seen even with the keyboard covering the bottom.
+                ErrorNote(action.error)
                 Text(stringResource(R.string.emergency_dialog_body), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     when {
@@ -127,16 +131,23 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         onValueChange = { reason = it.take(280) },
                         label = { Text(stringResource(R.string.emergency_dialog_reason)) },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                        supportingText = { if (!reasonOk) Text(stringResource(R.string.emergency_dialog_reason_hint)) },
+                        // Says what's still needed: the unlock button stays off until then.
+                        supportingText = {
+                            Text(
+                                if (reasonOk) stringResource(R.string.emergency_dialog_reason_seen)
+                                else pluralStringResource(R.plurals.emergency_dialog_reason_needed, missing, missing),
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                ErrorNote(action.error)
             }
         },
         confirmButton = {
             TextButton(
                 enabled = !usedUp && reasonOk && countdown == 0 && !action.busy,
+                // Through the button's colours, so it greys out while it can't be pressed.
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 onClick = {
                     val scope = if (onlyThisApp) packageName else null
                     action.run(onSuccess = onDismiss) {
@@ -157,7 +168,6 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         countdown > 0 -> stringResource(R.string.emergency_dialog_unlock_countdown, countdown)
                         else -> stringResource(R.string.emergency_dialog_unlock)
                     },
-                    color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

@@ -8,8 +8,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
@@ -34,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
@@ -194,12 +198,19 @@ fun Pill(text: String, color: Color, modifier: Modifier = Modifier, textColor: C
     }
 }
 
+/**
+ * What went wrong, scrolled into view when it appears: it often sits below the button that
+ * failed, under the keyboard or the fold, where a tap would otherwise seem to do nothing.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ErrorNote(message: String?, modifier: Modifier = Modifier) {
     if (message.isNullOrBlank()) return
+    val requester = remember { BringIntoViewRequester() }
+    LaunchedEffect(message) { requester.bringIntoView() }
     Text(
         "🍂 $message",
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+        modifier = modifier.bringIntoViewRequester(requester).fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.errorContainer).padding(12.dp),
         color = MaterialTheme.colorScheme.onErrorContainer,
         style = MaterialTheme.typography.bodyMedium,

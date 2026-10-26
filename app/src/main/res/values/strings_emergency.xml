@@ -15,7 +15,11 @@
     <string name="emergency_dialog_just_app">Just %1$s</string>
     <string name="emergency_dialog_all_apps">All apps</string>
     <string name="emergency_dialog_reason">What\'s the emergency?</string>
-    <string name="emergency_dialog_reason_hint">A few words. Your Bumblebees will see this.</string>
+    <plurals name="emergency_dialog_reason_needed">
+        <item quantity="one">%1$d more character to unlock. Your Bumblebees will see this.</item>
+        <item quantity="other">%1$d more characters to unlock. Your Bumblebees will see this.</item>
+    </plurals>
+    <string name="emergency_dialog_reason_seen">Your Bumblebees will see this.</string>
     <string name="emergency_dialog_unlock">Unlock now</string>
     <string name="emergency_dialog_unlock_countdown">Unlock (%1$d)</string>
     <string name="emergency_dialog_unlocking">Unlocking…</string>

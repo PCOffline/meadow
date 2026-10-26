@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -376,7 +377,9 @@ private fun DeleteAccountDialog(onDismiss: () -> Unit) {
             TextButton(
                 onClick = { action.run { AppGraph.profiles.deleteAccount() } },
                 enabled = !action.busy && typed.trim().equals(word, ignoreCase = true),
-            ) { Text(stringResource(R.string.settings_delete_button), color = MaterialTheme.colorScheme.error) }
+                // Through the button's colours, so it greys out until the word is typed.
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.settings_delete_button)) }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !action.busy) { Text(stringResource(R.string.settings_delete_keep)) } },
     )
@@ -400,12 +403,13 @@ private fun SwitchRow(title: String, body: String, checked: Boolean, enabled: Bo
 
 @Composable
 private fun LinkRow(label: String, enabled: Boolean = true, danger: Boolean = false, onClick: () -> Unit) {
-    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            label,
-            modifier = Modifier.weight(1f),
-            color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-        )
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.textButtonColors(contentColor = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null)
     }
 }
