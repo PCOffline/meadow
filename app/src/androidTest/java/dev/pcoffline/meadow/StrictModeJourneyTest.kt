@@ -69,8 +69,10 @@ class StrictModeJourneyTest : EndToEndTest() {
             waitForBackend(account) { it.bool("strictMode") == false }
             eventually("the cover gone") { !showing(text(R.string.strict_gate_title)) }
 
-            // On again, then off from Settings, which asks first.
+            // On again, then off from Settings, which asks first. The switch sits low in Settings,
+            // where the first "on" snackbar may still be over it.
             giveProtections()
+            waitForSnackbarToGo(R.string.settings_strict_on)
             strictSwitch().performScrollTo().performClick()
             waitForBackend(account) { it.bool("strictMode") == true }
             waitForSnackbarToGo(R.string.settings_strict_on)
