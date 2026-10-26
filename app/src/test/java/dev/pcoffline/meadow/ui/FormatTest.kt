@@ -5,6 +5,7 @@ import android.content.res.Resources
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.InviteLinks
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
@@ -72,15 +73,14 @@ class FormatTest {
 
     @Test
     fun `counts agree with their nouns`() {
-        val r = dev.pcoffline.meadow.R.plurals
-        assertEquals(true, res.getQuantityString(r.bee_stats_share, 1, 1, 100).contains("answered 1 request and"))
-        assertEquals(true, res.getQuantityString(r.bee_stats_share, 2, 2, 50).contains("answered 2 requests and"))
-        assertEquals(true, res.getQuantityString(r.bee_stats_share_with_leaning, 1, 1, 100, "Gentle").contains("1 request and"))
-        assertEquals(true, res.getQuantityString(r.emergency_dialog_used_up, 1, 1).contains("your 1 emergency unlock for"))
-        assertEquals(true, res.getQuantityString(r.emergency_dialog_used_up, 3, 3).contains("all 3 emergency unlocks"))
-        assertEquals("Answer at least 1 request to see how you lean.", res.getQuantityString(r.bee_stats_leniency_unknown, 1, 1))
-        assertEquals("2 of 3 left", res.getQuantityString(r.settings_emergency_left, 2, 2, 3))
-        assertEquals("1 of 4 ready", res.getQuantityString(r.setup_progress, 1, 1, 4))
+        assertEquals(true, res.getQuantityString(R.plurals.bee_stats_share, 1, 1, 100).contains("answered 1 request and"))
+        assertEquals(true, res.getQuantityString(R.plurals.bee_stats_share, 2, 2, 50).contains("answered 2 requests and"))
+        assertEquals(true, res.getQuantityString(R.plurals.bee_stats_share_with_leaning, 1, 1, 100, "Gentle").contains("1 request and"))
+        assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 1, 1).contains("your 1 emergency unlock for"))
+        assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 3, 3).contains("all 3 emergency unlocks"))
+        assertEquals("Answer at least 1 request to see how you lean.", res.getQuantityString(R.plurals.bee_stats_leniency_unknown, 1, 1))
+        assertEquals("2 of 3 left", res.getQuantityString(R.plurals.settings_emergency_left, 2, 2, 3))
+        assertEquals("1 of 4 ready", res.getQuantityString(R.plurals.setup_progress, 1, 1, 4))
     }
 
     @Test
