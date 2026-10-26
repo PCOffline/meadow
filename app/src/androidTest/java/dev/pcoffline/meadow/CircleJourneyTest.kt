@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.intent.Intents
-import androidx.test.espresso.intent.Intents.intended
 import androidx.test.espresso.intent.Intents.intending
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasAction
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra
@@ -162,8 +161,11 @@ class CircleJourneyTest : EndToEndTest() {
             // Sharing a link makes one and hands it to the share sheet.
             node(R.string.invite_link_button).performClick()
             waitForBackendDocs("inviteLinks") { links -> links.any { it.string("ownerUid") == kai.uid } }
-            poll("the link handed to the share sheet") {
-                runCatching { intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString("/i/"))))) }.isSuccess
+            val shared = allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString("/i/"))))
+            try {
+                poll("the link handed to the share sheet") { Intents.getIntents().any { shared.matches(it) } }
+            } catch (e: AssertionError) {
+                throw AssertionError("${e.message} Started: ${Intents.getIntents().map { "${it.action} ${it.extras?.keySet()}" }}", e)
             }
 
             // Pasting something that isn't a link says so.

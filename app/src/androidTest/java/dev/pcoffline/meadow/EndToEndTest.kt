@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.annotation.StringRes
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -106,6 +107,20 @@ abstract class EndToEndTest {
                     node.children.flatMap(::walk)
             walk(root)
         }.distinct().joinToString(" | ").replace('\n', ' ').take(1500)
+    }.getOrElse { "(couldn't read the screen: $it)" }
+
+    /** Every node that takes a tap, with its words and where it is: for when a tap seems lost. */
+    protected fun tappables(): String = runCatching {
+        compose.onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().flatMap { root ->
+            fun words(node: SemanticsNode): List<String> =
+                node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
+                    node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() + node.children.flatMap(::words)
+            fun walk(node: SemanticsNode): List<String> =
+                listOfNotNull(
+                    node.takeIf { SemanticsActions.OnClick in it.config }?.let { "${words(it).joinToString("/")}@${it.boundsInRoot}" },
+                ) + node.children.flatMap(::walk)
+            walk(root)
+        }.joinToString(" | ").take(3000)
     }.getOrElse { "(couldn't read the screen: $it)" }
 
     /** Types into [field], then closes the keyboard, which could otherwise cover what's tapped next. */

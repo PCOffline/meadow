@@ -2,12 +2,13 @@ package dev.pcoffline.meadow
 
 import android.content.Intent
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -130,9 +131,9 @@ class AskJourneyTest : EndToEndTest() {
 
             // The Requests tab's button asks about the same limited apps.
             node(R.string.tab_requests).performClick()
-            // The floating button's label is only in the unmerged tree; tapping it taps the button.
-            compose.onNodeWithText(text(R.string.requests_ask_button), useUnmergedTree = true).performClick()
-            waitFor(R.string.ask_title)
+            val askButton = hasClickAction() and hasAnyDescendant(hasText(text(R.string.requests_ask_button)))
+            compose.onNode(askButton, useUnmergedTree = true).performClick()
+            eventually("the ask dialog from the Requests button (tappable: ${tappables()})") { showing(text(R.string.ask_title)) }
             inDialog("Pebbles").assertExists()
             inDialog(text(R.string.action_cancel)).performClick()
         }
