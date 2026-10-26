@@ -35,16 +35,15 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.outlined.Share
-import dev.pcoffline.meadow.ui.components.ShareDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -52,7 +51,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.ui.components.AppIcon
@@ -64,6 +62,8 @@ import dev.pcoffline.meadow.ui.components.MonthHeatmap
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.StalkBarChart
+import dev.pcoffline.meadow.ui.components.TabTitle
+import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.minutesText
@@ -100,15 +100,27 @@ data class Selection(val period: Period = Period.WEEK, val offset: Int = 0) {
 /** [canLimit] is false for the phone, settings and apps since uninstalled, which can't be limited. */
 data class AppTime(val packageName: String, val label: String, val ms: Long, val limit: AppLimit?, val canLimit: Boolean = true)
 
+/**
+ * A stretch of usage. A day's time is null when the phone kept no record of it; [previousTotalMs]
+ * is null when either stretch has such a day, since a comparison would be made up.
+ */
 data class PeriodStats(
     val selection: Selection,
     val from: LocalDate,
     val to: LocalDate,
-    val days: List<Pair<LocalDate, Long>>,
+    val days: List<Pair<LocalDate, Long?>>,
     val apps: List<AppTime>,
     val totalMs: Long,
-    val previousTotalMs: Long,
-)
+    val previousTotalMs: Long?,
+) {
+    /** Days up to today, so the days still to come don't pull the average down. */
+    private fun counted(today: LocalDate) = days.filter { (day, ms) -> ms != null && !day.isAfter(today) }
+
+    fun dailyAverageMs(today: LocalDate): Long = counted(today).let { d -> if (d.isEmpty()) 0L else d.sumOf { it.second ?: 0L } / d.size }
+
+    /** Days so far that have no record. */
+    fun missingDays(today: LocalDate): Int = days.count { (day, ms) -> ms == null && !day.isAfter(today) }
+}
 
 data class StatsUiState(
     val selection: Selection = Selection(),
@@ -147,7 +159,9 @@ class StatsViewModel : ViewModel() {
         val days = history.range(from, to)
         val limitable = AppGraph.catalog.launchablePackages()
         val perApp = HashMap<String, Long>()
-        days.forEach { (_, apps) -> apps.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0L) + ms } }
+        days.forEach { (_, apps) -> apps?.forEach { (pkg, ms) -> perApp[pkg] = (perApp[pkg] ?: 0L) + ms } }
+        fun total(stretch: List<Pair<LocalDate, Map<String, Long>?>>): Long? =
+            if (stretch.any { it.second == null }) null else stretch.sumOf { (_, apps) -> apps.orEmpty().values.sum() }
         val previousFrom = if (sel.period == Period.MONTH) from.minusMonths(1) else from.minusDays(ChronoUnit.DAYS.between(from, to) + 1)
         val previousTo = from.minusDays(1)
         val previous = if (sel.offset == 0) {
@@ -155,23 +169,24 @@ class StatsViewModel : ViewModel() {
             val fullDays = ChronoUnit.DAYS.between(from, today)
             val partial = previousFrom.plusDays(fullDays)
             if (partial.isAfter(previousTo)) {
-                history.range(previousFrom, previousTo).sumOf { (_, apps) -> apps.values.sum() }
+                total(history.range(previousFrom, previousTo))
             } else {
-                history.range(previousFrom, partial.minusDays(1)).sumOf { (_, apps) -> apps.values.sum() } +
-                    history.partialDay(partial, System.currentTimeMillis() - Days.startMillis(today)).values.sum()
+                total(history.range(previousFrom, partial.minusDays(1)))
+                    ?.plus(history.partialDay(partial, System.currentTimeMillis() - Days.startMillis(today)).values.sum())
             }
         } else {
-            history.range(previousFrom, previousTo).sumOf { (_, apps) -> apps.values.sum() }
+            total(history.range(previousFrom, previousTo))
         }
         return PeriodStats(
             selection = sel,
             from = from,
             to = to,
-            days = days.map { (d, apps) -> d to apps.values.sum() },
+            days = days.map { (d, apps) -> d to apps?.values?.sum() },
             apps = perApp.entries.sortedByDescending { it.value }.take(25)
                 .map { AppTime(it.key, AppGraph.catalog.label(it.key), it.value, limit = null, canLimit = it.key in limitable) },
             totalMs = perApp.values.sum(),
-            previousTotalMs = previous,
+            // Days with no record in this stretch would make any comparison look better than it is.
+            previousTotalMs = previous.takeIf { days.none { (d, apps) -> apps == null && !d.isAfter(today) } },
         )
     }
 }
@@ -191,21 +206,8 @@ fun StatsContent(
     onOpenSetup: () -> Unit = {},
     onOpenApp: (String) -> Unit = {},
 ) {
-    var sharing by rememberSaveable { mutableStateOf(false) }
-    val res = LocalResources.current
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 8.dp)) {
-            Text(
-                stringResource(R.string.stats_title),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.asHeading().weight(1f),
-            )
-            if (state.stats != null && state.stats.totalMs > 0) {
-                IconButton(onClick = { sharing = true }) {
-                    Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.share_title))
-                }
-            }
-        }
+        TabTitle(stringResource(R.string.stats_title))
         Text(
             stringResource(R.string.stats_subtitle),
             style = MaterialTheme.typography.bodyMedium,
@@ -223,7 +225,6 @@ fun StatsContent(
                 }
             }
         }
-        if (sharing) state.stats?.let { ShareDialog(statsShareText(res, it), onDismiss = { sharing = false }) }
         if (!state.hasPermission) {
             EmptyState(
                 "📊",
@@ -318,15 +319,15 @@ private fun Summary(s: PeriodStats) {
                 Text(durationText(s.totalMs), style = MaterialTheme.typography.headlineLarge)
             }
             if (s.selection.period != Period.DAY) {
-                val counted = s.days.count { !it.first.isAfter(Days.today()) }.coerceAtLeast(1)
                 Column(horizontalAlignment = Alignment.End) {
                     Text(stringResource(R.string.stats_daily_average), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(durationText(s.totalMs / counted), style = MaterialTheme.typography.titleLarge)
+                    Text(durationText(s.dailyAverageMs(Days.today())), style = MaterialTheme.typography.titleLarge)
                 }
             }
         }
-        if (s.previousTotalMs > 0) {
-            val change = ((s.totalMs - s.previousTotalMs) * 100 / s.previousTotalMs).toInt()
+        val previousTotal = s.previousTotalMs
+        if (previousTotal != null && previousTotal > 0) {
+            val change = ((s.totalMs - previousTotal) * 100 / previousTotal).toInt()
             val previous = stringResource(
                 when (s.selection.period) {
                     Period.DAY -> if (s.selection.offset == 0) R.string.stats_so_far_day else R.string.stats_previous_day
@@ -335,11 +336,12 @@ private fun Summary(s: PeriodStats) {
                 },
             )
             Spacer(Modifier.height(8.dp))
-            Pill(
-                if (change <= 0) stringResource(R.string.stats_less_than, -change, previous)
-                else stringResource(R.string.stats_more_than, change, previous),
-                if (change <= 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
-            )
+            // Less screen time is the good news, so it's green; more is red.
+            if (change <= 0) {
+                Pill(stringResource(R.string.stats_less_than, -change, previous), Garden.colors.better, textColor = Garden.colors.onBetter)
+            } else {
+                Pill(stringResource(R.string.stats_more_than, change, previous), MaterialTheme.colorScheme.errorContainer, textColor = MaterialTheme.colorScheme.onErrorContainer)
+            }
         }
     }
 }
@@ -348,34 +350,54 @@ private fun Summary(s: PeriodStats) {
 private fun Chart(s: PeriodStats) {
     val today = Days.today()
     MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
-        val minutes = s.days.map { it.second / 60_000f }
+        val minutes = s.days.map { (it.second ?: 0L) / 60_000f }
+        val missing = s.days.indices.filter { s.days[it].second == null }.toSet()
         val highlight = s.days.indexOfFirst { it.first == today }
         if (s.selection.period == Period.WEEK) {
+            val average = s.dailyAverageMs(today)
+            val averageLabel = stringResource(R.string.stats_average_tag)
+            val averageText = durationText(average)
             StalkBarChart(
                 values = minutes,
                 labels = s.days.map { it.first.dayOfWeek.getDisplayName(TextStyle.SHORT, currentLocale()) },
                 highlightIndex = highlight,
-                referenceLine = minutes.filter { it > 0 }.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
-            )
-            Text(
-                stringResource(R.string.stats_average_line),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
+                // Named on the line itself: "a day on average", then how much.
+                referenceLine = (average / 60_000f).takeIf { it > 0f },
+                referenceLabel = if (average > 0) {
+                    buildAnnotatedString {
+                        append(averageLabel)
+                        append('\n')
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(averageText) }
+                    }
+                } else {
+                    null
+                },
+                missing = missing,
             )
         } else {
             MonthHeatmap(
                 values = minutes,
                 labels = s.days.map { it.first.dayOfMonth.toString() },
                 firstDayOffset = s.from.dayOfWeek.value - 1,
+                missing = missing,
             )
             Spacer(Modifier.height(12.dp))
             StalkBarChart(
                 values = minutes,
                 labels = s.days.map { it.first.dayOfMonth.toString() },
                 highlightIndex = highlight,
+                missing = missing,
                 height = 110.dp,
                 showEveryNthLabel = 5,
+            )
+        }
+        val unknown = s.missingDays(today)
+        if (unknown > 0) {
+            Text(
+                pluralStringResource(R.plurals.stats_missing_days, unknown, unknown),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 10.dp),
             )
         }
     }
@@ -417,17 +439,4 @@ private fun AppRow(app: AppTime, max: Long, total: Long, onOpen: (() -> Unit)?, 
             }
         }
     }
-}
-
-/** Totals and top apps only; the rest of the history never leaves the phone unless shared here. */
-private fun statsShareText(res: android.content.res.Resources, stats: PeriodStats): String {
-    val period = res.getString(
-        when (stats.selection.period) {
-            Period.DAY -> R.string.share_period_day
-            Period.WEEK -> R.string.share_period_week
-            Period.MONTH -> R.string.share_period_month
-        },
-    )
-    val top = stats.apps.take(3).joinToString(", ") { "${it.label} ${res.durationText(it.ms)}" }
-    return res.getString(R.string.share_stats, period, res.durationText(stats.totalMs), top)
 }

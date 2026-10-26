@@ -50,6 +50,12 @@ data class GardenColors(
     val growth: Color,
     /** Highlighted bars and nearly-full progress: [petalPink], made to stand out the same way. */
     val growthHigh: Color,
+    /**
+     * Less screen time than before: green in every theme, as the colour of things going well.
+     * More uses the scheme's error container, so the two never read alike.
+     */
+    val better: Color,
+    val onBetter: Color,
 ) {
     val petals: List<Color> get() = listOf(petalPink, petalLavender, petalHoney, petalPeach, petalSky)
 }
@@ -290,6 +296,7 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         )
     }
     fun visible(color: Color) = readable(color, surfaces, min = 3f, toward = if (dark) Color.White else Color.Black)
+    val better = if (dark) lerp(s.leaf, Color.Black, 0.62f) else lerp(s.leaf, Color.White, 0.7f)
     return GardenColors(
         petalPink = p[0],
         petalLavender = p[1],
@@ -305,6 +312,9 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         cardTint = cardTint,
         growth = visible(leaf),
         growthHigh = visible(p[0]),
+        better = better,
+        onBetter = readable(if (dark) lerp(s.leaf, Color.White, 0.85f) else lerp(s.leaf, Color.Black, 0.7f), listOf(better),
+            toward = if (dark) Color.White else Color.Black),
     )
 }
 

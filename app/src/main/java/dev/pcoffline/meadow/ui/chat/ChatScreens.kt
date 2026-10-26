@@ -57,7 +57,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Chat
 import dev.pcoffline.meadow.data.ChatMessage
 import dev.pcoffline.meadow.data.LimitRequest
@@ -66,6 +65,7 @@ import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.PersonAvatar
+import dev.pcoffline.meadow.ui.components.TabTitle
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
@@ -88,7 +88,7 @@ fun ChatListScreen(
 ) {
     val chats by viewModel.chats.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Text(stringResource(R.string.chats_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading().padding(start = 20.dp, top = 16.dp))
+        TabTitle(stringResource(R.string.chats_title))
         Text(
             stringResource(R.string.chats_subtitle),
             style = MaterialTheme.typography.bodyMedium,

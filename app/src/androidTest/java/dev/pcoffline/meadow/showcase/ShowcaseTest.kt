@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -210,8 +209,6 @@ class ShowcaseTest {
     @Test
     fun profile() {
         show { ProfileScreen(DemoGarden.robin, onBack = {}) }
-        // Scroll so the theme cards fill the screen.
-        compose.onNodeWithText(compose.activity.getString(R.string.dark_mode_system)).performScrollTo()
         capture("profile")
     }
 

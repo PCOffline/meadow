@@ -86,13 +86,14 @@ import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.limitText
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeWindow
-import dev.pcoffline.meadow.ui.components.ShareDialog
+import dev.pcoffline.meadow.ui.components.shareText
 import dev.pcoffline.meadow.ui.requests.BeePicks
 import dev.pcoffline.meadow.ui.requests.BumblebeePicker
 import dev.pcoffline.meadow.ui.requests.pendingRequestFor
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
 import dev.pcoffline.meadow.ui.requestSummary
 import dev.pcoffline.meadow.ui.ActionState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.json.Json
 import dev.pcoffline.meadow.ui.minutesText
@@ -246,7 +247,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
     var message by rememberSaveable { mutableStateOf("") }
     var removeNote by rememberSaveable { mutableStateOf("") }
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
-    var sharing by rememberSaveable { mutableStateOf(false) }
     val picks = rememberBeePicks()
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
@@ -390,7 +390,15 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
-            TextButton(onClick = { sharing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            val context = LocalContext.current
+            val res = LocalResources.current
+            // Straight to Android's share sheet: picking where it goes is the only choice to make.
+            TextButton(
+                onClick = {
+                    context.shareText(res.getString(R.string.share_limit, existing.appName, res.limitText(existing.dailyMinutes, existing.weeklyMinutes, existing.schedule)))
+                },
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) {
                 Text(stringResource(R.string.limit_editor_share))
             }
         }
@@ -426,12 +434,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             },
             dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.action_keep)) } },
         )
-    }
-    if (sharing && existing != null) {
-        val text = LocalResources.current.let { res ->
-            res.getString(R.string.share_limit, existing.appName, res.limitText(existing.dailyMinutes, existing.weeklyMinutes, existing.schedule))
-        }
-        ShareDialog(text, onDismiss = { sharing = false })
     }
 }
 

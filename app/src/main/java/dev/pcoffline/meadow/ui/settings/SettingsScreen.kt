@@ -67,6 +67,7 @@ fun SettingsScreen(
     onOpenProfile: () -> Unit,
     onOpenLegal: (LegalDoc) -> Unit,
     onOpenTroubleshoot: () -> Unit = {},
+    onOpenPrivacyPreview: () -> Unit = {},
 ) {
     var confirmStrictOff by rememberSaveable { mutableStateOf(false) }
     var strictNeedsSetup by rememberSaveable { mutableStateOf(false) }
@@ -85,6 +86,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             ProfileCard(profile, onOpenProfile)
+            AppearanceCard()
 
             if (anonymous) SecureAccountCard(R.string.settings_secure_reason)
 
@@ -138,7 +140,7 @@ fun SettingsScreen(
                 }
             }
 
-            PrivacyCard(profile)
+            PrivacyCard(profile, onPreview = onOpenPrivacyPreview)
             UpdatesCard()
 
             MeadowCard(Modifier.fillMaxWidth()) {
@@ -234,8 +236,9 @@ private fun ProfileCard(profile: UserProfile, onOpenProfile: () -> Unit) {
     }
 }
 
+/** The privacy choices; with [onPreview], a way to see the page they shape (see PrivacyPreviewContent). */
 @Composable
-private fun PrivacyCard(profile: UserProfile) {
+internal fun PrivacyCard(profile: UserProfile, onPreview: (() -> Unit)? = null) {
     val action = rememberAction()
     val saved = stringResource(R.string.settings_privacy_saved)
     val privacy = profile.privacy
@@ -255,6 +258,11 @@ private fun PrivacyCard(profile: UserProfile) {
             onChange = { on -> action.run(successMessage = saved) { AppGraph.profiles.setPrivacy(privacy.copy(shareUsage = on)) } },
         )
         ErrorNote(action.error)
+        if (onPreview != null) {
+            OutlinedButton(onClick = onPreview, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text(stringResource(R.string.settings_privacy_preview))
+            }
+        }
     }
 }
 

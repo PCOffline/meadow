@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import java.time.DayOfWeek
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import dev.pcoffline.meadow.ui.theme.contentOn
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
@@ -40,8 +46,9 @@ import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.theme.Garden
 
 /**
- * Rounded "stalk" bars. The highlighted bar (usually today) is drawn in petal pink;
- * an optional dashed line marks a limit or average.
+ * Rounded "stalk" bars. The highlighted bar (usually today) is drawn in petal pink; an optional
+ * dashed line marks a limit or average, named by [referenceLabel] at its end. Days in [missing]
+ * have no record and are drawn as empty outlines, so they don't read as days without use.
  */
 @Composable
 fun StalkBarChart(
@@ -50,11 +57,21 @@ fun StalkBarChart(
     modifier: Modifier = Modifier,
     highlightIndex: Int = -1,
     referenceLine: Float? = null,
+    referenceLabel: AnnotatedString? = null,
+    missing: Set<Int> = emptySet(),
     height: Dp = 160.dp,
     showEveryNthLabel: Int = 1,
 ) {
     val garden = Garden.colors
     val outline = MaterialTheme.colorScheme.outline
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val tagColor = MaterialTheme.colorScheme.surfaceVariant
+    val tagStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+    val measurer = rememberTextMeasurer()
+    val tag = remember(referenceLabel, tagStyle) { referenceLabel?.let { measurer.measure(it, tagStyle) } }
+    val density = LocalDensity.current
+    // The line's name sits in a gutter after the last bar, where it can't cover one.
+    val gutter = with(density) { tag?.let { (it.size.width + TAG_PADDING.roundToPx() * 2).toDp() + 6.dp } ?: 0.dp }
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, tween(700)) }
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f).coerceAtLeast(1f)
@@ -62,12 +79,23 @@ fun StalkBarChart(
     Column(modifier) {
         Canvas(Modifier.fillMaxWidth().height(height)) {
             val n = values.size.coerceAtLeast(1)
-            val slot = size.width / n
+            val plot = size.width - gutter.toPx()
+            val slot = plot / n
             val barWidth = (slot * 0.62f).coerceAtMost(28.dp.toPx())
             values.forEachIndexed { i, v ->
                 val barHeight = (v / max) * size.height * progress.value
                 val x = slot * i + (slot - barWidth) / 2f
                 val color = if (i == highlightIndex) garden.growthHigh else garden.growth
+                if (i in missing) {
+                    drawRoundRect(
+                        color = outlineVariant,
+                        topLeft = Offset(x, 0f),
+                        size = Size(barWidth, size.height),
+                        cornerRadius = CornerRadius(barWidth / 2f),
+                        style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))),
+                    )
+                    return@forEachIndexed
+                }
                 drawRoundRect(
                     color = color.copy(alpha = 0.18f),
                     topLeft = Offset(x, 0f),
@@ -88,10 +116,18 @@ fun StalkBarChart(
                 drawLine(
                     color = outline,
                     start = Offset(0f, y),
-                    end = Offset(size.width, y),
+                    end = Offset(plot, y),
                     strokeWidth = 1.5.dp.toPx(),
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
                 )
+                tag?.let { t ->
+                    val pad = TAG_PADDING.toPx()
+                    val tagSize = Size(t.size.width + pad * 2, t.size.height + pad)
+                    val top = (y - tagSize.height / 2f).coerceIn(0f, size.height - tagSize.height)
+                    val left = size.width - tagSize.width
+                    drawRoundRect(tagColor, Offset(left, top), tagSize, CornerRadius(tagSize.height / 2f))
+                    drawText(t, topLeft = Offset(left + pad, top + pad / 2f))
+                }
             }
         }
         // Each label is centred under its bar but may be wider than it, so "15" isn't cut to "1".
@@ -108,7 +144,7 @@ fun StalkBarChart(
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = gutter),
         ) { measurables, constraints ->
             val width = constraints.maxWidth
             val slot = width.toFloat() / labels.size.coerceAtLeast(1)
@@ -143,9 +179,9 @@ fun GrowthBar(fraction: Float, modifier: Modifier = Modifier, height: Dp = 10.dp
     }
 }
 
-/** A month at a glance: one soft square per day, deeper green for more screen time. */
+/** A month at a glance: one soft square per day, deeper green for more screen time; [missing] days have no record. */
 @Composable
-fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier = Modifier, firstDayOffset: Int = 0) {
+fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier = Modifier, firstDayOffset: Int = 0, missing: Set<Int> = emptySet()) {
     val garden = Garden.colors
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
     val cells = List(firstDayOffset) { null } + values.indices.toList()
@@ -163,7 +199,15 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
                 for (slot in 0 until 7) {
                     val index = week.getOrNull(slot)
                     Box(Modifier.weight(1f).height(34.dp), contentAlignment = Alignment.Center) {
-                        if (index != null) {
+                        if (index != null && index in missing) {
+                            Box(
+                                Modifier.fillMaxWidth().fillMaxHeight()
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(labels[index], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else if (index != null) {
                             val intensity = values[index] / max
                             val fill = if (values[index] <= 0f) MaterialTheme.colorScheme.surfaceVariant
                             else garden.leafDark.copy(alpha = 0.18f + 0.72f * intensity).compositeOver(MaterialTheme.colorScheme.surface)
@@ -181,3 +225,5 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
         }
     }
 }
+
+private val TAG_PADDING = 6.dp

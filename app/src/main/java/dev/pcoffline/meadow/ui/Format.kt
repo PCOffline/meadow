@@ -23,11 +23,20 @@ fun Resources.minutesText(minutes: Int): String = when {
     else -> getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
 }
 
-/** Like [minutesText], but shows "<1m" for a few seconds instead of "0m". */
+/** Time spent: like [minutesText], but "<1m" for a few seconds, and days and hours past a day. */
 fun Resources.durationText(millis: Long): String {
     val minutes = (millis / 60_000L).toInt()
-    return if (minutes == 0 && millis > 0) getString(R.string.duration_under_a_minute) else minutesText(minutes)
+    val days = minutes / MINUTES_PER_DAY
+    val hours = minutes % MINUTES_PER_DAY / 60
+    return when {
+        minutes == 0 && millis > 0 -> getString(R.string.duration_under_a_minute)
+        days > 0 && hours > 0 -> getString(R.string.duration_days_hours, days, hours)
+        days > 0 -> getString(R.string.duration_days, days)
+        else -> minutesText(minutes)
+    }
 }
+
+private const val MINUTES_PER_DAY = 24 * 60
 
 /** "30m a day and 3h a week", plus the allowed hours when there are any. */
 fun Resources.limitText(dailyMinutes: Int, weeklyMinutes: Int, schedule: Schedule? = null): String {
