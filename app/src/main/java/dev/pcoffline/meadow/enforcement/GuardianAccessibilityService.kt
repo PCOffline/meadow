@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.LruCache
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -164,20 +165,50 @@ class GuardianAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** Closes the app wherever it shows, then stops what it left running. */
-    private fun block(pkg: String) {
+    /**
+     * Covers the app with the block screen, then stops what it left running. The block screen
+     * opens straight over the app: after Home, Android holds back screens that apps in the
+     * background open for a few seconds, so going Home first would leave nothing shown.
+     */
+    internal fun block(pkg: String) {
         if (pkg == pipPackage) {
             dismissPictureInPicture()
             pipPackage = null
-        } else {
-            performGlobalAction(GLOBAL_ACTION_HOME)
         }
+        val since = SystemClock.elapsedRealtime()
         BlockActivity.launch(this, pkg)
         MeadowNotificationListener.rest(this, pkg)
-        scope.launch {
-            // Only a process in the background can be ended; give it a moment to get there.
-            delay(STOP_AFTER_MS)
-            if (!onScreen(pkg)) MeadowNotificationListener.stopInBackground(this@GuardianAccessibilityService, pkg)
+        scope.launch { makeSureBlocked(pkg, since) }
+    }
+
+    /**
+     * Waits for the block screen to show, opening it again if Android held it back. An app still
+     * on screen beside it (the other split-screen half) is left with Home, once, after which the
+     * block screen has to show again.
+     */
+    private suspend fun makeSureBlocked(pkg: String, launchedAt: Long) {
+        var since = launchedAt
+        var leftHome = false
+        repeat(BLOCK_ATTEMPTS) {
+            delay(BLOCK_CHECK_MS)
+            val shown = BlockActivity.shownSince(pkg, since)
+            if (shown && !onScreen(pkg)) {
+                // Only a process in the background can be ended, and now it is.
+                MeadowNotificationListener.stopInBackground(this, pkg)
+                return
+            }
+            val beside = pkg in sidePackages || pkg == pipPackage
+            withContext(Dispatchers.Main) {
+                when {
+                    beside && !leftHome -> {
+                        leftHome = true
+                        since = SystemClock.elapsedRealtime()
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                    }
+                    !shown -> BlockActivity.launch(this@GuardianAccessibilityService, pkg)
+                    else -> Unit // Shown; the app's own window events haven't caught up yet.
+                }
+            }
         }
     }
 
@@ -260,7 +291,9 @@ class GuardianAccessibilityService : AccessibilityService() {
             private set
 
         private const val SETTINGS = "com.android.settings"
-        private const val STOP_AFTER_MS = 1_500L
+        // Long enough to outlast the few seconds Android holds screens back after Home.
+        private const val BLOCK_CHECK_MS = 1_000L
+        private const val BLOCK_ATTEMPTS = 10
         private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")
 
         val GUARDED_SYSTEM_PACKAGES = setOf(
