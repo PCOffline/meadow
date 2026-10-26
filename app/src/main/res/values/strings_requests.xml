@@ -37,6 +37,7 @@
 
     <string name="ask_title">Ask for a little extra time</string>
     <string name="ask_no_limits">You haven\'t planted any limits yet.</string>
+    <string name="ask_pending">You\'ve already asked about %1$s. Wait for their answer, or withdraw that question in Requests first.</string>
     <string name="ask_how_much">How much?</string>
     <string name="ask_why">Why? It helps them say yes</string>
     <string name="ask_sending">Sending…</string>

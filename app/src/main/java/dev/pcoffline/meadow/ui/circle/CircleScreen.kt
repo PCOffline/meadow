@@ -357,9 +357,11 @@ private fun BumblebeeRow(bee: UserProfile, leavingAt: Long?, modifier: Modifier,
             IconButton(onClick = onChat) {
                 Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, bee.displayName))
             }
-            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                if (leavingAt == null) {
+            // Removing is the menu's only choice, so while a removal is under way there's no menu:
+            // it used to open empty.
+            if (leavingAt == null) {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.action_remove)) }, onClick = { menu = false; confirm = true })
                 }
             }

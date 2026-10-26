@@ -6,7 +6,7 @@
     <string name="setup_usage_title">Usage access</string>
     <string name="setup_usage_body">Lets Meadow measure how long each app is open. Required.</string>
     <string name="setup_keeper_title">Garden keeper</string>
-    <string name="setup_keeper_body">An accessibility service that notices which app is on screen and gently closes it when its time is up. It never reads what you type, and nothing on your screen leaves your phone. Required.\n\nIf the switch is greyed out, open Meadow\'s App info, tap ⋮ and choose \"Allow restricted settings\", then try again.</string>
+    <string name="setup_keeper_body">An accessibility service that notices which app is on screen and gently closes it when its time is up. It never reads what you type, and nothing on your screen leaves your phone. Required.</string>
     <string name="setup_notifications_title">Notifications</string>
     <string name="setup_notifications_body">Reminders before time runs out, answers from your Bumblebees, and messages.</string>
     <string name="setup_overlay_title">Show over other apps</string>
@@ -18,6 +18,8 @@
     <string name="setup_battery_body">Keeps the battery saver from putting the garden keeper to sleep.</string>
     <string name="setup_step_done">Done ✓</string>
     <string name="setup_step_allow">Allow</string>
+    <string name="setup_restricted_hint">Switch greyed out? Android holds this back for apps installed from outside an app store. In Meadow\'s App info, tap ⋮, choose \"Allow restricted settings\", then come back and tap Allow again.</string>
+    <string name="setup_restricted_action">Open App info</string>
     <string name="setup_done">Into the garden 🌼</string>
     <string name="setup_needs_essentials">Usage access, the garden keeper and notification access are needed</string>
     <string name="setup_later">I\'ll do this later</string>

@@ -5,6 +5,7 @@
     <string name="chats_empty_title">No conversations yet</string>
     <string name="chats_empty_body">A chat opens with each of your Bumblebees, and with each friend whose garden you look after.</string>
     <string name="chats_say_hello">Say hello 🌼</string>
+    <string name="chats_unread">Unread</string>
     <string name="chat_closed_title">This chat isn\'t open</string>
     <string name="chat_closed_body">Chats open once someone becomes a Bumblebee.</string>
     <string name="chat_placeholder">Write something kind…</string>

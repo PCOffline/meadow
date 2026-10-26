@@ -29,6 +29,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 
 /** Asking, answering and editing: request cards and the allowed-hours editor. */
 @RunWith(AndroidJUnit4::class)
@@ -130,10 +131,11 @@ class EditorsTest : ScreenTest() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 21 * 60)))
         show { ScheduleEditor(schedule) { schedule = it } }
         node(R.string.schedule_per_day).performClick()
-        // Monday is picked first; rest all day on Monday only.
+        // Today is picked first; rest all day on today only.
+        val today = LocalDate.now().dayOfWeek.value
         node(R.string.schedule_close_day).performClick()
-        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(1))
-        (2..7).forEach { assertEquals(listOf(TimeWindow(9 * 60, 21 * 60)), schedule.windowsOn(it)) }
+        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(today))
+        (1..7).filter { it != today }.forEach { assertEquals(listOf(TimeWindow(9 * 60, 21 * 60)), schedule.windowsOn(it)) }
         assertTrue(!schedule.sameEveryDay)
         assertAccessible(requireHeading = false)
     }

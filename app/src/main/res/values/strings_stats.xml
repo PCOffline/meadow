@@ -26,6 +26,8 @@
     <string name="stats_quiet_title">A quiet stretch</string>
     <string name="stats_quiet_body">No app time was recorded for this period.</string>
     <string name="stats_limit_tag">limit %1$s a day</string>
+    <string name="stats_open_limit">Change its limit</string>
+    <string name="stats_plant_limit">Plant a limit</string>
     <string name="stats_share">%1$d%% of your screen time</string>
     <string name="stats_no_access_title">Usage access is off</string>
     <string name="stats_no_access_body">Meadow needs usage access to measure your screen time.</string>

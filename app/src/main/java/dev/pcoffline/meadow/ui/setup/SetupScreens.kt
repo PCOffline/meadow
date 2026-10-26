@@ -4,6 +4,7 @@ package dev.pcoffline.meadow.ui.setup
 
 import android.Manifest
 import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -51,6 +52,7 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.enforcement.GuardianService
+import dev.pcoffline.meadow.enforcement.MeadowNotificationListener
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.GrowthBar
@@ -117,12 +119,14 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
             title = R.string.setup_keeper_title,
             body = R.string.setup_keeper_body,
             done = state.accessibility,
+            restricted = true,
         ) { disclosure = Disclosure.KEEPER }
         SetupStep(
             emoji = "🔕",
             title = R.string.setup_listener_title,
             body = R.string.setup_listener_body,
             done = state.notificationListener,
+            restricted = true,
         ) { disclosure = Disclosure.LISTENER }
         SetupStep(
             emoji = "🔔",
@@ -187,7 +191,7 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
             confirmButton = {
                 TextButton(onClick = {
                     disclosure = null
-                    context.openSettings(d.settingsAction)
+                    context.openFirst(d.intents(context))
                 }) { Text(stringResource(R.string.disclosure_agree)) }
             },
             dismissButton = { TextButton(onClick = { disclosure = null }) { Text(stringResource(R.string.disclosure_not_now)) } },
@@ -195,14 +199,51 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
     }
 }
 
-private enum class Disclosure(@StringRes val body: Int, val settingsAction: String) {
-    USAGE(R.string.disclosure_usage, Settings.ACTION_USAGE_ACCESS_SETTINGS),
-    KEEPER(R.string.disclosure_keeper, Settings.ACTION_ACCESSIBILITY_SETTINGS),
-    LISTENER(R.string.disclosure_listener, Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
+internal enum class Disclosure(@StringRes val body: Int) {
+    USAGE(R.string.disclosure_usage),
+    KEEPER(R.string.disclosure_keeper),
+    LISTENER(R.string.disclosure_listener);
+
+    /**
+     * Where to switch it on, best first: Meadow's own page where Android has one, so there's no
+     * hunting through a list, then the list itself.
+     */
+    fun intents(context: Context): List<Intent> = when (this) {
+        USAGE -> listOf(
+            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}")),
+            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
+        )
+        // Android keeps the page for one accessibility service to itself (a system-only
+        // permission), so the list is as close as an app can get.
+        KEEPER -> listOf(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        LISTENER -> listOfNotNull(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
+                    Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                    ComponentName(context, MeadowNotificationListener::class.java).flattenToString(),
+                )
+            } else {
+                null
+            },
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
+        )
+    }
 }
 
+/**
+ * [restricted] steps are ones Android greys out for apps installed outside an app store until
+ * "Allow restricted settings" is chosen in the app's info (Android 13 and later).
+ */
 @Composable
-private fun SetupStep(emoji: String, @StringRes title: Int, @StringRes body: Int, done: Boolean, onClick: () -> Unit) {
+private fun SetupStep(
+    emoji: String,
+    @StringRes title: Int,
+    @StringRes body: Int,
+    done: Boolean,
+    restricted: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
     MeadowCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.Top) {
             Text(emoji, fontSize = 26.sp)
@@ -217,6 +258,17 @@ private fun SetupStep(emoji: String, @StringRes title: Int, @StringRes body: Int
                 Text(stringResource(body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!done) {
                     FilledTonalButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text(stringResource(R.string.setup_step_allow)) }
+                    if (restricted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Text(
+                            stringResource(R.string.setup_restricted_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        TextButton(onClick = { context.openSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, withPackageUri = true) }) {
+                            Text(stringResource(R.string.setup_restricted_action))
+                        }
+                    }
                 }
             }
         }
@@ -236,8 +288,13 @@ private fun Context.openSettings(action: String, withPackageUri: Boolean = false
     val intent = Intent(action)
     if (withPackageUri) intent.data = Uri.parse("package:$packageName")
     if (withExtraPackage) intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-    runCatching { startActivity(intent) }.onFailure {
-        runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+    openFirst(listOf(intent))
+}
+
+/** Opens the first of [intents] the phone can open, or else Settings itself. */
+internal fun Context.openFirst(intents: List<Intent>) {
+    for (intent in intents + Intent(Settings.ACTION_SETTINGS)) {
+        if (runCatching { startActivity(intent) }.isSuccess) return
     }
 }
 

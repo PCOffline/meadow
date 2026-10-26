@@ -257,7 +257,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
                         )
                     }
-                    composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }) }
+                    composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }, onOpenApp = { nav.navigate(LimitRoute(it)) }) }
                     composable<RequestsRoute> {
                         RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
                     }
@@ -353,7 +353,8 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: Tab, select
         onClick = onClick,
         icon = {
             BadgedBox(badge = { if (count > 0) Badge { Text(count.toString()) } }) {
-                Icon(tab.icon, contentDescription = label, modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale })
+                // The label below already names the tab; naming the icon too made TalkBack say it twice.
+                Icon(tab.icon, contentDescription = null, modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale })
             }
         },
         label = { Text(label) },

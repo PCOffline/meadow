@@ -5,6 +5,9 @@ package dev.pcoffline.meadow.ui.limits
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,16 +49,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,11 +71,13 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChangeOutcome
+import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.LimitsRepository
 import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
+import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -80,7 +89,10 @@ import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.components.ShareDialog
 import dev.pcoffline.meadow.ui.requests.BeePicks
 import dev.pcoffline.meadow.ui.requests.BumblebeePicker
+import dev.pcoffline.meadow.ui.requests.pendingRequestFor
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
+import dev.pcoffline.meadow.ui.requestSummary
+import dev.pcoffline.meadow.ui.ActionState
 import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.json.Json
 import dev.pcoffline.meadow.ui.minutesText
@@ -88,6 +100,8 @@ import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
@@ -147,6 +161,9 @@ fun AppPickerScreen(
         } else {
             val filtered = remember(list, query) { list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) } }
             LazyColumn(Modifier.fillMaxSize().imePadding()) {
+                if (filtered.isEmpty() && query.isNotBlank()) {
+                    item { EmptyState("🔍", stringResource(R.string.picker_no_match_title), stringResource(R.string.picker_no_match_body, query.trim())) }
+                }
                 items(filtered, key = { it.packageName }) { row ->
                     ListItem(
                         headlineContent = { Text(row.label) },
@@ -174,6 +191,8 @@ data class LimitEditorState(
     val appName: String = "",
     val budget: AppBudget? = null,
     val bumblebeeCount: Int = 0,
+    /** My unanswered question about this app; only one can be open at a time. */
+    val pending: LimitRequest? = null,
     val loaded: Boolean = false,
 )
 
@@ -181,13 +200,15 @@ class LimitEditorViewModel(private val packageName: String) : ViewModel() {
     val state: StateFlow<LimitEditorState> = combine(
         AppGraph.store.limits,
         AppGraph.store.approverCount,
-    ) { limits, bees ->
+        pendingRequestFor(packageName),
+    ) { limits, bees, pending ->
         val existing = limits.firstOrNull { it.packageName == packageName }
         LimitEditorState(
             existing = existing,
             appName = existing?.appName ?: AppGraph.catalog.label(packageName),
             budget = AppGraph.engine.budget(packageName),
             bumblebeeCount = bees,
+            pending = pending,
             loaded = true,
         )
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, LimitEditorState())
@@ -210,7 +231,7 @@ fun LimitEditorScreen(
 }
 
 @Composable
-private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: () -> Unit) {
+internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: () -> Unit) {
     val existing = state.existing
     var dailyOn by rememberSaveable { mutableStateOf(existing == null || existing.dailyMinutes > 0) }
     var daily by rememberSaveable { mutableIntStateOf(existing?.dailyMinutes?.takeIf { it > 0 } ?: 30) }
@@ -223,6 +244,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
     }
     val schedule = ScheduleJson.decodeFromString(Schedule.serializer(), scheduleJson)
     var message by rememberSaveable { mutableStateOf("") }
+    var removeNote by rememberSaveable { mutableStateOf("") }
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
     var sharing by rememberSaveable { mutableStateOf(false) }
     val picks = rememberBeePicks()
@@ -235,6 +257,9 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
         schedule = if (hoursOn) schedule else null,
     )
     val needsApproval = existing != null && hasBees && LimitsRepository.isLooser(existing, proposed)
+    // The backend takes one open question per app, so another has to wait for its answer.
+    val waiting = state.pending
+    val anyLimitOn = dailyOn || weeklyOn || hoursOn
     val planted = stringResource(R.string.limit_editor_planted)
     val updated = stringResource(R.string.limit_editor_updated)
     val requested = stringResource(R.string.limit_editor_requested)
@@ -278,6 +303,14 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (dailyOn && weeklyOn && weekly < daily) {
+                Text(
+                    stringResource(R.string.limit_editor_weekly_below_daily),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn) { hoursOn = it }
@@ -292,7 +325,9 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
             }
         }
 
-        if (needsApproval) {
+        if (waiting != null) {
+            PendingCard(waiting, action)
+        } else if (needsApproval) {
             MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
                 Text(stringResource(R.string.limit_editor_loosens_title), style = MaterialTheme.typography.titleMedium)
                 Text(stringResource(R.string.limit_editor_loosens_body), style = MaterialTheme.typography.bodySmall)
@@ -312,6 +347,13 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
             )
         }
 
+        if (!anyLimitOn) {
+            Text(
+                stringResource(R.string.limit_editor_pick_one),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         ErrorNote(action.error)
         Button(
             onClick = {
@@ -327,7 +369,7 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
                     )
                 }
             },
-            enabled = !action.busy && (dailyOn || weeklyOn || hoursOn) && proposed != existing,
+            enabled = !action.busy && anyLimitOn && proposed != existing && !(needsApproval && waiting != null),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text(
@@ -341,7 +383,11 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
             )
         }
         if (existing != null) {
-            OutlinedButton(onClick = { confirmRemove = true }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { confirmRemove = true },
+                enabled = !action.busy && !(hasBees && waiting != null),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
             TextButton(onClick = { sharing = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -356,16 +402,24 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
             onDismissRequest = { confirmRemove = false },
             title = { Text(stringResource(R.string.limit_remove_title, existing.appName)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(if (hasBees) R.string.limit_remove_body_ask else R.string.limit_remove_body_now))
-                    if (hasBees) BumblebeePicker(picks)
+                    if (hasBees) {
+                        OutlinedTextField(
+                            value = removeNote, onValueChange = { removeNote = it.take(280) },
+                            label = { Text(stringResource(R.string.limit_editor_note)) },
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        BumblebeePicker(picks)
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmRemove = false
                     action.run(onSuccess = onDone) {
-                        val outcome = AppGraph.limits.remove(existing, message, if (hasBees) BeePicks.commit(picks.value) else null)
+                        val outcome = AppGraph.limits.remove(existing, removeNote, if (hasBees) BeePicks.commit(picks.value) else null)
                         action.toast(if (outcome == ChangeOutcome.REQUESTED) requested else removed)
                     }
                 }) { Text(stringResource(if (hasBees) R.string.limit_remove_ask else R.string.action_remove)) }
@@ -383,11 +437,37 @@ private fun LimitEditor(packageName: String, state: LimitEditorState, onDone: ()
 
 private val ScheduleJson = Json { ignoreUnknownKeys = true }
 
+/** The question already waiting about this app, and a way to take it back. */
+@Composable
+private fun PendingCard(request: LimitRequest, action: ActionState) {
+    val withdrawn = stringResource(R.string.request_withdrawn)
+    MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
+        Text(
+            stringResource(R.string.limit_editor_pending_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        Text(
+            stringResource(R.string.limit_editor_pending_body, requestSummary(request).replaceFirstChar { it.uppercase() }),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        TextButton(
+            onClick = { action.run(successMessage = withdrawn) { AppGraph.requests.cancel(request.id) } },
+            enabled = !action.busy,
+        ) { Text(stringResource(R.string.request_withdraw)) }
+    }
+}
+
+/** The whole row switches, not just the switch: the label is the bigger, more obvious target. */
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -398,15 +478,56 @@ private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, onChange: 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        FilledTonalIconButton(onClick = { onChange((value - step).coerceAtLeast(min)) }, enabled = value > min) {
+        // Read through the latest value, so holding a button keeps counting from where it is.
+        val current by rememberUpdatedState(value)
+        RepeatingIconButton(onStep = { onChange((current - step).coerceAtLeast(min)) }, enabled = value > min) {
             Icon(Icons.Outlined.Remove, contentDescription = stringResource(R.string.limit_editor_less))
         }
         Text(minutesText(value), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 24.dp))
-        FilledTonalIconButton(onClick = { onChange((value + step).coerceAtMost(max)) }, enabled = value < max) {
+        RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = value < max) {
             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))
         }
     }
 }
+
+/**
+ * A stepper button: a tap moves one step, and holding it keeps stepping, faster after a moment,
+ * so a far-off value is a press away rather than dozens of taps.
+ */
+@Composable
+private fun RepeatingIconButton(onStep: () -> Unit, enabled: Boolean, content: @Composable () -> Unit) {
+    val step by rememberUpdatedState(onStep)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Set once a hold starts stepping, so letting go doesn't add the tap's step on top.
+    var held by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed, enabled) {
+        if (!pressed || !enabled) return@LaunchedEffect
+        held = false
+        delay(HOLD_START_MS)
+        held = true
+        var steps = 0
+        while (isActive) {
+            step()
+            steps++
+            delay(if (steps < HOLD_FAST_AFTER) HOLD_REPEAT_MS else HOLD_FAST_REPEAT_MS)
+        }
+    }
+    FilledTonalIconButton(
+        onClick = {
+            if (!held) step()
+            held = false
+        },
+        enabled = enabled,
+        interactionSource = interaction,
+        content = content,
+    )
+}
+
+private const val HOLD_START_MS = 400L
+private const val HOLD_REPEAT_MS = 120L
+private const val HOLD_FAST_REPEAT_MS = 50L
+private const val HOLD_FAST_AFTER = 8
 
 @Composable
 private fun PresetChips(options: List<Int>, selected: Int, onSelect: (Int) -> Unit) {

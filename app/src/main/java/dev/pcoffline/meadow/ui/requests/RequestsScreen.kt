@@ -71,6 +71,7 @@ import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.requestSummary
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 
 class RequestsViewModel(uid: String) : ViewModel() {
     /** Requests friends sent me as one of their Bumblebees; null while loading. */
@@ -316,6 +317,9 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
     // Limits may arrive after the dialog opens, so fall back to the first one once they do.
     val limit: AppLimit? = limits.firstOrNull { it.packageName == selected } ?: limits.firstOrNull().takeIf { packageName == null }
     val asked = stringResource(R.string.ask_sent)
+    // One open question per app: say so now rather than after they've written it.
+    val pendingFlow = remember(limit?.packageName) { limit?.packageName?.let(::pendingRequestFor) ?: flowOf(null) }
+    val waiting by pendingFlow.collectAsStateWithLifecycle(null)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -329,6 +333,13 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
                             FilterChip(selected = limit?.packageName == it.packageName, onClick = { selected = it.packageName }, label = { Text(it.appName) })
                         }
                     }
+                }
+                if (waiting != null && limit != null) {
+                    Text(
+                        stringResource(R.string.ask_pending, limit.appName),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
                 }
                 Text(stringResource(R.string.ask_how_much), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -349,7 +360,7 @@ fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(
-                enabled = limit != null && !action.busy,
+                enabled = limit != null && waiting == null && !action.busy,
                 onClick = {
                     val l = limit ?: return@TextButton
                     action.run(successMessage = asked, onSuccess = onDismiss) {

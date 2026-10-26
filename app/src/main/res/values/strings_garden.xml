@@ -25,4 +25,5 @@
     <string name="garden_tile_ask">Ask for more</string>
     <string name="garden_tile_resting_until">Resting until %1$s</string>
     <string name="garden_tile_resting_hours">Resting outside its hours</string>
+    <string name="garden_tile_open_until">Open until %1$s</string>
 </resources>

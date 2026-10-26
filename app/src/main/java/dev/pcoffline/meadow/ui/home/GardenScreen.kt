@@ -293,6 +293,9 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
                     ?: stringResource(R.string.garden_tile_resting_hours)
                 budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)
                 budget.exhausted -> stringResource(R.string.garden_tile_resting_today)
+                // Only hours limit it: when it closes says more than a countdown of hours.
+                budget.allowedTodayMs == null && budget.untilScheduleChangeMs != null ->
+                    stringResource(R.string.garden_tile_open_until, opensAtText(budget.untilScheduleChangeMs))
                 budget.weeklyIsTighter -> stringResource(R.string.garden_tile_left_week, durationText(budget.remainingMs))
                 else -> stringResource(R.string.garden_tile_left_today, durationText(budget.remainingMs))
             },

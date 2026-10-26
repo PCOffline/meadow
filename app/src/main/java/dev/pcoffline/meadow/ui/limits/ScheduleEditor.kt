@@ -40,6 +40,7 @@ import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.clockText
 import dev.pcoffline.meadow.ui.currentLocale
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.format.TextStyle
 
 /** Most windows a day can have; matches the backend. */
@@ -59,7 +60,8 @@ private val PRESETS = listOf(
 @Composable
 fun ScheduleEditor(schedule: Schedule, onChange: (Schedule) -> Unit) {
     var perDay by rememberSaveable { mutableStateOf(!schedule.sameEveryDay) }
-    var day by rememberSaveable { mutableIntStateOf(1) }
+    // Today first: the day someone is most likely to be thinking about.
+    var day by rememberSaveable { mutableIntStateOf(LocalDate.now().dayOfWeek.value) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = !perDay, onClick = {

@@ -5,32 +5,42 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Chat
 import dev.pcoffline.meadow.data.ChatMessage
+import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.chat.ChatContent
+import dev.pcoffline.meadow.ui.chat.ChatRow
 import dev.pcoffline.meadow.ui.circle.CircleContent
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.home.GardenState
 import dev.pcoffline.meadow.ui.stats.Period
+import dev.pcoffline.meadow.ui.stats.Selection
 import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.stats.StatsUiState
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
+import dev.pcoffline.meadow.usage.UsageHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -107,6 +117,64 @@ class MainScreensTest : ScreenTest() {
     fun `stats can't go past this period`() {
         show { StatsContent(DemoGarden.stats.copy(selection = DemoGarden.stats.selection.copy(offset = 0))) }
         compose.onNodeWithContentDescription(text(R.string.stats_later)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun `tapping an app in stats opens its limit, unless it can't have one`() {
+        val opened = mutableListOf<String>()
+        val stats = DemoGarden.stats.stats!!
+        val withPhone = stats.copy(apps = stats.apps.map { if (it.label == "Maps") it.copy(canLimit = false) else it })
+        show { StatsContent(DemoGarden.stats.copy(stats = withPhone), onOpenApp = { opened += it }) }
+        compose.onNodeWithText("YouTube").performScrollTo().performClick()
+        assertEquals(listOf("demo.youtube"), opened)
+        // Further down a lazy list: scrolled to, so it's composed at all.
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Maps"))
+        compose.onNodeWithText("Maps").assertHasNoClickAction()
+        assertAccessible()
+    }
+
+    @Test
+    fun `stats stop going back where the kept history ends`() {
+        val edge = Selection(Period.DAY, -UsageHistory.KEEP_DAYS.toInt())
+        show { StatsContent(DemoGarden.stats.copy(selection = edge)) }
+        compose.onNodeWithContentDescription(text(R.string.stats_earlier)).assertIsNotEnabled()
+        assertTrue(Selection(Period.DAY, -UsageHistory.KEEP_DAYS.toInt() + 1).hasEarlier(Days.today()))
+        assertTrue(!Selection(Period.MONTH, -5).hasEarlier(Days.today()))
+        assertTrue(Selection(Period.WEEK, -1).hasEarlier(Days.today()))
+    }
+
+    @Test
+    fun `an unread chat says so, not only in bold`() {
+        val chat = Chat(
+            id = "maya_robin", participants = listOf("maya", "robin"), names = mapOf("maya" to "Maya"), avatars = emptyMap(),
+            lastMessage = "How was the walk?", lastMessageAtMillis = System.currentTimeMillis(), lastSenderId = "maya",
+            lastReadMillis = emptyMap(),
+        )
+        var opened = 0
+        show { ChatRow(chat, uid = "robin", onOpen = { opened++ }) }
+        compose.onNodeWithContentDescription(text(R.string.chats_unread)).performClick()
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun `a read chat has no unread mark`() {
+        val now = System.currentTimeMillis()
+        val chat = Chat(
+            id = "maya_robin", participants = listOf("maya", "robin"), names = mapOf("maya" to "Maya"), avatars = emptyMap(),
+            lastMessage = "How was the walk?", lastMessageAtMillis = now - 1_000, lastSenderId = "maya",
+            lastReadMillis = mapOf("robin" to now),
+        )
+        show { ChatRow(chat, uid = "robin", onOpen = {}) }
+        compose.onNodeWithContentDescription(text(R.string.chats_unread)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a Bumblebee already on the way out has no empty menu`() {
+        val leaving = DemoGarden.robin.copy(pendingRemovals = mapOf(DemoGarden.maya.uid to System.currentTimeMillis() + 3_600_000))
+        show { CircleContent(leaving, listOf(DemoGarden.maya, DemoGarden.theo), emptyList(), emptyList(), emptyList(), anonymous = false) }
+        // Only Theo, who isn't leaving, still offers the menu with "Remove" in it.
+        compose.onAllNodesWithContentDescription(text(R.string.action_more)).assertCountEquals(1)
+        assertAccessible()
     }
 
     @Test
