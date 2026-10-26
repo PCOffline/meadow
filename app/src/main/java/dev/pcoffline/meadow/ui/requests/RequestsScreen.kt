@@ -46,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -149,12 +151,14 @@ fun RequestsContent(
                 item { Spacer(Modifier.height(88.dp)) }
             }
         }
+        val label = stringResource(if (hasBees) R.string.requests_ask_button else R.string.requests_invite_button)
         ExtendedFloatingActionButton(
             onClick = { if (hasBees) asking = true else onOpenCircle() },
             icon = { Icon(Icons.Outlined.MoreTime, contentDescription = null) },
-            text = { Text(stringResource(if (hasBees) R.string.requests_ask_button else R.string.requests_invite_button)) },
+            text = { Text(label) },
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+            // Material keeps the label's text from screen readers, so the button names itself.
+            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).semantics { contentDescription = label },
         )
     }
     if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })

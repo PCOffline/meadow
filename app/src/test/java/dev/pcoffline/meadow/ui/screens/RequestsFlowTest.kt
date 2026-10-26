@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
+import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.requests.RequestsContent
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +24,18 @@ class RequestsFlowTest : ScreenTest() {
     fun `the ask button has a name`() {
         requests()
         assertAccessible()
+    }
+
+    @Test
+    fun `asking about any app opens`() {
+        show { AskForTimeDialog(packageName = null, onDismiss = {}) }
+        node(R.string.ask_title).assertExists()
+    }
+
+    @Test
+    fun `asking about one app opens`() {
+        show { AskForTimeDialog(packageName = "com.instagram.android", onDismiss = {}) }
+        node(R.string.ask_title).assertExists()
     }
 
     @Test
