@@ -7,12 +7,16 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -41,27 +46,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.annotation.StringRes
-import androidx.compose.ui.res.stringResource
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.enforcement.MeadowNotificationListener
-import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.GrowthBar
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.layout.size
+import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.ui.theme.Garden
 
 @Composable
@@ -102,7 +103,7 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(stringResource(R.string.setup_progress, done, total), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(pluralStringResource(R.plurals.setup_progress, done, done, total), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 GrowthBar(done / total.toFloat(), color = Garden.colors.growth)
             }
             Spacer(Modifier.width(12.dp))
@@ -210,7 +211,7 @@ internal enum class Disclosure(@StringRes val body: Int) {
      */
     fun intents(context: Context): List<Intent> = when (this) {
         USAGE -> listOf(
-            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}")),
+            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, "package:${context.packageName}".toUri()),
             Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
         )
         // Android keeps the page for one accessibility service to itself (a system-only
@@ -286,7 +287,7 @@ internal fun Context.afterNotificationRequest(granted: Boolean, canAskAgain: Boo
 
 private fun Context.openSettings(action: String, withPackageUri: Boolean = false, withExtraPackage: Boolean = false) {
     val intent = Intent(action)
-    if (withPackageUri) intent.data = Uri.parse("package:$packageName")
+    if (withPackageUri) intent.data = "package:$packageName".toUri()
     if (withExtraPackage) intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
     openFirst(listOf(intent))
 }

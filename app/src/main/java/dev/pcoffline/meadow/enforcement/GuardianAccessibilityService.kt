@@ -74,6 +74,7 @@ class GuardianAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 if (AppGraph.store.strictMode.value && pkg in GUARDED_SYSTEM_PACKAGES) checkStrict(pkg, force = false)
             }
+            else -> Unit // The service config only subscribes to the window events above.
         }
     }
 

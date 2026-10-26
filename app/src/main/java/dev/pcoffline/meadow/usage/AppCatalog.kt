@@ -3,13 +3,13 @@ package dev.pcoffline.meadow.usage
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.telecom.TelecomManager
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.createBitmap
 
 data class InstalledApp(val packageName: String, val label: String)
 
@@ -73,7 +73,7 @@ class AppCatalog(private val context: Context) {
         val bitmap = if (drawable is BitmapDrawable && drawable.bitmap != null && drawable.bitmap.width <= size) {
             drawable.bitmap
         } else {
-            Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also {
+            createBitmap(size, size).also {
                 val canvas = Canvas(it)
                 drawable.setBounds(0, 0, size, size)
                 drawable.draw(canvas)

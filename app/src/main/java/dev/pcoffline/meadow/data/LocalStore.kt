@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.data
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +59,10 @@ class LocalStore(context: Context) {
     val darkMode: StateFlow<String?> = _darkMode.asStateFlow()
 
     fun setAppearance(theme: String?, darkMode: String?) {
-        prefs.edit().putString(KEY_THEME, theme).putString(KEY_DARK_MODE, darkMode).apply()
+        prefs.edit {
+            putString(KEY_THEME, theme)
+            putString(KEY_DARK_MODE, darkMode)
+        }
         _theme.value = theme
         _darkMode.value = darkMode
     }
@@ -69,7 +73,7 @@ class LocalStore(context: Context) {
     val autoUpdate: StateFlow<Boolean> = _autoUpdate.asStateFlow()
 
     fun setAutoUpdate(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_AUTO_UPDATE, enabled).apply()
+        prefs.edit { putBoolean(KEY_AUTO_UPDATE, enabled) }
         _autoUpdate.value = enabled
     }
 
@@ -79,19 +83,19 @@ class LocalStore(context: Context) {
     val privacy: StateFlow<Privacy> = _privacy.asStateFlow()
 
     fun setPrivacy(privacy: Privacy) {
-        prefs.edit().putBoolean(KEY_SHARE_USAGE, privacy.shareUsage).apply()
+        prefs.edit { putBoolean(KEY_SHARE_USAGE, privacy.shareUsage) }
         _privacy.value = privacy
     }
 
     /** The address a sign-in link was last sent to from this phone, to finish signing in with it. */
     var pendingLinkEmail: String?
         get() = prefs.getString(KEY_LINK_EMAIL, null)
-        set(value) = prefs.edit().putString(KEY_LINK_EMAIL, value).apply()
+        set(value) = prefs.edit { putString(KEY_LINK_EMAIL, value) }
 
     /** The last release version a notification was shown for, so each one is offered once. */
     var notifiedUpdate: String?
         get() = prefs.getString(KEY_NOTIFIED_UPDATE, null)
-        set(value) = prefs.edit().putString(KEY_NOTIFIED_UPDATE, value).apply()
+        set(value) = prefs.edit { putString(KEY_NOTIFIED_UPDATE, value) }
 
     private val _acceptedTerms = MutableStateFlow(prefs.getInt(KEY_TERMS, 0))
 
@@ -101,7 +105,7 @@ class LocalStore(context: Context) {
     var acceptedTermsVersion: Int
         get() = _acceptedTerms.value
         set(value) {
-            prefs.edit().putInt(KEY_TERMS, value).apply()
+            prefs.edit { putInt(KEY_TERMS, value) }
             _acceptedTerms.value = value
         }
 
@@ -123,7 +127,7 @@ class LocalStore(context: Context) {
 
     /** Wipes everything this phone holds, after the account is deleted. */
     fun clearAll() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
         _limits.value = emptyList()
         _grants.value = emptyList()
         _strictMode.value = false
@@ -143,37 +147,37 @@ class LocalStore(context: Context) {
     val pendingInvite: StateFlow<String?> = _pendingInvite.asStateFlow()
 
     fun setPendingInvite(token: String?) {
-        prefs.edit().putString(KEY_PENDING_INVITE, token).apply()
+        prefs.edit { putString(KEY_PENDING_INVITE, token) }
         _pendingInvite.value = token
     }
 
     var ownerUid: String?
         get() = prefs.getString(KEY_OWNER, null)
-        set(value) = prefs.edit().putString(KEY_OWNER, value).apply()
+        set(value) = prefs.edit { putString(KEY_OWNER, value) }
 
     /** The protections last seen switched on, to notice one being switched off. */
     var lastReportedProtection: String?
         get() = prefs.getString(KEY_PROTECTION, null)
-        set(value) = prefs.edit().putString(KEY_PROTECTION, value).apply()
+        set(value) = prefs.edit { putString(KEY_PROTECTION, value) }
 
     /** When this phone last told the backend it's alive. */
     var lastHeartbeatMillis: Long
         get() = prefs.getLong(KEY_HEARTBEAT, 0L)
-        set(value) = prefs.edit().putLong(KEY_HEARTBEAT, value).apply()
+        set(value) = prefs.edit { putLong(KEY_HEARTBEAT, value) }
 
     /** The Bumblebees last asked for something, picked first next time. */
     var lastAskedBees: Set<String>
         get() = prefs.getStringSet(KEY_LAST_ASKED, emptySet()) ?: emptySet()
-        set(value) = prefs.edit().putStringSet(KEY_LAST_ASKED, value).apply()
+        set(value) = prefs.edit { putStringSet(KEY_LAST_ASKED, value) }
 
     var warnedKeys: Set<String>
         get() = prefs.getStringSet(KEY_WARNED, emptySet()) ?: emptySet()
-        set(value) = prefs.edit().putStringSet(KEY_WARNED, value).apply()
+        set(value) = prefs.edit { putStringSet(KEY_WARNED, value) }
 
     /** When the last offline emergency unlock was taken; offline ones are limited to one per 30 days. */
     var lastOfflineEmergencyMillis: Long
         get() = prefs.getLong(KEY_OFFLINE_EMERGENCY, 0L)
-        set(value) = prefs.edit().putLong(KEY_OFFLINE_EMERGENCY, value).apply()
+        set(value) = prefs.edit { putLong(KEY_OFFLINE_EMERGENCY, value) }
 
     var pendingEmergency: PendingEmergency?
         get() = read(KEY_PENDING_EMERGENCY)
@@ -190,12 +194,12 @@ class LocalStore(context: Context) {
     }
 
     fun setStrictMode(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_STRICT, enabled).apply()
+        prefs.edit { putBoolean(KEY_STRICT, enabled) }
         _strictMode.value = enabled
     }
 
     fun setApproverCount(count: Int) {
-        prefs.edit().putInt(KEY_APPROVERS, count).apply()
+        prefs.edit { putInt(KEY_APPROVERS, count) }
         _approverCount.value = count
     }
 
@@ -208,9 +212,9 @@ class LocalStore(context: Context) {
         prefs.getString(key, null)?.let { runCatching { json.decodeFromString<T>(it) }.getOrNull() }
 
     private inline fun <reified T> write(key: String, value: T?) {
-        prefs.edit().apply {
+        prefs.edit {
             if (value == null) remove(key) else putString(key, json.encodeToString(value))
-        }.apply()
+        }
     }
 
     private companion object {

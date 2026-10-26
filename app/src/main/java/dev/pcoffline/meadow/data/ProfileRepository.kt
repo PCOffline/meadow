@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
+import androidx.core.graphics.scale
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
@@ -127,7 +128,7 @@ class ProfileRepository(
         val source = decode(uri)
         val side = minOf(source.width, source.height)
         val cropped = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
-        val scaled = Bitmap.createScaledBitmap(cropped, PHOTO_SIZE, PHOTO_SIZE, true)
+        val scaled = cropped.scale(PHOTO_SIZE, PHOTO_SIZE)
         return ByteArrayOutputStream().use { out ->
             scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
             out.toByteArray()

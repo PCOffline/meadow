@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -95,8 +96,8 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                 Text(
                     when {
                         left == null -> stringResource(R.string.emergency_dialog_signed_out)
-                        usedUp -> stringResource(R.string.emergency_dialog_used_up, Emergency.ALLOWANCE)
-                        else -> stringResource(R.string.emergency_dialog_left, left, Emergency.ALLOWANCE)
+                        usedUp -> pluralStringResource(R.plurals.emergency_dialog_used_up, Emergency.ALLOWANCE, Emergency.ALLOWANCE)
+                        else -> pluralStringResource(R.plurals.emergency_dialog_left, left, left, Emergency.ALLOWANCE)
                     },
                     style = MaterialTheme.typography.labelLarge,
                     color = if (usedUp) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,

@@ -57,7 +57,10 @@
     <string name="bee_stats_empty_title">No requests yet</string>
     <string name="bee_stats_empty_body">Once the people you look after ask for something, you\'ll see how you\'ve answered here.</string>
     <string name="bee_stats_leniency">How you answer</string>
-    <string name="bee_stats_leniency_unknown">Answer at least %1$d requests to see how you lean.</string>
+    <plurals name="bee_stats_leniency_unknown">
+        <item quantity="one">Answer at least %1$d request to see how you lean.</item>
+        <item quantity="other">Answer at least %1$d requests to see how you lean.</item>
+    </plurals>
     <string name="bee_stats_leniency_score">Leniency %1$d of 100</string>
     <string name="bee_stats_leniency_how">A \"not today\" counts 0 and a yes counts 100; a yes with fewer minutes than asked counts the share you gave.</string>
     <string name="bee_leaning_very_strict">Very strict 🌵</string>
@@ -77,6 +80,12 @@
     <string name="bee_stats_person_line">Asked %1$d · yes %2$d · not today %3$d</string>
     <string name="bee_stats_percent">%1$d%%</string>
     <string name="bee_stats_none">–</string>
-    <string name="bee_stats_share">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d requests and said yes to %2$d%%.</string>
-    <string name="bee_stats_share_with_leaning">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d requests and said yes to %2$d%%. My style: %3$s</string>
+    <plurals name="bee_stats_share">
+        <item quantity="one">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d request and said yes to %2$d%%.</item>
+        <item quantity="other">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d requests and said yes to %2$d%%.</item>
+    </plurals>
+    <plurals name="bee_stats_share_with_leaning">
+        <item quantity="one">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d request and said yes to %2$d%%. My style: %3$s</item>
+        <item quantity="other">As a Bumblebee on Meadow 🐝 I\'ve answered %1$d requests and said yes to %2$d%%. My style: %3$s</item>
+    </plurals>
 </resources>

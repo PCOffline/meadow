@@ -2,7 +2,10 @@
 <resources>
     <string name="setup_title">Prepare the soil 🌱</string>
     <string name="setup_body">A few permissions let Meadow keep your promises for you. Your flower blooms as you go.</string>
-    <string name="setup_progress">%1$d of %2$d ready</string>
+    <plurals name="setup_progress">
+        <item quantity="one">%1$d of %2$d ready</item>
+        <item quantity="other">%1$d of %2$d ready</item>
+    </plurals>
     <string name="setup_usage_title">Usage access</string>
     <string name="setup_usage_body">Lets Meadow measure how long each app is open. Required.</string>
     <string name="setup_keeper_title">Garden keeper</string>

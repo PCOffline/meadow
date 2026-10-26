@@ -8,9 +8,9 @@ import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.pcoffline.meadow.AppGraph
@@ -113,7 +113,7 @@ class Updater(
     fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
 
     fun installPermissionIntent(): Intent =
-        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${context.packageName}".toUri())
 
     /** Downloads, verifies and hands the update to Android's installer, which asks to confirm. */
     private suspend fun install(update: AvailableUpdate) {

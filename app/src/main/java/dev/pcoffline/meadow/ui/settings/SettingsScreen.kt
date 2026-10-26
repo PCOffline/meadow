@@ -112,7 +112,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    stringResource(R.string.settings_emergency_left, profile.emergenciesLeft, Emergency.ALLOWANCE),
+                    pluralStringResource(R.plurals.settings_emergency_left, profile.emergenciesLeft, profile.emergenciesLeft, Emergency.ALLOWANCE),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(top = 6.dp),

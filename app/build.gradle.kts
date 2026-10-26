@@ -117,9 +117,7 @@ android {
     }
 
     lint {
-        // A text report too, which CI prints into its log (AGP no longer takes "stdout" here: it
-        // copied the report to a file of that name).
-        textReport = true
+        // Lint always writes a text report (build/reports/lint-results-debug.txt); CI prints it.
         abortOnError = true
         checkDependencies = true
     }

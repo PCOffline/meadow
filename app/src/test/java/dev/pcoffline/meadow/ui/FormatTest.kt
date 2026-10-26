@@ -71,6 +71,19 @@ class FormatTest {
     }
 
     @Test
+    fun `counts agree with their nouns`() {
+        val r = dev.pcoffline.meadow.R.plurals
+        assertEquals(true, res.getQuantityString(r.bee_stats_share, 1, 1, 100).contains("answered 1 request and"))
+        assertEquals(true, res.getQuantityString(r.bee_stats_share, 2, 2, 50).contains("answered 2 requests and"))
+        assertEquals(true, res.getQuantityString(r.bee_stats_share_with_leaning, 1, 1, 100, "Gentle").contains("1 request and"))
+        assertEquals(true, res.getQuantityString(r.emergency_dialog_used_up, 1, 1).contains("your 1 emergency unlock for"))
+        assertEquals(true, res.getQuantityString(r.emergency_dialog_used_up, 3, 3).contains("all 3 emergency unlocks"))
+        assertEquals("Answer at least 1 request to see how you lean.", res.getQuantityString(r.bee_stats_leniency_unknown, 1, 1))
+        assertEquals("2 of 3 left", res.getQuantityString(r.settings_emergency_left, 2, 2, 3))
+        assertEquals("1 of 4 ready", res.getQuantityString(r.setup_progress, 1, 1, 4))
+    }
+
+    @Test
     fun `exports turn backend values into plain JSON`() {
         val json = ProfileRepository.toJson(mapOf("name" to "Robin", "n" to 3L, "ok" to true, "none" to null, "list" to listOf(1, "a")))
         assertEquals("""{"name":"Robin","n":3,"ok":true,"none":null,"list":[1,"a"]}""", json.toString())
