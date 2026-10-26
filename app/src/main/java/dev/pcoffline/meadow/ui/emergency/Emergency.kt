@@ -193,9 +193,11 @@ class EmergencyBannerViewModel : ViewModel() {
 @Composable
 fun EmergencyBanner(modifier: Modifier = Modifier, viewModel: EmergencyBannerViewModel = viewModel { EmergencyBannerViewModel() }) {
     val active by viewModel.active.collectAsStateWithLifecycle()
-    val e = active ?: return
+    // Before the banner can go: ending the unlock removes it, and the action has to stay
+    // attached to say the limits are back.
     val action = rememberAction()
     val ended = stringResource(R.string.emergency_ended)
+    val e = active ?: return
     MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.errorContainer) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("🚨", fontSize = 22.sp)
