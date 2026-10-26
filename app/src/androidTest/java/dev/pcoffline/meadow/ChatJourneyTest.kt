@@ -3,6 +3,7 @@ package dev.pcoffline.meadow
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -48,6 +49,14 @@ class ChatJourneyTest : EndToEndTest() {
             val chatId = ChatRepository.chatIdFor(me, sam.uid)
             sam.send(chatId, "Thanks for looking after me")
 
+            // The Chats tab lists it with its last message, and opens it.
+            node(R.string.tab_chats).performClick()
+            waitForText("Thanks for looking after me")
+            compose.onNode(hasText("Sam") and hasClickAction()).performClick()
+            waitForText(text(R.string.chat_placeholder))
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+
+            // So does Sam's garden.
             node(R.string.tab_circle).performClick()
             openGardenOf("Sam")
             node(R.string.action_chat).performScrollTo().performClick()

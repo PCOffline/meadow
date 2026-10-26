@@ -9,7 +9,6 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.auth.FirebaseAuth
 import dev.pcoffline.meadow.usage.queryActivities
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -51,13 +50,5 @@ class SignInLinkTest : EndToEndTest() {
             assertEquals(sam.uid, FirebaseAuth.getInstance().currentUser?.uid)
             waitFor(R.string.setup_later)
         }
-    }
-
-    /** The newest sign-in link the Auth emulator "emailed" to [email]. */
-    private fun emailedLink(email: String): String {
-        val codes = JSONObject(emulatorGet(9099, "emulator/v1/projects/demo-meadow/oobCodes")).getJSONArray("oobCodes")
-        return (codes.length() - 1 downTo 0).map(codes::getJSONObject)
-            .first { it.optString("email") == email && it.optString("requestType") == "EMAIL_SIGNIN" }
-            .getString("oobLink")
     }
 }

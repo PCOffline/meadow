@@ -2,6 +2,10 @@ package dev.pcoffline.meadow
 
 import android.app.Activity
 import android.app.Application
+import android.app.UiAutomation
+import android.content.Intent
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -58,6 +62,21 @@ abstract class EndToEndTest {
 
     protected fun text(@StringRes id: Int, vararg args: Any) = app.getString(id, *args)
     protected fun node(@StringRes id: Int): SemanticsNodeInteraction = compose.onNodeWithText(text(id))
+    protected fun inDialog(value: String, substring: Boolean = false): SemanticsNodeInteraction =
+        compose.onNode(hasText(value, substring) and hasAnyAncestor(isDialog()))
+
+    /** Whether [value] is on screen now. */
+    protected fun showing(value: String, substring: Boolean = false) =
+        compose.onAllNodesWithText(value, substring).fetchSemanticsNodes().isNotEmpty()
+
+    /** Waits for [check], saying [what] never happened (and what was on screen) if it doesn't. */
+    protected fun eventually(what: String, timeout: Long = 20_000, check: () -> Boolean) {
+        try {
+            compose.waitUntil(timeout) { runCatching(check).getOrDefault(false) }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("Never saw $what. On screen: ${screenText()}", e)
+        }
+    }
     protected fun waitFor(@StringRes id: Int, substring: Boolean = false) = waitForText(text(id), substring)
     protected fun waitForText(value: String, substring: Boolean = false, timeout: Long = 60_000) {
         try {
@@ -160,6 +179,57 @@ abstract class EndToEndTest {
 
     protected fun JSONObject.string(field: String): String? = optJSONObject(field)?.optString("stringValue")
 
+    /** A Firestore REST integer field, or null when it's missing or not a number. */
+    protected fun JSONObject.int(field: String): Int? = optJSONObject(field)?.optString("integerValue")?.toIntOrNull()
+
+    protected fun JSONObject.bool(field: String): Boolean? = optJSONObject(field)?.takeIf { it.has("booleanValue") }?.getBoolean("booleanValue")
+
+    /** The package of Pebbles, a stand-in app in the test APK for the tests to limit: Meadow can't limit itself. */
+    protected val pebbles: String get() = InstrumentationRegistry.getInstrumentation().context.packageName
+
+    /** Opens Pebbles, as if from the launcher. */
+    protected fun openPebbles() = app.startActivity(
+        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setClassName(pebbles, PebblesActivity::class.java.name)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+
+    /**
+     * Runs [command] as the shell, the way adb would, and returns what it printed. Accessibility
+     * services stay on: by default a test's UiAutomation silences them.
+     */
+    protected fun shell(command: String): String {
+        val automation = InstrumentationRegistry.getInstrumentation().getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+        return ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes().decodeToString() }
+    }
+
+    /** Signs this phone in as [friend], who already has an email and a profile, before Meadow opens. */
+    protected fun signInAs(friend: EmulatorFriend) {
+        EmulatorFriend.await(FirebaseAuth.getInstance().signInWithEmailAndPassword(friend.email, EmulatorFriend.PASSWORD))
+    }
+
+    /** From Meadow opening, signed in as [name], past the setup offer to the garden. */
+    protected fun intoTheGarden(name: String) {
+        waitFor(R.string.setup_later)
+        compose.onAllNodesWithText(text(R.string.setup_later)).onFirst().performScrollTo().performClick()
+        waitForText(name, substring = true)
+    }
+
+    /** The newest sign-in link the Auth emulator "emailed" to [email]. */
+    protected fun emailedLink(email: String): String {
+        val codes = JSONObject(emulatorGet(9099, "emulator/v1/projects/demo-meadow/oobCodes")).getJSONArray("oobCodes")
+        return (codes.length() - 1 downTo 0).map(codes::getJSONObject)
+            .first { it.optString("email") == email && it.optString("requestType") == "EMAIL_SIGNIN" }
+            .getString("oobLink")
+    }
+
+    /** Opens an emailed sign-in link the way tapping it in a mail app does. */
+    protected fun openEmailedLink(email: String) {
+        val link = Uri.parse("https://${BuildConfig.AUTH_LINK_HOST}/__/auth/links?link=${Uri.encode(emailedLink(email))}")
+        app.startActivity(
+            Intent(Intent.ACTION_VIEW, link).addCategory(Intent.CATEGORY_BROWSABLE).setPackage(app.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     /** The strings in a Firestore REST array field (empty when the array is). */
     protected fun JSONObject.strings(field: String): List<String> {
         val values = getJSONObject(field).getJSONObject("arrayValue").optJSONArray("values") ?: JSONArray()
@@ -175,9 +245,7 @@ abstract class EndToEndTest {
         typeInto(hasSetTextAction() and hasText(text(R.string.onboarding_name_label)), name)
         node(R.string.legal_agree).performScrollTo().performClick()
         node(R.string.onboarding_plant).performScrollTo().performClick()
-        waitFor(R.string.setup_later)
-        compose.onAllNodesWithText(text(R.string.setup_later)).onFirst().performScrollTo().performClick()
-        waitForText(name, substring = true)
+        intoTheGarden(name)
     }
 
     /**

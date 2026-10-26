@@ -1,7 +1,6 @@
 package dev.pcoffline.meadow
 
 import android.content.Intent
-import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
@@ -33,9 +32,6 @@ import java.time.Instant
  */
 @RunWith(AndroidJUnit4::class)
 class EmergencyJourneyTest : EndToEndTest() {
-    private fun inDialog(value: String, substring: Boolean = false): SemanticsNodeInteraction =
-        compose.onNode(hasText(value, substring) and hasAnyAncestor(isDialog()))
-
     private val reasonField = hasSetTextAction() and hasAnyAncestor(isDialog())
 
     private fun JSONObject.millis(field: String): Long? =

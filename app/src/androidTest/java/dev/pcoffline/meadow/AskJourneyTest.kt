@@ -17,6 +17,7 @@ import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.enforcement.BlockActivity
 import dev.pcoffline.meadow.ui.minutesText
+import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -24,9 +25,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * End to end, from the side of the person who asks: Kai (on this phone) has Sam as a Bumblebee.
- * An app is resting; from its block screen Kai asks for 15 more minutes, Sam (played by the test)
+ * End to end, from the side of the person who asks. Kai (on this phone) has Sam as a Bumblebee:
+ * an app is resting, from its block screen Kai asks for 15 more minutes, Sam (played by the test)
  * says yes, and the block screen turns into a way back into the app, all without leaving it.
+ * With two Bumblebees, Kai asks early from the garden, only the one picked is asked, and the
+ * fewer minutes they give show on the app's flower.
  */
 @RunWith(AndroidJUnit4::class)
 class AskJourneyTest : EndToEndTest() {
@@ -82,6 +85,60 @@ class AskJourneyTest : EndToEndTest() {
             waitFor(R.string.rest_title_yes)
             compose.onNode(hasText(text(R.string.rest_open, "Sketchbook"))).assertExists()
             assertEquals(false, AppGraph.engine.budget(pkg, forceRefresh = true)!!.exhausted)
+        }
+    }
+
+    private fun inbox(person: EmulatorFriend): List<String> =
+        await(person.db.collection("users/${person.uid}/inbox").get()).documents.map { it.id }
+
+    @Test
+    fun askingEarlyGoesOnlyToTheBumblebeePickedAndCanGetLess() {
+        val kai = EmulatorFriend.create(app, "Kai", "🌷").also(people::add)
+        val sam = EmulatorFriend.create(app, "Sam", "🌻").also(people::add)
+        val lee = EmulatorFriend.create(app, "Lee", "🌼").also(people::add)
+        for (bee in listOf(sam, lee)) bee.call("acceptInviteLink", mapOf("token" to kai.call("createInviteLink")!!["token"]))
+        signInAs(kai)
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            intoTheGarden("Kai")
+            runBlocking { AppGraph.limits.save(AppLimit(pebbles, "Pebbles", 30, 0)) }
+            eventually("both Bumblebees counted") { AppGraph.store.approverCount.value == 2 }
+
+            // From the app's flower, before it's resting: 30 minutes, asked of Lee only.
+            waitFor(R.string.garden_tile_ask)
+            node(R.string.garden_tile_ask).performScrollTo().performClick()
+            waitFor(R.string.ask_title)
+            compose.onNode(hasText(app.resources.minutesText(30)) and hasAnyAncestor(isDialog())).performClick()
+            inDialog("Sam", substring = true).performClick()
+            typeIntoDialog(hasSetTextAction(), "A long call with Mum")
+            inDialog(text(R.string.action_send)).performClick()
+            waitFor(R.string.ask_sent)
+            var requestId = ""
+            eventually("the request in Lee's inbox") {
+                requestId = inbox(lee).firstOrNull().orEmpty()
+                requestId.isNotEmpty()
+            }
+            assertEquals(listOf(lee.uid), backendDoc("requests/$requestId")!!.strings("approverIds"))
+            assertEquals(emptyList<String>(), inbox(sam))
+
+            // Lee gives 10 of the 30 minutes, and the flower shows them.
+            lee.call("decideRequest", mapOf("requestId" to requestId, "approve" to true, "minutes" to 10))
+            waitForText(text(R.string.garden_tile_extra, app.resources.minutesText(10)))
+
+            // The Requests tab's button asks about the same limited apps.
+            node(R.string.tab_requests).performClick()
+            node(R.string.requests_ask_button).performClick()
+            waitFor(R.string.ask_title)
+            inDialog("Pebbles").assertExists()
+            inDialog(text(R.string.action_cancel)).performClick()
+        }
+
+        // The "ask" on a running-low notification opens the same question for its app.
+        val ask = Intent(app, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, DeepLinks.ask(pebbles))
+        ActivityScenario.launch<MainActivity>(ask).use {
+            waitFor(R.string.ask_title)
+            inDialog(text(R.string.ask_how_much)).assertExists()
+            inDialog(text(R.string.action_cancel)).performClick()
         }
     }
 }
