@@ -85,6 +85,15 @@ abstract class EndToEndTest {
         hideKeyboard()
     }
 
+    /**
+     * Types into a field in a dialog. The keyboard stays up: it belongs to the dialog's window,
+     * which [hideKeyboard] doesn't watch, and test taps reach the dialog's buttons regardless.
+     */
+    protected fun typeIntoDialog(field: SemanticsMatcher, value: String) {
+        compose.onNode(field and hasAnyAncestor(isDialog())).performTextInput(value)
+        compose.waitForIdle()
+    }
+
     private fun hideKeyboard() {
         val ime = WindowInsetsCompat.Type.ime()
         val instrumentation = InstrumentationRegistry.getInstrumentation()

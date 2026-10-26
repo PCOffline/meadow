@@ -63,7 +63,7 @@ class AskJourneyTest : EndToEndTest() {
             waitForText(text(R.string.rest_title, "Sketchbook"))
             node(R.string.rest_ask).performScrollTo().performClick()
             compose.onNode(hasText(app.resources.minutesText(15)) and hasAnyAncestor(isDialog())).performClick()
-            typeInto(hasSetTextAction() and hasAnyAncestor(isDialog()), "Finishing a drawing for Mum")
+            typeIntoDialog(hasSetTextAction(), "Finishing a drawing for Mum")
             compose.onNode(hasText(text(R.string.action_send)) and hasAnyAncestor(isDialog())).performClick()
 
             // It reaches Sam, and the block screen says it's waiting.
