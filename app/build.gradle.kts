@@ -117,9 +117,9 @@ android {
     }
 
     lint {
-        // Findings in the CI log, not only in an HTML report nobody can download.
+        // A text report too, which CI prints into its log (AGP no longer takes "stdout" here: it
+        // copied the report to a file of that name).
         textReport = true
-        textOutput = file("stdout")
         abortOnError = true
         checkDependencies = true
     }
@@ -130,6 +130,8 @@ android {
         unitTests.all {
             // Robolectric loads a whole Android framework per test class.
             it.maxHeapSize = "3g"
+            // Conscrypt (Robolectric's TLS) loads a native library; JDK 24+ warns unless allowed.
+            it.jvmArgs("--enable-native-access=ALL-UNNAMED")
             // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
             it.extensions.configure<JacocoTaskExtension> {
                 isIncludeNoLocationClasses = true

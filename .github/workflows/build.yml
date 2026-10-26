@@ -46,6 +46,9 @@ jobs:
         run: .github/scripts/detekt.sh
       - name: Build, unit test and lint
         run: ./gradlew assembleDebug assembleRelease createDebugUnitTestCoverageReport lintDebug --stacktrace
+      - name: Lint findings
+        if: always()
+        run: cat app/build/reports/lint-results-debug.txt 2>/dev/null || echo "No lint report"
       - name: Unit test coverage floor
         # Just under what the tests reach today (47.6% of lines, 32.8% of branches): it can only
         # go up. Raise it as coverage grows.

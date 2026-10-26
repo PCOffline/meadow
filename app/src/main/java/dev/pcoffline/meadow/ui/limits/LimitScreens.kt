@@ -117,7 +117,7 @@ fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable () -> Uni
             }
         },
         actions = { actions() },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
     )
 }
 

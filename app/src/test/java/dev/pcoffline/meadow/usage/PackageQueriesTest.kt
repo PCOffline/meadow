@@ -3,11 +3,11 @@ package dev.pcoffline.meadow.usage
 import android.app.Application
 import android.content.ComponentName
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -43,7 +43,7 @@ class PackageQueriesTest {
             applicationInfo = appInfo
         }
         shadowOf(pm).addOrUpdateActivity(activity)
-        shadowOf(pm).addResolveInfoForIntent(launcher, ResolveInfo().apply { activityInfo = activity })
+        shadowOf(pm).addIntentFilterForActivity(main, IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) })
     }
 
     @Test

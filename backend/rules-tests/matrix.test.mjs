@@ -6,8 +6,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import {
-  collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, updateDoc, where,
+  collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc, where,
 } from "firebase/firestore";
+
+// Denied writes are what these tests expect; the SDK would log each one as a warning.
+setLogLevel("error");
 
 let env;
 
