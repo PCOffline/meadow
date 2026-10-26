@@ -6,6 +6,7 @@ import org.intellij.markdown.ast.getTextInNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
+import org.intellij.markdown.parser.CancellationToken
 import org.intellij.markdown.parser.MarkdownParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -19,7 +20,10 @@ import java.io.File
  */
 class LegalDocsTest {
     private val dir = generateSequence(File("").absoluteFile) { it.parentFile }.map { File(it, "legal") }.first { it.isDirectory }
-    private val parser = MarkdownParser(GFMFlavourDescriptor())
+    private val parser = MarkdownParser(GFMFlavourDescriptor(), cancellationToken = CancellationToken.NonCancellable)
+
+    // Typed as CharSequence: the String overload is deprecated.
+    private fun tree(text: CharSequence) = parser.buildMarkdownTreeFromString(text)
 
     private fun read(doc: LegalDoc) = File(dir, doc.asset).readText()
     private fun ASTNode.all(): List<ASTNode> = listOf(this) + children.flatMap { it.all() }
@@ -32,7 +36,7 @@ class LegalDocsTest {
     fun `every document is shipped and opens with its title`() {
         LegalDoc.entries.forEach { doc ->
             val text = read(doc)
-            val first = parser.buildMarkdownTreeFromString(text).children.first { it.type != org.intellij.markdown.MarkdownTokenTypes.EOL }
+            val first = tree(text).children.first { it.type != org.intellij.markdown.MarkdownTokenTypes.EOL }
             assertEquals("${doc.asset} starts with a top-level heading", MarkdownElementTypes.ATX_1, first.type)
         }
     }
@@ -40,7 +44,7 @@ class LegalDocsTest {
     @Test
     fun `headings never skip a level, so screen readers can navigate them`() {
         LegalDoc.entries.forEach { doc ->
-            val levels = parser.buildMarkdownTreeFromString(read(doc)).all().mapNotNull { headings.indexOf(it.type).takeIf { i -> i >= 0 }?.plus(1) }
+            val levels = tree(read(doc)).all().mapNotNull { headings.indexOf(it.type).takeIf { i -> i >= 0 }?.plus(1) }
             assertEquals("${doc.asset} has exactly one title", 1, levels.count { it == 1 })
             levels.zipWithNext().forEach { (a, b) -> assertTrue("${doc.asset}: h$a followed by h$b", b <= a + 1) }
         }
@@ -50,7 +54,7 @@ class LegalDocsTest {
     fun `tables have a header and rows of the same width`() {
         LegalDoc.entries.forEach { doc ->
             val text = read(doc)
-            parser.buildMarkdownTreeFromString(text).all().filter { it.type == GFMElementTypes.TABLE }.forEach { table ->
+            tree(text).all().filter { it.type == GFMElementTypes.TABLE }.forEach { table ->
                 val rows = table.children.filter { it.type == GFMElementTypes.HEADER || it.type == GFMElementTypes.ROW }
                 assertEquals("${doc.asset}: a table starts with its header", GFMElementTypes.HEADER, rows.first().type)
                 val widths = rows.map { row -> row.children.count { it.type == GFMTokenTypes.CELL } }
@@ -78,7 +82,7 @@ class LegalDocsTest {
     fun `links point somewhere real`() {
         LegalDoc.entries.forEach { doc ->
             val text = read(doc)
-            parser.buildMarkdownTreeFromString(text).all().filter { it.type == MarkdownElementTypes.INLINE_LINK }.forEach { link ->
+            tree(text).all().filter { it.type == MarkdownElementTypes.INLINE_LINK }.forEach { link ->
                 val destination = link.children.first { it.type == MarkdownElementTypes.LINK_DESTINATION }.getTextInNode(text).toString()
                 assertTrue("${doc.asset}: $destination", destination.startsWith("https://"))
             }

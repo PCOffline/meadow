@@ -23,6 +23,8 @@ class BackupRulesTest {
         val application = parse("AndroidManifest.xml").children("application").single()
         assertEquals("false", application.getAttributeNS(ANDROID, "allowBackup"))
         assertEquals("@xml/data_extraction_rules", application.getAttributeNS(ANDROID, "dataExtractionRules"))
+        // Before Android 12 allowBackup="false" already covers it; this keeps lint's two-attribute rule.
+        assertEquals("false", application.getAttributeNS(ANDROID, "fullBackupContent"))
     }
 
     @Test
@@ -34,6 +36,12 @@ class BackupRulesTest {
             val excluded = entries.filter { it.getAttribute("path") == "." }.map { it.getAttribute("domain") }.toSet()
             assertEquals("$section excludes", DOMAINS, excluded)
         }
+    }
+
+    @Test
+    fun `the launcher icon has a monochrome layer for themed icons`() {
+        val icon = parse("res/drawable-anydpi/ic_launcher.xml")
+        assertEquals("@drawable/ic_launcher_foreground", icon.children("monochrome").single().getAttributeNS(ANDROID, "drawable"))
     }
 
     private companion object {

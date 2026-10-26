@@ -17,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -56,6 +58,16 @@ fun SnackbarScope(content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * How far up snackbars sit to clear the screen's floating button. Material puts them above it, so
+ * the button stays where the thumb expects it and a message never covers it.
+ */
+class SnackbarClearance {
+    var height: Dp by mutableStateOf(0.dp)
+}
+
+val LocalSnackbarClearance = staticCompositionLocalOf { SnackbarClearance() }
+
 /** Plays a shower of petals (and a little haptic tap) for happy moments. */
 val LocalCelebrate = staticCompositionLocalOf<() -> Unit> { {} }
 
@@ -63,7 +75,8 @@ val LocalCelebrate = staticCompositionLocalOf<() -> Unit> { {} }
  * Runs one user action at a time and exposes whether it's busy and what went wrong.
  *
  * Actions run in the app's process scope, so a rotation or leaving the screen never cancels a
- * write halfway. Callbacks only run while the screen is still showing.
+ * write halfway. [run]'s onSuccess only runs while the screen is still showing; its message
+ * always shows.
  */
 class ActionState(private val context: Context, private val snackbar: SnackbarHostState) {
     var busy by mutableStateOf(false)
@@ -72,23 +85,27 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
     internal var attached = true
 
     private var finishedAt = -SETTLE_MS
+    private var finishedBy: Class<*>? = null
 
     /**
-     * Runs [block] unless an action is already running or only just succeeded, so a double tap
-     * acts once. A failed action can be retried straight away.
+     * Runs [block] unless an action is already running or the same one only just succeeded, so a
+     * double tap acts once. A failed action can be retried straight away, and another button
+     * (removing the photo just added) works at once.
      */
     fun run(successMessage: String? = null, onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
-        if (busy || SystemClock.elapsedRealtime() - finishedAt < SETTLE_MS) return
+        // Each call site's lambda has its own class: that's what tells one button from another.
+        if (busy || (block.javaClass == finishedBy && SystemClock.elapsedRealtime() - finishedAt < SETTLE_MS)) return
         busy = true
         AppGraph.scope.launch(Dispatchers.Main.immediate) {
             error = null
             try {
                 block()
                 finishedAt = SystemClock.elapsedRealtime()
-                if (attached) {
-                    onSuccess()
-                    successMessage?.let { launch { snackbar.showSnackbar(it) } }
-                }
+                finishedBy = block.javaClass
+                if (attached) onSuccess()
+                // Even when what asked has gone (an accepted invite leaves the list): the message
+                // goes to the screen's host, which outlives it, and is often the only sign it worked.
+                successMessage?.let { launch { snackbar.showSnackbar(it) } }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

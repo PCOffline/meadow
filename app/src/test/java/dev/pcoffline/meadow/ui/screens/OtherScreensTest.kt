@@ -133,7 +133,7 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `the profile card says "Edit your profile" once`() {
+    fun `the profile card says Edit your profile only once`() {
         show { SettingsScreen(DemoGarden.robin.copy(bio = ""), onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
         // Shown as the card's text without a bio, so the arrow stays quiet.
         node(R.string.profile_open).assertExists()

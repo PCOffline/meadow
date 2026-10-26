@@ -86,9 +86,12 @@ class BumblebeeJourneyTest : EndToEndTest() {
             waitForText(text(R.string.friend_no_usage_shared, "Sam"))
             assertEquals(0, compose.onAllNodesWithText(text(R.string.friend_screen_time, app.resources.minutesText(42))).fetchSemanticsNodes().size)
 
-            // Stepping down ends it on Sam's side too.
+            // Stepping down ends it on Sam's side too, and goes back to the circle, saying so.
             compose.onNode(hasText(text(R.string.friend_step_down, "Sam"))).performScrollTo().performClick()
             node(R.string.friend_step_down_confirm).performClick()
+            waitFor(R.string.friend_stepped_down)
+            // The circle keeps its scroll, so its title may be out of sight; Sam's garden is gone.
+            waitFor(R.string.circle_looking_after_empty)
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds").isEmpty() }
             waitForBackend("users/$me/private/account") { it.strings("approveeIds").isEmpty() }
         }

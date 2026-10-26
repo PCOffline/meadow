@@ -48,6 +48,7 @@ import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.limitText
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.minutesText
+import dev.pcoffline.meadow.ui.ActionState
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -79,6 +80,9 @@ fun FriendScreen(
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
     val usage by viewModel.usage.collectAsStateWithLifecycle()
     val limits by viewModel.limits.collectAsStateWithLifecycle()
+    // Out here: stepping down can hide their profile, and with it the details, before the
+    // step down returns; the action has to stay attached to go back.
+    val action = rememberAction()
 
     Column(Modifier.fillMaxSize()) {
         BackTopBar(friend?.displayName.orEmpty(), onBack = onBack)
@@ -88,15 +92,21 @@ fun FriendScreen(
         } else if (f == null) {
             Loading()
         } else {
-            FriendDetails(f, usage, limits, onBack, onChat = { onOpenChat(ChatRepository.chatIdFor(me.uid, f.uid)) })
+            FriendDetails(f, usage, limits, action, onBack, onChat = { onOpenChat(ChatRepository.chatIdFor(me.uid, f.uid)) })
         }
     }
 }
 
 @Composable
-private fun FriendDetails(f: UserProfile, usage: SharedUsage?, limits: List<AppLimit>, onBack: () -> Unit, onChat: () -> Unit) {
+private fun FriendDetails(
+    f: UserProfile,
+    usage: SharedUsage?,
+    limits: List<AppLimit>,
+    action: ActionState,
+    onBack: () -> Unit,
+    onChat: () -> Unit,
+) {
     var confirmStepDown by rememberSaveable { mutableStateOf(false) }
-    val action = rememberAction()
     val steppedDown = stringResource(R.string.friend_stepped_down)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),

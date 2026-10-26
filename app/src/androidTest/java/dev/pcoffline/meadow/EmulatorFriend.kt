@@ -43,8 +43,17 @@ class EmulatorFriend private constructor(private val firebase: FirebaseApp, val 
 
         fun <T> await(task: Task<T>): T = Tasks.await(task, 30, TimeUnit.SECONDS)
 
-        /** Signs up a new person with an email (so they can invite Bumblebees) and a profile. */
-        fun create(context: Context, name: String, flower: String): EmulatorFriend {
+        /**
+         * Signs up a new person with an email (so they can invite Bumblebees) and, unless
+         * [profile] is false, a profile that accepted the terms in [termsVersion].
+         */
+        fun create(
+            context: Context,
+            name: String,
+            flower: String,
+            profile: Boolean = true,
+            termsVersion: Int = LegalDoc.CURRENT_VERSION,
+        ): EmulatorFriend {
             val host = BuildConfig.EMULATOR_HOST
             val firebase = FirebaseApp.initializeApp(context, FirebaseApp.getInstance().options, "friend-$name-${System.nanoTime()}")
             FirebaseAuth.getInstance(firebase).useEmulator(host, 9099)
@@ -53,7 +62,7 @@ class EmulatorFriend private constructor(private val firebase: FirebaseApp, val 
             val email = "${name.lowercase()}-${System.currentTimeMillis()}@example.com"
             val user = await(FirebaseAuth.getInstance(firebase).createUserWithEmailAndPassword(email, PASSWORD)).user!!
             return EmulatorFriend(firebase, user.uid, email).also {
-                it.call("createProfile", mapOf("displayName" to name, "flower" to flower, "termsVersion" to LegalDoc.CURRENT_VERSION))
+                if (profile) it.call("createProfile", mapOf("displayName" to name, "flower" to flower, "termsVersion" to termsVersion))
             }
         }
     }

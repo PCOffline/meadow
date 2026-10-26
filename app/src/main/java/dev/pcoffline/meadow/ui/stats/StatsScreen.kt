@@ -125,7 +125,7 @@ class StatsViewModel : ViewModel() {
         val byPackage = limits.associateBy { it.packageName }
         StatsUiState(
             selection = sel,
-            stats = stats?.takeIf { it.selection == sel }?.let { s -> s.copy(apps = s.apps.map { it.copy(limit = byPackage[it.packageName]) }) },
+            stats = stats.takeIf { it.selection == sel }?.let { s -> s.copy(apps = s.apps.map { it.copy(limit = byPackage[it.packageName]) }) },
             hasPermission = AppGraph.tracker.hasPermission(),
         )
     }.stateWhileVisible(this, StatsUiState())

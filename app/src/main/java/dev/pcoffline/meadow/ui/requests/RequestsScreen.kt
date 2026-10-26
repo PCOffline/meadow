@@ -37,6 +37,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +46,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +64,7 @@ import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
+import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -88,10 +94,22 @@ fun RequestsScreen(
     onOpenBeeStats: () -> Unit = {},
     viewModel: RequestsViewModel = viewModel(key = "requests-${profile.uid}") { RequestsViewModel(profile.uid) },
 ) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    var asking by rememberSaveable { mutableStateOf(false) }
     val incoming by viewModel.incoming.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoing.collectAsStateWithLifecycle()
+    RequestsContent(profile, incoming, outgoing, onOpenCircle, onOpenBeeStats)
+}
+
+/** The requests, drawn from plain state (also used for tests). */
+@Composable
+fun RequestsContent(
+    profile: UserProfile,
+    incoming: List<LimitRequest>?,
+    outgoing: List<LimitRequest>?,
+    onOpenCircle: () -> Unit = {},
+    onOpenBeeStats: () -> Unit = {},
+) {
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var asking by rememberSaveable { mutableStateOf(false) }
     val hasBees = profile.approverIds.isNotEmpty()
 
     Box(Modifier.fillMaxSize()) {
@@ -137,12 +155,22 @@ fun RequestsScreen(
                 item { Spacer(Modifier.height(88.dp)) }
             }
         }
+        val label = stringResource(if (hasBees) R.string.requests_ask_button else R.string.requests_invite_button)
+        // Snackbars sit above the button rather than over it (they'd take its taps), only while it's here.
+        val clearance = LocalSnackbarClearance.current
+        val density = LocalDensity.current
+        DisposableEffect(clearance) { onDispose { clearance.height = 0.dp } }
         ExtendedFloatingActionButton(
             onClick = { if (hasBees) asking = true else onOpenCircle() },
             icon = { Icon(Icons.Outlined.MoreTime, contentDescription = null) },
-            text = { Text(stringResource(if (hasBees) R.string.requests_ask_button else R.string.requests_invite_button)) },
+            text = { Text(label) },
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+            // Material keeps the label's text from screen readers, so the button names itself.
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+                .onSizeChanged { clearance.height = with(density) { it.height.toDp() } + 20.dp }
+                .semantics { contentDescription = label },
         )
     }
     if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })

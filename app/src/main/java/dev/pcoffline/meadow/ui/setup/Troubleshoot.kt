@@ -1,7 +1,6 @@
 package dev.pcoffline.meadow.ui.setup
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.pcoffline.meadow.AppGraph
@@ -53,7 +53,7 @@ fun TroubleshootScreen(onBack: () -> Unit, onOpenSetup: () -> Unit) {
         onOpen = { PhoneMaker.open(context, it) },
         onMoreHelp = {
             runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PhoneMaker.helpUrl(brand))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                context.startActivity(Intent(Intent.ACTION_VIEW, PhoneMaker.helpUrl(brand).toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
         },
     )

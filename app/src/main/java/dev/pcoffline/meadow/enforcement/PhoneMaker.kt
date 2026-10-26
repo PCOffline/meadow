@@ -3,10 +3,10 @@ package dev.pcoffline.meadow.enforcement
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.annotation.StringRes
+import androidx.core.net.toUri
 import dev.pcoffline.meadow.R
 
 /**
@@ -44,11 +44,11 @@ object PhoneMaker {
 
     fun steps(context: Context, brand: Brand = brand()): List<Step> {
         val pkg = context.packageName
-        val appInfo = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
+        val appInfo = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$pkg".toUri())
         @Suppress("BatteryLife") // Meadow enforces limits in the background; that's its whole job.
         val battery = Step(
             "battery", R.string.trouble_battery_title, R.string.trouble_battery_body,
-            listOf(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$pkg")), Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)),
+            listOf(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:$pkg".toUri()), Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)),
         )
         val background = Step("background", R.string.trouble_background_title, R.string.trouble_background_body, listOf(appInfo))
         val recents = Step("recents", R.string.trouble_lock_title, R.string.trouble_lock_body)

@@ -219,11 +219,12 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
     val acceptedTerms by AppGraph.store.acceptedTerms.collectAsStateWithLifecycle()
     val accountConfirmed by AppGraph.sync.accountConfirmed.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val clearance = remember { SnackbarClearance() }
 
-    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalCelebrate provides celebrate) {
+    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalCelebrate provides celebrate, LocalSnackbarClearance provides clearance) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
-            snackbarHost = { SnackbarHost(snackbar) },
+            snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = clearance.height)) },
             bottomBar = {
                 if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
             },

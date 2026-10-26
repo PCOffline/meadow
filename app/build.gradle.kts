@@ -117,9 +117,7 @@ android {
     }
 
     lint {
-        // Findings in the CI log, not only in an HTML report nobody can download.
-        textReport = true
-        textOutput = file("stdout")
+        // Lint always writes a text report (build/reports/lint-results-debug.txt); CI prints it.
         abortOnError = true
         checkDependencies = true
     }
@@ -130,6 +128,8 @@ android {
         unitTests.all {
             // Robolectric loads a whole Android framework per test class.
             it.maxHeapSize = "3g"
+            // Conscrypt (Robolectric's TLS) loads a native library; JDK 24+ warns unless allowed.
+            it.jvmArgs("--enable-native-access=ALL-UNNAMED")
             // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
             it.extensions.configure<JacocoTaskExtension> {
                 isIncludeNoLocationClasses = true
@@ -181,6 +181,7 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.espresso.intents)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestUtil(libs.androidx.test.orchestrator)
 

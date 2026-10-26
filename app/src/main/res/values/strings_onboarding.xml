@@ -37,8 +37,6 @@
     <string name="secure_title">Keep your garden safe 🔐</string>
     <string name="secure_button">Add email and password</string>
     <string name="secure_link_sent">Check your inbox at %1$s and tap the link to keep your garden safe 💌</string>
-    <string name="secure_busy">Saving…</string>
-    <string name="secure_done">Your garden is safe 🌿</string>
 
     <string name="profile_setup_title">Almost there</string>
     <string name="profile_setup_continue">Continue</string>

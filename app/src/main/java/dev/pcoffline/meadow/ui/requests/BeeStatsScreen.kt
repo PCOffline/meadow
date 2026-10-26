@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -96,7 +97,7 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
                     val leaning = stats.leaning
                     if (stats.leniency == null || leaning == null) {
                         Text(
-                            stringResource(R.string.bee_stats_leniency_unknown, BeeStats.MIN_ANSWERS),
+                            pluralStringResource(R.plurals.bee_stats_leniency_unknown, BeeStats.MIN_ANSWERS, BeeStats.MIN_ANSWERS),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
@@ -176,6 +177,6 @@ private fun leaningText(res: Resources, leaning: BeeStats.Leaning): String = res
 private fun shareText(res: Resources, stats: BeeStats): String {
     val rate = stats.approvalRate?.let { (it * 100).roundToInt() } ?: 0
     val leaning = stats.leaning?.let { leaningText(res, it) }
-    return if (leaning != null) res.getString(R.string.bee_stats_share_with_leaning, stats.answered, rate, leaning)
-    else res.getString(R.string.bee_stats_share, stats.answered, rate)
+    return if (leaning != null) res.getQuantityString(R.plurals.bee_stats_share_with_leaning, stats.answered, stats.answered, rate, leaning)
+    else res.getQuantityString(R.plurals.bee_stats_share, stats.answered, stats.answered, rate)
 }
