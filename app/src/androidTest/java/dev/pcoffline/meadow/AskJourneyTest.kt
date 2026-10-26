@@ -129,7 +129,7 @@ class AskJourneyTest : EndToEndTest() {
             // The Requests tab's button asks about the same limited apps.
             node(R.string.tab_requests).performClick()
             // The floating button's label is only in the unmerged tree; tapping it taps the button.
-            compose.onNodeWithText(text(R.string.requests_ask_button), useUnmergedNode = true).performClick()
+            compose.onNodeWithText(text(R.string.requests_ask_button), useUnmergedTree = true).performClick()
             waitFor(R.string.ask_title)
             inDialog("Pebbles").assertExists()
             inDialog(text(R.string.action_cancel)).performClick()
