@@ -61,7 +61,8 @@ class EnforcementJourneyTest : EndToEndTest() {
             waitForText(text(R.string.rest_title, "Pebbles"))
             eventually("Pebbles covered") { "BlockActivity" in onTop() }
             node(R.string.rest_home).performScrollTo().performClick()
-            eventually("the block screen gone") { !showing(text(R.string.rest_title, "Pebbles")) }
+            // Home, with neither the cover nor Pebbles in front (and so no screen of Meadow's to read).
+            eventually("the block screen gone") { onTop().let { "BlockActivity" !in it && "PebblesActivity" !in it && it.isNotEmpty() } }
         }
     }
 

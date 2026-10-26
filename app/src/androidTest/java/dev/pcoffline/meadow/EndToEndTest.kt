@@ -77,6 +77,16 @@ abstract class EndToEndTest {
             throw AssertionError("Never saw $what. On screen: ${screenText()}", e)
         }
     }
+
+    /** Like [eventually], but on the test thread, for checks Compose's wait can't run (Espresso's intents). */
+    protected fun poll(what: String, timeout: Long = 20_000, check: () -> Boolean) {
+        val end = System.currentTimeMillis() + timeout
+        while (!runCatching(check).getOrDefault(false)) {
+            if (System.currentTimeMillis() > end) throw AssertionError("Never saw $what. On screen: ${screenText()}")
+            Thread.sleep(250)
+        }
+    }
+
     protected fun waitFor(@StringRes id: Int, substring: Boolean = false) = waitForText(text(id), substring)
     protected fun waitForText(value: String, substring: Boolean = false, timeout: Long = 60_000) {
         try {

@@ -74,7 +74,7 @@ class AccountJourneyTest : EndToEndTest() {
             typeInto(email, address)
             typeInto(password, "not-my-password")
             node(R.string.sign_in_button).performClick()
-            waitFor(R.string.error_auth_wrong_credentials)
+            waitFor(R.string.error_auth_wrong_credentials, substring = true)
             node(R.string.sign_in_forgot).performClick()
             waitFor(R.string.sign_in_reset_sent)
             waitForSnackbarToGo(R.string.sign_in_reset_sent)

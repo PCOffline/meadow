@@ -90,7 +90,8 @@ class BumblebeeJourneyTest : EndToEndTest() {
             compose.onNode(hasText(text(R.string.friend_step_down, "Sam"))).performScrollTo().performClick()
             node(R.string.friend_step_down_confirm).performClick()
             waitFor(R.string.friend_stepped_down)
-            waitFor(R.string.circle_title)
+            // The circle keeps its scroll, so its title may be out of sight; Sam's garden is gone.
+            waitFor(R.string.circle_looking_after_empty)
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds").isEmpty() }
             waitForBackend("users/$me/private/account") { it.strings("approveeIds").isEmpty() }
         }

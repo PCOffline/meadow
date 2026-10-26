@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow
 
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -73,7 +74,9 @@ class StrictModeJourneyTest : EndToEndTest() {
             strictSwitch().performScrollTo().performClick()
             waitForBackend(account) { it.bool("strictMode") == true }
             waitForSnackbarToGo(R.string.settings_strict_on)
+            eventually("the switch on, uncovered") { !showing(text(R.string.strict_gate_title)) && runCatching { strictSwitch().assertIsOn() }.isSuccess }
             strictSwitch().performScrollTo().performClick()
+            waitFor(R.string.settings_strict_off_title)
             inDialog(text(R.string.settings_strict_off_button)).performClick()
             waitFor(R.string.settings_strict_off_done)
             waitForBackend(account) { it.bool("strictMode") == false }

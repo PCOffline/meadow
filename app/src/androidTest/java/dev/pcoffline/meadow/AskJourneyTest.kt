@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -127,7 +128,8 @@ class AskJourneyTest : EndToEndTest() {
 
             // The Requests tab's button asks about the same limited apps.
             node(R.string.tab_requests).performClick()
-            node(R.string.requests_ask_button).performClick()
+            // The floating button's label is only in the unmerged tree; tapping it taps the button.
+            compose.onNodeWithText(text(R.string.requests_ask_button), useUnmergedNode = true).performClick()
             waitFor(R.string.ask_title)
             inDialog("Pebbles").assertExists()
             inDialog(text(R.string.action_cancel)).performClick()

@@ -86,6 +86,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             node(R.string.request_withdraw).performScrollTo().performClick()
             waitFor(R.string.request_withdrawn)
             waitForBackend("requests/$first") { it.string("status") == "cancelled" }
+            waitForSnackbarToGo(R.string.request_withdrawn)
 
             // Asked again, Sam says yes: the new limit reaches the backend and this phone.
             compose.onNode(hasText(app.resources.minutesText(60)) and hasClickAction()).performScrollTo().performClick()

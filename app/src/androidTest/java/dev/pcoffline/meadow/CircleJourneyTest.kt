@@ -96,6 +96,8 @@ class CircleJourneyTest : EndToEndTest() {
             tapInCircle(hasText(text(R.string.circle_invite_accept)))
             waitForText(text(R.string.circle_invite_accepted, "Sam"))
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds") == listOf(kai.uid) }
+            // The message sits over the bottom of the list, where Sam's garden is.
+            waitForSnackbarToGo(R.string.circle_invite_accepted, "Sam")
             tapInCircle(hasText(text(R.string.circle_garden_role)) and hasClickAction())
             waitFor(R.string.friend_today)
         }
@@ -160,7 +162,7 @@ class CircleJourneyTest : EndToEndTest() {
             // Sharing a link makes one and hands it to the share sheet.
             node(R.string.invite_link_button).performClick()
             waitForBackendDocs("inviteLinks") { links -> links.any { it.string("ownerUid") == kai.uid } }
-            eventually("the link handed to the share sheet") {
+            poll("the link handed to the share sheet") {
                 runCatching { intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString("/i/"))))) }.isSuccess
             }
 

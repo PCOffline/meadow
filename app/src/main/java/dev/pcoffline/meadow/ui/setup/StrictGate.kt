@@ -46,7 +46,9 @@ import dev.pcoffline.meadow.ui.rememberAction
  */
 @Composable
 fun StrictGate(strictMode: Boolean, onTroubleshoot: () -> Unit) {
-    var state by remember { mutableStateOf(AppGraph.protection.current()) }
+    // Read again when strict mode turns on, not only on resume: what was missing then may be
+    // fixed by now, and Settings only turns it on once it is.
+    var state by remember(strictMode) { mutableStateOf(AppGraph.protection.current()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { state = AppGraph.protection.current() }
     if (!strictMode || state.strictReady) return
     val context = LocalContext.current

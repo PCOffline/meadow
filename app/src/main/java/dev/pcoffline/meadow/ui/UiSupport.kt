@@ -73,19 +73,23 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
     internal var attached = true
 
     private var finishedAt = -SETTLE_MS
+    private var finishedBy: Class<*>? = null
 
     /**
-     * Runs [block] unless an action is already running or only just succeeded, so a double tap
-     * acts once. A failed action can be retried straight away.
+     * Runs [block] unless an action is already running or the same one only just succeeded, so a
+     * double tap acts once. A failed action can be retried straight away, and another button
+     * (removing the photo just added) works at once.
      */
     fun run(successMessage: String? = null, onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
-        if (busy || SystemClock.elapsedRealtime() - finishedAt < SETTLE_MS) return
+        // Each call site's lambda has its own class: that's what tells one button from another.
+        if (busy || (block.javaClass == finishedBy && SystemClock.elapsedRealtime() - finishedAt < SETTLE_MS)) return
         busy = true
         AppGraph.scope.launch(Dispatchers.Main.immediate) {
             error = null
             try {
                 block()
                 finishedAt = SystemClock.elapsedRealtime()
+                finishedBy = block.javaClass
                 if (attached) onSuccess()
                 // Even when what asked has gone (an accepted invite leaves the list): the message
                 // goes to the screen's host, which outlives it, and is often the only sign it worked.
