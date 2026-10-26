@@ -17,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -55,6 +57,16 @@ fun SnackbarScope(content: @Composable () -> Unit) {
         }
     }
 }
+
+/**
+ * How far up snackbars sit to clear the screen's floating button. Material puts them above it, so
+ * the button stays where the thumb expects it and a message never covers it.
+ */
+class SnackbarClearance {
+    var height: Dp by mutableStateOf(0.dp)
+}
+
+val LocalSnackbarClearance = staticCompositionLocalOf { SnackbarClearance() }
 
 /** Plays a shower of petals (and a little haptic tap) for happy moments. */
 val LocalCelebrate = staticCompositionLocalOf<() -> Unit> { {} }

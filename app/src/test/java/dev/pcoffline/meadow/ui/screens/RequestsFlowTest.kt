@@ -1,19 +1,21 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
-import dev.pcoffline.meadow.ui.LocalSnackbar
+import dev.pcoffline.meadow.ui.LocalSnackbarClearance
+import dev.pcoffline.meadow.ui.SnackbarClearance
 import dev.pcoffline.meadow.ui.requests.RequestsContent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -31,20 +33,21 @@ class RequestsFlowTest : ScreenTest() {
     }
 
     @Test
-    fun `a snackbar doesn't cover the ask button`() {
-        lateinit var snackbar: SnackbarHostState
-        lateinit var scope: CoroutineScope
+    fun `snackbars sit above the ask button while it's there`() {
+        val clearance = SnackbarClearance()
+        var here by mutableStateOf(true)
         show {
-            snackbar = LocalSnackbar.current
-            scope = rememberCoroutineScope()
-            RequestsContent(DemoGarden.robin, incoming = emptyList(), outgoing = emptyList())
+            CompositionLocalProvider(LocalSnackbarClearance provides clearance) {
+                if (here) RequestsContent(DemoGarden.robin, incoming = emptyList(), outgoing = emptyList())
+            }
         }
-        val button = compose.onNodeWithContentDescription(text(R.string.requests_ask_button))
-        val resting = button.getBoundsInRoot().bottom
-        // Nothing here draws the snackbar, so it stays up until the end.
-        scope.launch { snackbar.showSnackbar("Asked") }
+        val button = compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).getBoundsInRoot()
+        // The button's height and the gap under it: the snackbar's own margin then keeps them apart.
+        assertEquals((button.height + 20.dp).value, clearance.height.value, 0.5f)
+
+        here = false
         compose.waitForIdle()
-        assertTrue(button.getBoundsInRoot().bottom <= resting - 71.dp)
+        assertEquals(0f, clearance.height.value)
     }
 
     // Opening it is checked on a phone (AskJourneyTest): Robolectric never settles with a dialog open.
