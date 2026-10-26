@@ -130,6 +130,7 @@ class AskJourneyTest : EndToEndTest() {
 
             // The Requests tab's button asks about the same limited apps.
             node(R.string.tab_requests).performClick()
+            waitForSnackbarToGo(R.string.ask_sent)
             compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).performClick()
             try {
                 eventually("the ask dialog from the Requests button") { showing(text(R.string.ask_title)) }

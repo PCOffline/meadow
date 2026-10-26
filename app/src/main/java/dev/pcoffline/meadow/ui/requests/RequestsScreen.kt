@@ -2,6 +2,7 @@
 
 package dev.pcoffline.meadow.ui.requests
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -61,6 +62,7 @@ import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
+import dev.pcoffline.meadow.ui.LocalSnackbar
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -152,13 +154,15 @@ fun RequestsContent(
             }
         }
         val label = stringResource(if (hasBees) R.string.requests_ask_button else R.string.requests_invite_button)
+        // Snackbars come up over the bottom of the screen and take taps, so the button steps above them.
+        val lift by animateDpAsState(if (LocalSnackbar.current.currentSnackbarData != null) 72.dp else 0.dp, label = "fab lift")
         ExtendedFloatingActionButton(
             onClick = { if (hasBees) asking = true else onOpenCircle() },
             icon = { Icon(Icons.Outlined.MoreTime, contentDescription = null) },
             text = { Text(label) },
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             // Material keeps the label's text from screen readers, so the button names itself.
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).semantics { contentDescription = label },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).padding(bottom = lift).semantics { contentDescription = label },
         )
     }
     if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })
