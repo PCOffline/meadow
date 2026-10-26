@@ -131,8 +131,11 @@ class AskJourneyTest : EndToEndTest() {
 
             // The Requests tab's button asks about the same limited apps.
             node(R.string.tab_requests).performClick()
+            // A real tap where the button is on screen, as a finger would: Compose's injected
+            // click on this floating button doesn't reach it on the emulator.
             val askButton = hasClickAction() and hasAnyDescendant(hasText(text(R.string.requests_ask_button)))
-            compose.onNode(askButton, useUnmergedTree = true).performClick()
+            val at = compose.onNode(askButton, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow.center
+            shell("input tap ${at.x.toInt()} ${at.y.toInt()}")
             eventually("the ask dialog from the Requests button (tappable: ${tappables()})") { showing(text(R.string.ask_title)) }
             inDialog("Pebbles").assertExists()
             inDialog(text(R.string.action_cancel)).performClick()
