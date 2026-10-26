@@ -63,7 +63,8 @@ val LocalCelebrate = staticCompositionLocalOf<() -> Unit> { {} }
  * Runs one user action at a time and exposes whether it's busy and what went wrong.
  *
  * Actions run in the app's process scope, so a rotation or leaving the screen never cancels a
- * write halfway. Callbacks only run while the screen is still showing.
+ * write halfway. [run]'s onSuccess only runs while the screen is still showing; its message
+ * always shows.
  */
 class ActionState(private val context: Context, private val snackbar: SnackbarHostState) {
     var busy by mutableStateOf(false)
@@ -85,10 +86,10 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
             try {
                 block()
                 finishedAt = SystemClock.elapsedRealtime()
-                if (attached) {
-                    onSuccess()
-                    successMessage?.let { launch { snackbar.showSnackbar(it) } }
-                }
+                if (attached) onSuccess()
+                // Even when what asked has gone (an accepted invite leaves the list): the message
+                // goes to the screen's host, which outlives it, and is often the only sign it worked.
+                successMessage?.let { launch { snackbar.showSnackbar(it) } }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
