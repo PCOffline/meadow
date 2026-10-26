@@ -48,8 +48,8 @@ class EmergencyJourneyTest : EndToEndTest() {
         // The countdown is over by now (typing takes longer), so only the reason holds it back.
         waitForText(text(R.string.emergency_dialog_unlock))
         inDialog(text(R.string.emergency_dialog_unlock)).assertIsNotEnabled()
+        // Test taps reach the button even with the keyboard up, so it's left open here.
         compose.onNode(reasonField).performTextReplacement("Lost my way home")
-        hideKeyboard()
         inDialog(text(R.string.emergency_dialog_reason_seen)).assertExists()
         inDialog(text(R.string.emergency_dialog_unlock)).assertIsEnabled()
     }

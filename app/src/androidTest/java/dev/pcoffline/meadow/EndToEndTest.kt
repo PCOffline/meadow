@@ -85,7 +85,7 @@ abstract class EndToEndTest {
         hideKeyboard()
     }
 
-    protected fun hideKeyboard() {
+    private fun hideKeyboard() {
         val ime = WindowInsetsCompat.Type.ime()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         fun onScreen(block: (Activity) -> Unit) = instrumentation.runOnMainSync {
