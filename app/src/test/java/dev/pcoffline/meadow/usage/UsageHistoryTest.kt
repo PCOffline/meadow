@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.Days
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -22,7 +23,7 @@ import java.io.File
 @Config(application = Application::class)
 class UsageHistoryTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val file = File(context.filesDir, "usage_history.json")
+    private val file = File(context.filesDir, UsageHistory.FILE)
 
     @Before
     fun clean() {
@@ -38,6 +39,20 @@ class UsageHistoryTest {
         val quiet = Days.today().minusDays(2)
         assertEquals(emptyMap<String, Long>(), history().day(quiet))
         assertTrue(stored().contains("\"${Days.key(quiet)}\":{}"))
+    }
+
+    @Test
+    fun `a day the phone kept no record of is unknown, and asked again later`() {
+        val old = Days.today().minusDays(30)
+        assertNull(history().day(old))
+        assertFalse(stored().contains(Days.key(old)))
+    }
+
+    @Test
+    fun `history saved by the version that counted whole weeks as days is dropped`() {
+        val legacy = File(context.filesDir, UsageHistory.LEGACY_FILE).apply { writeText("{\"2026-10-01\":{\"a\":144000000}}") }
+        history()
+        assertFalse(legacy.exists())
     }
 
     @Test

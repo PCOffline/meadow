@@ -17,18 +17,22 @@ class UsageTracker(private val context: Context) {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
-    /** Milliseconds of foreground time per package inside [start, end). */
-    fun usageBetween(start: Long, end: Long): Map<String, Long> {
+    /**
+     * Milliseconds of foreground time per package inside [start, end), or null when the phone no
+     * longer keeps a record that fine (see [dailyTotals]).
+     */
+    fun usageBetween(start: Long, end: Long): Map<String, Long>? {
         if (!hasPermission() || end <= start) return emptyMap()
-        val clippedEnd = minOf(end, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val clippedEnd = minOf(end, now)
         // Look back a little so an app that was already open at `start` is counted from `start`.
         val events = readEvents(start - LOOKBACK_MS, clippedEnd)
-        if (events.isEmpty()) {
-            // A quiet log for recent hours means nothing was used. The daily aggregates would
-            // answer with whole buckets, yesterday's included, so they're only for older days.
-            return if (clippedEnd > System.currentTimeMillis() - LOOKBACK_MS) emptyMap() else aggregateFallback(start, clippedEnd)
+        // The log covers the whole stretch when it's recent, or when it reaches back past its start:
+        // then a quiet log means nothing was used.
+        if (start >= now - LOG_KEPT_MS || events.firstOrNull()?.let { it.time < start } == true) {
+            return ForegroundTime.totals(events, start, clippedEnd)
         }
-        return ForegroundTime.totals(events, start, clippedEnd)
+        return dailyTotals(start, clippedEnd) ?: events.takeIf { it.isNotEmpty() }?.let { ForegroundTime.totals(it, start, clippedEnd) }
     }
 
     /**
@@ -60,14 +64,28 @@ class UsageTracker(private val context: Context) {
         return result
     }
 
-    /** Older days may have aged out of the event log; daily aggregates are less precise but kept longer. */
-    private fun aggregateFallback(start: Long, end: Long): Map<String, Long> =
-        usm.queryAndAggregateUsageStats(start, end)
-            .mapValues { (_, stats) -> stats.totalTimeInForeground }
-            .filterValues { it > 0 }
+    /**
+     * Older days may have aged out of the event log. Android keeps daily totals a while longer,
+     * then only weekly, monthly and yearly ones; those would count the other days in them too, so
+     * only daily totals inside [start, end) are used, and without any the answer is null.
+     */
+    private fun dailyTotals(start: Long, end: Long): Map<String, Long>? {
+        val days = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end).orEmpty()
+            .filter { it.firstTimeStamp >= start - BUCKET_SLACK_MS && it.lastTimeStamp <= end + BUCKET_SLACK_MS }
+        if (days.isEmpty()) return null
+        val totals = HashMap<String, Long>()
+        days.forEach { if (it.totalTimeInForeground > 0) totals[it.packageName] = (totals[it.packageName] ?: 0L) + it.totalTimeInForeground }
+        return totals
+    }
 
     private companion object {
         const val LOOKBACK_MS = 3 * 60 * 60_000L
+
+        // Android keeps the event log for about a week or more; inside that, it's complete.
+        const val LOG_KEPT_MS = 6 * 24 * 60 * 60_000L
+
+        // Daily totals start and end near midnight, not on it.
+        const val BUCKET_SLACK_MS = 2 * 60 * 60_000L
 
         // Constants added in later API levels; the values are stable.
         const val EVENT_ACTIVITY_STOPPED = 23

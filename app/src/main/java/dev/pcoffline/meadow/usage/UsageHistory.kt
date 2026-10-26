@@ -10,18 +10,20 @@ import java.time.LocalDate
 
 /**
  * Daily usage per app. Finished days are cached on disk because the system event log only
- * reaches back a limited time, and monthly statistics need every day of the month.
+ * reaches back a limited time, and monthly statistics need every day of the month. A day the
+ * phone kept no record of reads as null, never as a guess.
  */
 class UsageHistory(
     context: Context,
     private val tracker: UsageTracker,
     private val catalog: AppCatalog,
 ) {
-    private val file = File(context.filesDir, "usage_history.json")
+    // Version 1 counted whole weeks and months of old usage as single days; it's dropped, not trusted.
+    private val file = File(context.filesDir, FILE).also { File(context.filesDir, LEGACY_FILE).delete() }
     private val cache: MutableMap<String, Map<String, Long>> = load()
 
     @Synchronized
-    fun day(date: LocalDate): Map<String, Long> {
+    fun day(date: LocalDate): Map<String, Long>? {
         val today = Days.today()
         val key = Days.key(date)
         if (date.isBefore(today)) cache[key]?.let { return it }
@@ -30,9 +32,8 @@ class UsageHistory(
         if (date.isBefore(today)) refreshCatalog()
         // Without usage access every day reads as empty; a quiet day is only real with it.
         val readable = tracker.hasPermission()
-        val raw = tracker.usageBetween(Days.startMillis(date), Days.endMillis(date))
-        val usage = catalog.userFacing(raw)
-        if (date.isBefore(today) && (readable || usage.isNotEmpty())) {
+        val usage = tracker.usageBetween(Days.startMillis(date), Days.endMillis(date))?.let(catalog::userFacing)
+        if (date.isBefore(today) && usage != null && (readable || usage.isNotEmpty())) {
             cache[key] = usage
             prune(today)
             save()
@@ -44,11 +45,11 @@ class UsageHistory(
     @Synchronized
     fun partialDay(date: LocalDate, elapsedMs: Long): Map<String, Long> {
         val start = Days.startMillis(date)
-        return catalog.userFacing(tracker.usageBetween(start, minOf(start + elapsedMs, Days.endMillis(date))))
+        return catalog.userFacing(tracker.usageBetween(start, minOf(start + elapsedMs, Days.endMillis(date))).orEmpty())
     }
 
-    fun range(from: LocalDate, to: LocalDate): List<Pair<LocalDate, Map<String, Long>>> {
-        val days = mutableListOf<Pair<LocalDate, Map<String, Long>>>()
+    fun range(from: LocalDate, to: LocalDate): List<Pair<LocalDate, Map<String, Long>?>> {
+        val days = mutableListOf<Pair<LocalDate, Map<String, Long>?>>()
         var d = from
         while (!d.isAfter(to)) {
             days += d to day(d)
@@ -83,6 +84,8 @@ class UsageHistory(
     companion object {
         /** How far back history is kept; Growth doesn't page past it. */
         const val KEEP_DAYS = 120L
+        const val FILE = "usage_history_v2.json"
+        const val LEGACY_FILE = "usage_history.json"
         private const val CATALOG_FRESH_MS = 60_000L
     }
 }

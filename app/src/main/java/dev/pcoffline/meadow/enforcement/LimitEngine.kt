@@ -142,7 +142,7 @@ class LimitEngine(
             val totals = HashMap<String, Long>()
             if (start.isBefore(today)) {
                 history.range(start, today.minusDays(1)).forEach { (_, day) ->
-                    day.forEach { (pkg, ms) -> totals[pkg] = (totals[pkg] ?: 0L) + ms }
+                    day?.forEach { (pkg, ms) -> totals[pkg] = (totals[pkg] ?: 0L) + ms }
                 }
             }
             earlierThisWeek = totals
@@ -195,7 +195,7 @@ class LimitEngine(
                 val from = TimeWindow.edge(today, w.from, zone).toInstant().toEpochMilli()
                 if (from >= measuredAt) continue
                 val to = TimeWindow.edge(today, w.to, zone).toInstant().toEpochMilli()
-                tracker.usageBetween(from, minOf(to, measuredAt))
+                tracker.usageBetween(from, minOf(to, measuredAt)).orEmpty()
                     .forEach { (p, ms) -> totals[p] = totals[p].orZero() + ms }
             }
             totals.also { insideHours = insideHours + (windows to it) }
@@ -209,7 +209,7 @@ class LimitEngine(
         val key = Days.todayKey()
         if (!force && key == todayKey && now - measuredAt < REFRESH_MS) return
         val today = Days.today()
-        todayUsage = tracker.usageBetween(Days.startMillis(today), now)
+        todayUsage = tracker.usageBetween(Days.startMillis(today), now).orEmpty()
         todayKey = key
         measuredAt = now
     }
