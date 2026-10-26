@@ -88,10 +88,22 @@ fun RequestsScreen(
     onOpenBeeStats: () -> Unit = {},
     viewModel: RequestsViewModel = viewModel(key = "requests-${profile.uid}") { RequestsViewModel(profile.uid) },
 ) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    var asking by rememberSaveable { mutableStateOf(false) }
     val incoming by viewModel.incoming.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoing.collectAsStateWithLifecycle()
+    RequestsContent(profile, incoming, outgoing, onOpenCircle, onOpenBeeStats)
+}
+
+/** The requests, drawn from plain state (also used for tests). */
+@Composable
+fun RequestsContent(
+    profile: UserProfile,
+    incoming: List<LimitRequest>?,
+    outgoing: List<LimitRequest>?,
+    onOpenCircle: () -> Unit = {},
+    onOpenBeeStats: () -> Unit = {},
+) {
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var asking by rememberSaveable { mutableStateOf(false) }
     val hasBees = profile.approverIds.isNotEmpty()
 
     Box(Modifier.fillMaxSize()) {
