@@ -1,14 +1,8 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
-import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
-import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
 import dev.pcoffline.meadow.ui.requests.RequestsContent
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,22 +20,5 @@ class RequestsFlowTest : ScreenTest() {
         assertAccessible()
     }
 
-    @Test
-    fun `asking about any app opens`() {
-        show { AskForTimeDialog(packageName = null, onDismiss = {}) }
-        node(R.string.ask_title).assertExists()
-    }
-
-    @Test
-    fun `asking about one app opens`() {
-        show { AskForTimeDialog(packageName = "com.instagram.android", onDismiss = {}) }
-        node(R.string.ask_title).assertExists()
-    }
-
-    @Test
-    fun `the ask button opens the question`() {
-        requests()
-        compose.onNode(hasClickAction() and hasAnyDescendant(hasText(text(R.string.requests_ask_button))), useUnmergedTree = true).performClick()
-        node(R.string.ask_title).assertExists()
-    }
+    // Opening it is checked on a phone (AskJourneyTest): Robolectric never settles with a dialog open.
 }

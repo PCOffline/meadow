@@ -2,13 +2,12 @@ package dev.pcoffline.meadow
 
 import android.content.Intent
 import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -131,12 +130,15 @@ class AskJourneyTest : EndToEndTest() {
 
             // The Requests tab's button asks about the same limited apps.
             node(R.string.tab_requests).performClick()
-            // A real tap where the button is on screen, as a finger would: Compose's injected
-            // click on this floating button doesn't reach it on the emulator.
-            val askButton = hasClickAction() and hasAnyDescendant(hasText(text(R.string.requests_ask_button)))
-            val at = compose.onNode(askButton, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow.center
-            shell("input tap ${at.x.toInt()} ${at.y.toInt()}")
-            eventually("the ask dialog from the Requests button (tappable: ${tappables()})") { showing(text(R.string.ask_title)) }
+            compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).performClick()
+            try {
+                eventually("the ask dialog from the Requests button") { showing(text(R.string.ask_title)) }
+            } catch (e: AssertionError) {
+                // What the system shows, and what went wrong on the way, beyond Compose's view.
+                val windows = shell("dumpsys window windows").lines().filter { "Window #" in it || "mCurrentFocus" in it }
+                val log = shell("logcat -d -t 600 *:W").lines().filter { "meadow" in it.lowercase() || "Runtime" in it || "ompose" in it }
+                throw AssertionError("${e.message} Tappable: ${tappables()} Windows: $windows Log: ${log.takeLast(40)}", e)
+            }
             inDialog("Pebbles").assertExists()
             inDialog(text(R.string.action_cancel)).performClick()
         }
