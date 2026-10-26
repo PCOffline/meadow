@@ -72,6 +72,8 @@ import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.rememberAction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import dev.pcoffline.meadow.ui.theme.AvatarColor
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -192,13 +194,18 @@ private fun AppearancePicker() {
     val darkKey by AppGraph.store.darkMode.collectAsStateWithLifecycle()
     val current = GardenTheme.fromKey(themeKey)
     val darkMode = DarkMode.fromKey(darkKey)
-    val action = rememberAction()
+    // Applied here at once and saved to the account in the background: nothing to wait for, so a
+    // theme then a night mode picked straight after both count. Each takes the other from the
+    // store at the tap, not as last drawn.
+    fun pick(theme: String = AppGraph.store.theme.value ?: current.key, mode: String = AppGraph.store.darkMode.value ?: darkMode.key) {
+        AppGraph.scope.launch(Dispatchers.Main.immediate) { AppGraph.profiles.setAppearance(theme, mode) }
+    }
 
     FlowRow(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), maxItemsInEachRow = 3) {
         GardenTheme.entries.forEach { theme ->
             MeadowTheme(theme, darkMode) {
                 ThemeCard(theme, selected = theme == current, modifier = Modifier.weight(1f)) {
-                    action.run { AppGraph.profiles.setAppearance(theme.key, darkMode.key) }
+                    pick(theme = theme.key)
                 }
             }
         }
@@ -207,7 +214,7 @@ private fun AppearancePicker() {
         DarkMode.entries.forEachIndexed { i, mode ->
             SegmentedButton(
                 selected = mode == darkMode,
-                onClick = { action.run { AppGraph.profiles.setAppearance(current.key, mode.key) } },
+                onClick = { pick(mode = mode.key) },
                 shape = SegmentedButtonDefaults.itemShape(i, DarkMode.entries.size),
             ) { Text(stringResource(mode.label)) }
         }

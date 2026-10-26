@@ -76,6 +76,8 @@ class ProfileJourneyTest : EndToEndTest() {
             node(R.string.profile_photo_choose).performScrollTo().performClick()
             waitFor(R.string.profile_photo_saved)
             waitForBackend("users/$uid") { it.photoUrl()?.contains(uid) == true }
+            // The message covers the bottom of the screen, where the buttons below will be.
+            waitForSnackbarToGo(R.string.profile_photo_saved)
             node(R.string.profile_photo_remove).performScrollTo().performClick()
             waitForBackend("users/$uid") { it.photoUrl() == null }
 

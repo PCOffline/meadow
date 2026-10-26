@@ -110,7 +110,9 @@ class AskJourneyTest : EndToEndTest() {
             node(R.string.garden_tile_ask).performScrollTo().performClick()
             waitFor(R.string.ask_title)
             compose.onNode(hasText(app.resources.minutesText(30)) and hasAnyAncestor(isDialog())).performClick()
-            inDialog("Sam", substring = true).performClick()
+            // The Bumblebees' names load after the dialog opens.
+            eventually("Sam among the Bumblebees to ask") { runCatching { inDialog("Sam", substring = true).assertExists() }.isSuccess }
+            inDialog("Sam", substring = true).performScrollTo().performClick()
             typeIntoDialog(hasSetTextAction(), "A long call with Mum")
             inDialog(text(R.string.action_send)).performClick()
             waitFor(R.string.ask_sent)

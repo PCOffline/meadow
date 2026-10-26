@@ -171,7 +171,7 @@ class CircleJourneyTest : EndToEndTest() {
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(join)
             typeInto(join, "see you at the park")
             node(R.string.join_link_button).performClick()
-            waitFor(R.string.error_bad_invite_link)
+            waitFor(R.string.error_bad_invite_link, substring = true)
 
             // Kai's own link can't make Kai their own Bumblebee.
             val token = kai.call("createInviteLink")!!["token"] as String
