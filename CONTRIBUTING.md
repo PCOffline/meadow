@@ -27,5 +27,6 @@ WCAG AA contrast. New screens should get a screen test that calls it.
 ## README images
 
 Screenshots and animations come from `ShowcaseTest`, rendered on an emulator by the Screenshots
-workflow. Put `[screenshots]` in a commit message to refresh them. The banner and illustrations
-are drawn by `docs/art/build.py`.
+workflow whenever a pull request changes the app's screens, and committed to the pull request.
+Run it from the Actions tab for any other branch. The banner and illustrations are drawn by
+`docs/art/build.py`.

@@ -12,8 +12,8 @@ Every commit follows [Conventional Commits](https://www.conventionalcommits.org/
   `revert`.
 - Scopes, when they help: `app`, `backend`, `rules`, `legal`, `ci`, `e2e`, or a feature name.
 - Breaking changes: `!` after the type, or a `BREAKING CHANGE:` footer.
-- Release markers still apply on top (`[minor]`, `[major]`, `[skip release]`, `[skip deploy]`,
-  `[screenshots]`; see `docs/self-hosting.md`).
+- Release markers still apply on top (`[minor]`, `[major]`, `[skip release]`, `[skip deploy]`;
+  see `docs/self-hosting.md`).
 
 ## Branches
 
