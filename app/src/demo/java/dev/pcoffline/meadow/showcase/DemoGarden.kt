@@ -160,7 +160,7 @@ object DemoGarden {
         message("m2", robin, "Two chapters today, and no doomscrolling before bed!", 90),
         message("m3", maya, "That's wonderful. Proud of you 🌼", 88),
         message("m4", robin, "", 20, MessageKind.REQUEST, requestId = request.id),
-        message("m5", maya, "Maya said yes: 15 more minutes of YouTube 🌼", 15, MessageKind.SYSTEM),
+        message("m5", maya, "🌸 Maya approved 15 more minutes of YouTube", 15, MessageKind.SYSTEM),
         message("m6", robin, "Thank you! 💛", 2),
     )
 

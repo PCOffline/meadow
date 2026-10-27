@@ -12,23 +12,23 @@
     <string name="request_you_asked">You asked for</string>
     <string name="request_they_ask">%1$s asks for</string>
     <string name="quoted">“%1$s”</string>
-    <string name="request_decided_yes">%1$s said yes</string>
-    <string name="request_decided_no">%1$s said not today</string>
+    <string name="request_decided_yes">%1$s approved</string>
+    <string name="request_decided_no">%1$s denied</string>
     <string name="request_decided_with_note">%1$s: “%2$s”</string>
-    <string name="request_say_yes">Say yes 🌸</string>
-    <string name="request_not_today">Not today</string>
+    <string name="request_say_yes">Approve</string>
+    <string name="request_not_today">Deny</string>
     <string name="request_withdraw">Withdraw</string>
     <string name="request_withdrawn">Request withdrawn</string>
-    <string name="request_sent_yes">Your yes is on its way 🌸</string>
-    <string name="request_sent_no">Your answer is on its way 🍃</string>
+    <string name="request_sent_yes">Approved 🌸</string>
+    <string name="request_sent_no">Denied 🍃</string>
     <string name="request_sending_answer">Sending your answer…</string>
     <string name="request_status_waiting">Waiting</string>
-    <string name="request_status_yes">Yes 🌸</string>
-    <string name="request_status_no">Not today</string>
+    <string name="request_status_yes">Approved 🌸</string>
+    <string name="request_status_no">Denied</string>
     <string name="request_status_withdrawn">Withdrawn</string>
     <string name="request_status_expired">Expired</string>
-    <string name="request_decide_yes_title">Say yes to %1$s?</string>
-    <string name="request_decide_no_title">Not today?</string>
+    <string name="request_decide_yes_title">Approve %1$s?</string>
+    <string name="request_decide_no_title">Deny this request?</string>
     <string name="request_decide_less">You can give a little less if you like:</string>
     <string name="request_decide_note">A kind word (optional)</string>
 
@@ -44,8 +44,8 @@
     <string name="request_answered_by_other">Another Bumblebee answered</string>
     <string name="request_usage">Used %1$s of %2$s today</string>
     <string name="request_usage_no_allowance">Used %1$s today</string>
-    <string name="request_you_said_yes">You said yes</string>
-    <string name="request_you_said_no">You said not today</string>
+    <string name="request_you_said_yes">You approved</string>
+    <string name="request_you_said_no">You denied</string>
 
     <string name="bee_stats_open">Your answers as a Bumblebee</string>
     <string name="bee_stats_title">Your answers</string>
@@ -62,14 +62,14 @@
     <string name="bee_leaning_very_gentle">Very gentle 🌻</string>
     <string name="bee_stats_overall">Overall</string>
     <string name="bee_stats_asked">Requests sent to you</string>
-    <string name="bee_stats_yes">You said yes</string>
-    <string name="bee_stats_no">You said not today</string>
-    <string name="bee_stats_rate">Yes rate</string>
+    <string name="bee_stats_yes">You approved</string>
+    <string name="bee_stats_no">You denied</string>
+    <string name="bee_stats_rate">Approval rate</string>
     <string name="bee_stats_minutes">Extra time you gave</string>
     <string name="bee_stats_missed">Answered by someone else, withdrawn or expired</string>
     <string name="bee_stats_waiting">Waiting for you</string>
     <string name="bee_stats_by_person">By person</string>
-    <string name="bee_stats_person_line">Asked %1$d · yes %2$d · not today %3$d</string>
+    <string name="bee_stats_person_line">Asked %1$d · approved %2$d · denied %3$d</string>
     <string name="bee_stats_percent">%1$d%%</string>
     <string name="bee_stats_none">–</string>
 </resources>

@@ -33,7 +33,7 @@
     <string name="limit_editor_less">Less time</string>
     <string name="limit_editor_more">More time</string>
     <string name="limit_editor_loosens_title">This loosens your limit 💌</string>
-    <string name="limit_editor_locked_hint">Loosening it later needs a Bumblebee\'s yes.</string>
+    <string name="limit_editor_locked_hint">Loosening it later needs a Bumblebee\'s approval.</string>
     <string name="limit_editor_pick_one">Turn on at least one.</string>
     <string name="limit_editor_note">A note for them (optional)</string>
     <string name="limit_editor_plant">Plant this limit</string>

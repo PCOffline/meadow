@@ -312,8 +312,7 @@ private fun PeriodContent(s: PeriodStats, progress: Progress?, onOpenApp: (Strin
         if (progress != null) item { ProgressCard(progress, Modifier.padding(horizontal = 20.dp), showWeekChange = false) }
         if (s.selection.period != Period.DAY) item { Chart(s, onOpenDay) }
         if (s.apps.isNotEmpty()) item { SectionTitle(stringResource(R.string.stats_where_time_went), Modifier.padding(horizontal = 20.dp)) }
-        val max = s.apps.firstOrNull()?.ms ?: 1L
-        items(s.apps, key = { it.packageName }) { app -> AppRow(app, max, s.totalMs, { onOpenApp(app.packageName) }.takeIf { app.canLimit }, Modifier.animateItem()) }
+        items(s.apps, key = { it.packageName }) { app -> AppRow(app, s.totalMs, { onOpenApp(app.packageName) }.takeIf { app.canLimit }, Modifier.animateItem()) }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
@@ -417,8 +416,11 @@ private fun Chart(s: PeriodStats, onOpenDay: (LocalDate) -> Unit) {
     }
 }
 
+/** [ms] as a share (0 to 1) of [total]; nothing of nothing is 0. */
+internal fun shareOf(ms: Long, total: Long): Float = if (total <= 0) 0f else (ms.toFloat() / total).coerceIn(0f, 1f)
+
 @Composable
-private fun AppRow(app: AppTime, max: Long, total: Long, onOpen: (() -> Unit)?, modifier: Modifier) {
+private fun AppRow(app: AppTime, total: Long, onOpen: (() -> Unit)?, modifier: Modifier) {
     // Seeing where the time went is the moment to act on it: a tap opens the app's limit.
     val action = stringResource(if (app.limit != null) R.string.stats_open_limit else R.string.stats_plant_limit)
     Row(
@@ -443,10 +445,11 @@ private fun AppRow(app: AppTime, max: Long, total: Long, onOpen: (() -> Unit)?, 
                 }
                 Text(durationText(app.ms), style = MaterialTheme.typography.labelLarge)
             }
-            GrowthBar(app.ms.toFloat() / max.coerceAtLeast(1), height = 8.dp, color = MaterialTheme.colorScheme.primary)
+            // Every bar is the app's share of the screen time, the same number written under it.
+            GrowthBar(shareOf(app.ms, total), height = 8.dp, color = MaterialTheme.colorScheme.primary)
             if (total > 0) {
                 Text(
-                    stringResource(R.string.stats_share, (app.ms * 100 / total).toInt()),
+                    stringResource(R.string.stats_share, (shareOf(app.ms, total) * 100).toInt()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -34,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,22 +67,40 @@ import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.theme.AvatarColor
 import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
 
+/** What Save sends: the card's text and look, and whether the photo goes in favour of the flower. */
+data class ProfileEdit(val name: String, val emoji: String, val color: String, val bio: String, val removePhoto: Boolean)
+
+private suspend fun saveProfile(edit: ProfileEdit) {
+    AppGraph.profiles.update(edit.name, edit.emoji, edit.color, edit.bio)
+    if (edit.removePhoto) AppGraph.profiles.removePhoto()
+}
+
 @Composable
-fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
+fun ProfileScreen(
+    profile: UserProfile,
+    onBack: () -> Unit,
+    onSave: suspend (ProfileEdit) -> Unit = ::saveProfile,
+    onRemovePhoto: suspend () -> Unit = { AppGraph.profiles.removePhoto() },
+) {
     var name by rememberSaveable { mutableStateOf(profile.displayName) }
     var bio by rememberSaveable { mutableStateOf(profile.bio) }
     var emoji by rememberSaveable { mutableStateOf(profile.avatar.emoji) }
     var color by rememberSaveable { mutableStateOf(profile.avatar.color) }
+    val hasPhoto = profile.avatar.photoUrl != null
+    // A photo, while there is one, until a flower or colour is picked instead.
+    var usePhoto by rememberSaveable(hasPhoto) { mutableStateOf(hasPhoto) }
     val save = rememberAction()
     val photo = rememberAction()
     val celebrate = LocalCelebrate.current
     val saved = stringResource(R.string.profile_saved)
     val photoSaved = stringResource(R.string.profile_photo_saved)
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) photo.run(successMessage = photoSaved) { AppGraph.profiles.setPhoto(uri) }
+        if (uri != null) photo.run(successMessage = photoSaved, onSuccess = { usePhoto = true }) { AppGraph.profiles.setPhoto(uri) }
     }
-    val preview = Avatar(emoji, color, profile.avatar.photoUrl)
-    val changed = name != profile.displayName || bio != profile.bio || emoji != profile.avatar.emoji || color != profile.avatar.color
+    val dropPhoto = hasPhoto && !usePhoto
+    val preview = Avatar(emoji, color, profile.avatar.photoUrl.takeIf { usePhoto })
+    val changed = name != profile.displayName || bio != profile.bio || emoji != profile.avatar.emoji ||
+        color != profile.avatar.color || dropPhoto
 
     Column(Modifier.fillMaxSize()) {
         BackTopBar(stringResource(R.string.profile_title), onBack = onBack)
@@ -98,6 +115,30 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
                 if (bio.isNotBlank()) {
                     Text(bio, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
+                // The photo is changed where it's seen, right under it.
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        enabled = !photo.busy,
+                    ) {
+                        Text(
+                            stringResource(
+                                when {
+                                    photo.busy -> R.string.profile_photo_uploading
+                                    usePhoto -> R.string.profile_photo_change
+                                    else -> R.string.profile_photo_choose
+                                },
+                            ),
+                        )
+                    }
+                    if (usePhoto) {
+                        OutlinedButton(
+                            onClick = { photo.run(onSuccess = { usePhoto = false }) { onRemovePhoto() } },
+                            enabled = !photo.busy,
+                        ) { Text(stringResource(R.string.profile_photo_remove)) }
+                    }
+                }
+                ErrorNote(photo.error, Modifier.padding(top = 8.dp))
             }
 
             MeadowCard(Modifier.fillMaxWidth()) {
@@ -123,10 +164,18 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
 
             SectionTitle(stringResource(R.string.profile_avatar))
             MeadowCard(Modifier.fillMaxWidth()) {
+                // Picking a flower or a colour uses the flower instead of the photo, from Save on.
                 Text(stringResource(R.string.profile_avatar_emoji), style = MaterialTheme.typography.labelLarge)
                 FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     FlowerAvatars.forEach { option ->
-                        Choice(selected = option == emoji, label = stringResource(R.string.flower_picker_item, option), onClick = { emoji = option }) {
+                        Choice(
+                            selected = !usePhoto && option == emoji,
+                            label = stringResource(R.string.flower_picker_item, option),
+                            onClick = {
+                                emoji = option
+                                usePhoto = false
+                            },
+                        ) {
                             PersonAvatar(Avatar(option, color, null), size = 44.dp)
                         }
                     }
@@ -135,28 +184,23 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
                 FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AvatarColor.entries.forEach { option ->
                         val swatch = if (LocalDarkTheme.current) option.dark else option.light
-                        Choice(selected = option.key == color, label = stringResource(option.label), onClick = { color = option.key }) {
+                        Choice(
+                            selected = !usePhoto && option.key == color,
+                            label = stringResource(option.label),
+                            onClick = {
+                                color = option.key
+                                usePhoto = false
+                            },
+                        ) {
                             Box(Modifier.size(36.dp).clip(CircleShape).background(swatch))
                         }
                     }
                 }
-                Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        enabled = !photo.busy,
-                    ) { Text(stringResource(if (photo.busy) R.string.profile_photo_uploading else R.string.profile_photo_choose)) }
-                    if (profile.avatar.photoUrl != null) {
-                        TextButton(onClick = { photo.run { AppGraph.profiles.removePhoto() } }, enabled = !photo.busy) {
-                            Text(stringResource(R.string.profile_photo_remove))
-                        }
-                    }
-                }
-                ErrorNote(photo.error, Modifier.padding(top = 8.dp))
             }
 
             ErrorNote(save.error)
             Button(
-                onClick = { save.run(successMessage = saved, onSuccess = celebrate) { AppGraph.profiles.update(name, emoji, color, bio) } },
+                onClick = { save.run(successMessage = saved, onSuccess = celebrate) { onSave(ProfileEdit(name, emoji, color, bio, removePhoto = dropPhoto)) } },
                 enabled = changed && name.isNotBlank() && !save.busy,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(stringResource(R.string.action_save)) }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="rest_title">%1$s is resting 🌙</string>
-    <string name="rest_title_yes">Your Bumblebee said yes 🌸</string>
+    <string name="rest_title_yes">Your Bumblebee approved 🌸</string>
     <string name="rest_title_emergency">Emergency unlock on 🚨</string>
     <string name="rest_body_today">You\'ve used the %1$s you set aside today. It blooms again tomorrow.</string>
     <string name="rest_body_week">You\'ve used the %1$s you set aside for this week. It blooms again next week.</string>

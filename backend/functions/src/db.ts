@@ -218,7 +218,7 @@ export function pushPayload(uid: string, data: Record<string, string>): Record<s
 
 /**
  * Sends a data-only push to every device of each user; the app builds the notification itself
- * so it can add actions like "Say yes". Each user gets their own message, addressed to them.
+ * so it can add actions like "Approve". Each user gets their own message, addressed to them.
  * Phones no longer registered are cleaned up. Never throws.
  *
  * In the emulator every push is also written to `_testOutbox`, with the exact data sent in

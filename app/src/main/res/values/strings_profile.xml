@@ -9,6 +9,7 @@
     <string name="profile_avatar_color">Background</string>
     <string name="profile_photo_choose">Use a photo</string>
     <string name="profile_photo_uploading">Uploading…</string>
+    <string name="profile_photo_change">Change photo</string>
     <string name="profile_photo_remove">Remove photo</string>
     <string name="profile_photo_description">Your profile picture</string>
     <string name="profile_photo_saved">New photo set 📸</string>

@@ -3,7 +3,7 @@
  *
  * Voice: warm, calm and plain. Sentence case. At most one emoji, at the end.
  * Terms: "Bumblebee" (a friend who looks after your garden), "garden", "limit",
- * "extra time", "say yes" / "not today". These must match the app's strings.xml.
+ * "extra time", "approve" / "deny". These must match the app's strings.xml.
  */
 import { capitalize } from "./format";
 
@@ -59,7 +59,7 @@ export const errors = {
   notYourBumblebees: "You can only ask your own Bumblebees.",
   removalPending: "That Bumblebee is already leaving.",
   noRemoval: "That Bumblebee isn't leaving.",
-  needsAYes: "That would loosen the limit, so it needs a Bumblebee's yes.",
+  needsAYes: "That would loosen the limit, so it needs a Bumblebee's approval.",
 };
 
 export const chatNotes = {
@@ -71,8 +71,8 @@ export const chatNotes = {
   steppedDown: (bee: Person, owner: Person) => `${bee.displayName} stepped down as ${owner.displayName}'s Bumblebee`,
   request: (owner: Person, summary: string, usage: string | null) =>
     `💌 ${owner.displayName} asks for ${summary}${usage ? `. ${usage}` : ""}`,
-  yes: (bee: Person, summary: string) => `🌸 ${bee.displayName} said yes to ${summary}`,
-  notToday: (bee: Person, summary: string) => `🍃 ${bee.displayName} said not today to ${summary}`,
+  yes: (bee: Person, summary: string) => `🌸 ${bee.displayName} approved ${summary}`,
+  notToday: (bee: Person, summary: string) => `🍃 ${bee.displayName} denied ${summary}`,
   emergency: (headline: string, scope: string, reason: string) => `${headline}. Lifted ${scope}. Reason: “${reason}”`,
 };
 
@@ -80,7 +80,7 @@ export const chatNotes = {
 export const pushes = {
   invite: (owner: Person) => ({
     title: `${owner.flower} ${owner.displayName} would like you as their Bumblebee`,
-    body: "Open Meadow to say yes. You'll get to decide whenever they ask for extra time.",
+    body: "Open Meadow to approve. You'll get to decide whenever they ask for extra time.",
   }),
   inviteAccepted: (bee: Person) => ({
     title: `${bee.flower} ${bee.displayName} is your Bumblebee now`,
@@ -108,10 +108,10 @@ export const pushes = {
   }),
   request: (owner: Person, summary: string, message: string, usage: string | null) => ({
     title: `${owner.flower} ${owner.displayName} asks for ${summary}`,
-    body: [usage, message ? `“${message}”` : "Tap to answer, or say yes right from here."].filter(Boolean).join(" "),
+    body: [usage, message ? `“${message}”` : "Tap to answer, or approve right from here."].filter(Boolean).join(" "),
   }),
   decided: (bee: Person, approved: boolean, summary: string, note: string) => ({
-    title: approved ? `🌸 ${bee.displayName} said yes!` : `🍃 ${bee.displayName} said not today`,
+    title: approved ? `🌸 ${bee.displayName} approved` : `🍃 ${bee.displayName} denied`,
     body: note ? `${capitalize(summary)}. “${note}”` : `${capitalize(summary)}.`,
   }),
   chat: (sender: Person, text: string) => ({ title: `${sender.flower} ${sender.displayName}`, body: text }),

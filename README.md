@@ -12,12 +12,12 @@
 **Meadow is a cozy way to spend less time on the apps that pull you in.** Give each app a little
 patch of time. When it's used up, the app rests until tomorrow. Want more? Ask one of your
 **Bumblebees**, the friends you've chosen to look after your garden. Willpower is hard; a kind
-friend who has to say yes is much harder to argue with.
+friend who has to approve is much harder to argue with.
 
 <p align="center">
   <img src="docs/images/screen-garden.png" alt="The garden: a flower for each app, blooming while there's time left, resting when it's used up" width="250">
   &nbsp;
-  <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who said yes to 15 more minutes" width="250">
+  <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who approved 15 more minutes" width="250">
   &nbsp;
   <img src="docs/images/screen-stats.png" alt="A week of screen time, down 20% on the week before" width="250">
 </p>
@@ -28,7 +28,7 @@ friend who has to say yes is much harder to argue with.
   <tr>
     <td align="center" width="33%"><img src="docs/images/step-plant.svg" alt="" width="150"><br><b>Plant a limit</b><br>Choose how long an app may bloom each day or week.</td>
     <td align="center" width="33%"><img src="docs/images/step-rest.svg" alt="" width="150"><br><b>It rests</b><br>When the time is used up, the app closes gently until tomorrow.</td>
-    <td align="center" width="33%"><img src="docs/images/step-ask.svg" alt="" width="150"><br><b>Ask a Bumblebee</b><br>Need more? A friend can say yes, right from their notification.</td>
+    <td align="center" width="33%"><img src="docs/images/step-ask.svg" alt="" width="150"><br><b>Ask a Bumblebee</b><br>Need more? A friend can approve it, right from their notification.</td>
   </tr>
 </table>
 
@@ -53,7 +53,7 @@ When someone stops being your Bumblebee, your chat with them closes.
 
 ### Hard to wriggle out of
 Strict mode keeps Meadow's own settings, uninstalling and the phone's clock out of reach, and
-turning it off needs a Bumblebee's yes too. If something gets switched off anyway, or your phone
+turning it off needs a Bumblebee's approval too. If something gets switched off anyway, or your phone
 goes quiet, your Bumblebees are told. Your limits keep working offline.
 
 ### For real emergencies

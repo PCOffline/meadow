@@ -31,6 +31,7 @@ import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
+import dev.pcoffline.meadow.ui.profile.ProfileEdit
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
@@ -207,5 +208,44 @@ class OtherScreensTest : ScreenTest() {
     fun `colour choices are named, not just shown`() {
         show { ProfileScreen(DemoGarden.robin, onBack = {}) }
         compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.avatar_color_honey))).performScrollTo().assertExists()
+    }
+
+    private val withPhoto = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = "https://example.invalid/robin.jpg"))
+
+    @Test
+    fun `a photo can be changed or removed, right under it`() {
+        var removed = 0
+        show { ProfileScreen(withPhoto, onBack = {}, onRemovePhoto = { removed++ }) }
+        node(R.string.profile_photo_change).assertExists()
+        node(R.string.profile_photo_remove).performClick()
+        compose.waitUntil(5_000) { removed == 1 }
+        // Gone at once: the flower is back and it's a photo to add again.
+        node(R.string.profile_photo_remove).assertDoesNotExist()
+        node(R.string.profile_photo_choose).assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `picking a flower instead of the photo is saved, and the photo goes`() {
+        val saves = mutableListOf<ProfileEdit>()
+        show { ProfileScreen(withPhoto, onBack = {}, onSave = { saves += it }) }
+        val flower = compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.flower_picker_item, "🌻")))
+        flower.performScrollTo().performClick()
+        flower.assertIsSelected()
+        node(R.string.profile_photo_remove).assertDoesNotExist()
+        node(R.string.action_save).performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals("🌻", saves.single().emoji)
+        assertTrue(saves.single().removePhoto)
+    }
+
+    @Test
+    fun `without a photo, saving never removes one`() {
+        val saves = mutableListOf<ProfileEdit>()
+        show { ProfileScreen(DemoGarden.robin, onBack = {}, onSave = { saves += it }) }
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.flower_picker_item, "🌻"))).performScrollTo().performClick()
+        node(R.string.action_save).performScrollTo().performClick()
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals(false, saves.single().removePhoto)
     }
 }

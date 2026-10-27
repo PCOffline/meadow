@@ -321,7 +321,7 @@ internal object Scenarios {
         Scenario("Resting app", "Asked, waiting") { RestContent("demo.tiktok", Demo.restAsked) },
         Scenario("Resting app", "No Bumblebees") { RestContent("demo.tiktok", d.rest.copy(hasBumblebees = false)) },
         Scenario("Resting app", "Signed out") { RestContent("demo.tiktok", d.rest.copy(signedIn = false)) },
-        Scenario("Resting app", "A Bumblebee said yes") { RestContent("demo.tiktok", Demo.restYes) },
+        Scenario("Resting app", "A Bumblebee approved") { RestContent("demo.tiktok", Demo.restYes) },
         Scenario("Resting app", "Emergency unlock") { RestContent("demo.tiktok", Demo.restEmergency) },
 
         Scenario("Protections", "Nothing on yet") { Page { SetupScreen(onDone = {}, read = { Demo.protection(essentials = false, rest = false) }) } },

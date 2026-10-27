@@ -7,7 +7,7 @@
       limit                   time allowed for one app, per day and/or week
       resting                 an app whose time is up for now
       extra time              what you ask a Bumblebee for
-      say yes / not today     a Bumblebee's answers
+      approve / deny          a Bumblebee's answers
       emergency unlock        lifting limits without a Bumblebee
     The backend's functions/src/copy.ts uses the same terms for notifications.
 -->
