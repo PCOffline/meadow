@@ -45,12 +45,15 @@ object TextContrast {
         fun lum(argb: Int) = luminance.getOrPut(argb) { Color(argb).luminance() }
 
         val problems = mutableListOf<String>()
-        for (node in walk(root)) {
+        val nodes = walk(root)
+        for ((index, node) in nodes.withIndex()) {
             val text = textOf(node) ?: continue
             // Emoji and symbols are pictures, not text to read.
             if (text.none { it.isLetterOrDigit() }) continue
             if (disabled(node)) continue // Inactive controls are exempt (1.4.3).
             val where = bounds(node)
+            // Under a control drawn over it (a floating button): it scrolls out from under to be read.
+            if (nodes.drop(index + 1).any { covers(it, node, where, bounds) }) continue
             val left = max(0, where.left.toInt())
             val top = max(0, where.top.toInt())
             val right = min(bitmap.width, where.right.toInt())
@@ -113,6 +116,13 @@ object TextContrast {
         if (SemanticsActions.SetText in config) return null
         return config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }?.takeIf { it.isNotBlank() }
     }
+
+    /** Whether [control], drawn after [text], sits over it rather than holding it. */
+    private fun covers(control: SemanticsNode, text: SemanticsNode, where: Rect, bounds: (SemanticsNode) -> Rect): Boolean =
+        SemanticsActions.OnClick in control.config &&
+            generateSequence(text) { it.parent }.none { it.id == control.id } &&
+            generateSequence(control) { it.parent }.none { it.id == text.id } &&
+            bounds(control).overlaps(where)
 
     private fun disabled(node: SemanticsNode): Boolean =
         generateSequence(node) { it.parent }.any { SemanticsProperties.Disabled in it.config }

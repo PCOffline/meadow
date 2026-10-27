@@ -7,6 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.ui.geometry.Offset
+import dev.pcoffline.meadow.ui.LocalSnackbarClearance
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -202,11 +208,21 @@ fun GardenContent(
             }
         }
         // Planting a limit is what the garden is for, so it's the one big button, always in reach.
+        val plant = stringResource(R.string.garden_plant)
+        // Snackbars sit above the button rather than over it (they'd take its taps), only while it's here.
+        val clearance = LocalSnackbarClearance.current
+        val density = LocalDensity.current
+        DisposableEffect(clearance) { onDispose { clearance.height = 0.dp } }
         ExtendedFloatingActionButton(
             onClick = onPlantLimit,
             icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
-            text = { Text(stringResource(R.string.garden_plant)) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            text = { Text(plant) },
+            // Material keeps the label's text from screen readers, so the button names itself.
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .onSizeChanged { clearance.height = with(density) { it.height.toDp() } + 16.dp }
+                .semantics { contentDescription = plant },
         )
     }
 }

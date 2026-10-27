@@ -103,7 +103,7 @@ class MainScreensTest : ScreenTest() {
         node(R.string.garden_empty_title).performClick()
         assertEquals(1, planted)
         // And the big button, there whether the garden is empty or not.
-        node(R.string.garden_plant).performClick()
+        compose.onNodeWithContentDescription(text(R.string.garden_plant)).performClick()
         assertEquals(2, planted)
         assertAccessible()
     }
