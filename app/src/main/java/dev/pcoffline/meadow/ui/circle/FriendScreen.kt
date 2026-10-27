@@ -112,6 +112,37 @@ private fun FriendDetails(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        FriendPage(f, usage, limits) { FilledTonalButton(onClick = onChat) { Text(stringResource(R.string.action_chat)) } }
+        ErrorNote(action.error)
+        OutlinedButton(onClick = { confirmStepDown = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.friend_step_down, f.displayName))
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+    if (confirmStepDown) {
+        AlertDialog(
+            onDismissRequest = { confirmStepDown = false },
+            title = { Text(stringResource(R.string.friend_step_down_title)) },
+            text = { Text(stringResource(R.string.friend_step_down_body, f.displayName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmStepDown = false
+                    action.run(successMessage = steppedDown, onSuccess = onBack) { AppGraph.social.stepDown(f.uid) }
+                }) { Text(stringResource(R.string.friend_step_down_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmStepDown = false }) { Text(stringResource(R.string.friend_step_down_stay)) } },
+        )
+    }
+}
+
+/**
+ * A friend's page as their Bumblebees see it: who they are, today's screen time if they share it,
+ * and their limits. Settings shows people their own page through this too, so the preview is
+ * always the real thing. [action] sits beside the name.
+ */
+@Composable
+fun FriendPage(f: UserProfile, usage: SharedUsage?, limits: List<AppLimit>, action: @Composable () -> Unit = {}) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonAvatar(f.avatar, size = 64.dp)
             Spacer(Modifier.width(14.dp))
@@ -119,7 +150,7 @@ private fun FriendDetails(
                 Text(f.displayName, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.asHeading())
                 if (f.bio.isNotBlank()) Text(f.bio, style = MaterialTheme.typography.bodyMedium)
             }
-            FilledTonalButton(onClick = onChat) { Text(stringResource(R.string.action_chat)) }
+            action()
         }
 
         MeadowCard(Modifier.fillMaxWidth()) {
@@ -166,25 +197,5 @@ private fun FriendDetails(
                 }
             }
         }
-
-        ErrorNote(action.error)
-        OutlinedButton(onClick = { confirmStepDown = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.friend_step_down, f.displayName))
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-    if (confirmStepDown) {
-        AlertDialog(
-            onDismissRequest = { confirmStepDown = false },
-            title = { Text(stringResource(R.string.friend_step_down_title)) },
-            text = { Text(stringResource(R.string.friend_step_down_body, f.displayName)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmStepDown = false
-                    action.run(successMessage = steppedDown, onSuccess = onBack) { AppGraph.social.stepDown(f.uid) }
-                }) { Text(stringResource(R.string.friend_step_down_confirm)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmStepDown = false }) { Text(stringResource(R.string.friend_step_down_stay)) } },
-        )
     }
 }

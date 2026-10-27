@@ -33,6 +33,10 @@ class FormatTest {
         assertEquals("<1m", res.durationText(20_000))
         assertEquals("0m", res.durationText(0))
         assertEquals("1m", res.durationText(119_000))
+        // Past a day, minutes are noise: days and hours.
+        assertEquals("23h 59m", res.durationText(1439 * 60_000L))
+        assertEquals("1d", res.durationText(24 * 3_600_000L))
+        assertEquals("49d 4h", res.durationText((1180 * 60 + 55) * 60_000L))
     }
 
     @Test
@@ -73,9 +77,8 @@ class FormatTest {
 
     @Test
     fun `counts agree with their nouns`() {
-        assertEquals(true, res.getQuantityString(R.plurals.bee_stats_share, 1, 1, 100).contains("answered 1 request and"))
-        assertEquals(true, res.getQuantityString(R.plurals.bee_stats_share, 2, 2, 50).contains("answered 2 requests and"))
-        assertEquals(true, res.getQuantityString(R.plurals.bee_stats_share_with_leaning, 1, 1, 100, "Gentle").contains("1 request and"))
+        assertEquals(true, res.getQuantityString(R.plurals.stats_missing_days, 1, 1).startsWith("No record for 1 day."))
+        assertEquals(true, res.getQuantityString(R.plurals.stats_missing_days, 4, 4).startsWith("No record for 4 days."))
         assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 1, 1).contains("your 1 emergency unlock for"))
         assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 3, 3).contains("all 3 emergency unlocks"))
         assertEquals("Answer at least 1 request to see how you lean.", res.getQuantityString(R.plurals.bee_stats_leniency_unknown, 1, 1))

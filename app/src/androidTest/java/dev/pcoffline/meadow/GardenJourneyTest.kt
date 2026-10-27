@@ -61,12 +61,19 @@ class GardenJourneyTest : EndToEndTest() {
             assertEquals("Growing calmer days", backendDoc("users/$uid")!!.getJSONObject("bio").getString("stringValue"))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
-            // Privacy: stop sharing screen time.
+            // Privacy: a look at what Bumblebees see, then sharing screen time stops and leaves the page.
             compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
             waitFor(R.string.settings_privacy_title)
             compose.assertAccessible(compose.density)
+            node(R.string.settings_privacy_preview).performScrollTo().performClick()
+            waitFor(R.string.privacy_preview_title)
+            val notShared = text(R.string.friend_no_usage_shared, "Robin")
+            eventually("today's screen time on the page") { showing(text(R.string.friend_today)) && !showing(notShared) }
+            node(R.string.friend_limits).performScrollTo().assertExists()
+            compose.assertAccessible(compose.density)
             val shareUsage = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage)))
             shareUsage.performScrollTo().assertIsOn().performClick()
+            eventually("the page without today's screen time") { showing(notShared) }
             // Privacy choices are owner-only, so they live on the private account.
             waitForBackend("users/$uid/private/account") { doc ->
                 doc.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
@@ -74,6 +81,8 @@ class GardenJourneyTest : EndToEndTest() {
             }
             waitFor(R.string.settings_privacy_saved)
             waitForSnackbarToGo(R.string.settings_privacy_saved)
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+            waitFor(R.string.settings_privacy_title)
 
             // The privacy notice is a tap away.
             node(R.string.legal_privacy).performScrollTo().performClick()

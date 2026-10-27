@@ -95,10 +95,7 @@ class LimitJourneyTest : EndToEndTest() {
             // Sharing the commitment hands its words to the share sheet.
             compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
             node(R.string.limit_editor_share).performScrollTo().performClick()
-            inDialog("on Pebbles with Meadow", substring = true).assertExists()
-            inDialog(text(R.string.share_elsewhere)).performClick()
-            intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString("Pebbles")))))
-            inDialog(text(R.string.action_cancel)).performClick()
+            intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString("on Pebbles with Meadow")))))
 
             // With nobody to ask, removing is immediate.
             node(R.string.limit_editor_remove).performScrollTo().performClick()

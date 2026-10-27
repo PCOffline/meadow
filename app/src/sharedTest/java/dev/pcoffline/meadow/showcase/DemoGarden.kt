@@ -10,6 +10,8 @@ import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.Privacy
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.data.SharedAppUsage
+import dev.pcoffline.meadow.data.SharedUsage
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.enforcement.RestState
@@ -36,6 +38,20 @@ object DemoGarden {
     val ana = person("ana", "Ana", "🦊", "lavender", "Phone-free evenings")
     val robin = person("robin", "Robin", "🦔", "honey", "Reading more, scrolling less 📚")
         .copy(approverIds = listOf(maya.uid, theo.uid), approveeIds = listOf(ana.uid))
+
+    /** Robin's day so far, as it's shared with their Bumblebees. */
+    val today = SharedUsage(
+        Days.todayKey(),
+        totalMinutes = 134,
+        apps = listOf(
+            SharedAppUsage("demo.youtube", "YouTube", 52, 60),
+            SharedAppUsage("demo.instagram", "Instagram", 47, 45),
+            SharedAppUsage("demo.maps", "Maps", 21, 0),
+        ),
+    )
+
+    /** Robin's own limits. */
+    val myLimits = listOf(AppLimit("demo.youtube", "YouTube", 60, 0), AppLimit("demo.instagram", "Instagram", 45, 300))
 
     private fun budget(pkg: String, name: String, daily: Int, usedToday: Int, weekly: Int = 0, usedWeek: Int = usedToday * 4, bonus: Int = 0) =
         AppBudget(AppLimit(pkg, name, daily, weekly), usedToday * MIN, usedWeek * MIN, bonus, bonus)

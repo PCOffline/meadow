@@ -75,6 +75,8 @@
     <string name="duration_minutes">%1$dm</string>
     <string name="duration_hours">%1$dh</string>
     <string name="duration_hours_minutes">%1$dh %2$dm</string>
+    <string name="duration_days">%1$dd</string>
+    <string name="duration_days_hours">%1$dd %2$dh</string>
     <string name="duration_under_a_minute">&lt;1m</string>
     <string name="update_failed_checksum">The download didn\'t check out, so it wasn\'t installed. Please try again.</string>
     <string name="update_failed_signature">This update wasn\'t signed like your Meadow, so it can\'t replace it. Reinstall from the releases page if you moved between builds.</string>

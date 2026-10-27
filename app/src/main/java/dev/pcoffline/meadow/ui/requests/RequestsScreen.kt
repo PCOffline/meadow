@@ -57,7 +57,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
@@ -71,6 +70,7 @@ import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
+import dev.pcoffline.meadow.ui.components.TabTitle
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
@@ -114,7 +114,7 @@ fun RequestsContent(
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            Text(stringResource(R.string.requests_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading().padding(start = 20.dp, top = 16.dp))
+            TabTitle(stringResource(R.string.requests_title))
             Text(
                 stringResource(R.string.requests_subtitle),
                 style = MaterialTheme.typography.bodyMedium,

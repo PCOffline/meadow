@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import dev.pcoffline.meadow.usage.UsageHistory
 import java.io.ByteArrayOutputStream
 
 /** Your own profile, appearance, privacy choices and data rights. */
@@ -121,7 +122,7 @@ class ProfileRepository(
         }
         runCatchingCancellable { backend.auth.signOut() }
         store.clearAll()
-        context.filesDir.resolve("usage_history.json").delete()
+        listOf(UsageHistory.FILE, UsageHistory.LEGACY_FILE).forEach { context.filesDir.resolve(it).delete() }
     }
 
     private fun squareJpeg(uri: Uri): ByteArray {

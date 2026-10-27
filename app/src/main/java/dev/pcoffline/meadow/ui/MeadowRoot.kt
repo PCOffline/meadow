@@ -72,6 +72,8 @@ import dev.pcoffline.meadow.ui.chat.ChatScreen
 import dev.pcoffline.meadow.ui.circle.AcceptInviteDialog
 import dev.pcoffline.meadow.ui.circle.CircleScreen
 import dev.pcoffline.meadow.ui.circle.FriendScreen
+import dev.pcoffline.meadow.ui.components.AccountEntry
+import dev.pcoffline.meadow.ui.components.LocalAccount
 import dev.pcoffline.meadow.ui.components.PetalBurst
 import dev.pcoffline.meadow.ui.home.GardenScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -90,6 +92,7 @@ import dev.pcoffline.meadow.ui.navigation.LegalRoute
 import dev.pcoffline.meadow.ui.navigation.LimitRoute
 import dev.pcoffline.meadow.ui.navigation.ProfileRoute
 import dev.pcoffline.meadow.ui.navigation.PickAppRoute
+import dev.pcoffline.meadow.ui.navigation.PrivacyPreviewRoute
 import dev.pcoffline.meadow.ui.navigation.RequestsRoute
 import dev.pcoffline.meadow.ui.navigation.SettingsRoute
 import dev.pcoffline.meadow.ui.navigation.SetupRoute
@@ -97,6 +100,7 @@ import dev.pcoffline.meadow.ui.navigation.StatsRoute
 import dev.pcoffline.meadow.ui.navigation.TroubleshootRoute
 import dev.pcoffline.meadow.ui.navigation.BeeStatsRoute
 import dev.pcoffline.meadow.ui.requests.RequestsScreen
+import dev.pcoffline.meadow.ui.settings.PrivacyPreviewScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.BackendMissingScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
@@ -220,8 +224,14 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
     val accountConfirmed by AppGraph.sync.accountConfirmed.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val clearance = remember { SnackbarClearance() }
+    val account = remember(profile.avatar) { AccountEntry(profile.avatar) { nav.navigate(ProfileRoute) { launchSingleTop = true } } }
 
-    CompositionLocalProvider(LocalSnackbar provides snackbar, LocalCelebrate provides celebrate, LocalSnackbarClearance provides clearance) {
+    CompositionLocalProvider(
+        LocalSnackbar provides snackbar,
+        LocalCelebrate provides celebrate,
+        LocalSnackbarClearance provides clearance,
+        LocalAccount provides account,
+    ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = clearance.height)) },
@@ -278,8 +288,10 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             onOpenProfile = { nav.navigate(ProfileRoute) },
                             onOpenLegal = { nav.navigate(LegalRoute(it.name)) },
                             onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
+                            onOpenPrivacyPreview = { nav.navigate(PrivacyPreviewRoute) },
                         )
                     }
+                    composable<PrivacyPreviewRoute> { PrivacyPreviewScreen(profile, onBack = { nav.popBackStack() }) }
                     composable<ProfileRoute> { ProfileScreen(profile, onBack = { nav.popBackStack() }) }
                     composable<LegalRoute> { entry ->
                         LegalScreen(LegalDoc.fromName(entry.toRoute<LegalRoute>().doc), onBack = { nav.popBackStack() })

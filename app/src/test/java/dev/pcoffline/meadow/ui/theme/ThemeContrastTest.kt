@@ -72,7 +72,10 @@ class ThemeContrastTest {
                 "inverseOnSurface on inverseSurface (snackbars)" to (s.inverseOnSurface to s.inverseSurface),
                 "inversePrimary on inverseSurface (snackbar actions)" to (s.inversePrimary to s.inverseSurface),
             )
-            for ((label, colors) in pairs) out.require("${name(theme, dark)} $label", colors.first, colors.second, 4.5f)
+            val g = gardenColorsFor(theme, dark)
+            for ((label, colors) in pairs + ("onBetter on better (less screen time)" to (g.onBetter to g.better))) {
+                out.require("${name(theme, dark)} $label", colors.first, colors.second, 4.5f)
+            }
         },
     )
 

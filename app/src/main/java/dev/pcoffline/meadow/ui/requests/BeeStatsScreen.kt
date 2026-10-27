@@ -12,17 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
@@ -41,7 +34,6 @@ import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
-import dev.pcoffline.meadow.ui.components.ShareDialog
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.stateWhileVisible
@@ -70,16 +62,9 @@ fun BeeStatsScreen(
 /** A Bumblebee's own answering habits, drawn from plain state (also used for tests). */
 @Composable
 fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
-    var sharing by rememberSaveable { mutableStateOf(false) }
     val res = LocalResources.current
     Column(Modifier.fillMaxSize()) {
-        BackTopBar(stringResource(R.string.bee_stats_title), onBack = onBack, actions = {
-            if (stats != null && stats.answered > 0) {
-                IconButton(onClick = { sharing = true }) {
-                    Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.share_title))
-                }
-            }
-        })
+        BackTopBar(stringResource(R.string.bee_stats_title), onBack = onBack)
         when {
             stats == null -> Loading()
             stats.asked == 0 -> EmptyState("🐝", stringResource(R.string.bee_stats_empty_title), stringResource(R.string.bee_stats_empty_body))
@@ -148,7 +133,6 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
             }
         }
     }
-    if (sharing && stats != null) ShareDialog(shareText(res, stats), onDismiss = { sharing = false })
 }
 
 @Composable
@@ -172,11 +156,3 @@ private fun leaningText(res: Resources, leaning: BeeStats.Leaning): String = res
         BeeStats.Leaning.VERY_GENTLE -> R.string.bee_leaning_very_gentle
     },
 )
-
-/** Only totals: who asked what stays out of anything shared. */
-private fun shareText(res: Resources, stats: BeeStats): String {
-    val rate = stats.approvalRate?.let { (it * 100).roundToInt() } ?: 0
-    val leaning = stats.leaning?.let { leaningText(res, it) }
-    return if (leaning != null) res.getQuantityString(R.plurals.bee_stats_share_with_leaning, stats.answered, stats.answered, rate, leaning)
-    else res.getQuantityString(R.plurals.bee_stats_share, stats.answered, stats.answered, rate)
-}

@@ -75,8 +75,8 @@ words about yourself.
 
 ### Private by default
 No email needed to start; later you can keep your garden safe with a sign-in link emailed to
-you, or a password. You choose whether your Bumblebees see today's screen time. Your
-detailed history never leaves your phone. Who looks after whom is your own business: only the
+you, or a password. You choose whether your Bumblebees see today's screen time, and Settings
+shows your page exactly as they see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
 person affected is told when you add or remove a Bumblebee. Download everything Meadow holds about
 you, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
 

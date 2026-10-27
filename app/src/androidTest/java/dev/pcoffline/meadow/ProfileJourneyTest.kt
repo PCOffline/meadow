@@ -33,7 +33,7 @@ import java.io.File
 
 /**
  * End to end: someone makes their profile their own (name, critter, colour, a photo that's later
- * removed, the app's theme and night mode) and downloads all their data. Android's photo picker
+ * removed), picks the app's theme and night mode in Settings, and downloads all their data. Android's photo picker
  * and file saver are stood in for, answering with files the test made; the rest is the real app
  * against the emulators, checked in the backend.
  */
@@ -49,7 +49,7 @@ class ProfileJourneyTest : EndToEndTest() {
     private fun JSONObject.photoUrl(): String? = string("photoUrl")?.takeIf { it.isNotEmpty() }
 
     @Test
-    fun aProfileGetsANewNameAvatarPhotoAndTheme() {
+    fun aProfileGetsANewNameAvatarAndPhotoAndTheAppANewTheme() {
         val photo = File(app.cacheDir, "e2e-photo.png").apply {
             outputStream().use { createBitmap(64, 48).apply { eraseColor(Color.YELLOW) }.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
@@ -58,6 +58,8 @@ class ProfileJourneyTest : EndToEndTest() {
         ActivityScenario.launch(MainActivity::class.java).use {
             startAsGuest("Robin")
             val uid = FirebaseAuth.getInstance().currentUser!!.uid
+            // Every tab has the way to the profile, in the same corner.
+            node(R.string.tab_growth).performClick()
             compose.onNodeWithContentDescription(text(R.string.profile_open)).performClick()
             waitFor(R.string.profile_title)
 
@@ -81,7 +83,11 @@ class ProfileJourneyTest : EndToEndTest() {
             node(R.string.profile_photo_remove).performScrollTo().performClick()
             waitForBackend("users/$uid") { it.photoUrl() == null }
 
-            // The theme and night mode apply at once and follow the account to other phones.
+            // The theme and night mode are in Settings; they apply at once and follow the account to other phones.
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+            node(R.string.tab_garden).performClick()
+            compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
+            waitFor(R.string.settings_appearance_title)
             compose.onNode(hasText(text(R.string.theme_lavender), substring = true) and hasClickAction()).performScrollTo().performClick()
             node(R.string.dark_mode_dark).performScrollTo().performClick()
             waitForBackend("users/$uid/private/account") { it.string("theme") == "lavender" && it.string("darkMode") == "dark" }

@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.a11y.contrastProblems
 import dev.pcoffline.meadow.data.BeeStats
+import dev.pcoffline.meadow.data.Privacy
 import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.showcase.DemoGarden
@@ -34,6 +35,7 @@ import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.BeeStatsContent
 import dev.pcoffline.meadow.ui.requests.RequestCard
+import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
 import dev.pcoffline.meadow.ui.setup.StrictGateContent
@@ -90,10 +92,26 @@ class RenderedContrastTest : ScreenTest() {
     }
 
     @Test
-    fun `weekly stats`() = sweep { StatsContent(DemoGarden.stats) }
+    fun `weekly stats, better and worse than before, with a day not recorded`() =
+        // Less time than before, more, and a stretch with a day the phone kept no record of.
+        sweep(listOf("less", "more", "missing")) { v ->
+            val s = DemoGarden.stats.stats!!
+            StatsContent(
+                DemoGarden.stats.copy(
+                    stats = when (v) {
+                        "less" -> s
+                        "more" -> s.copy(previousTotalMs = 600 * 60_000L)
+                        else -> s.copy(days = s.days.mapIndexed { i, d -> if (i == 0) d.first to null else d }, previousTotalMs = null)
+                    },
+                ),
+            )
+        }
 
     @Test
-    fun `monthly stats, with the calendar`() = sweep { StatsContent(DemoGarden.monthStats) }
+    fun `monthly stats, with the calendar`() = sweep(listOf("all", "missing")) { v ->
+        val s = DemoGarden.monthStats.stats!!
+        StatsContent(if (v == "all") DemoGarden.monthStats else DemoGarden.monthStats.copy(stats = s.copy(days = s.days.mapIndexed { i, d -> if (i < 5) d.first to null else d })))
+    }
 
     @Test
     fun `stats without usage access`() = sweep { StatsContent(DemoGarden.stats.copy(hasPermission = false)) }
@@ -128,6 +146,11 @@ class RenderedContrastTest : ScreenTest() {
 
     @Test
     fun `settings`() = sweep { SettingsScreen(DemoGarden.robin, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
+
+    @Test
+    fun `what Bumblebees see, shared and not`() = sweep(listOf(true, false)) { shared ->
+        PrivacyPreviewContent(DemoGarden.robin.copy(privacy = Privacy(shareUsage = shared)), DemoGarden.today, DemoGarden.myLimits)
+    }
 
     @Test
     fun `profile`() = sweep { ProfileScreen(DemoGarden.robin, onBack = {}) }

@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class LegalRoute(val doc: String)
 @Serializable data object TroubleshootRoute
 @Serializable data object BeeStatsRoute
+@Serializable data object PrivacyPreviewRoute
 
 /**
  * Where a notification asks to go. Notifications carry a small string so they stay valid

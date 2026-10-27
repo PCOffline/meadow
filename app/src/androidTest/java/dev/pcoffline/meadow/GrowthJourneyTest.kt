@@ -53,10 +53,8 @@ class GrowthJourneyTest : EndToEndTest() {
             waitFor(R.string.stats_this_week)
             waitForText("Pebbles")
 
-            // The week can be shared, in words.
-            compose.onNodeWithContentDescription(text(R.string.share_title)).performClick()
-            inDialog("Most used:", substring = true).assertExists()
-            inDialog(text(R.string.action_cancel)).performClick()
+            // Screen time is for the person, not for posting.
+            compose.onNodeWithContentDescription(text(R.string.share_title)).assertDoesNotExist()
 
             // An app leads to planting its limit.
             compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
