@@ -120,6 +120,26 @@ class NotifierTest {
     }
 
     @Test
+    fun `a test notification shows on the channel it tests, and only a known one`() {
+        for ((asked, shown) in listOf("chat" to Notifier.CH_CHAT, "requests" to Notifier.CH_REQUESTS, "alerts" to Notifier.CH_CHAT)) {
+            manager.cancelAll()
+            notifier.fromPush(mapOf("to" to "sam", "type" to "test", "channel" to asked, "title" to "Test $asked"), signedInUid = "sam")
+            assertEquals(shown, shadowOf(manager).allNotifications.single().channelId)
+        }
+    }
+
+    @Test
+    fun `chat and request channels turned off are named, and all are when notifications are off`() {
+        assertEquals(emptyList<String>(), notifier.silentMessageChannels())
+        val chat = manager.getNotificationChannel(Notifier.CH_CHAT)
+        chat.importance = NotificationManager.IMPORTANCE_NONE
+        manager.createNotificationChannel(chat)
+        assertEquals(listOf(chat.name.toString()), notifier.silentMessageChannels())
+        shadowOf(manager).setNotificationsEnabled(false)
+        assertEquals(null, notifier.silentMessageChannels())
+    }
+
+    @Test
     fun `an update is offered once with a way to open settings`() {
         notifier.updateAvailable("1.2.0")
         val notification = shadowOf(manager).getNotification(Notifier.UPDATE_ID)

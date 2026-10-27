@@ -216,27 +216,42 @@ export function pushPayload(uid: string, data: Record<string, string>): Record<s
   return { ...data, to: uid };
 }
 
+/** What one push to one person did: how many of their phones there were, how many got it, and why others didn't. */
+export interface PushResult {
+  phones: number;
+  delivered: number;
+  errors: string[];
+}
+
 /**
- * Sends a data-only push to every device of each user; the app builds the notification itself
- * so it can add actions like "Approve". Each user gets their own message, addressed to them.
- * Phones no longer registered are cleaned up. Never throws.
+ * Sends one data-only push to every phone of `uid`; the app builds the notification itself so it
+ * can add actions like "Approve". Phones no longer registered are cleaned up, and any phone FCM
+ * refused is logged with FCM's reason, so a push that never shows can be traced.
  *
  * In the emulator every push is also written to `_testOutbox`, with the exact data sent in
  * `sent`, so integration tests can check exactly who was told what.
  */
+export async function pushTo(uid: string, data: Record<string, string>): Promise<PushResult> {
+  const payload = pushPayload(uid, data);
+  if (isEmulator()) await db().collection("_testOutbox").add({ ...payload, sent: payload, at: FieldValue.serverTimestamp() });
+  const fids = accountOf(await accountRef(uid).get()).pushIds;
+  if (fids.length === 0) return { phones: 0, delivered: 0, errors: [] };
+  const result = await getMessaging().sendEachForMulticast({ fids, data: payload, android: { priority: "high" } });
+  const errors = result.responses.flatMap((r) => (r.error ? [r.error.code] : []));
+  const dead = fids.filter((_, i) => result.responses[i]?.error?.code === "messaging/installation-id-not-registered");
+  if (dead.length) await accountRef(uid).update({ pushIds: FieldValue.arrayRemove(...dead) });
+  if (errors.length) logger.warn("Push not delivered to every phone", { uid, type: data.type, errors });
+  return { phones: fids.length, delivered: result.successCount, errors };
+}
+
+/** [pushTo] each user, once each. Never throws: a failed push never fails what caused it. */
 export async function notify(uids: string[], data: Record<string, string>): Promise<void> {
   await Promise.all(
     [...new Set(uids)].map(async (uid) => {
       try {
-        const payload = pushPayload(uid, data);
-        if (isEmulator()) await db().collection("_testOutbox").add({ ...payload, sent: payload, at: FieldValue.serverTimestamp() });
-        const fids = accountOf(await accountRef(uid).get()).pushIds;
-        if (fids.length === 0) return;
-        const result = await getMessaging().sendEachForMulticast({ fids, data: payload, android: { priority: "high" } });
-        const dead = fids.filter((_, i) => result.responses[i]?.error?.code === "messaging/installation-id-not-registered");
-        if (dead.length) await accountRef(uid).update({ pushIds: FieldValue.arrayRemove(...dead) });
+        await pushTo(uid, data);
       } catch (e) {
-        logger.warn("Push failed", { uid, error: String(e) });
+        logger.warn("Push failed", { uid, type: data.type, error: String(e) });
       }
     }),
   );

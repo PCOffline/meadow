@@ -67,6 +67,7 @@ function everything() {
     "pushes.bumblebeeLeftMeadow": () => pushes.bumblebeeLeftMeadow(maya),
     "pushes.quietPhone": () => pushes.quietPhone(sam),
     "pushes.emergency": () => pushes.emergency(emergencyHeadline(sam, true, false), emergencyScope(null, 60), "Lost"),
+    "pushes.test": () => [pushes.test("chat"), pushes.test("requests")],
   };
   return fns;
 }

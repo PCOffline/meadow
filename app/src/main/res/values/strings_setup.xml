@@ -32,10 +32,20 @@
     <string name="setup_listener_body">Quiets resting apps\' notifications and media.</string>
     <string name="notification_listener_label">Meadow garden keeper</string>
 
-    <string name="trouble_title">Keep Meadow awake</string>
+    <string name="trouble_title">Troubleshoot</string>
     <string name="trouble_button">Troubleshoot</string>
     <string name="trouble_essentials">Turn on the essentials in Protections first.</string>
     <string name="trouble_step">%1$d. %2$s</string>
+    <string name="trouble_notify_title">Chat and request notifications</string>
+    <string name="trouble_notify_ok">Notifications are on. Send a test to check they reach this phone.</string>
+    <string name="trouble_notify_off">Notifications are off for Meadow, so chats and requests can\'t reach you.</string>
+    <string name="trouble_notify_silent">Turned off: %1$s.</string>
+    <string name="trouble_notify_settings">Open notification settings</string>
+    <string name="trouble_notify_test">Send a test notification</string>
+    <string name="trouble_notify_sending">Sending…</string>
+    <string name="trouble_notify_sent">Sent. Two test notifications should appear within a minute. If they don\'t, follow the steps below.</string>
+    <string name="trouble_notify_no_phone">This phone couldn\'t sign up for notifications. Check that you\'re online and Google Play services is up to date, then try again.</string>
+    <string name="trouble_notify_undelivered">Google couldn\'t deliver to this phone (%1$s). Try again in a few minutes.</string>
     <string name="trouble_open">Open settings</string>
     <string name="trouble_more_help">More help for this phone</string>
     <string name="trouble_battery_title">Unrestricted battery</string>

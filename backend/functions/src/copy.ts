@@ -139,6 +139,11 @@ export const pushes = {
     title: headline,
     body: `Lifted ${scope}. “${reason}”`,
   }),
+  /** Sent only when someone asks for it, from Troubleshoot. */
+  test: (channel: "chat" | "requests") => ({
+    title: channel === "chat" ? "Chat notifications work 💬" : "Request notifications work 💌",
+    body: "If you can see this, Meadow can reach this phone.",
+  }),
 };
 
 export function emergencyHeadline(owner: Person, offline: boolean, overAllowance: boolean): string {

@@ -850,6 +850,22 @@ describe("chat and alerts", () => {
   });
 });
 
+describe("test notifications", () => {
+  test("go only to your own phones, one per channel, and can't be sent all day", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // No phone registered: nothing to deliver, and the app can say so.
+    assert.deepEqual(await sam.call("sendTestPush"), { phones: 0, delivered: 0, errors: [] });
+    const sent = await outbox(sam.uid, "test");
+    assert.deepEqual(sent.map((p) => p.channel).sort(), ["chat", "requests"]);
+    assert.ok(sent.every((p) => p.title && p.body));
+    assert.equal((await outbox(bee.uid, "test")).length, 0);
+    for (let i = 1; i < 5; i++) await sam.call("sendTestPush");
+    await rejects(sam.call("sendTestPush"), "resource-exhausted");
+  });
+});
+
 describe("your data", () => {
   test("export includes your garden and conversations but never push tokens", async () => {
     const sam = await person("Sam");
@@ -1083,7 +1099,7 @@ describe("every callable is safe to call wrongly", () => {
   const CALLABLES = [
     "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "respondInvite", "cancelInvite",
     "removeApprover", "cancelRemoval", "stepDown", "createRequest", "decideRequest", "cancelRequest", "saveLimit",
-    "emergencyUnlock", "exportMyData", "deleteAccount",
+    "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush",
   ];
 
   test("nothing works without signing in", async () => {
