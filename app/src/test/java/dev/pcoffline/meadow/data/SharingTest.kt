@@ -55,7 +55,7 @@ class SharingTest {
     }
 
     @Test
-    fun `choices from before the split still hold for today's time and apps; progress waits to be chosen`() {
+    fun `choices from before the split still hold for today's time and apps, and progress waits to be chosen`() {
         val old = mapOf("shareUsage" to false)
         assertEquals(Privacy(shareLimits = true, shareTime = false, shareApps = false, shareProgress = false), Privacy.read { old[it] })
         assertEquals(false, Privacy.read { mapOf("shareUsage" to true)[it] }.shareProgress)

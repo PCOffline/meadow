@@ -70,7 +70,7 @@ class StatsTest : ScreenTest() {
     }
 
     @Test
-    fun `the current period shows progress over the weeks; past ones don't`() {
+    fun `the current period shows progress over the weeks, past ones don't`() {
         val now = week.selection.copy(offset = 0)
         var state by mutableStateOf(week.copy(selection = now, stats = week.stats!!.copy(selection = now), progress = DemoGarden.progress))
         show { StatsContent(state) }
