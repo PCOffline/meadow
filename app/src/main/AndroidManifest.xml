@@ -82,11 +82,13 @@
 
         <activity
             android:name=".enforcement.BlockActivity"
+            android:enableOnBackInvokedCallback="false"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity="dev.pcoffline.meadow.block"
-            android:theme="@style/Theme.Meadow" />
+            android:theme="@style/Theme.Meadow"
+            tools:targetApi="34" />
 
         <service
             android:name=".enforcement.GuardianAccessibilityService"

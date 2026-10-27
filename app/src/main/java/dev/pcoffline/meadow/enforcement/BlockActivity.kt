@@ -2,9 +2,11 @@
 
 package dev.pcoffline.meadow.enforcement
 
+import android.app.ActivityOptions
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
@@ -96,7 +98,9 @@ class BlockActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         packageState.value = intent.getStringExtra(EXTRA_PACKAGE)
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+        // Not tied to the lifecycle: one that comes and goes left back to the system at times, which
+        // shrank the screen away into the app it covers.
+        onBackPressedDispatcher.addCallback(object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goHome()
         })
         setContent {
@@ -117,9 +121,21 @@ class BlockActivity : ComponentActivity() {
         packageState.value?.let { markShown(it) }
     }
 
+    /** Home, fading out the same way however it's asked for, instead of the launcher's zoom. */
     private fun goHome() {
-        startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(home, ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, android.R.anim.fade_out).toBundle())
         finish()
+        fadeOut()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun fadeOut() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
     }
 
     private fun openApp(pkg: String) {
