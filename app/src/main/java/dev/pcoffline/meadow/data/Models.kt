@@ -32,20 +32,17 @@ data class Avatar(val emoji: String, val color: String, val photoUrl: String?) {
 }
 
 /**
- * What someone shares with their Bumblebees, each part on its own. Protections, strict mode,
- * extra time and earlier days' screen time are never shared.
+ * What someone shares with their Bumblebees, each part on its own. Nothing is shared until it's
+ * chosen. Protections, strict mode, extra time and earlier days' screen time are never shared.
  */
 data class Privacy(
     /** Which apps have limits, and what they are. */
-    val shareLimits: Boolean = true,
+    val shareLimits: Boolean = false,
     /** Today's total screen time. */
-    val shareTime: Boolean = true,
+    val shareTime: Boolean = false,
     /** The apps used most today, and for how long. */
-    val shareApps: Boolean = true,
-    /**
-     * How the weeks compare, and how often limits were kept: see [Progress]. It sums up earlier
-     * days, which otherwise never leave the phone, so it's only shared when chosen.
-     */
+    val shareApps: Boolean = false,
+    /** How the weeks compare, and how often limits were kept: see [Progress]. */
     val shareProgress: Boolean = false,
 ) {
     /** As stored on the account, under "privacy". */
@@ -55,9 +52,9 @@ data class Privacy(
     companion object {
         /** Reads the choices through [field] ("shareTime" and so on); one never made is the default. */
         fun read(field: (String) -> Boolean?): Privacy = Privacy(
-            shareLimits = field("shareLimits") ?: true,
-            shareTime = field("shareTime") ?: true,
-            shareApps = field("shareApps") ?: true,
+            shareLimits = field("shareLimits") ?: false,
+            shareTime = field("shareTime") ?: false,
+            shareApps = field("shareApps") ?: false,
             shareProgress = field("shareProgress") ?: false,
         )
     }

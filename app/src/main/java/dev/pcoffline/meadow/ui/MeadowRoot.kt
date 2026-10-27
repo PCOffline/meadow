@@ -254,7 +254,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                         popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
                     ) {
                         composable<SetupRoute> {
-                            SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
+                            SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) }, profile = profile)
                         }
                         composable<TroubleshootRoute> {
                             TroubleshootScreen(onBack = { nav.popBackStack() }, onOpenSetup = { nav.navigate(SetupRoute) })

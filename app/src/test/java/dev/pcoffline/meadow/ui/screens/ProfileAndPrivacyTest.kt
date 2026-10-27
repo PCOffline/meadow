@@ -139,7 +139,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         assertEquals(1, previews)
     }
 
-    private fun preview(privacy: Privacy = Privacy(shareProgress = true), save: suspend (Privacy) -> Unit = {}) = show {
+    private fun preview(privacy: Privacy = DemoGarden.sharesEverything, save: suspend (Privacy) -> Unit = {}) = show {
         PrivacyPreviewContent(robin.copy(privacy = privacy), DemoGarden.today, DemoGarden.progress, DemoGarden.myLimits, save = save)
     }
 
@@ -168,7 +168,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     @Test
     fun `each part comes off the page on its own`() {
-        preview(Privacy(shareTime = false, shareLimits = false, shareProgress = true))
+        preview(DemoGarden.sharesEverything.copy(shareTime = false, shareLimits = false))
         node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).assertDoesNotExist()
         node(R.string.friend_limits).assertDoesNotExist()
         // Top apps stay, without the limits that are now private.
@@ -179,7 +179,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     @Test
     fun `with nothing shared, the preview says so`() {
-        preview(Privacy(shareLimits = false, shareTime = false, shareApps = false, shareProgress = false))
+        preview(Privacy())
         node(R.string.friend_nothing_shared, robin.displayName).performScrollTo().assertExists()
         node(R.string.friend_limits).assertDoesNotExist()
         compose.onAllNodesWithText("Maps").assertCountEquals(0)
@@ -202,7 +202,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.mainClock.advanceTimeBy(PRIVACY_SETTLE_MS)
         compose.mainClock.autoAdvance = true
         compose.waitUntil(5_000) { saves.isNotEmpty() }
-        assertEquals(listOf(Privacy(shareTime = false, shareApps = false, shareProgress = true)), saves)
+        assertEquals(listOf(DemoGarden.sharesEverything.copy(shareTime = false, shareApps = false)), saves)
     }
 
     @Test

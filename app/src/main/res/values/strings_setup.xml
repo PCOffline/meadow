@@ -18,6 +18,10 @@
     <string name="setup_admin_explanation">Meadow gets no admin powers from this, so the list below is empty. It only means Meadow has to be turned off here before it can be uninstalled.</string>
     <string name="setup_battery_title">Run in the background</string>
     <string name="setup_battery_body">Keeps Meadow running.</string>
+    <string name="setup_sharing_title">What your Bumblebees see</string>
+    <string name="setup_sharing_body">Nothing is shared until you turn it on. You can change this any time in Settings.</string>
+    <string name="setup_sharing_example">Example: your page as a Bumblebee sees it</string>
+    <string name="setup_sharing_done">Keep these choices</string>
     <string name="setup_account_title">Save your garden</string>
     <string name="setup_account_body">Add your email to keep your garden if you change phones, and to invite Bumblebees.</string>
     <string name="setup_account_action">Add email</string>

@@ -58,6 +58,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.enforcement.MeadowNotificationListener
 import dev.pcoffline.meadow.enforcement.ProtectionState
@@ -75,6 +77,10 @@ fun SetupScreen(
     onTroubleshoot: () -> Unit = {},
     read: () -> ProtectionState = { AppGraph.protection.current() },
     anonymous: Boolean = AppGraph.auth.anonymous.collectAsStateWithLifecycle().value,
+    profile: UserProfile? = null,
+    sharingChosen: Boolean = AppGraph.store.sharingChosen.collectAsStateWithLifecycle().value,
+    onSharingChosen: () -> Unit = { AppGraph.store.setSharingChosen() },
+    savePrivacy: suspend (Privacy) -> Unit = { AppGraph.profiles.setPrivacy(it) },
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -183,7 +189,17 @@ fun SetupScreen(
             @Suppress("BatteryLife")
             context.openSettings(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, withPackageUri = true)
         }
-        // Not a permission, so not counted above, but a garden without an email is lost with the phone.
+        // Not permissions either, so not counted above.
+        if (profile != null) {
+            SetupStep(
+                emoji = "🐝",
+                title = R.string.setup_sharing_title,
+                body = R.string.setup_sharing_body,
+                done = sharingChosen,
+                expanded = { SharingChoice(profile, onDone = onSharingChosen, save = savePrivacy) },
+            ) {}
+        }
+        // A garden without an email is lost with the phone.
         var addingEmail by rememberSaveable { mutableStateOf(false) }
         SetupStep(
             emoji = "🔐",

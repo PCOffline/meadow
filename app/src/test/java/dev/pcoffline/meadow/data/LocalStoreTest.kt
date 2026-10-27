@@ -111,6 +111,24 @@ class LocalStoreTest {
     }
 
     @Test
+    fun `what to share, once settled, stays settled for that account only`() {
+        val store = LocalStore(context)
+        assertFalse(store.sharingChosen.value)
+        store.switchAccount("sam")
+        store.setSharingChosen()
+        assertTrue(LocalStore(context).sharingChosen.value)
+        store.switchAccount("sam")
+        assertTrue(store.sharingChosen.value)
+        store.switchAccount("robin")
+        assertFalse(store.sharingChosen.value)
+        assertFalse(LocalStore(context).sharingChosen.value)
+        store.setSharingChosen()
+        store.clearAll()
+        assertFalse(store.sharingChosen.value)
+        assertFalse(LocalStore(context).sharingChosen.value)
+    }
+
+    @Test
     fun `clearAll forgets everything, in memory and on disk`() {
         val store = LocalStore(context).apply {
             setLimits(listOf(AppLimit("com.insta", "Instagram", 30, 0)))

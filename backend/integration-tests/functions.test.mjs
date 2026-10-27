@@ -192,7 +192,7 @@ describe("profiles", () => {
     assert.deepEqual(account.approverIds, []);
     assert.equal(account.acceptedTerms.version, 1);
     assert.equal(account.strictMode, false);
-    assert.deepEqual(account.privacy, { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false });
+    assert.deepEqual(account.privacy, { shareLimits: false, shareTime: false, shareApps: false, shareProgress: false });
     assert.deepEqual(await read(`friendCodes/${account.friendCode}`), { uid: sam.uid });
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
   });

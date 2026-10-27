@@ -100,20 +100,26 @@ internal const val PRIVACY_SETTLE_MS = 700L
 /** The privacy choices, part by part; with [onPreview], a way to see the page they shape (see PrivacyPreviewContent). */
 @Composable
 internal fun PrivacyCard(choices: PrivacyChoices, onPreview: (() -> Unit)? = null) {
-    val p = choices.current
-    // Each change starts from what's showing now, so quick taps on two switches both count.
-    fun change(edit: Privacy.() -> Privacy) = choices.change(choices.current.edit())
     MeadowCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.settings_privacy_title), style = MaterialTheme.typography.titleMedium)
-        SwitchRow(stringResource(R.string.settings_share_limits), checked = p.shareLimits) { on -> change { copy(shareLimits = on) } }
-        SwitchRow(stringResource(R.string.settings_share_time), checked = p.shareTime) { on -> change { copy(shareTime = on) } }
-        SwitchRow(stringResource(R.string.settings_share_apps), checked = p.shareApps) { on -> change { copy(shareApps = on) } }
-        SwitchRow(stringResource(R.string.settings_share_progress), checked = p.shareProgress) { on -> change { copy(shareProgress = on) } }
-        ErrorNote(choices.error)
+        PrivacySwitches(choices)
         if (onPreview != null) {
             OutlinedButton(onClick = onPreview, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text(stringResource(R.string.settings_privacy_preview))
             }
         }
     }
+}
+
+/** A switch for each part that can be shared, and why the last change wasn't saved, if it wasn't. */
+@Composable
+internal fun PrivacySwitches(choices: PrivacyChoices) {
+    val p = choices.current
+    // Each change starts from what's showing now, so quick taps on two switches both count.
+    fun change(edit: Privacy.() -> Privacy) = choices.change(choices.current.edit())
+    SwitchRow(stringResource(R.string.settings_share_limits), checked = p.shareLimits) { on -> change { copy(shareLimits = on) } }
+    SwitchRow(stringResource(R.string.settings_share_time), checked = p.shareTime) { on -> change { copy(shareTime = on) } }
+    SwitchRow(stringResource(R.string.settings_share_apps), checked = p.shareApps) { on -> change { copy(shareApps = on) } }
+    SwitchRow(stringResource(R.string.settings_share_progress), checked = p.shareProgress) { on -> change { copy(shareProgress = on) } }
+    ErrorNote(choices.error)
 }

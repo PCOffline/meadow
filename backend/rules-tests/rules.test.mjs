@@ -37,7 +37,7 @@ const account = (overrides = {}) => ({
   pushIds: ["phone"],
   friendCode: "ABC234",
   strictMode: false,
-  privacy: { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false },
+  privacy: { shareLimits: false, shareTime: false, shareApps: false, shareProgress: false },
   pendingRemovals: {},
   ...overrides,
 });
@@ -288,13 +288,12 @@ describe("limits", () => {
     }
   });
 
-  test("a choice never made shares today's time and apps, and progress waits to be chosen", async () => {
+  test("a choice never made shares nothing", async () => {
     await seed({ privacy: {} });
-    for (const path of ["users/sam/limits/com.insta", "users/sam/usage/today", "users/sam/appUsage/today"]) {
-      await assertSucceeds(getDoc(doc(as("bee"), path)));
+    for (const path of ["users/sam/limits/com.insta", "users/sam/usage/today", "users/sam/appUsage/today", "users/sam/progress/current"]) {
+      await assertFails(getDoc(doc(as("bee"), path)));
+      await assertSucceeds(getDoc(doc(as("sam"), path)));
     }
-    await assertFails(getDoc(doc(as("bee"), "users/sam/progress/current")));
-    await assertSucceeds(getDoc(doc(as("sam"), "users/sam/progress/current")));
   });
 
   test("only today's copy of time and top apps is kept; earlier days never leave the phone", async () => {

@@ -35,9 +35,12 @@ object DemoGarden {
     private const val MIN = 60_000L
     private val now = System.currentTimeMillis()
 
+    /** Every part shared, so the showcase has a full page to show. */
+    val sharesEverything = Privacy(shareLimits = true, shareTime = true, shareApps = true, shareProgress = true)
+
     private fun person(uid: String, name: String, emoji: String, color: String, bio: String = "") = UserProfile(
         uid = uid, displayName = name, avatar = Avatar(emoji, color, null), bio = bio, friendCode = "PETAL7",
-        approverIds = emptyList(), approveeIds = emptyList(), privacy = Privacy(), strictMode = true,
+        approverIds = emptyList(), approveeIds = emptyList(), privacy = sharesEverything, strictMode = true,
         emergencyUntilMillis = 0L, emergencyPackage = null, emergencyUsesMillis = emptyList(),
     )
 

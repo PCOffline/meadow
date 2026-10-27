@@ -25,8 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.auth.AuthScreen
@@ -182,6 +182,39 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `setup asks what to share, with nothing shared to start and an example of the page it makes`() {
+        val saves = mutableListOf<Privacy>()
+        var chosen by mutableStateOf(false)
+        val robin = DemoGarden.robin.copy(privacy = Privacy())
+        show {
+            SetupScreen(
+                onDone = {}, anonymous = false, profile = robin,
+                sharingChosen = chosen, onSharingChosen = { chosen = true }, savePrivacy = { saves += it },
+            )
+        }
+        node(R.string.setup_sharing_title).performScrollTo().assertExists()
+        for (part in listOf(R.string.settings_share_limits, R.string.settings_share_time, R.string.settings_share_apps, R.string.settings_share_progress)) {
+            compose.onNode(isToggleable() and hasText(text(part))).performScrollTo().assertIsOff()
+        }
+        node(R.string.friend_nothing_shared, robin.displayName).performScrollTo().assertExists()
+        assertAccessible()
+
+        // The example follows each switch as it moves, and the choice is saved as in Settings.
+        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time))).performScrollTo().performClick()
+        val time = text(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 8))
+        compose.onNodeWithText(time).performScrollTo().assertExists()
+        node(R.string.friend_nothing_shared, robin.displayName).assertDoesNotExist()
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals(listOf(Privacy(shareTime = true)), saves)
+
+        // Settled, the step folds away.
+        node(R.string.setup_sharing_done).performScrollTo().performClick()
+        assertTrue(chosen)
+        node(R.string.setup_sharing_example).assertDoesNotExist()
+        node(R.string.setup_sharing_done).assertDoesNotExist()
+    }
+
+    @Test
     fun `setup has one way out, into the garden only once the essentials are on`() {
         var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
         var left = 0
@@ -202,7 +235,7 @@ class OtherScreensTest : ScreenTest() {
     @Test
     fun `settings show privacy choices, legal documents and a careful delete`() {
         val opened = mutableListOf<LegalDoc>()
-        val shy = DemoGarden.robin.copy(privacy = Privacy(shareTime = false))
+        val shy = DemoGarden.robin.copy(privacy = DemoGarden.sharesEverything.copy(shareTime = false))
         show { SettingsScreen(shy, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = { opened += it }) }
         compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time))).performScrollTo().assertIsOff()
         node(R.string.legal_privacy).performScrollTo().performClick()

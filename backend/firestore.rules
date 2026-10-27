@@ -20,9 +20,9 @@ service cloud.firestore {
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
     // Whether the owner shares [part] ("shareLimits", "shareTime", "shareApps", "shareProgress")
-    // with their Bumblebees. Progress sums up earlier days, so it's only shared once chosen.
+    // with their Bumblebees. Nothing is shared until it's chosen.
     function shares(uid, part) {
-      return account(uid).get('privacy', {}).get(part, part != 'shareProgress') == true;
+      return account(uid).get('privacy', {}).get(part, false) == true;
     }
 
     function validPrivacy(p) {
