@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
@@ -71,36 +72,52 @@ class UsageShareRepository(private val backend: Backend) {
 
     /** A friend's screen time on [dayKey]; null while it isn't shared, or there's none yet. */
     fun minutes(uid: String, dayKey: String): Flow<Int?> =
-        sharedPart("Shared time") { backend.user(uid).collection(TIME).document(dayKey).tracedSnapshots().map { if (it.exists()) it.int("totalMinutes") else null } }
+        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(dayKey).tracedSnapshots() }, { it.metadata.isFromCache }) {
+            if (it.exists()) it.int("totalMinutes") else null
+        }
 
     /** A friend's top apps on [dayKey]; null while they aren't shared, or there are none yet. */
     fun apps(uid: String, dayKey: String): Flow<List<SharedAppUsage>?> =
-        sharedPart("Shared apps") { backend.user(uid).collection(APPS).document(dayKey).tracedSnapshots().map { if (it.exists()) it.toSharedApps() else null } }
+        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(dayKey).tracedSnapshots() }, { it.metadata.isFromCache }) {
+            if (it.exists()) it.toSharedApps() else null
+        }
 
     /** A friend's progress; null while it isn't shared, or there's none yet. */
     fun progress(uid: String): Flow<Progress?> =
-        sharedPart("Shared progress") { backend.user(uid).collection(PROGRESS).document(PROGRESS_DOC).tracedSnapshots().map { if (it.exists()) it.toProgress() else null } }
+        sharedPart("Shared progress", { backend.user(uid).collection(PROGRESS).document(PROGRESS_DOC).tracedSnapshots() }, { it.metadata.isFromCache }) {
+            if (it.exists()) it.toProgress() else null
+        }
 
     /** A friend's limits; null while they aren't shared. */
     fun limits(uid: String): Flow<List<AppLimit>?> =
-        sharedPart("Shared limits") {
-            backend.user(uid).collection("limits").tracedSnapshots()
-                .map { snapshot -> snapshot.documents.map { it.toLimit() }.sortedBy { it.appName.lowercase() } }
+        sharedPart("Shared limits", { backend.user(uid).collection("limits").tracedSnapshots() }, { it.metadata.isFromCache }) { snapshot ->
+            snapshot.documents.map { it.toLimit() }.sortedBy { it.appName.lowercase() }
         }
 
     /**
      * A part of a friend's page. When it can't be read (they stopped sharing it, or you're no
-     * longer their Bumblebee) it reads as not shared, so neither what was on screen nor a copy
-     * cached on this phone stays visible; it's tried again now and then, in case it's shared again.
+     * longer their Bumblebee) it reads as not shared, and it's tried again now and then, in case
+     * it's shared again. Until the server has said it may be read, this phone's cached copy of
+     * what used to be shared is never shown.
      */
-    private fun <T> sharedPart(label: String, listen: () -> Flow<T?>): Flow<T?> =
-        flow { emitAll(listen()) }.retryWhen { cause, _ ->
+    private fun <S, T> sharedPart(label: String, listen: () -> Flow<S>, fromCache: (S) -> Boolean, read: (S) -> T?): Flow<T?> {
+        var unconfirmed = true
+        return flow {
+            emitAll(
+                listen().filter { !(unconfirmed && fromCache(it)) }.map {
+                    unconfirmed = false
+                    read(it)
+                },
+            )
+        }.retryWhen { cause, _ ->
             if (cause !is FirebaseFirestoreException) return@retryWhen false
             Log.w(TAG, "$label unreadable", cause)
+            unconfirmed = true
             emit(null)
             delay(RECHECK_MS)
             true
         }
+    }
 
     companion object {
         /** Today's total, read while "Today's screen time" is shared. */
