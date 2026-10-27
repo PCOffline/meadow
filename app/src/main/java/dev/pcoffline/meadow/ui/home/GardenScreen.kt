@@ -286,7 +286,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
     }
     MeadowCard(modifier, onClick = onClick) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp))
+            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.restingByHours)
             AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
             if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
         }

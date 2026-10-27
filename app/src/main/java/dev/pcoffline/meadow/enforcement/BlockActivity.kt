@@ -272,7 +272,10 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
                 ) {
                     AppIcon(pkg, size = 56.dp)
                     Box {
-                        BloomFlower(if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp))
+                        BloomFlower(
+                            if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp),
+                            asleep = !state.unlocked && state.budget?.restingByHours == true,
+                        )
                         if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
                     }
                     MeadowCard(Modifier.fillMaxWidth()) {

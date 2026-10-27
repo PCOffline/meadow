@@ -35,8 +35,8 @@ friend who has to approve is much harder to argue with.
 ## Features
 
 ### A garden that grows with your time
-Every app you limit is a flower that blooms while there's time left and wilts as it runs out. The
-sky follows your day, from a peach sunrise to a starry night with fireflies. Gentle reminders
+Every app you limit is a flower that blooms while there's time left, wilts as it runs out and
+sleeps outside the hours you allow it. The sky follows your day, from a peach sunrise to a starry night with fireflies. Gentle reminders
 arrive at five minutes and one minute left.
 
 ### Friends who have your back

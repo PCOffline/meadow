@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import dev.pcoffline.meadow.ui.components.FlowerAsleep
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performSemanticsAction
@@ -64,7 +66,32 @@ class MainScreensTest : ScreenTest() {
         compose.onNodeWithText("extra today", substring = true).assertExists()
         compose.onNodeWithText("Instagram").performScrollTo().performClick()
         assertEquals(listOf("demo.instagram"), opened)
+        // Within their hours, no flower sleeps.
+        compose.onAllNodes(SemanticsMatcher.expectValue(FlowerAsleep, true), useUnmergedTree = true).assertCountEquals(0)
         assertAccessible()
+    }
+
+    @Test
+    fun `an app resting outside its hours sleeps, while one used up wilts`() {
+        val night = DemoGarden.budget("demo.news", "News", daily = 40, usedToday = 6)
+            .copy(outsideHours = true, untilScheduleChangeMs = 60 * 60_000L)
+        show { GardenContent(DemoGarden.robin, GardenState(listOf(DemoGarden.tiktok, night), loaded = true, essentialsReady = true)) }
+        compose.onAllNodes(SemanticsMatcher.expectValue(FlowerAsleep, true), useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodes(SemanticsMatcher.expectValue(FlowerAsleep, false), useUnmergedTree = true).assertCountEquals(1)
+        assertAccessible()
+    }
+
+    @Test
+    fun `the rest screen's flower sleeps while the app rests outside its hours`() {
+        val night = DemoGarden.tiktok.copy(usedTodayMs = 0, outsideHours = true, untilScheduleChangeMs = 60 * 60_000L)
+        show { RestContent("demo.tiktok", DemoGarden.rest.copy(budget = night)) }
+        compose.onAllNodes(SemanticsMatcher.expectValue(FlowerAsleep, true), useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun `the rest screen's flower is wilted, not asleep, once the time is used up`() {
+        show { RestContent("demo.tiktok", DemoGarden.rest) }
+        compose.onAllNodes(SemanticsMatcher.expectValue(FlowerAsleep, false), useUnmergedTree = true).assertCountEquals(1)
     }
 
     @Test

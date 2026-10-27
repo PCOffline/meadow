@@ -297,7 +297,10 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                     )
                 }
             }
-            BloomFlower(1f - (state.budget?.usedFraction ?: 0f), Garden.colors.petalPink, Modifier.size(48.dp, 72.dp))
+            BloomFlower(
+                1f - (state.budget?.usedFraction ?: 0f), Garden.colors.petalPink, Modifier.size(48.dp, 72.dp),
+                asleep = state.budget?.restingByHours == true,
+            )
         }
 
         MeadowCard(Modifier.fillMaxWidth()) {

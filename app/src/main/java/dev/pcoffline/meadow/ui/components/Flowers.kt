@@ -30,14 +30,22 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.semantics
 import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.theme.readable
 import kotlin.math.cos
 import kotlin.math.sin
 
+/** Whether a [BloomFlower] is drawn asleep; read by tests, never announced. */
+val FlowerAsleep = SemanticsPropertyKey<Boolean>("FlowerAsleep")
+private var SemanticsPropertyReceiver.flowerAsleep by FlowerAsleep
+
 /**
  * A flower whose bloom mirrors how much time is left: wide open with plenty left,
- * closing and drooping as the limit approaches, wilted once it is used up.
+ * closing and drooping as the limit approaches, wilted once it is used up. [asleep] folds it into
+ * a closed bud nodding off, keeping its colour: resting outside its hours, not used up.
  */
 @Composable
 fun BloomFlower(
@@ -47,10 +55,12 @@ fun BloomFlower(
     petals: Int = 6,
     sway: Boolean = true,
     growIn: Boolean = true,
+    asleep: Boolean = false,
 ) {
     val garden = Garden.colors
     val reduced = rememberReducedMotion()
     val animatedBloom by animateFloatAsState(bloom.coerceIn(0f, 1f), tween(900), label = "bloom")
+    val sleep by animateFloatAsState(if (asleep) 1f else 0f, tween(900), label = "sleep")
     // Sprouts up from the soil the first time it appears.
     val grow = remember { Animatable(if (growIn && !reduced) 0f else 1f) }
     LaunchedEffect(Unit) {
@@ -70,29 +80,35 @@ fun BloomFlower(
     val stem = remember { Path() }
     val leafPath = remember { Path() }
 
-    Canvas(modifier) {
-        val angle = swayAngle?.value ?: 0f
-        val wilt = 1f - animatedBloom
+    Canvas(modifier.semantics { flowerAsleep = asleep }) {
+        // Asleep, it barely sways and never looks wilted.
+        val angle = (swayAngle?.value ?: 0f) * (1f - 0.7f * sleep)
+        val wilt = (1f - animatedBloom) * (1f - sleep)
+        val shown = animatedBloom + (0.12f - animatedBloom) * sleep
         val w = size.width
         val h = size.height
         val base = Offset(w / 2f, h * 0.94f)
-        val head = Offset(w / 2f + wilt * wilt * w * 0.22f, h * 0.34f + wilt * wilt * h * 0.16f)
+        // Nods off to one side, gently, rather than drooping.
+        val head = Offset(
+            w / 2f + wilt * wilt * w * 0.22f + sleep * w * 0.12f,
+            h * 0.34f + wilt * wilt * h * 0.16f + sleep * h * 0.07f,
+        )
 
         // Soil mound.
         drawOval(garden.soil.copy(alpha = 0.55f), topLeft = Offset(w * 0.22f, h * 0.89f), size = Size(w * 0.56f, h * 0.09f))
 
         scale(grow.value, grow.value, pivot = base) {
-        rotate(angle * (0.4f + animatedBloom), pivot = base) {
+        rotate(angle * (0.4f + shown), pivot = base) {
             stem.reset()
             stem.moveTo(base.x, base.y)
             stem.quadraticTo(w / 2f - w * 0.06f, h * 0.62f, head.x, head.y)
             drawPath(stem, lerp(garden.stem, garden.wilted, wilt * 0.7f), style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
             leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
             leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
-            flowerHead(head, w * 0.13f + w * 0.11f * animatedBloom, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), animatedBloom, garden.petalHoney)
+            flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, garden.petalHoney, droops = 1f - sleep)
         }
         }
-        if (animatedBloom < 0.15f) {
+        if (animatedBloom < 0.15f && sleep < 0.5f) {
             // A couple of fallen petals.
             val fallen = lerp(petalColor, garden.wilted, 0.6f)
             drawOval(fallen, topLeft = Offset(w * 0.62f, h * 0.88f), size = Size(w * 0.10f, h * 0.035f))
@@ -112,10 +128,10 @@ private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Col
     }
 }
 
-private fun DrawScope.flowerHead(center: Offset, radius: Float, petals: Int, color: Color, bloom: Float, heart: Color) {
-    // Petals fold inwards and droop as the bloom fades.
+private fun DrawScope.flowerHead(center: Offset, radius: Float, petals: Int, color: Color, bloom: Float, heart: Color, droops: Float = 1f) {
+    // Petals fold inwards and droop as the bloom fades; a sleeping bud folds without drooping.
     val spread = 0.45f + 0.55f * bloom
-    val droop = (1f - bloom) * 50f
+    val droop = (1f - bloom) * 50f * droops
     for (i in 0 until petals) {
         val baseAngle = 360f / petals * i - 90f
         val a = baseAngle * spread + droop * (if (baseAngle > -90f) 1f else -1f) * 0.3f + (1f - spread) * 90f
