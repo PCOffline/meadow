@@ -76,6 +76,14 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `someone with a photo is greeted without a flower next to their name`() {
+        val withPhoto = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = "https://example.invalid/robin.jpg"))
+        show { GardenContent(withPhoto, DemoGarden.garden) }
+        compose.onNodeWithText("Robin", substring = true).assertExists()
+        compose.onNodeWithText("Robin ${DemoGarden.robin.avatar.emoji}", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun `the garden is accessible in every theme, by day and night`() {
         var look by mutableStateOf(GardenTheme.MEADOW to DarkMode.LIGHT)
         compose.setContent {
@@ -94,6 +102,9 @@ class MainScreensTest : ScreenTest() {
         show { GardenContent(DemoGarden.robin, GardenState(loaded = true), onPlantLimit = { planted++ }) }
         node(R.string.garden_empty_title).performClick()
         assertEquals(1, planted)
+        // And the big button, there whether the garden is empty or not.
+        node(R.string.garden_plant).performClick()
+        assertEquals(2, planted)
         assertAccessible()
     }
 

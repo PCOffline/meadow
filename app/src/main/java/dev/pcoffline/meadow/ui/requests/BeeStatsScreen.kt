@@ -29,7 +29,7 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.BeeStats
 import dev.pcoffline.meadow.data.UserProfile
-import dev.pcoffline.meadow.ui.components.FlowerAvatar
+import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -37,14 +37,24 @@ import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
 class BeeStatsViewModel(uid: String) : ViewModel() {
     /** Worked out from this Bumblebee's own copies of the requests; null while loading. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     val stats: StateFlow<BeeStats?> = AppGraph.requests.incoming(uid, limit = 500)
         .map { BeeStats.from(it) }
+        // Each person as they look now: requests keep the flower they were sent with.
+        .flatMapLatest { stats ->
+            AppGraph.social.profiles(stats.people.map { it.uid }).map { profiles ->
+                val now = profiles.associateBy { it.uid }
+                stats.copy(people = stats.people.map { p -> now[p.uid]?.let { p.copy(name = it.displayName, avatar = it.avatar) } ?: p })
+            }
+        }
         .stateWhileVisible(this, null)
 }
 
@@ -103,7 +113,7 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
                 stats.people.forEach { person ->
                     MeadowCard(Modifier.fillMaxWidth()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            FlowerAvatar(person.flower, size = 36.dp)
+                            PersonAvatar(person.avatar, size = 36.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(person.name, style = MaterialTheme.typography.titleSmall)

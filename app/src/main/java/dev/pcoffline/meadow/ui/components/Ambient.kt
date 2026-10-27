@@ -161,10 +161,11 @@ fun rememberSkyMood(): SkyMood {
 
 /**
  * The living backdrop for headers: sky gradient, sun or moon, drifting clouds, rolling hills with
- * tiny flowers, the theme's two butterflies by day and fireflies and stars by night.
+ * tiny flowers, the theme's two butterflies by day and fireflies and stars by night. The sun or
+ * moon sits at [celestial] (fractions of the width and height), clear of whatever is on top.
  */
 @Composable
-fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
+fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = Offset(0.82f, 0.24f)) {
     val garden = Garden.colors
     val theme = Garden.theme
     val butterflies = remember(theme) { butterfliesFor(theme) }
@@ -181,9 +182,9 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
                     val twinkle = 0.35f + 0.65f * abs(sin(t * 0.9f + i * 1.7f))
                     drawCircle(Color.White.copy(alpha = twinkle * 0.85f), radius = if (i % 5 == 0) 2.4f else 1.5f, center = Offset(p.x * size.width, p.y * size.height))
                 }
-                moon(Offset(size.width * 0.82f, size.height * 0.24f), 22.dp.toPx(), mood.top)
+                moon(Offset(size.width * celestial.x, size.height * celestial.y), 22.dp.toPx(), mood.top)
             } else {
-                sun(Offset(size.width * 0.84f, size.height * 0.22f), 20.dp.toPx(), t, garden.petalHoney)
+                sun(Offset(size.width * (celestial.x + 0.02f), size.height * (celestial.y - 0.02f)), 20.dp.toPx(), t, garden.petalHoney)
             }
             val cloudAlpha = if (mood.night) 0.10f else 0.85f
             cloud(Offset(((t * 9f) % (size.width + 240f)) - 120f, size.height * 0.18f), 1f, cloudAlpha)

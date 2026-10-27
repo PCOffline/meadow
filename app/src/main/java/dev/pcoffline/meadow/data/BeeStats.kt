@@ -25,6 +25,8 @@ data class BeeStats(
         val asked: Int,
         val yes: Int,
         val no: Int,
+        /** Their picture as it is now, where it can be read; otherwise the flower their requests carry. */
+        val avatar: Avatar = Avatar.Default.copy(emoji = flower),
     ) {
         val approvalRate: Float? get() = rate(yes, no)
     }

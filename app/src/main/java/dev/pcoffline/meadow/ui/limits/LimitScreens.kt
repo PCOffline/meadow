@@ -275,6 +275,9 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
     val planted = stringResource(R.string.limit_editor_planted)
     val updated = stringResource(R.string.limit_editor_updated)
     val requested = stringResource(R.string.limit_editor_requested)
+    val shareLabel = stringResource(R.string.share_title)
+    val context = LocalContext.current
+    val res = LocalResources.current
     val removed = stringResource(R.string.limit_editor_removed)
 
     Column(
@@ -347,14 +350,14 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             onClick = {
                 action.run(onSuccess = onDone) {
                     val outcome = AppGraph.limits.save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
-                    if (outcome == ChangeOutcome.APPLIED) celebrate()
-                    action.toast(
-                        when {
-                            outcome == ChangeOutcome.REQUESTED -> requested
-                            existing == null -> planted
-                            else -> updated
-                        },
-                    )
+                    if (outcome == ChangeOutcome.APPLIED) {
+                        celebrate()
+                        // A commitment just made is the one most worth telling someone about.
+                        val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed.dailyMinutes, proposed.weeklyMinutes, proposed.schedule))
+                        action.toast(if (existing == null) planted else updated, shareLabel) { context.shareText(shared) }
+                    } else {
+                        action.toast(requested)
+                    }
                 }
             },
             enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && waiting != null) && (online || !needsConnection),
@@ -378,8 +381,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
-            val context = LocalContext.current
-            val res = LocalResources.current
             // Straight to Android's share sheet: picking where it goes is the only choice to make.
             TextButton(
                 onClick = {

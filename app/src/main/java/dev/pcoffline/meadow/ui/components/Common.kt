@@ -26,6 +26,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -172,14 +174,17 @@ fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp
     val circle = AvatarColor.fromKey(avatar.color).let { if (LocalDarkTheme.current) it.dark else it.light }
     // With a description, the avatar reads as that one label (photo or emoji); without, as its emoji.
     val semantics = if (contentDescription != null) Modifier.clearAndSetSemantics { this.contentDescription = contentDescription } else Modifier
+    val photo = remember(avatar.photoUrl) { Photos.safe(avatar.photoUrl) }
+    // A photo replaces the flower: it isn't drawn underneath, only shown if the photo can't load.
+    var photoFailed by remember(photo) { mutableStateOf(false) }
     Box(modifier.size(size).clip(CircleShape).background(circle).then(semantics), contentAlignment = Alignment.Center) {
-        Text(avatar.emoji, fontSize = (size.value * 0.5f).sp)
-        val photo = remember(avatar.photoUrl) { Photos.safe(avatar.photoUrl) }
-        if (photo != null) {
+        if (photo == null || photoFailed) Text(avatar.emoji, fontSize = (size.value * 0.5f).sp)
+        if (photo != null && !photoFailed) {
             AsyncImage(
                 model = photo,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onError = { photoFailed = true },
                 modifier = Modifier.fillMaxSize(),
             )
         }

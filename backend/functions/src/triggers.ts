@@ -5,7 +5,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
 import { chatMedia, pushes } from "./copy";
-import { accountOf, accountRef, chats, db, heartbeats, isEmulator, loadPerson, notify, profileOf, users } from "./db";
+import { accountOf, accountRef, chats, db, heartbeats, invites, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
 import { finishDueRemovals } from "./social";
 
@@ -21,9 +21,9 @@ export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{message
   if (!chat.exists || chat.get("closed") === true) return;
   const participants = (chat.get("participants") as string[] | undefined) ?? [];
   const names = (chat.get("names") as Record<string, string> | undefined) ?? {};
-  const avatars = (chat.get("avatars") as Record<string, { flower?: string }> | undefined) ?? {};
+  const avatars = (chat.get("avatars") as Record<string, { flower?: string; photo?: string | null }> | undefined) ?? {};
   const sender = String(message.senderId);
-  const person = { displayName: names[sender] ?? "Friend", flower: avatars[sender]?.flower ?? "🌼" };
+  const person = { displayName: names[sender] ?? "Friend", flower: avatars[sender]?.flower ?? "🌼", photoUrl: avatars[sender]?.photo ?? null };
   await notify(participants.filter((p) => p !== sender), {
     type: "chat",
     chatId: event.params.chatId,
@@ -53,8 +53,8 @@ export const onProtectionAlert = onDocumentCreated("users/{uid}/alerts/{alertId}
 });
 
 /**
- * Keeps names and avatars in open chats up to date when someone edits their profile. A closed
- * chat (the two parted ways) never gets them again.
+ * Keeps names and avatars in open chats, and in invites still waiting, up to date when someone
+ * edits their profile. A closed chat (the two parted ways) never gets them again.
  */
 export const onProfileUpdated = onDocumentUpdated("users/{uid}", async (event) => {
   const before = event.data?.before;
@@ -75,6 +75,16 @@ export const onProfileUpdated = onDocumentUpdated("users/{uid}", async (event) =
       [`avatars.${uid}`]: { flower: profile.flower, color: profile.avatarColor, photo: profile.photoUrl },
     });
   }).catch((e) => logger.warn("Chat profile update failed", { chat: chat.id, error: String(e) }))));
+  // Invites still waiting for an answer show the names and flower they were sent with.
+  const [sent, got] = await Promise.all([
+    invites().where("fromUid", "==", uid).where("status", "==", "pending").get(),
+    invites().where("toUid", "==", uid).where("status", "==", "pending").get(),
+  ]);
+  if (sent.empty && got.empty) return;
+  const batch = db().batch();
+  for (const invite of sent.docs) batch.update(invite.ref, { fromName: profile.displayName, fromFlower: profile.flower });
+  for (const invite of got.docs) batch.update(invite.ref, { toName: profile.displayName });
+  await batch.commit().catch((e) => logger.warn("Invite profile update failed", { error: String(e) }));
 });
 
 /**

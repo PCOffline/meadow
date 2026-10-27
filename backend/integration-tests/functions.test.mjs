@@ -233,6 +233,21 @@ describe("profiles", () => {
       assert.equal(chat.avatars[sam.uid].color, "honey");
     });
   });
+
+  test("profile edits reach invites still waiting for an answer", async () => {
+    const sam = await person("Sam");
+    const ana = await person("Ana");
+    await sam.call("sendInvite", { friendCode: await friendCodeOf(ana) });
+    const [{ inviteId }] = await outbox(ana.uid, "invite");
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}`), { displayName: "Sammy", flower: "🦔" }));
+    await admin((db) => updateDoc(doc(db, `users/${ana.uid}`), { displayName: "Anna" }));
+    await eventually(async () => {
+      const invite = await read(`invites/${inviteId}`);
+      assert.equal(invite.fromName, "Sammy");
+      assert.equal(invite.fromFlower, "🦔");
+      assert.equal(invite.toName, "Anna");
+    });
+  });
 });
 
 describe("invite links", () => {
