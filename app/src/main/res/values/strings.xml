@@ -63,6 +63,7 @@
     <string name="error_auth_recent_login">For your safety, please sign in again first.</string>
     <string name="error_sign_in_first">Please sign in first.</string>
     <string name="error_auth_other_method">That email already has a garden with another way to sign in. Sign in that way first.</string>
+    <string name="error_auth_not_enabled">This way of signing in isn\'t turned on for Meadow yet.</string>
     <string name="error_link_invalid">That sign-in link has expired or was already used. Ask for a new one.</string>
     <string name="error_name_required">Please choose a name.</string>
     <string name="error_email_required">Enter your email first.</string>

@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.data
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException.Code
 import dev.pcoffline.meadow.R
@@ -52,6 +53,13 @@ class BackendErrorsTest {
         assertEquals(context.getString(R.string.error_offline), shown("", Code.UNAVAILABLE, unreachable = true))
         assertEquals(context.getString(R.string.error_offline), shown("", null, unreachable = true))
         assertEquals("That request is gone.", shown("That request is gone.", Code.NOT_FOUND))
+    }
+
+    @Test
+    fun `a sign-in method the project hasn't switched on says so`() {
+        for (code in listOf("ERROR_OPERATION_NOT_ALLOWED", "ERROR_UNAUTHORIZED_DOMAIN", "ERROR_INVALID_CONTINUE_URI")) {
+            assertEquals(context.getString(R.string.error_auth_not_enabled), FirebaseAuthException(code, "raw").friendlyMessage(context))
+        }
     }
 
     @Test

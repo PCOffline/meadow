@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import dev.pcoffline.meadow.data.InviteLinks
+import dev.pcoffline.meadow.data.SignInLinks
 import dev.pcoffline.meadow.ui.MeadowRoot
 import dev.pcoffline.meadow.ui.theme.MeadowAppTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,8 +38,10 @@ class MainActivity : ComponentActivity() {
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRoute.value = it }
         val data = intent.data ?: return
-        // Passwordless sign-in links finish in a dialog over whatever screen is showing.
-        if (AppGraph.backendReady && AppGraph.auth.receiveLink(data.toString())) return
+        // Passwordless sign-in links finish in a dialog over whatever screen is showing, whether
+        // they came straight here or by way of the browser's page.
+        val link = SignInLinks.fromApp(data.toString()) ?: data.toString()
+        if (AppGraph.backendReady && AppGraph.auth.receiveLink(link)) return
         // Invite links: kept in storage so they survive onboarding for people new to Meadow.
         InviteLinks.tokenFrom(data)?.let { AppGraph.store.setPendingInvite(it) }
     }

@@ -238,8 +238,9 @@ is per signing key.
 4. Publish them: `cd backend && firebase deploy --only hosting`. This writes
    `/.well-known/assetlinks.json` on both addresses.
 
-Without this step, invite links still work through the web page's *Open in Meadow* button, but
-sign-in links open in the browser, which then asks to open them on the phone.
+Without this step, or for a build signed with a key that isn't listed (say, a release from
+GitHub when only the debug key is), links open in the browser instead. Both pages there have an
+*Open in Meadow* button that hands the link to the app, so they still work, with one more tap.
 
 ## 6. Build the app on your computer
 
