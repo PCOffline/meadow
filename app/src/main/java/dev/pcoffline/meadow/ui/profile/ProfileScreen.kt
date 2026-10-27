@@ -151,12 +151,6 @@ fun ProfileScreen(profile: UserProfile, onBack: () -> Unit) {
                         }
                     }
                 }
-                Text(
-                    stringResource(R.string.profile_photo_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
                 ErrorNote(photo.error, Modifier.padding(top = 8.dp))
             }
 

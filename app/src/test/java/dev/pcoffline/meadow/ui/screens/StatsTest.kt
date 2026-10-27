@@ -1,16 +1,33 @@
 package dev.pcoffline.meadow.ui.screens
 
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.performSemanticsAction
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Days
+import dev.pcoffline.meadow.data.Progress
 import dev.pcoffline.meadow.showcase.DemoGarden
+import dev.pcoffline.meadow.ui.stats.Period
+import dev.pcoffline.meadow.ui.stats.PeriodStats
+import dev.pcoffline.meadow.ui.stats.Selection
 import dev.pcoffline.meadow.ui.stats.StatsContent
+import dev.pcoffline.meadow.ui.stats.StatsUiState
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.colorSchemeFor
 import dev.pcoffline.meadow.ui.theme.gardenColorsFor
@@ -19,6 +36,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 import kotlin.math.abs
 
 /** Growth's numbers: honest about days it has no record of, and coloured by whether they're good news. */
@@ -62,5 +80,84 @@ class StatsTest : ScreenTest() {
         compose.onNodeWithText("1h").assertExists()
         assertTrue(compose.onAllNodes(hasText("than", substring = true)).fetchSemanticsNodes().isEmpty())
         assertEquals(60 * min, s.copy(days = days).dailyAverageMs(s.to))
+    }
+
+    @Test
+    fun `the current period shows progress over the weeks, past ones don't`() {
+        val now = week.selection.copy(offset = 0)
+        var state by mutableStateOf(week.copy(selection = now, stats = week.stats!!.copy(selection = now), progress = DemoGarden.progress))
+        show { StatsContent(state) }
+        node(R.string.progress_title).assertExists()
+        compose.onNodeWithText(app.resources.getQuantityString(R.plurals.progress_calmer_weeks, 3, 3)).assertExists()
+        node(R.string.progress_kept, 5, 7).assertExists()
+        // The summary already compares the week with the last; the card doesn't say it again.
+        assertEquals(1, compose.onAllNodesWithText("less than", substring = true).fetchSemanticsNodes().size)
+        assertAccessible()
+
+        state = week.copy(progress = DemoGarden.progress)
+        compose.waitForIdle()
+        node(R.string.progress_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `progress with nothing to show yet stays out of the way`() {
+        val now = week.selection.copy(offset = 0)
+        show { StatsContent(week.copy(selection = now, stats = week.stats!!.copy(selection = now), progress = Progress(null, 0, 0, 0))) }
+        node(R.string.progress_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a day of the month opens on its own, by tap or by a screen reader, but days still to come don't`() {
+        val today = Days.today()
+        val from = today.withDayOfMonth(1)
+        val to = from.plusMonths(1).minusDays(1)
+        val days = generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }
+            .map { it to if (it.isAfter(today)) 0L else 30 * min }.toList()
+        val month = Selection(Period.MONTH, 0)
+        val stats = PeriodStats(month, from, to, days, apps = emptyList(), totalMs = today.dayOfMonth * 30 * min, previousTotalMs = null)
+        val opened = mutableListOf<LocalDate>()
+        show { StatsContent(StatsUiState(month, stats), onOpenDay = { opened += it }) }
+
+        val openDay = text(R.string.stats_open_day)
+        val pickable = compose.onAllNodes(SemanticsMatcher("opens a day") { it.config.getOrNull(SemanticsActions.OnClick)?.label == openDay })
+        assertEquals(today.dayOfMonth, pickable.fetchSemanticsNodes().size)
+        pickable[0].performTouchInput { click() }
+        val last = pickable[today.dayOfMonth - 1]
+        assertTrue(last.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single().endsWith(", 30m"))
+        // As a screen reader's double tap does it.
+        last.performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(listOf(from, today), opened)
+        assertAccessible()
+    }
+
+    @Test
+    fun `after moving to another month, a tap opens a day of that month`() {
+        val today = Days.today()
+        fun month(back: Long): StatsUiState {
+            val from = today.withDayOfMonth(1).minusMonths(back)
+            val to = from.plusMonths(1).minusDays(1)
+            val days = generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }.map { it to 30 * min }.toList()
+            val selection = Selection(Period.MONTH, -back.toInt())
+            return StatsUiState(selection, PeriodStats(selection, from, to, days, apps = emptyList(), totalMs = days.size * 30 * min, previousTotalMs = null))
+        }
+        var state by mutableStateOf(month(2))
+        val opened = mutableListOf<LocalDate>()
+        show { StatsContent(state, onOpenDay = { opened += it }) }
+        val openDay = text(R.string.stats_open_day)
+        val firstDay = { compose.onAllNodes(SemanticsMatcher("opens a day") { it.config.getOrNull(SemanticsActions.OnClick)?.label == openDay })[0] }
+
+        firstDay().performTouchInput { click() }
+        state = month(1)
+        compose.waitForIdle()
+        firstDay().performTouchInput { click() }
+        assertEquals(listOf(today.withDayOfMonth(1).minusMonths(2), today.withDayOfMonth(1).minusMonths(1)), opened)
+    }
+
+    @Test
+    fun `a day picked from the month is shown as that day, never one still to come`() {
+        val today = Days.today()
+        assertEquals(Selection(Period.DAY, -3), Selection.ofDay(today.minusDays(3), today))
+        assertEquals(Selection(Period.DAY, 0), Selection.ofDay(today, today))
+        assertEquals(Selection(Period.DAY, 0), Selection.ofDay(today.plusDays(2), today))
     }
 }

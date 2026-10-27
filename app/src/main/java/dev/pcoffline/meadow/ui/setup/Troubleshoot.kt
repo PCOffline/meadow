@@ -75,11 +75,6 @@ fun TroubleshootContent(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.trouble_intro),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             if (!state.essentialsReady) {
                 MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.errorContainer) {
                     Text(stringResource(R.string.trouble_essentials), style = MaterialTheme.typography.bodyMedium)

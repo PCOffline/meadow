@@ -44,6 +44,17 @@ class ModelsTest {
     }
 
     @Test
+    fun `a sign-in link handed back from the browser is unwrapped, and nothing else is taken for one`() {
+        val link = "https://x.web.app/signed-in?apiKey=k&oobCode=c0de&mode=signIn&lang=en"
+        val wrapped = "meadow://signin?link=" + java.net.URLEncoder.encode(link, "UTF-8")
+        assertEquals(link, SignInLinks.fromApp(wrapped))
+        assertNull(SignInLinks.fromApp("meadow://invite/AbCdEfGh12345678"))
+        assertNull(SignInLinks.fromApp("meadow://signin"))
+        assertNull(SignInLinks.fromApp("meadow://signin?link=javascript%3Aalert(1)"))
+        assertNull(SignInLinks.fromApp(link))
+    }
+
+    @Test
     fun `chats with the same two people share an id`() {
         assertEquals(ChatRepository.chatIdFor("a", "b"), ChatRepository.chatIdFor("b", "a"))
     }

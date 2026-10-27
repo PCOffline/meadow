@@ -17,11 +17,10 @@
     <!-- App picker -->
     <string name="picker_title">Choose an app</string>
     <string name="picker_search">Search apps</string>
+    <string name="picker_no_match">No apps match “%1$s”</string>
     <string name="picker_used_today">%1$s today</string>
     <string name="picker_not_opened">Not opened today</string>
     <string name="picker_planted">Planted</string>
-    <string name="picker_no_match_title">No apps found</string>
-    <string name="picker_no_match_body">No app\'s name has \"%1$s\" in it. Phone and emergency apps can\'t be limited, so they aren\'t listed.</string>
 
     <!-- Limit editor -->
     <string name="limit_editor_new">Plant a limit</string>
@@ -29,17 +28,14 @@
     <string name="limit_editor_usage">%1$s today · %2$s this week</string>
     <string name="limit_editor_daily">Daily limit</string>
     <string name="limit_editor_weekly">Weekly limit</string>
-    <string name="limit_editor_weekly_hint">Weeks start on Monday. Whichever limit runs out first wins.</string>
-    <string name="limit_editor_weekly_below_daily">This week\'s limit is less than a single day\'s, so the daily limit will never be the one that counts.</string>
-    <string name="limit_editor_pick_one">Turn on at least one of these to plant a limit.</string>
     <string name="limit_editor_pending_title">Waiting for your Bumblebees 💌</string>
-    <string name="limit_editor_pending_body">%1$s is still waiting for an answer. You can ask about this app again once they reply, or withdraw the question now.</string>
+    <string name="limit_editor_pending_body">%1$s is still waiting for an answer.</string>
     <string name="limit_editor_less">Less time</string>
     <string name="limit_editor_more">More time</string>
     <string name="limit_editor_loosens_title">This loosens your limit 💌</string>
-    <string name="limit_editor_loosens_body">Your Bumblebees will be asked first. The new limit starts once one of them says yes.</string>
+    <string name="limit_editor_locked_hint">Loosening it later needs a Bumblebee\'s yes.</string>
+    <string name="limit_editor_pick_one">Turn on at least one.</string>
     <string name="limit_editor_note">A note for them (optional)</string>
-    <string name="limit_editor_locked_hint">Once planted, loosening or removing this limit needs a yes from a Bumblebee.</string>
     <string name="limit_editor_plant">Plant this limit</string>
     <string name="limit_editor_ask">Ask my Bumblebees</string>
     <string name="limit_editor_remove">Remove this limit</string>
@@ -55,20 +51,21 @@
 
     <string name="limit_and_hours">%1$s, %2$s</string>
     <string name="limit_editor_hours">Allowed hours</string>
-    <string name="limit_editor_hours_hint">Outside these hours the app rests, even with time left.</string>
     <string name="limit_editor_share">Share this commitment</string>
     <string name="schedule_every_day">Every day</string>
     <string name="schedule_per_day">Per weekday</string>
     <string name="schedule_window">%1$s–%2$s</string>
     <string name="schedule_all_day">all day</string>
-    <string name="schedule_closed">Resting all day</string>
+    <string name="schedule_day_off">Not allowed</string>
+    <string name="schedule_day_allowed">Allowed on %1$s</string>
+    <string name="schedule_starts">Starts at %1$s</string>
+    <string name="schedule_ends">Ends at %1$s</string>
     <string name="schedule_never">never</string>
     <string name="schedule_only">only %1$s</string>
     <string name="schedule_by_day">set hours each day</string>
     <string name="schedule_preset_until">Until %1$s</string>
     <string name="schedule_preset_from">From %1$s</string>
     <string name="schedule_add_window">Add hours</string>
-    <string name="schedule_close_day">Rest all day</string>
     <string name="schedule_remove_window">Remove these hours</string>
-    <string name="schedule_bad_window">The end has to be after the start. For hours past midnight, add a second window that starts at midnight.</string>
+    <string name="schedule_bad_window">The end has to be after the start.</string>
 </resources>

@@ -26,7 +26,8 @@ before(async () => {
     const db = ctx.firestore();
     const card = (name) => ({ displayName: name, flower: "🌼", avatarColor: "leaf", photoUrl: null, bio: "" });
     const account = (approverIds, approveeIds) => ({
-      approverIds, approveeIds, pushIds: ["phone"], friendCode: "ABC234", strictMode: true, privacy: { shareUsage: true },
+      approverIds, approveeIds, pushIds: ["phone"], friendCode: "ABC234", strictMode: true,
+      privacy: { shareLimits: true, shareTime: true, shareApps: true, shareProgress: true },
     });
     const circles = { sam: [["bee"], ["ward"]], bee: [[], ["sam"]], ward: [["sam"], []], stranger: [[], []], anon: [[], []] };
     for (const [uid, [approvers, approvees]] of Object.entries(circles)) {
@@ -36,7 +37,9 @@ before(async () => {
     await setDoc(doc(db, "users/sam/inbox/r9"), { requesterId: "ward", status: "pending" });
     await setDoc(doc(db, "users/sam/limits/com.insta"), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
     await setDoc(doc(db, "users/sam/grants/g1"), { packageName: "com.insta", minutes: 15, byUid: "bee" });
-    await setDoc(doc(db, "users/sam/usage/2026-10-12"), { totalMinutes: 42, apps: [] });
+    await setDoc(doc(db, "users/sam/usage/today"), { dayKey: "2026-10-12", totalMinutes: 42 });
+    await setDoc(doc(db, "users/sam/appUsage/today"), { dayKey: "2026-10-12", apps: [] });
+    await setDoc(doc(db, "users/sam/progress/current"), { weekChange: -10, calmerWeeks: 1, keptDays: 5, limitDays: 7 });
     await setDoc(doc(db, "users/sam/emergencies/e1"), { minutes: 30, reason: "Maps" });
     await setDoc(doc(db, "users/sam/alerts/a1"), { kind: "protection_off", createdAt: Timestamp.now() });
     await setDoc(doc(db, "heartbeats/sam"), { at: Timestamp.now(), staleNotified: false });
@@ -90,7 +93,9 @@ describe("reading", () => {
     ["sam's Bumblebee inbox", "users/sam/inbox/r9", ["sam"]],
     ["sam's limits", "users/sam/limits/com.insta", ["sam", "bee"]],
     ["sam's extra-time grants", "users/sam/grants/g1", ["sam"]],
-    ["sam's shared screen time", "users/sam/usage/2026-10-12", ["sam", "bee"]],
+    ["sam's shared screen time", "users/sam/usage/today", ["sam", "bee"]],
+    ["sam's shared top apps", "users/sam/appUsage/today", ["sam", "bee"]],
+    ["sam's shared progress", "users/sam/progress/current", ["sam", "bee"]],
     ["sam's emergency unlocks", "users/sam/emergencies/e1", ["sam", "bee"]],
     ["sam's protection alerts", "users/sam/alerts/a1", []],
     ["sam's heartbeat", "heartbeats/sam", []],
@@ -118,7 +123,9 @@ describe("writing someone else's data", () => {
     ["inbox", "users/sam/inbox/r9", { status: "approved" }, []],
     ["limit", "users/sam/limits/com.insta", { dailyMinutes: 20 }, ["sam"]],
     ["grant", "users/sam/grants/g1", { minutes: 600 }, []],
-    ["usage", "users/sam/usage/2026-10-12", { totalMinutes: 1 }, ["sam"]],
+    ["usage", "users/sam/usage/today", { totalMinutes: 1 }, ["sam"]],
+    ["top apps", "users/sam/appUsage/today", { apps: [] }, ["sam"]],
+    ["progress", "users/sam/progress/current", { keptDays: 6 }, ["sam"]],
     ["emergency", "users/sam/emergencies/e1", { minutes: 60 }, []],
     ["heartbeat", "heartbeats/sam", { staleNotified: true }, []],
     ["request", "requests/r1", { status: "approved" }, []],
@@ -128,12 +135,19 @@ describe("writing someone else's data", () => {
     test(`updating ${label}`, () => expectOnly(`update ${label}`, writers, (db) => updateDoc(doc(db, path), change)));
   }
   test("overwriting", async () => {
-    // A full overwrite must pass the same checks. Only sam's usage (free-form) and a stricter
-    // limit can be written this way, and only by sam.
-    const stricter = { packageName: "com.insta", appName: "Instagram", dailyMinutes: 10, weeklyMinutes: 0 };
+    // A full overwrite must pass the same checks. Only sam's shared parts and a stricter limit
+    // can be written this way, and only by sam, each holding only what it's for.
+    const valid = {
+      limit: { packageName: "com.insta", appName: "Instagram", dailyMinutes: 10, weeklyMinutes: 0 },
+      usage: { dayKey: "2026-10-12", totalMinutes: 5 },
+      "top apps": { dayKey: "2026-10-12", apps: [] },
+      progress: { weekChange: null, calmerWeeks: 0, keptDays: 0, limitDays: 0 },
+    };
     for (const [label, path] of samsDocs) {
-      const writers = label === "usage" || label === "limit" ? ["sam"] : [];
-      await expectOnly(`overwrite ${label}`, writers, (db) => setDoc(doc(db, path), label === "limit" ? stricter : { overwritten: true }));
+      const writers = label in valid ? ["sam"] : [];
+      await expectOnly(`overwrite ${label}`, writers, (db) => setDoc(doc(db, path), valid[label] ?? { overwritten: true }));
+      // Anything else in it is refused, even from sam.
+      await expectOnly(`overwrite ${label} with more`, [], (db) => setDoc(doc(db, path), { ...(valid[label] ?? {}), overwritten: true }));
     }
   });
   test("deleting", async () => {
@@ -147,7 +161,10 @@ describe("writing someone else's data", () => {
   });
   test("nobody creates documents in another person's space", async () => {
     const wrong = [];
-    const paths = ["users/sam/limits/com.new", "users/sam/usage/2026-10-13", "users/sam/alerts/a2", "users/sam/inbox/r2", "users/sam/grants/g2"];
+    const paths = [
+      "users/sam/limits/com.new", "users/sam/usage/today", "users/sam/appUsage/today", "users/sam/progress/current2",
+      "users/sam/alerts/a2", "users/sam/inbox/r2", "users/sam/grants/g2",
+    ];
     for (const path of paths) {
       for (const who of PEOPLE.filter((p) => p !== "sam")) {
         const data = path.includes("limits")
@@ -165,7 +182,7 @@ describe("searching", () => {
     expectOnly("list users", [], (db) => getDocs(collection(db, "users"))));
 
   test("nobody can search every inbox, request, chat or heartbeat", async () => {
-    for (const group of ["inbox", "private", "limits", "usage", "grants", "messages"]) {
+    for (const group of ["inbox", "private", "limits", "usage", "appUsage", "progress", "grants", "messages"]) {
       await expectOnly(`collection group ${group}`, [], (db) => getDocs(collectionGroup(db, group)));
     }
     for (const top of ["requests", "chats", "heartbeats", "invites", "friendCodes", "inviteLinks"]) {
@@ -181,6 +198,8 @@ describe("searching", () => {
   test("lists inside a garden follow the same rules as reading one document", async () => {
     await expectOnly("sam's limits", ["sam", "bee"], (db) => getDocs(collection(db, "users/sam/limits")));
     await expectOnly("sam's usage", ["sam", "bee"], (db) => getDocs(collection(db, "users/sam/usage")));
+    await expectOnly("sam's top apps", ["sam", "bee"], (db) => getDocs(collection(db, "users/sam/appUsage")));
+    await expectOnly("sam's progress", ["sam", "bee"], (db) => getDocs(collection(db, "users/sam/progress")));
     await expectOnly("sam's inbox", ["sam"], (db) => getDocs(collection(db, "users/sam/inbox")));
     await expectOnly("sam's grants", ["sam"], (db) => getDocs(collection(db, "users/sam/grants")));
     await expectOnly("chats with sam", ["sam"], (db) => getDocs(query(collection(db, "chats"), where("participants", "array-contains", "sam"))));

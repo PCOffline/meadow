@@ -184,7 +184,7 @@ class ShowcaseTest {
     fun circle() {
         show {
             WithTabs(Tab.CIRCLE) {
-                CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList(), anonymous = false)
+                CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList())
             }
         }
         capture("circle")

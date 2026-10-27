@@ -10,6 +10,7 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
+import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.DayUsage
 import dev.pcoffline.meadow.data.EmergencyRepository
@@ -27,6 +28,7 @@ import dev.pcoffline.meadow.enforcement.ProtectionMonitor
 import dev.pcoffline.meadow.notifications.Notifier
 import dev.pcoffline.meadow.update.Updater
 import dev.pcoffline.meadow.usage.AppCatalog
+import dev.pcoffline.meadow.usage.ProgressMeter
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -69,15 +71,17 @@ object AppGraph {
     val tracker by lazy { UsageTracker(app) }
     val catalog by lazy { AppCatalog(app) }
     val history by lazy { UsageHistory(app, tracker, catalog) }
+    val progress by lazy { ProgressMeter(history, store) }
     val engine by lazy { LimitEngine(store, tracker, history, catalog) }
     val emergency by lazy { EmergencyRepository(app, backend, store) }
-    val profiles by lazy { ProfileRepository(app, backend, store) { sync } }
+    val profiles by lazy { ProfileRepository(app, backend, store, share) { sync } }
     val notifier by lazy { Notifier(app, store) }
     val updater by lazy { Updater(app) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }
 
     fun init(application: Application) {
         app = application
+        Connectivity.watch(application)
         val emulatorHost = BuildConfig.EMULATOR_HOST
         if (emulatorHost.isNotEmpty()) useEmulators(application, emulatorHost)
         backendReady = (BuildConfig.HAS_FIREBASE_CONFIG || emulatorHost.isNotEmpty()) && FirebaseApp.getApps(application).isNotEmpty()

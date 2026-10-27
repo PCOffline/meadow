@@ -12,7 +12,6 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.SharedAppUsage
 import dev.pcoffline.meadow.data.SharedUsage
-import dev.pcoffline.meadow.data.Sharing
 import dev.pcoffline.meadow.data.runCatchingCancellable
 import dev.pcoffline.meadow.enforcement.GuardianService
 import java.util.concurrent.TimeUnit
@@ -29,7 +28,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         return runCatchingCancellable {
             AppGraph.emergency.flushPending()
             val privacy = AppGraph.store.privacy.value
-            Sharing.usage(privacy, ::todaySummary)?.let { AppGraph.share.upload(it) }
+            AppGraph.share.share(privacy, ::todaySummary) { AppGraph.progress.now() }
             val now = System.currentTimeMillis()
             if (now - AppGraph.store.lastHeartbeatMillis >= HEARTBEAT_EVERY_MS) {
                 AppGraph.share.heartbeat()
@@ -45,7 +44,6 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
         fun todaySummary(): SharedUsage {
             val usage = AppGraph.engine.todayUsage(forceRefresh = true)
-            val limits = AppGraph.store.limits.value.associateBy { it.packageName }
             val apps = AppGraph.catalog.userFacing(usage)
                 .entries
                 .sortedByDescending { it.value }
@@ -55,7 +53,6 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                         packageName = pkg,
                         appName = AppGraph.catalog.label(pkg),
                         minutes = (ms / 60_000L).toInt(),
-                        limitMinutes = limits[pkg]?.dailyMinutes ?: 0,
                     )
                 }
             val total = AppGraph.catalog.userFacing(usage).values.sum()

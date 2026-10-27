@@ -10,7 +10,6 @@
     <string name="profile_photo_choose">Use a photo</string>
     <string name="profile_photo_uploading">Uploading…</string>
     <string name="profile_photo_remove">Remove photo</string>
-    <string name="profile_photo_hint">Your photo is cropped to a small square and only shown to people in your circle.</string>
     <string name="profile_photo_description">Your profile picture</string>
     <string name="profile_photo_saved">New photo set 📸</string>
     <string name="profile_saved">Profile saved 🌼</string>
@@ -21,7 +20,7 @@
     <string name="theme_sunflower">Sunflower</string>
     <string name="theme_pond">Lily pond</string>
     <string name="theme_mushroom">Mushroom forest</string>
-    <string name="dark_mode_system">Follow phone</string>
+    <string name="dark_mode_system">Auto</string>
     <string name="dark_mode_light">Day</string>
     <string name="dark_mode_dark">Night</string>
     <string name="avatar_color_leaf">Leaf green</string>

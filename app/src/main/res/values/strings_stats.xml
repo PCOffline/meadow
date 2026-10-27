@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="stats_title">Growth</string>
-    <string name="stats_subtitle">How your time has been spent</string>
     <string name="stats_day">Day</string>
     <string name="stats_week">Week</string>
     <string name="stats_month">Month</string>
@@ -21,19 +20,24 @@
     <string name="stats_so_far_month">this point last month</string>
     <string name="stats_less_than">🌱 %1$d%% less than %2$s</string>
     <string name="stats_more_than">🍂 %1$d%% more than %2$s</string>
-    <string name="stats_average_tag">Daily avg</string>
+    <string name="stats_average_tag">avg</string>
+    <string name="stats_open_day">Show this day</string>
+    <string name="stats_day_no_record">no record</string>
     <plurals name="stats_missing_days">
-        <item quantity="one">No record for %1$d day. Your phone keeps detailed screen time for about a week, so earlier days Meadow didn\'t see can\'t be shown.</item>
-        <item quantity="other">No record for %1$d days. Your phone keeps detailed screen time for about a week, so earlier days Meadow didn\'t see can\'t be shown.</item>
+        <item quantity="one">No record for %1$d day</item>
+        <item quantity="other">No record for %1$d days</item>
     </plurals>
+    <string name="progress_title">Progress</string>
+    <plurals name="progress_calmer_weeks">
+        <item quantity="one">🌿 Less screen time %1$d week running</item>
+        <item quantity="other">🌿 Less screen time %1$d weeks running</item>
+    </plurals>
+    <string name="progress_kept">Limits kept %1$d of the last %2$d days</string>
     <string name="stats_where_time_went">Where the time went</string>
-    <string name="stats_quiet_title">A quiet stretch</string>
-    <string name="stats_quiet_body">No app time was recorded for this period.</string>
     <string name="stats_limit_tag">limit %1$s a day</string>
     <string name="stats_open_limit">Change its limit</string>
     <string name="stats_plant_limit">Plant a limit</string>
     <string name="stats_share">%1$d%% of your screen time</string>
     <string name="stats_no_access_title">Usage access is off</string>
-    <string name="stats_no_access_body">Meadow needs usage access to measure your screen time.</string>
     <string name="stats_no_access_action">Turn it on</string>
 </resources>

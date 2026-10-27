@@ -12,6 +12,24 @@ it. The Android SDK platform tools include `adb`.
 On WSL, USB devices aren't visible. Use wireless debugging (`adb pair <ip>:<port>` once, then
 `adb connect <ip>:<port>`), or the Windows `adb.exe`. An Android emulator also works.
 
+## Every screen by hand
+
+Debug builds come with a second launcher icon, **Meadow screens**: a gallery of every screen in
+each of its states (an empty garden, a resting app outside its hours, a friend who shares nothing,
+a limit waiting on a question, and so on), drawn from the made-up garden in
+`app/src/demo/java/…/showcase/DemoGarden.kt`. Pick a theme, day or night, or *Offline* at the top
+of the list, then open any state; back returns to the list. In Growth, the periods and the
+month's days can be tapped as in the app.
+
+The data is made up, but buttons still do what they do in the app, as whoever is signed in to
+this build. Release builds don't have the gallery or its data.
+
+A debug build signs with your debug key, so it can't be installed over a release build: uninstall
+that first, or use a second phone or an emulator.
+
+To add a state, add a `Scenario` to `app/src/debug/java/…/showcase/Gallery.kt`;
+`GalleryTest` draws every one.
+
 ## Trace mode
 
 A debug build made with `-Pmeadow.trace=true` logs every exchange with Firebase:

@@ -137,8 +137,9 @@ class LimitEngine(
         val key = Days.key(today)
         val grants = store.grants.value
         val needsWeek = limits.any { it.weeklyMinutes > 0 }
+        val week = store.weekRule.value
         if (needsWeek && weekMeasuredFor != key) {
-            val start = Days.weekStart(today)
+            val start = week.limitStart(today)
             val totals = HashMap<String, Long>()
             if (start.isBefore(today)) {
                 history.range(start, today.minusDays(1)).forEach { (_, day) ->
@@ -163,7 +164,7 @@ class LimitEngine(
                 usedWeekMs = (earlierThisWeek[pkg] ?: 0L) + usedToday,
                 bonusTodayMinutes = bonusToday,
                 bonusWeekMinutes = grants.bonus(pkg) { dayKey ->
-                    Days.parse(dayKey)?.let { Days.isSameWeek(it, today) } == true
+                    Days.parse(dayKey)?.let { week.limitStart(it) == week.limitStart(today) } == true
                 },
                 emergencyUntilMillis = emergency?.takeIf { it.covers(pkg) }?.untilMillis ?: 0L,
                 outsideHours = outside,

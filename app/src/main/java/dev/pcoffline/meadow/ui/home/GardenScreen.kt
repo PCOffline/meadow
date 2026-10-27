@@ -111,14 +111,13 @@ fun GardenScreen(
     onOpenSetup: () -> Unit,
     onPlantLimit: () -> Unit,
     onOpenLimit: (String) -> Unit,
-    onOpenCircle: () -> Unit,
     onOpenTroubleshoot: () -> Unit = {},
     viewModel: GardenViewModel = viewModel { GardenViewModel() },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var askFor by rememberSaveable { mutableStateOf<String?>(null) }
     GardenContent(
-        profile, state, onOpenSettings, onOpenProfile, onOpenSetup, onPlantLimit, onOpenLimit, onOpenCircle,
+        profile, state, onOpenSettings, onOpenProfile, onOpenSetup, onPlantLimit, onOpenLimit,
         onOpenTroubleshoot = onOpenTroubleshoot,
         onAsk = { askFor = it },
     )
@@ -135,7 +134,6 @@ fun GardenContent(
     onOpenSetup: () -> Unit = {},
     onPlantLimit: () -> Unit = {},
     onOpenLimit: (String) -> Unit = {},
-    onOpenCircle: () -> Unit = {},
     onOpenTroubleshoot: () -> Unit = {},
     onAsk: (String) -> Unit = {},
 ) {
@@ -169,16 +167,6 @@ fun GardenContent(
                 )
             }
         }
-        if (profile.approverIds.isEmpty()) {
-            item {
-                Notice(
-                    emoji = "🐝",
-                    text = stringResource(R.string.garden_notice_no_bees),
-                    action = stringResource(R.string.garden_notice_no_bees_action),
-                    onClick = onOpenCircle,
-                )
-            }
-        }
 
         item {
             SectionTitle(stringResource(R.string.garden_title), Modifier.padding(horizontal = 20.dp)) {
@@ -192,14 +180,7 @@ fun GardenContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         BloomFlower(0.2f, Garden.colors.petalPink, Modifier.size(56.dp, 84.dp), sway = false)
                         Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(stringResource(R.string.garden_empty_title), style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                stringResource(R.string.garden_empty_body),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(stringResource(R.string.garden_empty_title), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }

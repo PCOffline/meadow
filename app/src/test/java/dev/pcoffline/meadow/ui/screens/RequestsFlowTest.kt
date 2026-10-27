@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.screens
 
+import androidx.compose.ui.test.performClick
 import android.app.Application
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -30,6 +31,22 @@ class RequestsFlowTest : ScreenTest() {
     fun `the ask button has a name`() {
         requests()
         assertAccessible()
+    }
+
+    @Test
+    fun `each empty tab says so in a word`() {
+        requests()
+        node(R.string.requests_empty_for_you_title).assertExists()
+        node(R.string.requests_tab_yours).performClick()
+        node(R.string.requests_empty_yours_title).assertExists()
+        node(R.string.requests_empty_for_you_title).assertDoesNotExist()
+        assertAccessible()
+    }
+
+    @Test
+    fun `while requests load, no tab claims to be empty`() {
+        show { RequestsContent(DemoGarden.robin, incoming = null, outgoing = null) }
+        node(R.string.requests_empty_for_you_title).assertDoesNotExist()
     }
 
     @Test

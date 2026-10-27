@@ -383,9 +383,15 @@ private val MeadowShapes = Shapes(
 
 val LocalGarden = staticCompositionLocalOf { gardenColors(Seeds.getValue(GardenTheme.MEADOW), dark = false) }
 
+/** The theme showing now, for what's drawn rather than coloured, like its butterflies. */
+val LocalGardenTheme = staticCompositionLocalOf { GardenTheme.MEADOW }
+
 object Garden {
     val colors: GardenColors
         @Composable get() = LocalGarden.current
+
+    val theme: GardenTheme
+        @Composable get() = LocalGardenTheme.current
 }
 
 @Composable
@@ -402,7 +408,7 @@ fun MeadowTheme(
     val seed = Seeds.getValue(theme)
     val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
     val garden = remember(theme, dark) { gardenColors(seed, dark) }
-    CompositionLocalProvider(LocalGarden provides garden, LocalDarkTheme provides dark) {
+    CompositionLocalProvider(LocalGarden provides garden, LocalGardenTheme provides theme, LocalDarkTheme provides dark) {
         MaterialTheme(colorScheme = scheme, typography = MeadowTypography, shapes = MeadowShapes) {
             // Screens drawn straight on the background (onboarding, the rest screen) have no Surface
             // to set a text colour, and Compose's default is black, unreadable at night.

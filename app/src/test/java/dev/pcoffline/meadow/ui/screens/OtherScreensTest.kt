@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -15,9 +18,16 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -29,6 +39,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class, qualifiers = "w411dp-h891dp-xxhdpi")
@@ -47,6 +60,22 @@ class OtherScreensTest : ScreenTest() {
         plant.assertIsNotEnabled() // Still needs the terms accepted.
         node(R.string.legal_agree).performScrollTo().performClick()
         plant.assertIsEnabled()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a first run starts weeks the region's way, and can pick another day`() {
+        show { AuthScreen() }
+        // Robolectric runs as en-US, where weeks start on Sunday.
+        compose.waitUntil(5_000) { AppGraph.store.weekStartSet }
+        assertEquals(WeekRule(DayOfWeek.SUNDAY), AppGraph.store.weekRule.value)
+        repeat(2) { node(R.string.intro_next).performClick() }
+        node(R.string.intro_begin).performClick()
+        node(R.string.settings_week_start).performScrollTo()
+        compose.onNode(hasText(DayOfWeek.SUNDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())) and isSelectable()).assertIsSelected()
+        compose.onNodeWithText(DayOfWeek.MONDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())).performScrollTo().performClick()
+        // Nothing to keep yet, so at once.
+        assertEquals(WeekRule(DayOfWeek.MONDAY), AppGraph.store.weekRule.value)
         assertAccessible()
     }
 
@@ -117,11 +146,29 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `setup has one way out, into the garden only once the essentials are on`() {
+        var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
+        var left = 0
+        // A new state starts the screen afresh, as coming back from Android's settings would.
+        show { key(state) { SetupScreen(onDone = { left++ }, read = { state }) } }
+        assertEquals(3, compose.onAllNodesWithText(text(R.string.setup_step_required)).fetchSemanticsNodes().size)
+        node(R.string.setup_done).assertDoesNotExist()
+        node(R.string.setup_later).performScrollTo().performClick()
+
+        state = ProtectionState(true, true, false, false, false, false, notificationListener = true)
+        node(R.string.setup_step_required).assertDoesNotExist()
+        node(R.string.setup_later).assertDoesNotExist()
+        node(R.string.setup_done).performScrollTo().performClick()
+        assertEquals(2, left)
+        assertAccessible()
+    }
+
+    @Test
     fun `settings show privacy choices, legal documents and a careful delete`() {
         val opened = mutableListOf<LegalDoc>()
-        val shy = DemoGarden.robin.copy(privacy = Privacy(shareUsage = false))
+        val shy = DemoGarden.robin.copy(privacy = Privacy(shareTime = false))
         show { SettingsScreen(shy, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = { opened += it }) }
-        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage))).performScrollTo().assertIsOff()
+        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time))).performScrollTo().assertIsOff()
         node(R.string.legal_privacy).performScrollTo().performClick()
         node(R.string.legal_terms).performScrollTo().performClick()
         assertEquals(listOf(LegalDoc.PRIVACY, LegalDoc.TERMS), opened)

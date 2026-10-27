@@ -2,6 +2,18 @@
 
 package dev.pcoffline.meadow.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Connectivity
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -33,7 +45,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -109,8 +120,14 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composa
     }
 }
 
+/** A short, quiet line that says what the screen around it can't show by itself. */
 @Composable
-fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null) {
+fun Hint(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
+}
+
+@Composable
+fun EmptyState(emoji: String, title: String, body: String? = null, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null) {
     Column(
         modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -121,12 +138,14 @@ fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = 
         )
         Text(emoji, fontSize = 44.sp, modifier = Modifier.graphicsLayer { translationY = (bob?.value ?: 0f).dp.toPx() })
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.asHeading())
-        Text(
-            body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        if (body != null) {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (action != null) {
             Spacer(Modifier.height(4.dp))
             action()
@@ -215,4 +234,39 @@ fun ErrorNote(message: String?, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onErrorContainer,
         style = MaterialTheme.typography.bodyMedium,
     )
+}
+
+/** Says that what's on screen needs a connection the phone doesn't have right now. */
+@Composable
+fun OfflineNote(modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            stringResource(R.string.offline_needs_connection),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+/** A thin strip across the top while the phone is offline. */
+@Composable
+fun OfflineBar(modifier: Modifier = Modifier) {
+    val online by Connectivity.online.collectAsStateWithLifecycle()
+    AnimatedVisibility(!online, modifier, enter = expandVertically(), exit = shrinkVertically()) {
+        Row(
+            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 16.dp, vertical = 6.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Outlined.CloudOff, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.offline_bar), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }

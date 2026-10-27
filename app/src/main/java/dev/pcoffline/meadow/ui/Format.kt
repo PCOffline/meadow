@@ -60,7 +60,7 @@ fun clockText(minuteOfDay: Int): String =
 
 /** "10:00–12:00, 18:00–22:00". */
 fun Resources.windowsText(windows: List<TimeWindow>): String = when {
-    windows.isEmpty() -> getString(R.string.schedule_closed)
+    windows.isEmpty() -> getString(R.string.schedule_day_off)
     windows == listOf(TimeWindow.ALL_DAY) -> getString(R.string.schedule_all_day)
     else -> windows.joinToString(", ") { getString(R.string.schedule_window, clockText(it.from), clockText(it.to)) }
 }

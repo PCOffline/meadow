@@ -2,7 +2,7 @@
 import { after, before, beforeEach, describe, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { addDoc, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc } from "firebase/firestore";
 
 // Denied writes are what these tests expect; the SDK would log each one as a warning.
 setLogLevel("error");
@@ -37,7 +37,7 @@ const account = (overrides = {}) => ({
   pushIds: ["phone"],
   friendCode: "ABC234",
   strictMode: false,
-  privacy: { shareUsage: true },
+  privacy: { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false },
   pendingRemovals: {},
   ...overrides,
 });
@@ -45,19 +45,23 @@ const account = (overrides = {}) => ({
 const limit = (daily, weekly = 0) => ({ packageName: "com.insta", appName: "Instagram", dailyMinutes: daily, weeklyMinutes: weekly });
 
 /** sam is looked after by bee (and bee2); stranger has nothing to do with them. */
-async function seed({ samHasBee = true, shareUsage = true } = {}) {
+const EVERYTHING = { shareLimits: true, shareTime: true, shareApps: true, shareProgress: true };
+
+async function seed({ samHasBee = true, privacy = EVERYTHING } = {}) {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, "users/sam"), profile());
-    await setDoc(doc(db, "users/sam/private/account"), account({ approverIds: samHasBee ? ["bee", "bee2"] : [], privacy: { shareUsage } }));
+    await setDoc(doc(db, "users/sam/private/account"), account({ approverIds: samHasBee ? ["bee", "bee2"] : [], privacy }));
     for (const bee of ["bee", "bee2"]) {
       await setDoc(doc(db, `users/${bee}`), profile({ displayName: bee }));
       await setDoc(doc(db, `users/${bee}/private/account`), account({ approveeIds: samHasBee ? ["sam"] : [] }));
     }
     await setDoc(doc(db, "users/stranger"), profile({ displayName: "Stranger" }));
     await setDoc(doc(db, "users/stranger/private/account"), account());
-    await setDoc(doc(db, "users/sam/usage/2026-10-12"), { totalMinutes: 42, apps: [] });
+    await setDoc(doc(db, "users/sam/usage/today"), { dayKey: "2026-10-12", totalMinutes: 42 });
+    await setDoc(doc(db, "users/sam/appUsage/today"), { dayKey: "2026-10-12", apps: [] });
+    await setDoc(doc(db, "users/sam/progress/current"), { weekChange: -10, calmerWeeks: 1, keptDays: 5, limitDays: 7 });
     await setDoc(doc(db, "users/sam/limits/com.insta"), limit(30, 300));
     await setDoc(doc(db, "users/sam/grants/g1"), { packageName: "com.insta", minutes: 15, dayKey: "2026-10-12" });
     await setDoc(doc(db, "requests/r1"), { requesterId: "sam", approverIds: ["bee", "bee2"], status: "pending" });
@@ -139,8 +143,13 @@ describe("profiles", () => {
   test("you can update your own settings, nothing the backend keeps", async () => {
     const mine = doc(as("sam"), "users/sam/private/account");
     await assertSucceeds(updateDoc(mine, { pushIds: ["a", "b"], theme: "lavender", darkMode: "system" }));
-    await assertSucceeds(updateDoc(mine, { privacy: { shareUsage: false } }));
-    await assertFails(updateDoc(mine, { privacy: { shareUsage: false, sneaky: true } }));
+    const choices = { shareLimits: true, shareTime: false, shareApps: true, shareProgress: false };
+    await assertSucceeds(updateDoc(mine, { privacy: choices }));
+    // The one choice from before they were split is gone.
+    await assertFails(updateDoc(mine, { privacy: { shareUsage: false } }));
+    await assertFails(updateDoc(mine, { privacy: { ...choices, sneaky: true } }));
+    await assertFails(updateDoc(mine, { privacy: { ...choices, shareTime: "yes" } }));
+    await assertFails(updateDoc(mine, { privacy: "everything" }));
     await assertFails(updateDoc(mine, { pushIds: Array.from({ length: 11 }, (_, i) => `t${i}`) }));
     for (const field of ["friendCode", "pendingRemovals", "emergencyUses", "lastAlertAt"]) {
       await assertFails(updateDoc(mine, { [field]: field === "friendCode" ? "MINE11" : { sneaky: 1 } }));
@@ -245,20 +254,82 @@ describe("limits", () => {
     await assertSucceeds(setDoc(ref, { ...limit(30, 300), schedule: evenings }));
   });
 
-  test("Bumblebees can see limits and usage; strangers can't, and extra time stays private", async () => {
+  test("Bumblebees can see what's shared; strangers can't, and extra time stays private", async () => {
     await seed();
+    await assertSucceeds(getDoc(doc(as("bee"), "users/sam/appUsage/today")));
+    await assertSucceeds(getDoc(doc(as("bee"), "users/sam/progress/current")));
+    await assertFails(getDoc(doc(as("stranger"), "users/sam/appUsage/today")));
+    await assertFails(getDoc(doc(as("stranger"), "users/sam/progress/current")));
     await assertSucceeds(getDoc(doc(as("bee"), "users/sam/limits/com.insta")));
     await assertFails(getDoc(doc(as("bee"), "users/sam/grants/g1")));
     await assertSucceeds(getDoc(doc(as("sam"), "users/sam/grants/g1")));
-    await assertSucceeds(getDoc(doc(as("bee"), "users/sam/usage/2026-10-12")));
+    await assertSucceeds(getDoc(doc(as("bee"), "users/sam/usage/today")));
     await assertFails(getDoc(doc(as("stranger"), "users/sam/limits/com.insta")));
-    await assertFails(getDoc(doc(as("stranger"), "users/sam/usage/2026-10-12")));
+    await assertFails(getDoc(doc(as("stranger"), "users/sam/usage/today")));
   });
 
-  test("usage stays private when sharing is off", async () => {
-    await seed({ shareUsage: false });
-    await assertFails(getDoc(doc(as("bee"), "users/sam/usage/2026-10-12")));
-    await assertSucceeds(getDoc(doc(as("sam"), "users/sam/usage/2026-10-12")));
+  // Each shared part, and the choice that keeps it private.
+  const PARTS = [
+    ["shareLimits", "users/sam/limits/com.insta"],
+    ["shareTime", "users/sam/usage/today"],
+    ["shareApps", "users/sam/appUsage/today"],
+    ["shareProgress", "users/sam/progress/current"],
+  ];
+
+  test("each part is kept private on its own; the rest stay shared", async () => {
+    for (const [choice, hidden] of PARTS) {
+      await seed({ privacy: { ...EVERYTHING, [choice]: false } });
+      for (const [other, path] of PARTS) {
+        const read = getDoc(doc(as("bee"), path));
+        await (other === choice ? assertFails(read) : assertSucceeds(read));
+        await assertSucceeds(getDoc(doc(as("sam"), path)));
+      }
+      await assertFails(getDocs(collection(as("bee"), hidden.split("/").slice(0, -1).join("/"))));
+    }
+  });
+
+  test("a choice never made shares today's time and apps, and progress waits to be chosen", async () => {
+    await seed({ privacy: {} });
+    for (const path of ["users/sam/limits/com.insta", "users/sam/usage/today", "users/sam/appUsage/today"]) {
+      await assertSucceeds(getDoc(doc(as("bee"), path)));
+    }
+    await assertFails(getDoc(doc(as("bee"), "users/sam/progress/current")));
+    await assertSucceeds(getDoc(doc(as("sam"), "users/sam/progress/current")));
+  });
+
+  test("only today's copy of time and top apps is kept; earlier days never leave the phone", async () => {
+    await seed();
+    const sam = as("sam");
+    for (const part of ["usage", "appUsage"]) {
+      const data = part === "usage" ? { dayKey: "2026-10-13", totalMinutes: 3 } : { dayKey: "2026-10-13", apps: [] };
+      await assertFails(setDoc(doc(sam, `users/sam/${part}/2026-10-13`), data));
+      await assertSucceeds(setDoc(doc(sam, `users/sam/${part}/today`), data));
+    }
+    await assertFails(setDoc(doc(sam, "users/sam/usage/today"), { dayKey: "2026-10-13", totalMinutes: 1441 }));
+    await assertFails(setDoc(doc(sam, "users/sam/usage/today"), { dayKey: "2026-10-13", totalMinutes: -1 }));
+    await assertFails(setDoc(doc(sam, "users/sam/usage/today"), { dayKey: "x".repeat(11), totalMinutes: 1 }));
+  });
+
+  test("each shared part holds only what it's for, and only its owner writes or removes it", async () => {
+    await seed();
+    const sam = as("sam");
+    await assertSucceeds(setDoc(doc(sam, "users/sam/usage/today"), { dayKey: "2026-10-13", totalMinutes: 3, updatedAt: serverTimestamp() }));
+    // Today's apps can't ride along with the total: they have a choice of their own.
+    await assertFails(setDoc(doc(sam, "users/sam/usage/today"), { dayKey: "2026-10-13", totalMinutes: 3, apps: [] }));
+    await assertFails(setDoc(doc(sam, "users/sam/usage/today"), { dayKey: "2026-10-13", totalMinutes: "3" }));
+    const apps = Array.from({ length: 15 }, (_, i) => ({ packageName: `p${i}`, appName: "App", minutes: 1 }));
+    await assertSucceeds(setDoc(doc(sam, "users/sam/appUsage/today"), { dayKey: "2026-10-13", apps, updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(sam, "users/sam/appUsage/today"), { dayKey: "2026-10-13", apps: [...apps, apps[0]] }));
+    await assertFails(setDoc(doc(sam, "users/sam/appUsage/today"), { dayKey: "2026-10-13", apps, totalMinutes: 3 }));
+    const progress = { weekChange: null, calmerWeeks: 0, keptDays: 0, limitDays: 0, updatedAt: serverTimestamp() };
+    await assertSucceeds(setDoc(doc(sam, "users/sam/progress/current"), progress));
+    await assertFails(setDoc(doc(sam, "users/sam/progress/current"), { ...progress, totalMinutes: 3 }));
+    await assertFails(setDoc(doc(sam, "users/sam/progress/current"), { ...progress, weekChange: "-10" }));
+    await assertFails(setDoc(doc(sam, "users/sam/progress/other"), progress));
+    for (const path of ["users/sam/usage/today", "users/sam/appUsage/today", "users/sam/progress/current"]) {
+      await assertFails(deleteDoc(doc(as("bee"), path)));
+      await assertSucceeds(deleteDoc(doc(sam, path)));
+    }
   });
 
   test("extra time can't be granted from a phone", async () => {

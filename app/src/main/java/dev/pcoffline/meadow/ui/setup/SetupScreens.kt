@@ -58,6 +58,7 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.enforcement.MeadowNotificationListener
+import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -66,18 +67,22 @@ import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.ui.theme.Garden
 
 @Composable
-fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
+fun SetupScreen(
+    onDone: () -> Unit,
+    onTroubleshoot: () -> Unit = {},
+    read: () -> ProtectionState = { AppGraph.protection.current() },
+) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    var state by remember { mutableStateOf(AppGraph.protection.current()) }
+    var state by remember { mutableStateOf(read()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        state = AppGraph.protection.current()
+        state = read()
         if (state.essentialsReady) GuardianService.start(context)
         AppGraph.protection.check(state)
     }
     val activity = LocalActivity.current
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        state = AppGraph.protection.current()
+        state = read()
         val canAskAgain = activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)
         context.afterNotificationRequest(granted, canAskAgain)
@@ -98,11 +103,6 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading())
-                Text(
-                    stringResource(R.string.setup_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 Text(pluralStringResource(R.plurals.setup_progress, done, done, total), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 GrowthBar(done / total.toFloat(), color = Garden.colors.growth)
             }
@@ -114,12 +114,14 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
             title = R.string.setup_usage_title,
             body = R.string.setup_usage_body,
             done = state.usageAccess,
+            required = true,
         ) { disclosure = Disclosure.USAGE }
         SetupStep(
             emoji = "🌿",
             title = R.string.setup_keeper_title,
             body = R.string.setup_keeper_body,
             done = state.accessibility,
+            required = true,
             restricted = true,
         ) { disclosure = Disclosure.KEEPER }
         SetupStep(
@@ -127,6 +129,7 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
             title = R.string.setup_listener_title,
             body = R.string.setup_listener_body,
             done = state.notificationListener,
+            required = true,
             restricted = true,
         ) { disclosure = Disclosure.LISTENER }
         SetupStep(
@@ -172,16 +175,16 @@ fun SetupScreen(onDone: () -> Unit, onTroubleshoot: () -> Unit = {}) {
             context.openSettings(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, withPackageUri = true)
         }
         TextButton(onClick = onTroubleshoot, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text(stringResource(R.string.trouble_open_from_setup))
+            Text(stringResource(R.string.trouble_button))
         }
         Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = onDone,
-            enabled = state.essentialsReady,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) { Text(stringResource(if (state.essentialsReady) R.string.setup_done else R.string.setup_needs_essentials)) }
-        TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text(stringResource(R.string.setup_later))
+        // One way out: into the garden once the essentials are on, or later until then.
+        if (state.essentialsReady) {
+            Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.setup_done)) }
+        } else {
+            TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(stringResource(R.string.setup_later))
+            }
         }
     }
     disclosure?.let { d ->
@@ -232,8 +235,9 @@ internal enum class Disclosure(@StringRes val body: Int) {
 }
 
 /**
- * [restricted] steps are ones Android greys out for apps installed outside an app store until
- * "Allow restricted settings" is chosen in the app's info (Android 13 and later).
+ * [required] steps are the ones limits can't work without. [restricted] steps are ones Android
+ * greys out for apps installed outside an app store until "Allow restricted settings" is chosen in
+ * the app's info (Android 13 and later).
  */
 @Composable
 private fun SetupStep(
@@ -241,6 +245,7 @@ private fun SetupStep(
     @StringRes title: Int,
     @StringRes body: Int,
     done: Boolean,
+    required: Boolean = false,
     restricted: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -252,6 +257,7 @@ private fun SetupStep(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    if (required && !done) Pill(stringResource(R.string.setup_step_required), MaterialTheme.colorScheme.secondaryContainer)
                     AnimatedVisibility(done, enter = scaleIn(spring(dampingRatio = 0.4f)) + fadeIn()) {
                         Pill(stringResource(R.string.setup_step_done), MaterialTheme.colorScheme.primaryContainer)
                     }

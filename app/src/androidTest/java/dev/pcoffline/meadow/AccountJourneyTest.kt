@@ -50,9 +50,7 @@ class AccountJourneyTest : EndToEndTest() {
             compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
             waitFor(R.string.secure_title)
             // Without an email, signing out would lose the garden, so it isn't offered.
-            node(R.string.settings_sign_out).performScrollTo().performClick()
-            waitFor(R.string.settings_sign_out_anonymous)
-            inDialog(text(R.string.action_ok)).performClick()
+            assertFalse(showing(text(R.string.settings_sign_out)))
             node(R.string.auth_password_instead).performScrollTo().performClick()
             typeInto(email, address)
             typeInto(password, EmulatorFriend.PASSWORD)

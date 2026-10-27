@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
   <title>Almost there · Meadow</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="/signed-in.js" defer></script>
 </head>
 <body>
   <main class="card">
     <div class="flower" aria-hidden="true">💌</div>
     <h1>Almost there</h1>
-    <p>Open this sign-in link on the phone where Meadow is installed, and Meadow will sign you in.</p>
-    <p class="links">Links work once and expire after a while. If this one has, ask Meadow for a new one.</p>
+    <a id="open" class="button" href="#" hidden>Open in Meadow</a>
+    <p id="broken" hidden>This link doesn't look right. Ask Meadow for a new one.</p>
   </main>
 </body>
 </html>

@@ -6,7 +6,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
 import {
   accountOf, accountRef, chats, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
-  postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
+  postToChat, projectId, removals, requireAuth, users,
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken, withPhotoToken } from "./format";
 import {
@@ -15,6 +15,11 @@ import {
 } from "./schemas";
 
 const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60_000;
+/**
+ * What a new garden shares with its Bumblebees, each part a choice of its own (the app's Privacy).
+ * Progress sums up earlier days, so it waits to be chosen.
+ */
+export const DEFAULT_PRIVACY = { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false } as const;
 /** Removing a Bumblebee waits a day, so a weak moment can't undo every commitment at once. */
 export const REMOVAL_DELAY_MS = 24 * 60 * 60_000;
 const DAY_MS = 24 * 60 * 60_000;
@@ -23,6 +28,11 @@ const INVITES_PER_DAY = 20;
 const REMOVALS_PER_DAY = 10;
 /** Friend codes looked up, found or not, so codes can't be guessed by trying them all. */
 export const CODE_LOOKUPS_PER_DAY = 30;
+/**
+ * Unanswered invites one person can have waiting. Rate limits count per account, and guest
+ * accounts cost nothing to make, so this is what keeps anyone from being flooded with them.
+ */
+export const PENDING_INVITES_PER_PERSON = 10;
 
 /** Creates the caller's profile and claims a unique friend code. Safe to call twice. */
 export const createProfile = onCall(async (req) => {
@@ -58,7 +68,7 @@ export const createProfile = onCall(async (req) => {
       pushIds: [],
       friendCode: code,
       strictMode: false,
-      privacy: { shareUsage: true },
+      privacy: { ...DEFAULT_PRIVACY },
       pendingRemovals: {},
       ...(termsVersion ? { acceptedTerms: { version: termsVersion, at: FieldValue.serverTimestamp() } } : {}),
     });
@@ -87,7 +97,6 @@ async function announceNewBumblebee(chatId: string, owner: Person, bee: Person) 
  */
 export const createInviteLink = onCall(async (req) => {
   const uid = requireAuth(req);
-  requireEmailAccount(req);
   const token = randomInviteToken();
   const expiresAt = Date.now() + INVITE_LINK_TTL_MS;
   await db().runTransaction(async (tx) => {
@@ -153,7 +162,6 @@ export const acceptInviteLink = onCall(async (req) => {
 /** Asks the person with this friend code to be the caller's Bumblebee. */
 export const sendInvite = onCall(async (req) => {
   const uid = requireAuth(req);
-  requireEmailAccount(req);
   const { friendCode } = parse(InviteByCodeInput, req.data);
 
   // Counted before looking, and kept even when no one has the code.
@@ -175,9 +183,9 @@ export const sendInvite = onCall(async (req) => {
     }
     const commitRate = await consumeRate(tx, uid, "invite", INVITES_PER_DAY, DAY_MS);
     // Checked in the same transaction as the rate counter, so a double tap invites once.
-    const pending = await tx.get(invites()
-      .where("fromUid", "==", uid).where("toUid", "==", targetUid).where("status", "==", "pending").limit(1));
-    if (!pending.empty) throw new HttpsError("already-exists", errors.alreadyInvited(target.profile.displayName));
+    const waiting = await tx.get(invites().where("toUid", "==", targetUid).where("status", "==", "pending").limit(PENDING_INVITES_PER_PERSON));
+    if (waiting.docs.some((d) => d.get("fromUid") === uid)) throw new HttpsError("already-exists", errors.alreadyInvited(target.profile.displayName));
+    if (waiting.size >= PENDING_INVITES_PER_PERSON) throw new HttpsError("resource-exhausted", errors.inviteeBusy(target.profile.displayName));
     commitRate();
     tx.set(ref, {
       fromUid: uid,

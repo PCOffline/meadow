@@ -75,8 +75,9 @@ words about yourself.
 
 ### Private by default
 No email needed to start; later you can keep your garden safe with a sign-in link emailed to
-you, or a password. You choose whether your Bumblebees see today's screen time, and Settings
-shows your page exactly as they see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
+you, or a password. You choose what your Bumblebees see, part by part (your limits, today's
+screen time, top apps and your progress over the weeks), and Settings shows your page exactly as
+they see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
 person affected is told when you add or remove a Bumblebee. Download everything Meadow holds about
 you, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
 
@@ -127,10 +128,15 @@ The `justfile` has a shortcut for each of these and for building, installing and
 | Cloud Functions unit tests | `cd backend/functions && npm test` |
 | Security rules (Firestore and Storage) | `cd backend && npm ci && npm run test:rules` |
 | Cloud Functions on the emulators | `cd backend && npm ci && npm --prefix functions ci && npm run test:integration` |
-| Hosted legal pages | `cd backend && npm run test:hosting` |
+| Hosted pages (legal, invite and sign-in) | `cd backend && npm run test:hosting` |
 | Deploy scripts | `cd backend && npm run test:deploy` |
 | End to end, on an Android emulator | Start the Firebase emulators (`npm run emulators` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2`. Use an emulator, not your own phone: some tests switch Meadow's accessibility service, notification access and usage access on and off |
 | CI scripts and workflows | `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`, plus `actionlint`, `shellcheck` and `ruff check` |
+
+To try every screen by hand, install a debug build (`./gradlew installDebug`, or the
+`meadow-debug-apk` artifact from CI) and open **Meadow screens**, its second icon: each screen in
+each of its states, from made-up data, in any theme, by day or night, and offline. See
+[Debugging Meadow](docs/debugging.md#every-screen-by-hand).
 
 Building and testing need Java 21 or newer (CI uses 25) and Node 24; `mise install` sets both up.
 CI runs everything on every pull request and every push to `main`. To see every request the app

@@ -115,12 +115,6 @@ fun RequestsContent(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             TabTitle(stringResource(R.string.requests_title))
-            Text(
-                stringResource(R.string.requests_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
             val waiting = incoming?.count { it.status == RequestStatus.PENDING } ?: 0
             PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 8.dp)) {
                 Tab(
@@ -140,13 +134,10 @@ fun RequestsContent(
                         }
                     }
                 }
-                if (list != null && list.isEmpty()) {
+                if (list?.isEmpty() == true) {
                     item {
-                        if (tab == 0) {
-                            EmptyState("🌤️", stringResource(R.string.requests_empty_for_you_title), stringResource(R.string.requests_empty_for_you_body))
-                        } else {
-                            EmptyState("🌱", stringResource(R.string.requests_empty_yours_title), stringResource(R.string.requests_empty_yours_body))
-                        }
+                        if (tab == 0) EmptyState("🌤️", stringResource(R.string.requests_empty_for_you_title))
+                        else EmptyState("🌱", stringResource(R.string.requests_empty_yours_title))
                     }
                 }
                 items(list.orEmpty(), key = { it.id }) { request ->

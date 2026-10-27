@@ -56,20 +56,22 @@ class LimitJourneyTest : EndToEndTest() {
             val uid = FirebaseAuth.getInstance().currentUser!!.uid
             val limit = "users/$uid/limits/$pebbles"
 
-            // From the empty garden to the picker; a search finds the app, or says nothing matches.
+            // From the empty garden to the picker; a search narrows the apps down.
             node(R.string.garden_empty_title).performScrollTo().performClick()
             waitFor(R.string.picker_title)
-            typeInto(hasSetTextAction(), "zzz")
-            waitFor(R.string.picker_no_match_title)
+            // Pebbles may sit below the fold, so it's found by searching.
+            typeInto(hasSetTextAction(), "pebb")
+            waitForText("Pebbles")
+            compose.onNode(hasSetTextAction()).performTextReplacement("zzz")
+            eventually("Pebbles filtered out") { !showing("Pebbles") }
             compose.onNode(hasSetTextAction()).performTextReplacement("pebb")
             waitForText("Pebbles")
             compose.onNode(hasText("Pebbles") and hasClickAction()).performClick()
 
-            // With every kind of limit off there's nothing to plant, and the editor says so.
+            // With every kind of limit off there's nothing to plant.
             waitFor(R.string.limit_editor_new)
             toggle(R.string.limit_editor_daily)
-            waitFor(R.string.limit_editor_pick_one)
-            node(R.string.limit_editor_plant).assertIsNotEnabled()
+            eventually("planting turned off") { runCatching { node(R.string.limit_editor_plant).assertIsNotEnabled() }.isSuccess }
             toggle(R.string.limit_editor_daily)
 
             // 45 minutes a day, 5 hours a week, and only between 10:00 and 16:00.

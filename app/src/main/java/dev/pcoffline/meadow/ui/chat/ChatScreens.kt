@@ -87,20 +87,17 @@ fun ChatListScreen(
     viewModel: ChatListViewModel = viewModel(key = "chats-${profile.uid}") { ChatListViewModel(profile.uid) },
 ) {
     val chats by viewModel.chats.collectAsStateWithLifecycle()
+    ChatListContent(profile, chats, onOpenChat)
+}
+
+/** The chat list itself, given the chats ([chats] is null while they load). */
+@Composable
+fun ChatListContent(profile: UserProfile, chats: List<Chat>?, onOpenChat: (String) -> Unit = {}) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         TabTitle(stringResource(R.string.chats_title))
-        Text(
-            stringResource(R.string.chats_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        val list = chats
-        if (list != null && list.isEmpty()) {
-            EmptyState("🕊️", stringResource(R.string.chats_empty_title), stringResource(R.string.chats_empty_body))
-        }
         LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
-            items(list.orEmpty(), key = { it.id }) { chat ->
+            if (chats?.isEmpty() == true) item { EmptyState("🕊️", stringResource(R.string.chats_empty_title)) }
+            items(chats.orEmpty(), key = { it.id }) { chat ->
                 ChatRow(chat, profile.uid, onOpen = { onOpenChat(chat.id) }, Modifier.animateItem())
             }
         }
@@ -225,7 +222,7 @@ fun ChatContent(
         BackTopBar(title, onBack = onBack)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (chat == null && !loading) {
-                item { EmptyState("🕊️", stringResource(R.string.chat_closed_title), stringResource(R.string.chat_closed_body)) }
+                item { EmptyState("🕊️", stringResource(R.string.chat_closed_title)) }
             }
             items(messages, key = { it.id }) { message ->
                 Box(Modifier.animateItem()) {

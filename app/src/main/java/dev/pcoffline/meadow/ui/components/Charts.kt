@@ -33,11 +33,14 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import dev.pcoffline.meadow.ui.theme.contentOn
 import androidx.compose.ui.layout.Layout
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -47,7 +50,7 @@ import dev.pcoffline.meadow.ui.theme.Garden
 
 /**
  * Rounded "stalk" bars. The highlighted bar (usually today) is drawn in petal pink; an optional
- * dashed line marks a limit or average, named by [referenceLabel] at its end. Days in [missing]
+ * dashed line marks a limit or average, named by a short [referenceLabel] just past its end. Days in [missing]
  * have no record and are drawn as empty outlines, so they don't read as days without use.
  */
 @Composable
@@ -57,7 +60,7 @@ fun StalkBarChart(
     modifier: Modifier = Modifier,
     highlightIndex: Int = -1,
     referenceLine: Float? = null,
-    referenceLabel: AnnotatedString? = null,
+    referenceLabel: String? = null,
     missing: Set<Int> = emptySet(),
     height: Dp = 160.dp,
     showEveryNthLabel: Int = 1,
@@ -65,13 +68,12 @@ fun StalkBarChart(
     val garden = Garden.colors
     val outline = MaterialTheme.colorScheme.outline
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
-    val tagColor = MaterialTheme.colorScheme.surfaceVariant
-    val tagStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+    val tagStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val measurer = rememberTextMeasurer()
     val tag = remember(referenceLabel, tagStyle) { referenceLabel?.let { measurer.measure(it, tagStyle) } }
     val density = LocalDensity.current
-    // The line's name sits in a gutter after the last bar, where it can't cover one.
-    val gutter = with(density) { tag?.let { (it.size.width + TAG_PADDING.roundToPx() * 2).toDp() + 6.dp } ?: 0.dp }
+    // The line's name sits just past its end, in a narrow gutter where it can't cover a bar.
+    val gutter = with(density) { tag?.let { it.size.width.toDp() + TAG_GAP } ?: 0.dp }
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, tween(700)) }
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f).coerceAtLeast(1f)
@@ -121,12 +123,8 @@ fun StalkBarChart(
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
                 )
                 tag?.let { t ->
-                    val pad = TAG_PADDING.toPx()
-                    val tagSize = Size(t.size.width + pad * 2, t.size.height + pad)
-                    val top = (y - tagSize.height / 2f).coerceIn(0f, size.height - tagSize.height)
-                    val left = size.width - tagSize.width
-                    drawRoundRect(tagColor, Offset(left, top), tagSize, CornerRadius(tagSize.height / 2f))
-                    drawText(t, topLeft = Offset(left + pad, top + pad / 2f))
+                    val top = (y - t.size.height / 2f).coerceIn(0f, size.height - t.size.height)
+                    drawText(t, topLeft = Offset(size.width - t.size.width, top))
                 }
             }
         }
@@ -179,17 +177,34 @@ fun GrowthBar(fraction: Float, modifier: Modifier = Modifier, height: Dp = 10.dp
     }
 }
 
-/** A month at a glance: one soft square per day, deeper green for more screen time; [missing] days have no record. */
+/**
+ * A month at a glance: one soft square per day, deeper green for more screen time; [missing] days
+ * have no record. Weeks run from [firstDay]; the month's first day sits [firstDayOffset] squares in.
+ *
+ * With [onSelect], a tap on a day for which [canSelect] holds picks it; screen readers read each
+ * day's [descriptions] and pick it with a double tap, named [selectLabel].
+ */
 @Composable
-fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier = Modifier, firstDayOffset: Int = 0, missing: Set<Int> = emptySet()) {
+fun MonthHeatmap(
+    values: List<Float>,
+    labels: List<String>,
+    modifier: Modifier = Modifier,
+    firstDay: DayOfWeek = DayOfWeek.MONDAY,
+    firstDayOffset: Int = 0,
+    missing: Set<Int> = emptySet(),
+    descriptions: List<String> = labels,
+    selectLabel: String = "",
+    canSelect: (Int) -> Boolean = { true },
+    onSelect: ((Int) -> Unit)? = null,
+) {
     val garden = Garden.colors
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
     val cells = List(firstDayOffset) { null } + values.indices.toList()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, currentLocale()) }.forEach {
+            for (i in 0L until 7L) {
                 Text(
-                    it, Modifier.weight(1f), textAlign = TextAlign.Center,
+                    firstDay.plus(i).getDisplayName(java.time.format.TextStyle.NARROW, currentLocale()), Modifier.weight(1f), textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -198,7 +213,17 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (slot in 0 until 7) {
                     val index = week.getOrNull(slot)
-                    Box(Modifier.weight(1f).height(34.dp), contentAlignment = Alignment.Center) {
+                    // A square is narrower than 48dp, but a tap close enough still counts: Compose
+                    // widens the touch area of anything clickable to the minimum.
+                    val day = when {
+                        index == null -> Modifier
+                        onSelect != null && canSelect(index) -> Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable(onClickLabel = selectLabel, role = Role.Button) { onSelect(index) }
+                            .clearAndSetSemantics { contentDescription = descriptions[index] }
+                        else -> Modifier.clearAndSetSemantics { contentDescription = descriptions[index] }
+                    }
+                    Box(Modifier.weight(1f).height(40.dp).then(day), contentAlignment = Alignment.Center) {
                         if (index != null && index in missing) {
                             Box(
                                 Modifier.fillMaxWidth().fillMaxHeight()
@@ -226,4 +251,4 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
     }
 }
 
-private val TAG_PADDING = 6.dp
+private val TAG_GAP = 6.dp

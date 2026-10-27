@@ -14,7 +14,6 @@ import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -29,6 +28,7 @@ class ProfileRepository(
     private val context: Context,
     private val backend: Backend,
     private val store: LocalStore,
+    private val share: UsageShareRepository,
     private val sync: () -> SyncManager,
 ) {
     private val storage by lazy { FirebaseStorage.getInstance() }
@@ -72,19 +72,12 @@ class ProfileRepository(
         runCatchingCancellable { backend.account(uid).update(mapOf("theme" to theme, "darkMode" to darkMode)).awaitWrite() }
     }
 
-    /** Updates what Bumblebees can see. Turning usage sharing off also removes what was already shared. */
+    /** Updates what Bumblebees can see. Each part turned off also takes down what was already shared of it. */
     suspend fun setPrivacy(privacy: Privacy) {
         val uid = backend.requireUid()
         store.setPrivacy(privacy)
-        backend.account(uid).update("privacy", mapOf("shareUsage" to privacy.shareUsage)).awaitWrite()
-        if (!privacy.shareUsage) {
-            withTimeoutOrNull(WRITE_TIMEOUT_MS) {
-                val shared = backend.user(uid).collection("usage").get().await()
-                val batch = backend.db.batch()
-                shared.documents.forEach { batch.delete(it.reference) }
-                batch.commit().awaitWrite()
-            }
-        }
+        backend.account(uid).update("privacy", privacy.toFirestore()).awaitWrite()
+        share.takeDown(privacy)
     }
 
     /** Records that the person accepted [version] of the terms and privacy notice. */

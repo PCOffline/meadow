@@ -8,6 +8,7 @@
   <meta property="og:title" content="Will you be my Bumblebee? 🐝">
   <meta property="og:description" content="Help a friend look after their screen time in Meadow.">
   <link rel="stylesheet" href="/style.css">
+  <script src="/invite.js" defer></script>
 </head>
 <body>
   <main class="card">
@@ -20,20 +21,9 @@
     <a id="open" class="button" href="#">Open in Meadow</a>
     <p class="small">
       Don't have Meadow yet? Install it, set up your garden, then tap this link again.
-      You can also paste the link into Meadow under <b>Circle → Got an invite link?</b>
+      You can also paste it into Meadow, under <b>Circle → Got a friend code?</b>
     </p>
     <p class="small" id="expired" hidden>This link doesn't look right. Ask your friend for a new one.</p>
   </main>
-  <script>
-    // The token is the last path segment: /i/<token>
-    const token = location.pathname.split("/").filter(Boolean).pop() || "";
-    const open = document.getElementById("open");
-    if (/^[A-Za-z0-9]{16}$/.test(token)) {
-      open.href = "meadow://invite/" + token;
-    } else {
-      open.hidden = true;
-      document.getElementById("expired").hidden = false;
-    }
-  </script>
 </body>
 </html>

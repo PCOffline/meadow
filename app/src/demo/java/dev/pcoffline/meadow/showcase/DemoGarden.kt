@@ -2,15 +2,20 @@ package dev.pcoffline.meadow.showcase
 
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Avatar
+import dev.pcoffline.meadow.data.BeeStats
 import dev.pcoffline.meadow.data.Chat
 import dev.pcoffline.meadow.data.ChatMessage
 import dev.pcoffline.meadow.data.Days
+import dev.pcoffline.meadow.data.Invite
+import dev.pcoffline.meadow.data.InviteStatus
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.Progress
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.SharedAppUsage
+import dev.pcoffline.meadow.data.SharedPage
 import dev.pcoffline.meadow.data.SharedUsage
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.AppBudget
@@ -22,7 +27,10 @@ import dev.pcoffline.meadow.ui.stats.PeriodStats
 import dev.pcoffline.meadow.ui.stats.Selection
 import dev.pcoffline.meadow.ui.stats.StatsUiState
 
-/** A made-up but lived-in garden for screenshots: Robin, two Bumblebees and a friend. */
+/**
+ * A made-up but lived-in garden: Robin, two Bumblebees and a friend. Drawn by the screen gallery
+ * in debug builds, the tests and the README's screenshots; never part of a release.
+ */
 object DemoGarden {
     private const val MIN = 60_000L
     private val now = System.currentTimeMillis()
@@ -44,16 +52,19 @@ object DemoGarden {
         Days.todayKey(),
         totalMinutes = 134,
         apps = listOf(
-            SharedAppUsage("demo.youtube", "YouTube", 52, 60),
-            SharedAppUsage("demo.instagram", "Instagram", 47, 45),
-            SharedAppUsage("demo.maps", "Maps", 21, 0),
+            SharedAppUsage("demo.youtube", "YouTube", 52),
+            SharedAppUsage("demo.instagram", "Instagram", 47),
+            SharedAppUsage("demo.maps", "Maps", 21),
         ),
     )
 
     /** Robin's own limits. */
     val myLimits = listOf(AppLimit("demo.youtube", "YouTube", 60, 0), AppLimit("demo.instagram", "Instagram", 45, 300))
 
-    private fun budget(pkg: String, name: String, daily: Int, usedToday: Int, weekly: Int = 0, usedWeek: Int = usedToday * 4, bonus: Int = 0) =
+    /** 18% less than last week so far, three calmer weeks running, limits kept five days of seven. */
+    val progress = Progress(weekChange = -18, calmerWeeks = 3, keptDays = 5, limitDays = 7)
+
+    fun budget(pkg: String, name: String, daily: Int, usedToday: Int, weekly: Int = 0, usedWeek: Int = usedToday * 4, bonus: Int = 0) =
         AppBudget(AppLimit(pkg, name, daily, weekly), usedToday * MIN, usedWeek * MIN, bonus, bonus)
 
     val tiktok = budget("demo.tiktok", "TikTok", daily = 30, usedToday = 30)
@@ -154,4 +165,36 @@ object DemoGarden {
     )
 
     val rest = RestState(appName = "TikTok", budget = tiktok, signedIn = true, hasBumblebees = true, pendingRequest = null)
+
+    /** Ana asking Robin, her Bumblebee, for a little more time. */
+    val askFromAna = request.copy(
+        id = "r2", requesterId = ana.uid, requesterName = ana.displayName, requesterFlower = ana.avatar.emoji,
+        appName = "Instagram", packageName = "demo.instagram", minutes = 10, message = "Sharing photos from the hike 🏔️",
+        status = RequestStatus.PENDING, approverIds = listOf(robin.uid), decidedByName = null, decisionNote = null,
+        createdAtMillis = now - 4 * MIN,
+    )
+
+    /** Robin's own question, still waiting. */
+    val waitingAsk = request.copy(
+        id = "r3", packageName = "demo.tiktok", appName = "TikTok", status = RequestStatus.PENDING,
+        decidedByName = null, decisionNote = null, message = "", createdAtMillis = now - 6 * MIN,
+    )
+
+    val inviteToRobin = Invite("i1", ana.uid, ana.displayName, ana.avatar.emoji, robin.uid, robin.displayName, InviteStatus.PENDING, now - 30 * MIN)
+    val inviteFromRobin = Invite("i2", robin.uid, robin.displayName, robin.avatar.emoji, theo.uid, theo.displayName, InviteStatus.PENDING, now - 90 * MIN)
+
+    val beeStats = BeeStats(
+        asked = 14, yes = 9, no = 4, missed = 1, waiting = 1, minutesGranted = 135,
+        people = listOf(BeeStats.Person(ana.uid, ana.displayName, ana.avatar.emoji, asked = 14, yes = 9, no = 4)),
+        leniency = 62,
+    )
+
+    /** Ana's page as Robin sees it, with everything shared. */
+    val anaPage = SharedPage(
+        ana,
+        minutes = today.totalMinutes,
+        apps = today.apps,
+        progress = progress,
+        limits = myLimits,
+    )
 }

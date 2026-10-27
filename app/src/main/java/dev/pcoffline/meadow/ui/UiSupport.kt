@@ -189,6 +189,8 @@ private fun Throwable.plainMessage(context: Context): String = when (this) {
             "ERROR_REQUIRES_RECENT_LOGIN" -> R.string.error_auth_recent_login
             "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" -> R.string.error_auth_other_method
             "ERROR_INVALID_ACTION_CODE", "ERROR_EXPIRED_ACTION_CODE" -> R.string.error_link_invalid
+            // The project hasn't switched this sign-in method on, or doesn't trust the link's address.
+            "ERROR_OPERATION_NOT_ALLOWED", "ERROR_UNAUTHORIZED_DOMAIN", "ERROR_INVALID_CONTINUE_URI" -> R.string.error_auth_not_enabled
             else -> R.string.error_generic
         },
     )

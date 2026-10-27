@@ -18,6 +18,20 @@ service cloud.firestore {
     function isApproveeOf(uid) { return me() in account(uid).approveeIds; }
     function hasNoApprovers(uid) { return account(uid).approverIds.size() == 0; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // Whether the owner shares [part] ("shareLimits", "shareTime", "shareApps", "shareProgress")
+    // with their Bumblebees. Progress sums up earlier days, so it's only shared once chosen.
+    function shares(uid, part) {
+      return account(uid).get('privacy', {}).get(part, part != 'shareProgress') == true;
+    }
+
+    function validPrivacy(p) {
+      return p is map && p.keys().hasOnly(['shareLimits', 'shareTime', 'shareApps', 'shareProgress'])
+        && (!('shareLimits' in p) || p.shareLimits is bool)
+        && (!('shareTime' in p) || p.shareTime is bool)
+        && (!('shareApps' in p) || p.shareApps is bool)
+        && (!('shareProgress' in p) || p.shareProgress is bool);
+    }
     function isString(v, max) { return v is string && v.size() <= max; }
 
     function validLimit(d, pkg) {
@@ -86,8 +100,7 @@ service cloud.firestore {
           && (!('theme' in changed()) || isString(request.resource.data.theme, 20))
           && (!('darkMode' in changed()) || isString(request.resource.data.darkMode, 10))
           && (!('strictMode' in changed()) || request.resource.data.strictMode is bool)
-          && (!('privacy' in changed()) || (request.resource.data.privacy.keys().hasOnly(['shareUsage'])
-              && request.resource.data.privacy.shareUsage is bool))
+          && (!('privacy' in changed()) || validPrivacy(request.resource.data.privacy))
           // An emergency unlock can only be ended early from the phone, never started or extended.
           && (!('emergencyUntil' in changed()) || request.resource.data.emergencyUntil <= request.time);
         allow create, delete: if false;
@@ -100,7 +113,7 @@ service cloud.firestore {
       }
 
       match /limits/{pkg} {
-        allow read: if signedIn() && (me() == uid || isApproverOf(uid));
+        allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareLimits')));
         allow create: if signedIn() && me() == uid && validLimit(request.resource.data, pkg);
         // Allowed hours can't be compared here, so with Bumblebees they change through the
         // backend's saveLimit, which checks they only got stricter. The app's name stays as it
@@ -118,11 +131,37 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Daily usage is shared with Bumblebees only while the owner allows it.
-      match /usage/{day} {
-        allow read: if signedIn() && (me() == uid
-          || (isApproverOf(uid) && account(uid).get('privacy', {}).get('shareUsage', true) == true));
-        allow write: if signedIn() && me() == uid;
+      // What the owner shares with their Bumblebees, each part in a document of its own so these
+      // rules can hold each choice: today's total (usage), today's top apps (appUsage) and how
+      // the weeks compare (progress). Each holds only its part, and only the latest copy: one
+      // document, "today", that says which day it is. Earlier days never leave the phone.
+      match /usage/{docId} {
+        allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareTime')));
+        allow create, update: if signedIn() && me() == uid && docId == 'today'
+          && request.resource.data.keys().hasOnly(['dayKey', 'totalMinutes', 'updatedAt'])
+          && isString(request.resource.data.dayKey, 10)
+          && request.resource.data.totalMinutes is int && request.resource.data.totalMinutes >= 0 && request.resource.data.totalMinutes <= 1440;
+        allow delete: if signedIn() && me() == uid;
+      }
+
+      match /appUsage/{docId} {
+        allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareApps')));
+        allow create, update: if signedIn() && me() == uid && docId == 'today'
+          && request.resource.data.keys().hasOnly(['dayKey', 'apps', 'updatedAt'])
+          && isString(request.resource.data.dayKey, 10)
+          && request.resource.data.apps is list && request.resource.data.apps.size() <= 15;
+        allow delete: if signedIn() && me() == uid;
+      }
+
+      match /progress/{docId} {
+        allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareProgress')));
+        allow create, update: if signedIn() && me() == uid && docId == 'current'
+          && request.resource.data.keys().hasOnly(['weekChange', 'calmerWeeks', 'keptDays', 'limitDays', 'updatedAt'])
+          && (request.resource.data.weekChange == null || request.resource.data.weekChange is int)
+          && request.resource.data.calmerWeeks is int
+          && request.resource.data.keptDays is int
+          && request.resource.data.limitDays is int;
+        allow delete: if signedIn() && me() == uid;
       }
 
       match /emergencies/{emergencyId} {

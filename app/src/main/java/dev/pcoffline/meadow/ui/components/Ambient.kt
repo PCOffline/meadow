@@ -42,12 +42,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.key
@@ -68,6 +65,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.butterfliesFor
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
 import kotlin.math.abs
@@ -163,11 +161,13 @@ fun rememberSkyMood(): SkyMood {
 
 /**
  * The living backdrop for headers: sky gradient, sun or moon, drifting clouds, rolling hills with
- * tiny flowers, a butterfly by day and fireflies and stars by night.
+ * tiny flowers, the theme's two butterflies by day and fireflies and stars by night.
  */
 @Composable
 fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
     val garden = Garden.colors
+    val theme = Garden.theme
+    val butterflies = remember(theme) { butterfliesFor(theme) }
     val clock = rememberClock()
     val stars = remember { List(28) { Offset(Random(it * 31).nextFloat(), Random(it * 17 + 3).nextFloat() * 0.55f) } }
     val sky = remember(mood.top, mood.bottom) { Brush.verticalGradient(listOf(mood.top, mood.bottom)) }
@@ -201,10 +201,9 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
                     drawCircle(garden.petalHoney.copy(alpha = glow), radius = 2.6f, center = Offset(x, y))
                 }
             } else {
-                val path = t * 0.25f
-                val x = size.width * (0.5f + 0.38f * sin(path))
-                val y = size.height * (0.5f + 0.12f * sin(path * 2.3f))
-                butterfly(Offset(x, y), 9.dp.toPx(), flap = abs(sin(t * 9f)), color = garden.petalLavender)
+                // The theme's two butterflies, the smaller one further off and higher up.
+                flutter(butterflies[1], t, seed = 2.1f, lane = 0.38f, length = 9.5.dp.toPx(), speed = 0.19f)
+                flutter(butterflies[0], t, seed = 0f, lane = 0.52f, length = 13.dp.toPx(), speed = 0.25f)
             }
         }
     }
@@ -246,20 +245,6 @@ private fun DrawScope.cloud(at: Offset, scale: Float, alpha: Float) {
         size = Size(r * 4.8f, r * 1.25f),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(r * 0.62f),
     )
-}
-
-/** A two-tone butterfly; [flap] 0..1 folds the wings. */
-fun DrawScope.butterfly(at: Offset, size: Float, flap: Float, color: Color) {
-    val wing = 0.25f + 0.75f * flap
-    translate(at.x, at.y) {
-        scale(scaleX = wing, scaleY = 1f, pivot = Offset.Zero) {
-            drawOval(color, topLeft = Offset(-size * 1.1f, -size), size = Size(size * 1.1f, size * 1.1f))
-            drawOval(color, topLeft = Offset(0f, -size), size = Size(size * 1.1f, size * 1.1f))
-            drawOval(color.copy(alpha = 0.8f), topLeft = Offset(-size * 0.85f, 0f), size = Size(size * 0.85f, size * 0.8f))
-            drawOval(color.copy(alpha = 0.8f), topLeft = Offset(0f, 0f), size = Size(size * 0.85f, size * 0.8f))
-        }
-        drawLine(Color(0xFF5A4E44), Offset(0f, -size * 0.7f), Offset(0f, size * 0.7f), strokeWidth = size * 0.22f, cap = StrokeCap.Round)
-    }
 }
 
 private data class Petal(val x: Float, val speed: Float, val sway: Float, val phase: Float, val size: Float, val colorIndex: Int)

@@ -20,7 +20,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,10 +36,12 @@ import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.Days
-import dev.pcoffline.meadow.data.SharedUsage
+import dev.pcoffline.meadow.data.SharedAppUsage
+import dev.pcoffline.meadow.data.SharedPage
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.ErrorNote
+import dev.pcoffline.meadow.ui.components.Hint
 import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
@@ -51,21 +52,30 @@ import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.ActionState
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
+import dev.pcoffline.meadow.ui.stats.ProgressCard
 import dev.pcoffline.meadow.ui.theme.Garden
+import androidx.lifecycle.viewModelScope
+import dev.pcoffline.meadow.data.Connectivity
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 
 /** What a Bumblebee can see about a friend they look after. */
 class FriendViewModel(uid: String) : ViewModel() {
-    private val profile = AppGraph.social.profile(uid)
+    // One listener, for the name up top and the page below alike.
+    private val profile = AppGraph.social.profile(uid).shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
     val friend: StateFlow<UserProfile?> = profile.stateWhileVisible(this, null)
 
     /** False until the profile has been read; then [friend] null means they've left Meadow. */
     val loaded: StateFlow<Boolean> = profile.map { true }.stateWhileVisible(this, false)
 
-    // The rules refuse it while the friend doesn't share it; that reads as nothing shared.
-    val usage: StateFlow<SharedUsage?> = AppGraph.share.usage(uid, Days.todayKey()).stateWhileVisible(this, null)
-    val limits: StateFlow<List<AppLimit>> = AppGraph.share.limits(uid).stateWhileVisible(this, emptyList())
+    // Each part the rules refuse (the friend doesn't share it) reads as not shared.
+    private val today = combine(AppGraph.share.minutes(uid, Days.todayKey()), AppGraph.share.apps(uid, Days.todayKey())) { m, a -> m to a }
+    val page: StateFlow<SharedPage?> = combine(profile, today, AppGraph.share.progress(uid), AppGraph.share.limits(uid)) { f, (minutes, apps), progress, limits ->
+        f?.let { SharedPage(it, minutes, apps, progress, limits) }
+    }.stateWhileVisible(this, null)
 }
 
 @Composable
@@ -78,8 +88,8 @@ fun FriendScreen(
 ) {
     val friend by viewModel.friend.collectAsStateWithLifecycle()
     val loaded by viewModel.loaded.collectAsStateWithLifecycle()
-    val usage by viewModel.usage.collectAsStateWithLifecycle()
-    val limits by viewModel.limits.collectAsStateWithLifecycle()
+    val page by viewModel.page.collectAsStateWithLifecycle()
+    val online by Connectivity.online.collectAsStateWithLifecycle()
     // Out here: stepping down can hide their profile, and with it the details, before the
     // step down returns; the action has to stay attached to go back.
     val action = rememberAction()
@@ -88,31 +98,39 @@ fun FriendScreen(
         BackTopBar(friend?.displayName.orEmpty(), onBack = onBack)
         val f = friend
         if (f == null && loaded) {
-            EmptyState("🍂", stringResource(R.string.friend_gone_title), stringResource(R.string.friend_gone_body))
+            EmptyState("🍂", stringResource(R.string.friend_gone_title))
         } else if (f == null) {
             Loading()
         } else {
-            FriendDetails(f, usage, limits, action, onBack, onChat = { onOpenChat(ChatRepository.chatIdFor(me.uid, f.uid)) })
+            // Until every part has been read, the page waits rather than saying nothing's shared.
+            // Offline, the parts can't be read (what's cached might no longer be shared), and the
+            // offline strip already says why.
+            val shared = page?.copy(profile = f)
+            FriendDetails(
+                shared ?: SharedPage(f, null, null, null, null), waiting = shared == null, offline = !online, action, onBack,
+                onChat = { onOpenChat(ChatRepository.chatIdFor(me.uid, f.uid)) },
+            )
         }
     }
 }
 
 @Composable
 private fun FriendDetails(
-    f: UserProfile,
-    usage: SharedUsage?,
-    limits: List<AppLimit>,
+    page: SharedPage,
+    waiting: Boolean,
+    offline: Boolean,
     action: ActionState,
     onBack: () -> Unit,
     onChat: () -> Unit,
 ) {
+    val f = page.profile
     var confirmStepDown by rememberSaveable { mutableStateOf(false) }
     val steppedDown = stringResource(R.string.friend_stepped_down)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        FriendPage(f, usage, limits) { FilledTonalButton(onClick = onChat) { Text(stringResource(R.string.action_chat)) } }
+        FriendPage(page, waiting, offline) { FilledTonalButton(onClick = onChat) { Text(stringResource(R.string.action_chat)) } }
         ErrorNote(action.error)
         OutlinedButton(onClick = { confirmStepDown = true }, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.friend_step_down, f.displayName))
@@ -136,12 +154,14 @@ private fun FriendDetails(
 }
 
 /**
- * A friend's page as their Bumblebees see it: who they are, today's screen time if they share it,
- * and their limits. Settings shows people their own page through this too, so the preview is
- * always the real thing. [action] sits beside the name.
+ * A friend's page as their Bumblebees see it: who they are, then each part they share. Settings
+ * shows people their own page through this too, so the preview is always the real thing.
+ * [action] sits beside the name. While [waiting] for the parts, there's a spinner, unless
+ * [offline], where they won't come.
  */
 @Composable
-fun FriendPage(f: UserProfile, usage: SharedUsage?, limits: List<AppLimit>, action: @Composable () -> Unit = {}) {
+fun FriendPage(page: SharedPage, waiting: Boolean = false, offline: Boolean = false, action: @Composable () -> Unit = {}) {
+    val f = page.profile
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonAvatar(f.avatar, size = 64.dp)
@@ -153,48 +173,63 @@ fun FriendPage(f: UserProfile, usage: SharedUsage?, limits: List<AppLimit>, acti
             action()
         }
 
-        MeadowCard(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.friend_today), style = MaterialTheme.typography.titleMedium)
-            if (usage == null) {
-                Text(stringResource(R.string.friend_no_usage_shared, f.displayName), style = MaterialTheme.typography.bodySmall)
-            } else {
-                Text(stringResource(R.string.friend_screen_time, minutesText(usage.totalMinutes)), style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(8.dp))
-                val max = usage.apps.maxOfOrNull { it.minutes }?.coerceAtLeast(1) ?: 1
-                usage.apps.take(8).forEach { app ->
-                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AppIcon(app.packageName, size = 28.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Row {
-                                Text(app.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                                Text(
-                                    if (app.limitMinutes > 0) stringResource(R.string.friend_used_of, minutesText(app.minutes), minutesText(app.limitMinutes))
-                                    else minutesText(app.minutes),
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
-                            GrowthBar(
-                                if (app.limitMinutes > 0) app.minutes / app.limitMinutes.toFloat() else app.minutes / max.toFloat(),
-                                height = 6.dp,
-                                color = if (app.limitMinutes > 0) null else Garden.colors.growth,
-                            )
-                        }
+        if (waiting) {
+            if (!offline) Loading(Modifier.height(140.dp))
+            return@Column
+        }
+        val nothing = page.progress == null && page.minutes == null && page.apps == null && page.limits == null
+        if (nothing) Hint(stringResource(R.string.friend_nothing_shared, f.displayName))
+        page.progress?.let { ProgressCard(it) }
+        if (page.minutes != null || page.apps != null) TodayCard(page.minutes, page.apps.orEmpty(), page.limits.orEmpty())
+        page.limits?.takeIf { it.isNotEmpty() }?.let { LimitsCard(it) }
+    }
+}
+
+@Composable
+private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>, limits: List<AppLimit>) {
+    val daily = limits.associate { it.packageName to it.dailyMinutes }
+    MeadowCard(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.friend_today), style = MaterialTheme.typography.titleMedium)
+        if (minutes != null) {
+            Text(stringResource(R.string.friend_screen_time, minutesText(minutes)), style = MaterialTheme.typography.headlineSmall)
+        }
+        if (minutes != null && apps.isNotEmpty()) Spacer(Modifier.height(8.dp))
+        val max = apps.maxOfOrNull { it.minutes }?.coerceAtLeast(1) ?: 1
+        apps.take(8).forEach { app ->
+            val limit = daily[app.packageName] ?: 0
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(app.packageName, size = 28.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Row {
+                        Text(app.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(
+                            if (limit > 0) stringResource(R.string.friend_used_of, minutesText(app.minutes), minutesText(limit))
+                            else minutesText(app.minutes),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
                     }
+                    GrowthBar(
+                        if (limit > 0) app.minutes / limit.toFloat() else app.minutes / max.toFloat(),
+                        height = 6.dp,
+                        color = if (limit > 0) null else Garden.colors.growth,
+                    )
                 }
             }
         }
+    }
+}
 
-        MeadowCard(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.friend_limits), style = MaterialTheme.typography.titleMedium)
-            if (limits.isEmpty()) Text(stringResource(R.string.friend_no_limits), style = MaterialTheme.typography.bodySmall)
-            limits.forEach { limit ->
-                Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AppIcon(limit.packageName, size = 28.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Text(limit.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Text(limitText(limit.dailyMinutes, limit.weeklyMinutes, limit.schedule), style = MaterialTheme.typography.labelMedium)
-                }
+@Composable
+private fun LimitsCard(limits: List<AppLimit>) {
+    MeadowCard(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.friend_limits), style = MaterialTheme.typography.titleMedium)
+        limits.forEach { limit ->
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(limit.packageName, size = 28.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(limit.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text(limitText(limit.dailyMinutes, limit.weeklyMinutes, limit.schedule), style = MaterialTheme.typography.labelMedium)
             }
         }
     }

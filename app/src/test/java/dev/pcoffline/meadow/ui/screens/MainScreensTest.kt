@@ -1,5 +1,8 @@
 package dev.pcoffline.meadow.ui.screens
 
+import dev.pcoffline.meadow.data.SharedPage
+import dev.pcoffline.meadow.ui.circle.FriendPage
+import dev.pcoffline.meadow.ui.chat.ChatListContent
 import android.app.Application
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -21,6 +25,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Chat
@@ -86,16 +91,11 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `the garden points to unfinished setup and to inviting a first Bumblebee`() {
+    fun `the garden points to unfinished setup`() {
         var setup = 0
-        var circle = 0
-        val lonely = DemoGarden.robin.copy(approverIds = emptyList())
-        show {
-            GardenContent(lonely, DemoGarden.garden.copy(essentialsReady = false), onOpenSetup = { setup++ }, onOpenCircle = { circle++ })
-        }
+        show { GardenContent(DemoGarden.robin, DemoGarden.garden.copy(essentialsReady = false), onOpenSetup = { setup++ }) }
         node(R.string.garden_notice_setup_action).performClick()
-        node(R.string.garden_notice_no_bees_action).performClick()
-        assertEquals(1 to 1, setup to circle)
+        assertEquals(1, setup)
         assertAccessible()
     }
 
@@ -157,6 +157,29 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `no chats says so, and loading or a chat doesn't`() {
+        var chats by mutableStateOf<List<Chat>?>(null)
+        show { ChatListContent(DemoGarden.robin, chats) }
+        node(R.string.chats_empty_title).assertDoesNotExist()
+        chats = emptyList()
+        node(R.string.chats_empty_title).assertExists()
+        assertAccessible()
+        chats = listOf(DemoGarden.chat)
+        node(R.string.chats_empty_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `offline, a friend's page waits quietly for parts that can't come yet`() {
+        var offline by mutableStateOf(false)
+        show { FriendPage(SharedPage(DemoGarden.maya, null, null, null, null), waiting = true, offline = offline) }
+        node(R.string.loading_garden).assertExists()
+        offline = true
+        node(R.string.loading_garden).assertDoesNotExist()
+        // Not knowing isn't the same as nothing shared.
+        node(R.string.friend_nothing_shared, DemoGarden.maya.displayName).assertDoesNotExist()
+    }
+
+    @Test
     fun `a read chat has no unread mark`() {
         val now = System.currentTimeMillis()
         val chat = Chat(
@@ -171,7 +194,7 @@ class MainScreensTest : ScreenTest() {
     @Test
     fun `a Bumblebee already on the way out has no empty menu`() {
         val leaving = DemoGarden.robin.copy(pendingRemovals = mapOf(DemoGarden.maya.uid to System.currentTimeMillis() + 3_600_000))
-        show { CircleContent(leaving, listOf(DemoGarden.maya, DemoGarden.theo), emptyList(), emptyList(), emptyList(), anonymous = false) }
+        show { CircleContent(leaving, listOf(DemoGarden.maya, DemoGarden.theo), emptyList(), emptyList(), emptyList()) }
         // Only Theo, who isn't leaving, still offers the menu with "Remove" in it.
         compose.onAllNodesWithContentDescription(text(R.string.action_more)).assertCountEquals(1)
         assertAccessible()
@@ -194,7 +217,7 @@ class MainScreensTest : ScreenTest() {
         show {
             CircleContent(
                 DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList(),
-                anonymous = false, onOpenChat = { chats += it }, onOpenFriend = { friends += it },
+                onOpenChat = { chats += it }, onOpenFriend = { friends += it },
             )
         }
         compose.onNodeWithContentDescription(text(R.string.circle_chat_with, "Maya")).performClick()
@@ -206,12 +229,29 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `a garden without an email is asked to add one before inviting`() {
-        show { CircleContent(DemoGarden.robin.copy(approverIds = emptyList(), approveeIds = emptyList()), emptyList(), emptyList(), emptyList(), emptyList(), anonymous = true) }
-        node(R.string.secure_title).assertExists()
-        assertTrue(compose.onAllNodesWithText(text(R.string.invite_title)).fetchSemanticsNodes().isEmpty())
-        node(R.string.circle_no_bees_title).assertExists()
+    fun `a garden without an email can invite too`() {
+        show { CircleContent(DemoGarden.robin.copy(approverIds = emptyList(), approveeIds = emptyList()), emptyList(), emptyList(), emptyList(), emptyList()) }
+        node(R.string.invite_title).assertExists()
+        node(R.string.invite_code_title).assertExists()
+        // Nobody in the circle yet: no empty sections, just ways to fill them.
+        node(R.string.circle_your_bees).assertDoesNotExist()
+        node(R.string.circle_looking_after).assertDoesNotExist()
         assertAccessible()
+    }
+
+    @Test
+    fun `a friend code or a pasted invite link can be entered, and nothing else`() {
+        show { CircleContent(DemoGarden.robin, emptyList(), emptyList(), emptyList(), emptyList()) }
+        val field = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
+        val invite = compose.onNode(hasText(text(R.string.invite_code_button)) and hasClickAction())
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(field)
+        invite.assertIsNotEnabled()
+        compose.onNode(field).performTextInput("see you at the park")
+        invite.assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performTextReplacement("ab12-cd34")
+        invite.assertIsEnabled()
+        compose.onNode(hasSetTextAction()).performTextReplacement("Be my Bumblebee? https://meadow.example/i/AbCdEfGh12345678")
+        invite.assertIsEnabled()
     }
 
     @Test

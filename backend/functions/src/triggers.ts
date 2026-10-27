@@ -92,7 +92,8 @@ export async function migrateProfiles(limit = 200): Promise<number> {
     const d = doc.data();
     const moved: Record<string, unknown> = {};
     for (const f of PRIVATE_FIELDS) if (d[f] !== undefined) moved[f] = d[f];
-    moved.privacy = { shareUsage: d.privacy?.shareUsage !== false };
+    const usage = d.privacy?.shareUsage !== false;
+    moved.privacy = { shareLimits: true, shareTime: usage, shareApps: usage, shareProgress: false };
     moved.pendingRemovals = {};
     const batch = db().batch();
     batch.set(accountRef(doc.id), moved, { merge: true });

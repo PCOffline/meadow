@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="requests_title">Requests</string>
-    <string name="requests_subtitle">Asking for extra time, and answering friends</string>
     <string name="requests_tab_for_you">For you</string>
     <string name="requests_tab_for_you_count">For you (%1$d)</string>
     <string name="requests_tab_yours">Yours</string>
     <string name="requests_empty_for_you_title">Nothing to answer</string>
-    <string name="requests_empty_for_you_body">When a friend you look after asks for extra time, it shows up here.</string>
     <string name="requests_empty_yours_title">No requests yet</string>
-    <string name="requests_empty_yours_body">When an app is resting, you can ask your Bumblebees for a little extra time.</string>
     <string name="requests_ask_button">Ask for extra time</string>
     <string name="requests_invite_button">Invite a Bumblebee</string>
 
@@ -37,14 +34,13 @@
 
     <string name="ask_title">Ask for a little extra time</string>
     <string name="ask_no_limits">You haven\'t planted any limits yet.</string>
-    <string name="ask_pending">You\'ve already asked about %1$s. Wait for their answer, or withdraw that question in Requests first.</string>
+    <string name="ask_pending">You\'ve already asked about %1$s.</string>
     <string name="ask_how_much">How much?</string>
-    <string name="ask_why">Why? It helps them say yes</string>
+    <string name="ask_why">Why?</string>
     <string name="ask_sending">Sending…</string>
     <string name="ask_sent">Asked your Bumblebees 💌</string>
 
     <string name="ask_who">Ask</string>
-    <string name="ask_who_private">Each Bumblebee sees only your request, not who else you asked.</string>
     <string name="request_answered_by_other">Another Bumblebee answered</string>
     <string name="request_usage">Used %1$s of %2$s today</string>
     <string name="request_usage_no_allowance">Used %1$s today</string>
@@ -53,16 +49,12 @@
 
     <string name="bee_stats_open">Your answers as a Bumblebee</string>
     <string name="bee_stats_title">Your answers</string>
-    <string name="bee_stats_private">Worked out on this phone from the requests sent to you. Only you see it, unless you share it.</string>
-    <string name="bee_stats_empty_title">No requests yet</string>
-    <string name="bee_stats_empty_body">Once the people you look after ask for something, you\'ll see how you\'ve answered here.</string>
     <string name="bee_stats_leniency">How you answer</string>
     <plurals name="bee_stats_leniency_unknown">
         <item quantity="one">Answer at least %1$d request to see how you lean.</item>
         <item quantity="other">Answer at least %1$d requests to see how you lean.</item>
     </plurals>
     <string name="bee_stats_leniency_score">Leniency %1$d of 100</string>
-    <string name="bee_stats_leniency_how">A \"not today\" counts 0 and a yes counts 100; a yes with fewer minutes than asked counts the share you gave.</string>
     <string name="bee_leaning_very_strict">Very strict 🌵</string>
     <string name="bee_leaning_strict">Strict 🌿</string>
     <string name="bee_leaning_balanced">Balanced 🌼</string>

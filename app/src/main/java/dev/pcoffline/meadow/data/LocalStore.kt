@@ -9,6 +9,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.time.DayOfWeek
+import java.time.LocalDate
 
 /** An offline emergency unlock that still has to be reported to the backend. */
 @Serializable
@@ -77,13 +79,49 @@ class LocalStore(context: Context) {
         _autoUpdate.value = enabled
     }
 
-    private val _privacy = MutableStateFlow(Privacy(prefs.getBoolean(KEY_SHARE_USAGE, true)))
+    private val _weekRule = MutableStateFlow(
+        WeekRule(
+            first = DayOfWeek.of(prefs.getInt(KEY_WEEK_FIRST, DayOfWeek.MONDAY.value)),
+            previous = DayOfWeek.of(prefs.getInt(KEY_WEEK_PREVIOUS, prefs.getInt(KEY_WEEK_FIRST, DayOfWeek.MONDAY.value))),
+            limitsFrom = prefs.getString(KEY_WEEK_LIMITS_FROM, null)?.let(Days::parse),
+        ),
+    )
+
+    /** The day weeks start on, for Growth and weekly limits. */
+    val weekRule: StateFlow<WeekRule> = _weekRule.asStateFlow()
+
+    /** Whether the first day of the week was ever set here; until it is, weeks start on Monday. */
+    val weekStartSet: Boolean get() = prefs.contains(KEY_WEEK_FIRST)
+
+    /** Weeks start on [day], unless a first day was already set here. For first runs. */
+    fun adoptWeekStart(day: DayOfWeek) {
+        if (!weekStartSet) setWeekStart(day)
+    }
+
+    /**
+     * Weeks start on [day] from [today] on. With no weekly limit there's nothing to keep, so at
+     * once; otherwise this week's limits keep the start they began with ([WeekRule.changedTo]).
+     */
+    fun setWeekStart(day: DayOfWeek, today: LocalDate = Days.today()) {
+        val weekly = _limits.value.any { it.weeklyMinutes > 0 }
+        val rule = if (weekly) _weekRule.value.changedTo(day, today) else WeekRule(day)
+        prefs.edit {
+            putInt(KEY_WEEK_FIRST, rule.first.value)
+            putInt(KEY_WEEK_PREVIOUS, rule.previous.value)
+            putString(KEY_WEEK_LIMITS_FROM, rule.limitsFrom?.let(Days::key))
+        }
+        _weekRule.value = rule
+    }
+
+    private val _privacy = MutableStateFlow(
+        Privacy.read { name -> if (prefs.contains(name)) prefs.getBoolean(name, true) else null },
+    )
 
     /** Mirrors the profile's privacy choices so background work can respect them offline. */
     val privacy: StateFlow<Privacy> = _privacy.asStateFlow()
 
     fun setPrivacy(privacy: Privacy) {
-        prefs.edit { putBoolean(KEY_SHARE_USAGE, privacy.shareUsage) }
+        prefs.edit { privacy.toFirestore().forEach { (name, on) -> putBoolean(name, on) } }
         _privacy.value = privacy
     }
 
@@ -138,6 +176,7 @@ class LocalStore(context: Context) {
         _theme.value = null
         _darkMode.value = null
         _autoUpdate.value = true
+        _weekRule.value = WeekRule()
         _acceptedTerms.value = 0
     }
 
@@ -236,7 +275,10 @@ class LocalStore(context: Context) {
         const val KEY_THEME = "theme"
         const val KEY_DARK_MODE = "dark_mode"
         const val KEY_AUTO_UPDATE = "auto_update"
-        const val KEY_SHARE_USAGE = "share_usage"
+        const val KEY_WEEK_FIRST = "week_first"
+        const val KEY_WEEK_PREVIOUS = "week_previous"
+        const val KEY_WEEK_LIMITS_FROM = "week_limits_from"
+        /** Before privacy was split into parts; the parts are kept under their own names. */
         const val KEY_TERMS = "accepted_terms_version"
         const val KEY_NOTIFIED_UPDATE = "notified_update"
         const val KEY_LINK_EMAIL = "link_email"

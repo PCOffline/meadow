@@ -63,6 +63,12 @@ class EnforcementJourneyTest : EndToEndTest() {
             node(R.string.rest_home).performScrollTo().performClick()
             // Home, with neither the cover nor Pebbles in front (and so no screen of Meadow's to read).
             eventually("the block screen gone") { onTop().let { "BlockActivity" !in it && "PebblesActivity" !in it && it.isNotEmpty() } }
+
+            // Back does the same: home, not back into the app it covers.
+            openPebbles()
+            eventually("Pebbles covered again") { "BlockActivity" in onTop() }
+            shell("input keyevent KEYCODE_BACK")
+            eventually("home after back") { onTop().let { "BlockActivity" !in it && "PebblesActivity" !in it && it.isNotEmpty() } }
         }
     }
 

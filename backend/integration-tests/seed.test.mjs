@@ -34,7 +34,9 @@ test("the demo people are seeded with a circle, limits, usage, a request and a c
 
     const limits = (p) => getDocs(collection(db, `users/${p.uid}/limits`)).then((s) => s.docs.map((d) => d.id).toSorted());
     assert.deepEqual(await limits(sam), ["com.google.android.youtube", "com.instagram.android"]);
-    assert.equal((await getDocs(collection(db, `users/${sam.uid}/usage`))).size, 7);
+    assert.equal((await getDoc(doc(db, `users/${sam.uid}/usage/today`))).get("totalMinutes"), 65);
+    assert.equal((await getDoc(doc(db, `users/${sam.uid}/appUsage/today`))).get("apps").length, 2);
+    assert.equal((await getDoc(doc(db, `users/${sam.uid}/progress/current`))).get("calmerWeeks"), 2);
 
     const inbox = (await getDocs(collection(db, `users/${bee.uid}/inbox`))).docs.map((d) => d.data());
     assert.equal(inbox.length, 1);

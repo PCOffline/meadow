@@ -63,6 +63,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="meadow" android:host="invite" />
             </intent-filter>
+            <!-- Sign-in links handed back by the browser's page when they opened there. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="meadow" android:host="signin" />
+            </intent-filter>
             <!-- Invite links (verified App Links once assetlinks.json is deployed). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -82,11 +89,13 @@
 
         <activity
             android:name=".enforcement.BlockActivity"
+            android:enableOnBackInvokedCallback="false"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity="dev.pcoffline.meadow.block"
-            android:theme="@style/Theme.Meadow" />
+            android:theme="@style/Theme.Meadow"
+            tools:targetApi="34" />
 
         <service
             android:name=".enforcement.GuardianAccessibilityService"
