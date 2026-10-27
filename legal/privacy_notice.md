@@ -1,6 +1,6 @@
 # Privacy notice
 
-Version 2 · updated 13 October 2026
+Version 2 · updated 27 October 2026
 
 Meadow helps you keep the app time limits you choose, with the help of friends you trust (your Bumblebees). This notice explains what Meadow collects, why, who can see it, and the choices you have. We've tried to keep it short and plain.
 
@@ -10,7 +10,7 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 
 ## What stays on your phone
 
-- **Your detailed screen time.** Meadow reads Android's usage log to measure how long each app is open. The full history (up to 120 days) stays on your phone.
+- **Your detailed screen time.** Meadow reads Android's usage log to measure how long each app is open. The full history (up to 120 days) stays on your phone; only the summaries you choose to share below leave it.
 - **What's on screen.** The garden keeper (an accessibility service) notices which app is in front so it can close apps whose time is up. In strict mode it also reads the words on a few system settings screens, to stop Meadow being switched off. This happens on your phone only. Meadow never reads what you type, and never stores or sends what's on your screen.
 - **Notifications from resting apps.** With notification access, Meadow hides notifications from apps whose time is up and pauses their media. It only looks at which app posted them, and never stores or sends their content.
 - **Your list of installed apps,** used to let you pick apps to limit.
@@ -22,9 +22,10 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 |---|---|
 | Your name, picture (emoji or photo), short bio and friend code | So your Bumblebees know who you are |
 | Your email address, if you add one, and how you sign in (password or emailed link) | To sign you in and recover your garden |
-| Your limits (app name, minutes and allowed hours) | So they can't be loosened without a Bumblebee's yes |
+| Your limits (app name, minutes and allowed hours) | So they can't be loosened without a Bumblebee's yes. Your Bumblebees see them unless you turn that off |
 | Requests, answers, and chat messages. A request includes how long you've used that app today and how much today allows | So you and your Bumblebees can talk and decide |
-| Today's screen time summary (top apps and minutes) | So your Bumblebees can see how you're doing. **Optional** |
+| Today's screen time, and today's top apps with their minutes, each shared on its own | So your Bumblebees can see how you're doing. **Optional** |
+| Your progress: this week's screen time compared with last week's, how many weeks in a row it went down, and on how many of the last 7 days you kept your limits | So your Bumblebees can see how you're doing over time. **Optional, off unless you turn it on** |
 | When your phone last checked in | So Meadow can tell your Bumblebees, without details, if it may have stopped working. Only Meadow's servers read it |
 | Emergency unlocks: when, how long and your reason | So emergency unlocks stay rare and honest |
 | An ID for each phone you're signed in on (a Firebase installation ID) | To send your notifications to the right phones. Signing out removes that phone's ID |
@@ -34,7 +35,7 @@ We don't sell your data, show ads, or use analytics or tracking tools.
 
 ## Who can see what
 
-- **Your Bumblebees** can see your name, picture, bio, limits, the requests you send them, emergency unlocks, and, if you allow it, your daily screen time. If Meadow may have stopped working on your phone, they're told that, but not why.
+- **Your Bumblebees** can see your name, picture, bio, the requests you send them and emergency unlocks. They can also see each of these, unless you turn it off: your limits, today's screen time and today's top apps. They see your progress only if you turn it on. If Meadow may have stopped working on your phone, they're told that, but not why.
 - **Each Bumblebee** only sees the requests sent to them. They don't learn who else was asked, or who answered.
 - **Nobody** can see who your other Bumblebees are, or whose garden you look after. Adding or removing a Bumblebee is your own business; only the person affected is told.
 - **Nobody** sees your settings, strict mode or protection status.
@@ -51,7 +52,7 @@ When Meadow checks for updates, your phone asks GitHub for the latest release. G
 
 ## How long we keep it
 
-We keep your data until you delete it or your account. Turning off screen-time sharing deletes what you've already shared. Deleting your account removes your profile, limits, requests, chats, photo and sign-in from our systems right away. Backups held by Google may take up to 30 days to expire.
+We keep your data until you delete it or your account. Turning off sharing today's screen time, top apps or progress deletes what you've already shared of it. Limits stay, since they're what keeps your commitments, but your Bumblebees can't see them while that's off. Deleting your account removes your profile, limits, requests, chats, photo and sign-in from our systems right away. Backups held by Google may take up to 30 days to expire.
 
 ## Your choices and rights
 

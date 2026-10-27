@@ -1,6 +1,11 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import dev.pcoffline.meadow.ui.settings.PRIVACY_SETTLE_MS
+import dev.pcoffline.meadow.ui.minutesText
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsOff
+import androidx.annotation.StringRes
 import android.text.format.DateFormat
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -120,22 +125,75 @@ class ProfileAndPrivacyTest : ScreenTest() {
         assertEquals(1, previews)
     }
 
+    private fun preview(privacy: Privacy = Privacy(shareProgress = true), save: suspend (Privacy) -> Unit = {}) = show {
+        PrivacyPreviewContent(robin.copy(privacy = privacy), DemoGarden.today, DemoGarden.progress, DemoGarden.myLimits, save = save)
+    }
+
+    private fun switch(@StringRes title: Int) = compose.onNode(isToggleable() and hasText(text(title)))
+
     @Test
-    fun `the preview shows today's time and limits while it's shared`() {
-        show { PrivacyPreviewContent(robin, DemoGarden.today, DemoGarden.myLimits) }
-        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage))).assertExists()
+    fun `the preview shows each part that's shared`() {
+        preview()
+        for (part in listOf(R.string.settings_share_limits, R.string.settings_share_time, R.string.settings_share_apps, R.string.settings_share_progress)) {
+            switch(part).assertIsOn()
+        }
         node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).performScrollTo().assertExists()
         compose.onNodeWithText("Maps").performScrollTo().assertExists()
+        node(R.string.progress_title).performScrollTo().assertExists()
+        node(R.string.progress_kept, 5, 7).performScrollTo().assertExists()
+        node(R.string.friend_limits).performScrollTo().assertExists()
         compose.onNodeWithText(robin.bio).performScrollTo().assertExists()
         assertAccessible()
     }
 
     @Test
-    fun `with sharing off, the preview shows what Bumblebees get instead`() {
-        show { PrivacyPreviewContent(robin.copy(privacy = Privacy(shareUsage = false)), DemoGarden.today, DemoGarden.myLimits) }
-        node(R.string.friend_no_usage_shared, robin.displayName).performScrollTo().assertExists()
+    fun `each part comes off the page on its own`() {
+        preview(Privacy(shareTime = false, shareLimits = false, shareProgress = true))
+        node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).assertDoesNotExist()
+        node(R.string.friend_limits).assertDoesNotExist()
+        // Top apps stay, without the limits that are now private.
+        compose.onNodeWithText("Maps").performScrollTo().assertExists()
+        node(R.string.friend_used_of, app.resources.minutesText(52), app.resources.minutesText(60)).assertDoesNotExist()
+        node(R.string.progress_title).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `with nothing shared, the preview says so`() {
+        preview(Privacy(shareLimits = false, shareTime = false, shareApps = false, shareProgress = false))
+        node(R.string.friend_nothing_shared, robin.displayName).performScrollTo().assertExists()
         compose.onAllNodesWithText("Maps").assertCountEquals(0)
-        // Limits are always theirs to see.
-        compose.onNodeWithText("Instagram").performScrollTo().assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a switch moves at once, and a quick run of changes is saved once`() {
+        val saves = mutableListOf<Privacy>()
+        preview { saves += it }
+        compose.mainClock.autoAdvance = false
+        switch(R.string.settings_share_time).performClick()
+        compose.mainClock.advanceTimeByFrame()
+        // Straight away, before anything is saved: the switch and the page below.
+        switch(R.string.settings_share_time).assertIsOff()
+        node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).assertDoesNotExist()
+        switch(R.string.settings_share_apps).performClick()
+        compose.mainClock.advanceTimeBy(PRIVACY_SETTLE_MS / 2)
+        assertEquals(emptyList<Privacy>(), saves)
+        compose.mainClock.advanceTimeBy(PRIVACY_SETTLE_MS)
+        compose.mainClock.autoAdvance = true
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals(listOf(Privacy(shareTime = false, shareApps = false, shareProgress = true)), saves)
+    }
+
+    @Test
+    fun `a change that can't be saved goes back, and says why`() {
+        preview { throw IllegalStateException("no network") }
+        compose.mainClock.autoAdvance = false
+        switch(R.string.settings_share_progress).performClick()
+        compose.mainClock.advanceTimeByFrame()
+        switch(R.string.settings_share_progress).assertIsOff()
+        compose.mainClock.advanceTimeBy(PRIVACY_SETTLE_MS * 2)
+        compose.mainClock.autoAdvance = true
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.error_generic), substring = true).fetchSemanticsNodes().isNotEmpty() }
+        switch(R.string.settings_share_progress).assertIsOn()
     }
 }

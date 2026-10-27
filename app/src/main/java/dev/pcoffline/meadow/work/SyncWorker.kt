@@ -12,7 +12,6 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.SharedAppUsage
 import dev.pcoffline.meadow.data.SharedUsage
-import dev.pcoffline.meadow.data.Sharing
 import dev.pcoffline.meadow.data.runCatchingCancellable
 import dev.pcoffline.meadow.enforcement.GuardianService
 import java.util.concurrent.TimeUnit
@@ -29,7 +28,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         return runCatchingCancellable {
             AppGraph.emergency.flushPending()
             val privacy = AppGraph.store.privacy.value
-            Sharing.usage(privacy, ::todaySummary)?.let { AppGraph.share.upload(it) }
+            AppGraph.share.share(privacy, Days.todayKey(), ::todaySummary) { AppGraph.progress.now() }
             val now = System.currentTimeMillis()
             if (now - AppGraph.store.lastHeartbeatMillis >= HEARTBEAT_EVERY_MS) {
                 AppGraph.share.heartbeat()

@@ -149,7 +149,8 @@ class RenderedContrastTest : ScreenTest() {
 
     @Test
     fun `what Bumblebees see, shared and not`() = sweep(listOf(true, false)) { shared ->
-        PrivacyPreviewContent(DemoGarden.robin.copy(privacy = Privacy(shareUsage = shared)), DemoGarden.today, DemoGarden.myLimits)
+        val privacy = if (shared) Privacy(shareProgress = true) else Privacy(shareLimits = false, shareTime = false, shareApps = false, shareProgress = false)
+        PrivacyPreviewContent(DemoGarden.robin.copy(privacy = privacy), DemoGarden.today, DemoGarden.progress, DemoGarden.myLimits, save = {})
     }
 
     @Test

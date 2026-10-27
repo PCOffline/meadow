@@ -66,12 +66,14 @@ export async function seed({ domain = "meadow.test", host = "127.0.0.1" } = {}) 
     await robin.call("saveLimit", { ...CHESS, dailyMinutes: 45, weeklyMinutes: 0 });
     await kai.call("saveLimit", { ...INSTAGRAM, dailyMinutes: 20, weeklyMinutes: 0 });
 
-    // A week of shared screen time, written by Sam's own phone as the app does.
+    // A week of shared screen time and top apps, written by Sam's own phone as the app does:
+    // each part in its own document, so each privacy choice can be held by the rules.
     const week = [[24, 41], [30, 58], [12, 20], [29, 63], [31, 44], [18, 35], [22, 15]];
     for (const [daysAgo, [insta, yt]] of week.entries()) {
-      await setDoc(doc(sam.db, `users/${sam.uid}/usage/${dayKey(daysAgo)}`), {
-        dayKey: dayKey(daysAgo),
-        totalMinutes: insta + yt,
+      const day = dayKey(daysAgo);
+      await setDoc(doc(sam.db, `users/${sam.uid}/usage/${day}`), { dayKey: day, totalMinutes: insta + yt, updatedAt: serverTimestamp() });
+      await setDoc(doc(sam.db, `users/${sam.uid}/appUsage/${day}`), {
+        dayKey: day,
         apps: [
           { ...INSTAGRAM, minutes: insta, limitMinutes: 30 },
           { ...YOUTUBE, minutes: yt, limitMinutes: 60 },
@@ -79,6 +81,9 @@ export async function seed({ domain = "meadow.test", host = "127.0.0.1" } = {}) 
         updatedAt: serverTimestamp(),
       });
     }
+    await setDoc(doc(sam.db, `users/${sam.uid}/progress/current`), {
+      weekChange: -18, calmerWeeks: 2, keptDays: 5, limitDays: 7, updatedAt: serverTimestamp(),
+    });
 
     // An open question for Bee, and a word in their chat.
     await sam.call("createRequest", {

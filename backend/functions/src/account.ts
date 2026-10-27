@@ -44,7 +44,7 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
     })),
   );
   const [
-    profile, account, limits, extraTime, sharedUsage, emergencyUnlocks, requestsYouMade, requestsYouWereAsked,
+    profile, account, limits, extraTime, sharedUsage, sharedTopApps, sharedProgress, emergencyUnlocks, requestsYouMade, requestsYouWereAsked,
     invitesYouSent, invitesYouGot, conversations,
   ] = await Promise.all([
     userRef.get(),
@@ -52,6 +52,8 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
     docs(userRef.collection("limits")),
     docs(userRef.collection("grants")),
     docs(userRef.collection("usage")),
+    docs(userRef.collection("appUsage")),
+    docs(userRef.collection("progress")),
     docs(userRef.collection("emergencies")),
     docs(requests().where("requesterId", "==", uid)),
     docs(userRef.collection("inbox")),
@@ -68,6 +70,8 @@ export const exportMyData = onCall({ timeoutSeconds: 120, memory: "512MiB" }, as
     limits,
     extraTime,
     sharedUsage,
+    sharedTopApps,
+    sharedProgress,
     emergencyUnlocks,
     requestsYouMade,
     requestsYouWereAsked,

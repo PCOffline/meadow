@@ -70,5 +70,5 @@
     <string name="circle_bee_removing">%1$s will stop being your Bumblebee in 24 hours</string>
     <string name="circle_remove_body_delayed">%1$s stops being your Bumblebee in 24 hours, so it can\'t be a way around a \"not today\". You can change your mind until then. Only %1$s is told, straight away.</string>
     <string name="circle_garden_role">You\'re their Bumblebee</string>
-    <string name="friend_no_usage_shared">%1$s hasn\'t shared any screen time today.</string>
+    <string name="friend_nothing_shared">%1$s hasn\'t shared anything yet.</string>
 </resources>

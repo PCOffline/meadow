@@ -105,7 +105,7 @@ fun DocumentSnapshot.toProfile(account: DocumentSnapshot? = null): UserProfile {
         approverIds = acc?.approverIds.orEmpty(),
         approveeIds = acc?.approveeIds.orEmpty(),
         pendingRemovals = acc?.pendingRemovals.orEmpty(),
-        privacy = Privacy(shareUsage = pick("privacy") { getBoolean("privacy.shareUsage") } ?: true),
+        privacy = Privacy.read { name -> pick("privacy") { getBoolean("privacy.$name") } },
         strictMode = pick("strictMode") { getBoolean(it) } ?: false,
         emergencyUntilMillis = pick("emergencyUntil") { getTimestamp(it)?.toDate()?.time } ?: 0L,
         emergencyPackage = pick("emergencyPackage") { getString(it) },
@@ -122,7 +122,7 @@ fun DocumentSnapshot.toAccount() = Account(
     pendingRemovals = timestampMap("pendingRemovals"),
     friendCode = getString("friendCode").orEmpty(),
     strictMode = getBoolean("strictMode") ?: false,
-    privacy = Privacy(shareUsage = getBoolean("privacy.shareUsage") ?: true),
+    privacy = Privacy.read { getBoolean("privacy.$it") },
     emergencyUntilMillis = getTimestamp("emergencyUntil")?.toDate()?.time ?: 0L,
     emergencyPackage = getString("emergencyPackage"),
     emergencyUsesMillis = timestampList("emergencyUses"),
@@ -222,8 +222,8 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
     pending = metadata.hasPendingWrites(),
 )
 
-fun DocumentSnapshot.toSharedUsage(): SharedUsage {
-    val apps = (get("apps") as? List<*>)?.mapNotNull { raw ->
+fun DocumentSnapshot.toSharedApps(): List<SharedAppUsage> =
+    (get("apps") as? List<*>)?.mapNotNull { raw ->
         val map = raw as? Map<*, *> ?: return@mapNotNull null
         SharedAppUsage(
             packageName = map["packageName"] as? String ?: return@mapNotNull null,
@@ -232,5 +232,16 @@ fun DocumentSnapshot.toSharedUsage(): SharedUsage {
             limitMinutes = (map["limitMinutes"] as? Number)?.toInt() ?: 0,
         )
     } ?: emptyList()
-    return SharedUsage(dayKey = id, totalMinutes = int("totalMinutes"), apps = apps)
-}
+
+fun SharedAppUsage.toFirestore(): Map<String, Any> =
+    mapOf("packageName" to packageName, "appName" to appName, "minutes" to minutes, "limitMinutes" to limitMinutes)
+
+fun DocumentSnapshot.toProgress() = Progress(
+    weekChange = getLong("weekChange")?.toInt(),
+    calmerWeeks = int("calmerWeeks"),
+    keptDays = int("keptDays"),
+    limitDays = int("limitDays"),
+)
+
+fun Progress.toFirestore(): Map<String, Any?> =
+    mapOf("weekChange" to weekChange, "calmerWeeks" to calmerWeeks, "keptDays" to keptDays, "limitDays" to limitDays)

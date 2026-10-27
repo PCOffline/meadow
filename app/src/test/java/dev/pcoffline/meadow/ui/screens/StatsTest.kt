@@ -1,14 +1,19 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Progress
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.theme.GardenTheme
@@ -62,5 +67,29 @@ class StatsTest : ScreenTest() {
         compose.onNodeWithText("1h").assertExists()
         assertTrue(compose.onAllNodes(hasText("than", substring = true)).fetchSemanticsNodes().isEmpty())
         assertEquals(60 * min, s.copy(days = days).dailyAverageMs(s.to))
+    }
+
+    @Test
+    fun `the current period shows progress over the weeks; past ones don't`() {
+        val now = week.selection.copy(offset = 0)
+        var state by mutableStateOf(week.copy(selection = now, stats = week.stats!!.copy(selection = now), progress = DemoGarden.progress))
+        show { StatsContent(state) }
+        node(R.string.progress_title).assertExists()
+        compose.onNodeWithText(app.resources.getQuantityString(R.plurals.progress_calmer_weeks, 3, 3)).assertExists()
+        node(R.string.progress_kept, 5, 7).assertExists()
+        // The summary already compares the week with the last; the card doesn't say it again.
+        assertEquals(1, compose.onAllNodesWithText("less than", substring = true).fetchSemanticsNodes().size)
+        assertAccessible()
+
+        state = week.copy(progress = DemoGarden.progress)
+        compose.waitForIdle()
+        node(R.string.progress_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `progress with nothing to show yet stays out of the way`() {
+        val now = week.selection.copy(offset = 0)
+        show { StatsContent(week.copy(selection = now, stats = week.stats!!.copy(selection = now), progress = Progress(null, 0, 0, 0))) }
+        node(R.string.progress_title).assertDoesNotExist()
     }
 }

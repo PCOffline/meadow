@@ -15,6 +15,11 @@ import {
 } from "./schemas";
 
 const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60_000;
+/**
+ * What a new garden shares with its Bumblebees, each part a choice of its own (the app's Privacy).
+ * Progress sums up earlier days, so it waits to be chosen.
+ */
+export const DEFAULT_PRIVACY = { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false } as const;
 /** Removing a Bumblebee waits a day, so a weak moment can't undo every commitment at once. */
 export const REMOVAL_DELAY_MS = 24 * 60 * 60_000;
 const DAY_MS = 24 * 60 * 60_000;
@@ -58,7 +63,7 @@ export const createProfile = onCall(async (req) => {
       pushIds: [],
       friendCode: code,
       strictMode: false,
-      privacy: { shareUsage: true },
+      privacy: { ...DEFAULT_PRIVACY },
       pendingRemovals: {},
       ...(termsVersion ? { acceptedTerms: { version: termsVersion, at: FieldValue.serverTimestamp() } } : {}),
     });

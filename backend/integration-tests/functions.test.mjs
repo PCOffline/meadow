@@ -192,7 +192,7 @@ describe("profiles", () => {
     assert.deepEqual(account.approverIds, []);
     assert.equal(account.acceptedTerms.version, 1);
     assert.equal(account.strictMode, false);
-    assert.deepEqual(account.privacy, { shareUsage: true });
+    assert.deepEqual(account.privacy, { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false });
     assert.deepEqual(await read(`friendCodes/${account.friendCode}`), { uid: sam.uid });
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
   });
@@ -841,6 +841,9 @@ describe("your data", () => {
     await admin(async (db) => {
       await updateDoc(doc(db, `users/${sam.uid}/private/account`), { pushIds: arrayUnion("secret-phone-id"), fcmTokens: ["secret-old-token"] });
       await setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
+      await setDoc(doc(db, `users/${sam.uid}/usage/2026-10-27`), { dayKey: "2026-10-27", totalMinutes: 42 });
+      await setDoc(doc(db, `users/${sam.uid}/appUsage/2026-10-27`), { dayKey: "2026-10-27", apps: [] });
+      await setDoc(doc(db, `users/${sam.uid}/progress/current`), { weekChange: -12, calmerWeeks: 2, keptDays: 6, limitDays: 7 });
     });
     const { path } = await sam.call("exportMyData");
     assert.match(path, new RegExp(`^exports/${sam.uid}/`));
@@ -848,6 +851,10 @@ describe("your data", () => {
     assert.equal(data.profile.displayName, "Sam");
     assert.deepEqual(data.account.approverIds, [bee.uid]);
     assert.equal(data.limits[0].id, "com.insta");
+    // Everything shared with Bumblebees, part by part.
+    assert.equal(data.sharedUsage[0].totalMinutes, 42);
+    assert.equal(data.sharedTopApps.length, 1);
+    assert.equal(data.sharedProgress[0].weekChange, -12);
     assert.equal(data.conversations.length, 1);
     assert.ok(data.conversations[0].messages.length >= 1);
     assert.doesNotMatch(await readFile(path), /secret-phone-id|secret-old-token/);
@@ -860,6 +867,10 @@ describe("your data", () => {
     await link(friend, sam); // sam looks after friend
     await link(friend, bystander); // bystander also looks after friend, but has nothing to do with sam
     const code = await friendCodeOf(sam);
+    await admin(async (db) => {
+      await setDoc(doc(db, `users/${sam.uid}/appUsage/2026-10-27`), { dayKey: "2026-10-27", apps: [] });
+      await setDoc(doc(db, `users/${sam.uid}/progress/current`), { weekChange: null, calmerWeeks: 0, keptDays: 0, limitDays: 0 });
+    });
 
     await sam.call("deleteAccount");
 
@@ -867,6 +878,8 @@ describe("your data", () => {
     assert.equal(await read(`users/${sam.uid}/private/account`), undefined);
     assert.equal(await read(`friendCodes/${code}`), undefined);
     assert.equal(await read(`heartbeats/${sam.uid}`), undefined);
+    assert.equal(await read(`users/${sam.uid}/appUsage/2026-10-27`), undefined);
+    assert.equal(await read(`users/${sam.uid}/progress/current`), undefined);
     assert.equal(await read(`chats/${[sam.uid, bee.uid].toSorted().join("_")}`), undefined);
     assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, []);
     assert.deepEqual((await read(`users/${friend.uid}/private/account`)).approverIds, [bystander.uid]);

@@ -26,6 +26,12 @@
         <item quantity="one">No record for %1$d day. Your phone keeps detailed screen time for about a week, so earlier days Meadow didn\'t see can\'t be shown.</item>
         <item quantity="other">No record for %1$d days. Your phone keeps detailed screen time for about a week, so earlier days Meadow didn\'t see can\'t be shown.</item>
     </plurals>
+    <string name="progress_title">Progress</string>
+    <plurals name="progress_calmer_weeks">
+        <item quantity="one">🌿 Less screen time %1$d week running</item>
+        <item quantity="other">🌿 Less screen time %1$d weeks running</item>
+    </plurals>
+    <string name="progress_kept">Limits kept %1$d of the last %2$d days</string>
     <string name="stats_where_time_went">Where the time went</string>
     <string name="stats_quiet_title">A quiet stretch</string>
     <string name="stats_quiet_body">No app time was recorded for this period.</string>

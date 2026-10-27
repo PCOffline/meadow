@@ -20,8 +20,10 @@
     <string name="settings_protections_button">Review protections</string>
     <string name="settings_appearance_title">Appearance</string>
     <string name="settings_privacy_title">Privacy</string>
-    <string name="settings_share_usage">Today\'s screen time</string>
-    <string name="settings_share_usage_body">Let your Bumblebees see how long you\'ve spent on your phone today, and on which apps, as the day goes. Earlier days never leave this phone.</string>
+    <string name="settings_share_limits">Limits</string>
+    <string name="settings_share_time">Today\'s screen time</string>
+    <string name="settings_share_apps">Top apps today</string>
+    <string name="settings_share_progress">Progress</string>
     <string name="settings_privacy_preview">See what your Bumblebees see</string>
     <string name="privacy_preview_title">What your Bumblebees see</string>
     <string name="settings_privacy_saved">Privacy choices saved 🔒</string>

@@ -49,17 +49,16 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
+import dev.pcoffline.meadow.data.Progress
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.MonthHeatmap
-import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.StalkBarChart
 import dev.pcoffline.meadow.ui.components.TabTitle
-import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.minutesText
@@ -72,6 +71,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -125,6 +125,8 @@ data class StatsUiState(
     val selection: Selection = Selection(),
     val stats: PeriodStats? = null,
     val hasPermission: Boolean = true,
+    /** How things are going over the weeks, beside the current period. */
+    val progress: Progress? = null,
 )
 
 class StatsViewModel : ViewModel() {
@@ -134,12 +136,19 @@ class StatsViewModel : ViewModel() {
         .mapLatest { (sel, firstDay) -> load(sel, firstDay) }
         .flowOn(Dispatchers.IO)
 
-    val state: StateFlow<StatsUiState> = combine(selection, loaded, AppGraph.store.limits) { sel, stats, limits ->
+    // Read again when limits or the week's first day change, since both shape it.
+    private val progress = combine(AppGraph.store.limits, AppGraph.store.weekRule) { _, _ -> }
+        .mapLatest { AppGraph.progress.now() }
+        .flowOn(Dispatchers.IO)
+        .onStart<Progress?> { emit(null) }
+
+    val state: StateFlow<StatsUiState> = combine(selection, loaded, AppGraph.store.limits, progress) { sel, stats, limits, progress ->
         val byPackage = limits.associateBy { it.packageName }
         StatsUiState(
             selection = sel,
             stats = stats.takeIf { it.selection == sel }?.let { s -> s.copy(apps = s.apps.map { it.copy(limit = byPackage[it.packageName]) }) },
             hasPermission = AppGraph.tracker.hasPermission(),
+            progress = progress,
         )
     }.stateWhileVisible(this, StatsUiState())
 
@@ -261,7 +270,7 @@ private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit, onOpenApp: (S
             label = "period",
         ) { selection ->
             val stats = state.stats?.takeIf { it.selection == selection }
-            if (stats == null) Loading() else PeriodContent(stats, onOpenApp)
+            if (stats == null) Loading() else PeriodContent(stats, state.progress.takeIf { selection.offset == 0 }, onOpenApp)
         }
     }
 }
@@ -285,9 +294,11 @@ private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
 }
 
 @Composable
-private fun PeriodContent(s: PeriodStats, onOpenApp: (String) -> Unit) {
+private fun PeriodContent(s: PeriodStats, progress: Progress?, onOpenApp: (String) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Summary(s) }
+        // The summary already compares this period with the last.
+        if (progress != null) item { ProgressCard(progress, Modifier.padding(horizontal = 20.dp), showWeekChange = false) }
         if (s.selection.period != Period.DAY) item { Chart(s) }
         item { SectionTitle(stringResource(R.string.stats_where_time_went), Modifier.padding(horizontal = 20.dp)) }
         if (s.apps.isEmpty()) {
@@ -338,12 +349,7 @@ private fun Summary(s: PeriodStats) {
                 },
             )
             Spacer(Modifier.height(8.dp))
-            // Less screen time is the good news, so it's green; more is red.
-            if (change <= 0) {
-                Pill(stringResource(R.string.stats_less_than, -change, previous), Garden.colors.better, textColor = Garden.colors.onBetter)
-            } else {
-                Pill(stringResource(R.string.stats_more_than, change, previous), MaterialTheme.colorScheme.errorContainer, textColor = MaterialTheme.colorScheme.onErrorContainer)
-            }
+            WeekChangePill(change, previous)
         }
     }
 }

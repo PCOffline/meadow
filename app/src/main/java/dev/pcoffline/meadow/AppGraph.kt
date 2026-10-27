@@ -27,6 +27,7 @@ import dev.pcoffline.meadow.enforcement.ProtectionMonitor
 import dev.pcoffline.meadow.notifications.Notifier
 import dev.pcoffline.meadow.update.Updater
 import dev.pcoffline.meadow.usage.AppCatalog
+import dev.pcoffline.meadow.usage.ProgressMeter
 import dev.pcoffline.meadow.usage.UsageHistory
 import dev.pcoffline.meadow.usage.UsageTracker
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -69,9 +70,10 @@ object AppGraph {
     val tracker by lazy { UsageTracker(app) }
     val catalog by lazy { AppCatalog(app) }
     val history by lazy { UsageHistory(app, tracker, catalog) }
+    val progress by lazy { ProgressMeter(history, store) }
     val engine by lazy { LimitEngine(store, tracker, history, catalog) }
     val emergency by lazy { EmergencyRepository(app, backend, store) }
-    val profiles by lazy { ProfileRepository(app, backend, store) { sync } }
+    val profiles by lazy { ProfileRepository(app, backend, store, share) { sync } }
     val notifier by lazy { Notifier(app, store) }
     val updater by lazy { Updater(app) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }

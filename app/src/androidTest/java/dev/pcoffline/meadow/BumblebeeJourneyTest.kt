@@ -39,14 +39,28 @@ class BumblebeeJourneyTest : EndToEndTest() {
         val sam = EmulatorFriend.create(app, "Sam", "🌻").also { sam = it }
         val today = Days.todayKey()
         sam.call("saveLimit", mapOf("packageName" to "com.instagram.android", "appName" to "Instagram", "dailyMinutes" to 30, "weeklyMinutes" to 0))
+        // Sam shares everything, progress included (it waits to be chosen), each part as Sam's
+        // phone shares it, in a document of its own.
         await(
-            sam.db.document("users/${sam.uid}/usage/$today").set(
+            sam.db.document("users/${sam.uid}/private/account")
+                .update("privacy", mapOf("shareLimits" to true, "shareTime" to true, "shareApps" to true, "shareProgress" to true)),
+        )
+        await(
+            sam.db.document("users/${sam.uid}/usage/$today")
+                .set(mapOf("dayKey" to today, "totalMinutes" to 42, "updatedAt" to FieldValue.serverTimestamp())),
+        )
+        await(
+            sam.db.document("users/${sam.uid}/appUsage/$today").set(
                 mapOf(
                     "dayKey" to today,
-                    "totalMinutes" to 42,
                     "apps" to listOf(mapOf("packageName" to "com.instagram.android", "appName" to "Instagram", "minutes" to 42, "limitMinutes" to 30)),
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),
+            ),
+        )
+        await(
+            sam.db.document("users/${sam.uid}/progress/current").set(
+                mapOf("weekChange" to -20, "calmerWeeks" to 2, "keptDays" to 6, "limitDays" to 7, "updatedAt" to FieldValue.serverTimestamp()),
             ),
         )
 
@@ -74,17 +88,28 @@ class BumblebeeJourneyTest : EndToEndTest() {
             assertEquals(me, grant.getJSONObject("grantedBy").getString("stringValue"))
             waitFor(R.string.request_status_yes)
 
-            // Sam's garden: today's screen time, while Sam shares it.
+            // Sam's garden: each part Sam shares.
             node(R.string.tab_circle).performClick()
             openGardenOf("Sam")
             waitForText(text(R.string.friend_screen_time, app.resources.minutesText(42)))
+            waitForText(text(R.string.progress_kept, 6, 7))
+            waitForText(text(R.string.friend_limits))
 
-            // Sam stops sharing. Coming back, nothing is shown: not even this phone's cached copy.
-            await(sam.db.document("users/${sam.uid}/private/account").update("privacy", mapOf("shareUsage" to false)))
+            // Sam keeps today's time and progress private, then limits too. Coming back each time,
+            // only what's still shared is shown: not even this phone's cached copy of the rest.
+            val privacy = "users/${sam.uid}/private/account"
+            await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to true, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
             openGardenOf("Sam")
-            waitForText(text(R.string.friend_no_usage_shared, "Sam"))
-            assertEquals(0, compose.onAllNodesWithText(text(R.string.friend_screen_time, app.resources.minutesText(42))).fetchSemanticsNodes().size)
+            waitForText(text(R.string.friend_limits))
+            eventually("today's time and progress gone") {
+                !showing(text(R.string.friend_screen_time, app.resources.minutesText(42))) && !showing(text(R.string.progress_title))
+            }
+            await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to false, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+            openGardenOf("Sam")
+            waitForText(text(R.string.friend_nothing_shared, "Sam"))
+            assertEquals(0, compose.onAllNodesWithText(text(R.string.friend_limits)).fetchSemanticsNodes().size)
 
             // Stepping down ends it on Sam's side too, and goes back to the circle, saying so.
             compose.onNode(hasText(text(R.string.friend_step_down, "Sam"))).performScrollTo().performClick()

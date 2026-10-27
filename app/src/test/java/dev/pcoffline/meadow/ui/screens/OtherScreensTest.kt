@@ -119,9 +119,9 @@ class OtherScreensTest : ScreenTest() {
     @Test
     fun `settings show privacy choices, legal documents and a careful delete`() {
         val opened = mutableListOf<LegalDoc>()
-        val shy = DemoGarden.robin.copy(privacy = Privacy(shareUsage = false))
+        val shy = DemoGarden.robin.copy(privacy = Privacy(shareTime = false))
         show { SettingsScreen(shy, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = { opened += it }) }
-        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage))).performScrollTo().assertIsOff()
+        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time))).performScrollTo().assertIsOff()
         node(R.string.legal_privacy).performScrollTo().performClick()
         node(R.string.legal_terms).performScrollTo().performClick()
         assertEquals(listOf(LegalDoc.PRIVACY, LegalDoc.TERMS), opened)

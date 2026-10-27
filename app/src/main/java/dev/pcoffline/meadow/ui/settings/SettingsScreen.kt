@@ -131,7 +131,7 @@ fun SettingsScreen(
                 }
             }
 
-            PrivacyCard(profile, onPreview = onOpenPrivacyPreview)
+            PrivacyCard(rememberPrivacyChoices(profile.privacy), onPreview = onOpenPrivacyPreview)
             UpdatesCard()
 
             DataCard(onOpenLegal = onOpenLegal, onDelete = { confirmDelete = true })
@@ -215,30 +215,6 @@ private fun ProfileCard(profile: UserProfile, onOpenProfile: () -> Unit) {
                 contentDescription = if (profile.bio.isBlank()) null else stringResource(R.string.profile_open),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-/** The privacy choices; with [onPreview], a way to see the page they shape (see PrivacyPreviewContent). */
-@Composable
-internal fun PrivacyCard(profile: UserProfile, onPreview: (() -> Unit)? = null) {
-    val action = rememberAction()
-    val saved = stringResource(R.string.settings_privacy_saved)
-    val privacy = profile.privacy
-    MeadowCard(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.settings_privacy_title), style = MaterialTheme.typography.titleMedium)
-        SwitchRow(
-            title = stringResource(R.string.settings_share_usage),
-            body = stringResource(R.string.settings_share_usage_body),
-            checked = privacy.shareUsage,
-            enabled = !action.busy,
-            onChange = { on -> action.run(successMessage = saved) { AppGraph.profiles.setPrivacy(privacy.copy(shareUsage = on)) } },
-        )
-        ErrorNote(action.error)
-        if (onPreview != null) {
-            OutlinedButton(onClick = onPreview, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Text(stringResource(R.string.settings_privacy_preview))
-            }
         }
     }
 }
@@ -370,7 +346,7 @@ private fun DeleteAccountDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(title: String, body: String? = null, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, body: String? = null, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     // The whole row is one switch, so it's an easy target and reads as one control to TalkBack.
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp)

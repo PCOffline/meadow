@@ -8,6 +8,7 @@ import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.Progress
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.SharedAppUsage
@@ -52,6 +53,9 @@ object DemoGarden {
 
     /** Robin's own limits. */
     val myLimits = listOf(AppLimit("demo.youtube", "YouTube", 60, 0), AppLimit("demo.instagram", "Instagram", 45, 300))
+
+    /** 18% less than last week so far, three calmer weeks running, limits kept five days of seven. */
+    val progress = Progress(weekChange = -18, calmerWeeks = 3, keptDays = 5, limitDays = 7)
 
     private fun budget(pkg: String, name: String, daily: Int, usedToday: Int, weekly: Int = 0, usedWeek: Int = usedToday * 4, bonus: Int = 0) =
         AppBudget(AppLimit(pkg, name, daily, weekly), usedToday * MIN, usedWeek * MIN, bonus, bonus)

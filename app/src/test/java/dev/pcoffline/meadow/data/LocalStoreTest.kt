@@ -30,7 +30,7 @@ class LocalStoreTest {
         assertEquals(emptyList<AppLimit>(), store.limits.value)
         assertFalse(store.strictMode.value)
         assertTrue(store.autoUpdate.value)
-        assertEquals(Privacy(shareUsage = true), store.privacy.value)
+        assertEquals(Privacy(), store.privacy.value)
         assertEquals(0, store.acceptedTerms.value)
         assertNull(store.theme.value)
     }
@@ -46,6 +46,12 @@ class LocalStoreTest {
     }
 
     @Test
+    fun `a privacy choice saved before the split still holds after the update`() {
+        context.getSharedPreferences("meadow_store", Context.MODE_PRIVATE).edit().putBoolean("share_usage", false).commit()
+        assertEquals(Privacy(shareTime = false, shareApps = false), LocalStore(context).privacy.value)
+    }
+
+    @Test
     fun `commitments survive a process restart`() {
         val limits = listOf(AppLimit("com.insta", "Instagram", 30, 0), AppLimit("com.tok", "TikTok", 0, 120))
         val grants = listOf(Grant("r1", "com.insta", 15, "2026-10-12"))
@@ -54,7 +60,7 @@ class LocalStoreTest {
             setGrants(grants)
             setStrictMode(true)
             setEmergency(Emergency(5_000L, "com.insta"))
-            setPrivacy(Privacy(shareUsage = false))
+            setPrivacy(Privacy(shareApps = false, shareLimits = false))
             setAppearance("pond", "dark")
             setAutoUpdate(false)
             acceptedTermsVersion = 1
@@ -66,7 +72,7 @@ class LocalStoreTest {
         assertEquals(grants, restarted.grants.value)
         assertTrue(restarted.strictMode.value)
         assertEquals(Emergency(5_000L, "com.insta"), restarted.emergency.value)
-        assertFalse(restarted.privacy.value.shareUsage)
+        assertEquals(Privacy(shareApps = false, shareLimits = false), restarted.privacy.value)
         assertEquals("pond", restarted.theme.value)
         assertEquals("dark", restarted.darkMode.value)
         assertFalse(restarted.autoUpdate.value)

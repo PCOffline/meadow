@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow
 
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -67,17 +68,20 @@ class GardenJourneyTest : EndToEndTest() {
             compose.assertAccessible(compose.density)
             node(R.string.settings_privacy_preview).performScrollTo().performClick()
             waitFor(R.string.privacy_preview_title)
-            val notShared = text(R.string.friend_no_usage_shared, "Robin")
-            eventually("today's screen time on the page") { showing(text(R.string.friend_today)) && !showing(notShared) }
+            // "… of screen time", whatever today's total is.
+            val screenTime = text(R.string.friend_screen_time, "")
+            eventually("today's screen time on the page") { showing(screenTime, substring = true) }
             node(R.string.friend_limits).performScrollTo().assertExists()
             compose.assertAccessible(compose.density)
-            val shareUsage = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_usage)))
-            shareUsage.performScrollTo().assertIsOn().performClick()
-            eventually("the page without today's screen time") { showing(notShared) }
+            val shareTime = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time)))
+            shareTime.performScrollTo().assertIsOn().performClick()
+            // At once, before it's saved.
+            shareTime.assertIsOff()
+            eventually("the page without today's screen time") { !showing(screenTime, substring = true) }
             // Privacy choices are owner-only, so they live on the private account.
             waitForBackend("users/$uid/private/account") { doc ->
-                doc.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
-                    .getJSONObject("shareUsage").getBoolean("booleanValue").not()
+                val fields = doc.getJSONObject("privacy").getJSONObject("mapValue").getJSONObject("fields")
+                !fields.getJSONObject("shareTime").getBoolean("booleanValue") && fields.getJSONObject("shareApps").getBoolean("booleanValue")
             }
             waitFor(R.string.settings_privacy_saved)
             waitForSnackbarToGo(R.string.settings_privacy_saved)
