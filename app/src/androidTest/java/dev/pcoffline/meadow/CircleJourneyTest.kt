@@ -5,7 +5,6 @@ import android.app.Instrumentation.ActivityResult
 import android.content.Intent
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -52,7 +51,7 @@ class CircleJourneyTest : EndToEndTest() {
 
     private fun friendCodeOf(person: EmulatorFriend) = backendDoc("users/${person.uid}/private/account")!!.string("friendCode")!!
 
-    /** Waits for [matcher] somewhere in the circle, scrolling to it: the list is longer than the screen. */
+    /** Waits for [matcher] somewhere in People, scrolling to it: the list is longer than the screen. */
     private fun seeInCircle(matcher: SemanticsMatcher) =
         eventually("$matcher in the circle") { runCatching { compose.onNode(hasScrollToNodeAction()).performScrollToNode(matcher) }.isSuccess }
 
@@ -78,8 +77,8 @@ class CircleJourneyTest : EndToEndTest() {
         val (kai, sam) = kaiAndSam()
         ActivityScenario.launch(MainActivity::class.java).use {
             intoTheGarden("Kai")
-            node(R.string.tab_circle).performClick()
-            waitFor(R.string.circle_title)
+            node(R.string.tab_people).performClick()
+            waitFor(R.string.people_title)
 
             // Sam asks by Kai's code; Kai says not now, and nothing changes.
             sam.call("sendInvite", mapOf("friendCode" to friendCodeOf(kai)))
@@ -96,8 +95,9 @@ class CircleJourneyTest : EndToEndTest() {
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds") == listOf(kai.uid) }
             // The message sits over the bottom of the list, where Sam's garden is.
             waitForSnackbarToGo(R.string.circle_invite_accepted, "Sam")
-            tapInCircle(hasText(text(R.string.circle_garden_role)) and hasClickAction())
-            // Sam's page, with nothing planted yet to show.
+            // Sam opens their chat, and from there their page, with nothing planted yet to show.
+            tapInCircle(hasText("Sam") and hasClickAction())
+            compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Sam")).performClick()
             waitForText(text(R.string.friend_step_down, "Sam"))
         }
     }
@@ -107,8 +107,8 @@ class CircleJourneyTest : EndToEndTest() {
         val (kai, sam) = kaiAndSam()
         ActivityScenario.launch(MainActivity::class.java).use {
             intoTheGarden("Kai")
-            node(R.string.tab_circle).performClick()
-            waitFor(R.string.circle_title)
+            node(R.string.tab_people).performClick()
+            waitFor(R.string.people_title)
             val code = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
 
             // Kai invites Sam by code, then thinks better of it.
@@ -120,6 +120,7 @@ class CircleJourneyTest : EndToEndTest() {
             eventually("the invite cancelled") { !pendingInvite(kai, sam) }
 
             // Invited again, Sam says yes.
+            seeInCircle(code)
             typeInto(code, friendCodeOf(sam))
             node(R.string.invite_code_button).performClick()
             var inviteId = ""
@@ -130,23 +131,23 @@ class CircleJourneyTest : EndToEndTest() {
             }
             sam.call("respondInvite", mapOf("inviteId" to inviteId, "accept" to true))
             waitForBackend("users/${kai.uid}/private/account") { it.strings("approverIds") == listOf(sam.uid) }
-            seeInCircle(hasText(text(R.string.circle_bee_role)))
 
-            // Removing Sam takes a day, so it can't dodge a "not today"; until then, Kai can keep Sam.
-            tapInCircle(hasContentDescription(text(R.string.action_more)))
-            node(R.string.action_remove).performClick()
+            // Removing Sam, from their chat, takes a day, so it can't dodge a "not today"; until
+            // then, Kai can keep Sam, from People or the chat.
+            tapInCircle(hasText("Sam") and hasClickAction())
+            waitForText(text(R.string.chat_placeholder))
+            compose.onNodeWithContentDescription(text(R.string.action_more)).performClick()
+            node(R.string.chat_remove_bee).performClick()
             inDialog(text(R.string.circle_remove_title, "Sam")).assertExists()
             inDialog(text(R.string.action_remove)).performClick()
             waitForText(text(R.string.circle_bee_removing, "Sam"))
             waitForBackend("users/${kai.uid}/private/account") { it.optJSONObject("pendingRemovals")?.toString()?.contains(sam.uid) == true }
+            waitForSnackbarToGo(R.string.circle_bee_removing, "Sam")
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
             tapInCircle(hasText(text(R.string.circle_bee_keep)))
             waitForText(text(R.string.circle_bee_kept, "Sam"))
             waitForBackend("users/${kai.uid}/private/account") { it.optJSONObject("pendingRemovals")?.toString()?.contains(sam.uid) != true }
             assertEquals(listOf(sam.uid), backendDoc("users/${kai.uid}/private/account")!!.strings("approverIds"))
-
-            // The chat with Sam is a tap away.
-            tapInCircle(hasContentDescription(text(R.string.circle_chat_with, "Sam")))
-            waitForText(text(R.string.chat_placeholder))
         }
     }
 
@@ -155,8 +156,8 @@ class CircleJourneyTest : EndToEndTest() {
         val (kai, _) = kaiAndSam()
         ActivityScenario.launch(MainActivity::class.java).use {
             intoTheGarden("Kai")
-            node(R.string.tab_circle).performClick()
-            waitFor(R.string.circle_title)
+            node(R.string.tab_people).performClick()
+            waitFor(R.string.people_title)
 
             // Sharing a link makes one and hands it to the share sheet.
             node(R.string.invite_link_button).performClick()

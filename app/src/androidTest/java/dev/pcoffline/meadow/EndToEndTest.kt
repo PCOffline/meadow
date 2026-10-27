@@ -24,6 +24,7 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -278,14 +279,14 @@ abstract class EndToEndTest {
     }
 
     /**
-     * Becomes [friend]'s Bumblebee by pasting their invite link into the circle's friend code
+     * Becomes [friend]'s Bumblebee by pasting their invite link into People's friend code
      * field (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
      */
     protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
         val token = friend.call("createInviteLink")!!["token"] as String
         val me = FirebaseAuth.getInstance().currentUser!!.uid
-        node(R.string.tab_circle).performClick()
-        waitFor(R.string.circle_title)
+        node(R.string.tab_people).performClick()
+        waitFor(R.string.people_title)
         val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
         typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
@@ -300,9 +301,18 @@ abstract class EndToEndTest {
     }
 
     /** From the circle screen, opens the garden of the person called [name]. */
+    /** Opens the chat with [name] from People, where everyone opens their chat. */
+    protected fun openChatWith(name: String) {
+        node(R.string.tab_people).performClick()
+        val person = hasText(name) and hasClickAction()
+        eventually("$name in People") { runCatching { compose.onNode(hasScrollToNodeAction()).performScrollToNode(person) }.isSuccess }
+        compose.onNode(person).performClick()
+        waitForText(text(R.string.chat_placeholder))
+    }
+
+    /** Opens the garden of [name], whom this phone looks after: from People, through their chat. */
     protected fun openGardenOf(name: String) {
-        val garden = hasText(name, substring = true) and hasClickAction()
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(garden)
-        compose.onNode(garden).performClick()
+        openChatWith(name)
+        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
     }
 }

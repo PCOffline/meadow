@@ -32,7 +32,7 @@ import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
-import dev.pcoffline.meadow.ui.circle.CircleContent
+import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
@@ -181,13 +181,9 @@ class ShowcaseTest {
     }
 
     @Test
-    fun circle() {
-        show {
-            WithTabs(Tab.CIRCLE) {
-                CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList())
-            }
-        }
-        capture("circle")
+    fun people() {
+        show { WithTabs(Tab.PEOPLE) { PeopleContent(DemoGarden.robin, DemoGarden.people.copy(incomingRequests = emptyList(), outgoingRequests = emptyList())) } }
+        capture("people")
     }
 
     @Test

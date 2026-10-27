@@ -48,7 +48,7 @@ From a chat you can ask them to be your Bumblebee too, or offer to be theirs. Wh
 being your Bumblebee, your chat with them closes.
 
 <p align="center">
-  <img src="docs/images/screen-circle.png" alt="Your circle: two Bumblebees, and a friend whose garden you look after" width="250">
+  <img src="docs/images/screen-people.png" alt="People: two Bumblebees and a friend whose garden you look after, each with their latest message" width="250">
   &nbsp;
   <img src="docs/images/screen-resting.png" alt="A resting app under a night sky, with a button to ask a Bumblebee" width="250">
 </p>

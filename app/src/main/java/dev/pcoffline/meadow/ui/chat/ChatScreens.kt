@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow.ui.chat
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,6 +22,8 @@ import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.LocalFlorist
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
@@ -77,38 +81,31 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.flow.map
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -123,8 +120,6 @@ import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
-import dev.pcoffline.meadow.ui.components.PersonAvatar
-import dev.pcoffline.meadow.ui.components.TabTitle
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
@@ -133,70 +128,6 @@ import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-
-class ChatListViewModel(uid: String) : ViewModel() {
-    /** Null while loading. */
-    val chats: StateFlow<List<Chat>?> = AppGraph.chats.chats(uid).stateWhileVisible(this, null)
-}
-
-@Composable
-fun ChatListScreen(
-    profile: UserProfile,
-    onOpenChat: (String) -> Unit,
-    viewModel: ChatListViewModel = viewModel(key = "chats-${profile.uid}") { ChatListViewModel(profile.uid) },
-) {
-    val chats by viewModel.chats.collectAsStateWithLifecycle()
-    ChatListContent(profile, chats, onOpenChat)
-}
-
-/** The chat list itself, given the chats ([chats] is null while they load). */
-@Composable
-fun ChatListContent(profile: UserProfile, chats: List<Chat>?, onOpenChat: (String) -> Unit = {}) {
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        TabTitle(stringResource(R.string.chats_title))
-        LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
-            if (chats?.isEmpty() == true) item { EmptyState("🕊️", stringResource(R.string.chats_empty_title)) }
-            items(chats.orEmpty(), key = { it.id }) { chat ->
-                ChatRow(chat, profile.uid, onOpen = { onOpenChat(chat.id) }, Modifier.animateItem())
-            }
-        }
-    }
-}
-
-/** One conversation in the list; an unread one is bolder and says so to a screen reader too. */
-@Composable
-internal fun ChatRow(chat: Chat, uid: String, onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    val unread = chat.isUnread(uid)
-    ListItem(
-        headlineContent = {
-            Text(chat.otherName(uid), fontWeight = if (unread) FontWeight.Bold else FontWeight.SemiBold)
-        },
-        supportingContent = {
-            Text(
-                chat.lastMessage.ifBlank { stringResource(R.string.chats_say_hello) },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal,
-            )
-        },
-        leadingContent = { PersonAvatar(chat.otherAvatar(uid)) },
-        trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(relativeTime(chat.lastMessageAtMillis), style = MaterialTheme.typography.labelSmall)
-                if (unread) {
-                    val unreadLabel = stringResource(R.string.chats_unread)
-                    Box(
-                        Modifier.semantics { contentDescription = unreadLabel }
-                            .padding(top = 4.dp).size(10.dp).clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondary),
-                    )
-                }
-            }
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = modifier.clickable(onClick = onOpen).padding(horizontal = 8.dp),
-    )
-}
 
 /** A chat once loaded; [chat] is null when it's closed (the friendship ended). */
 data class LoadedChat(val chat: Chat?)
@@ -233,6 +164,7 @@ fun ChatScreen(
     profile: UserProfile,
     chatId: String,
     onBack: () -> Unit,
+    onOpenGarden: (uid: String) -> Unit = {},
     viewModel: ChatViewModel = viewModel(key = "chat-$chatId") { ChatViewModel(chatId, profile.uid) },
 ) {
     val loaded by viewModel.chat.collectAsStateWithLifecycle()
@@ -249,6 +181,7 @@ fun ChatScreen(
         onBack = onBack,
         invited = loaded?.chat?.otherId(profile.uid) in invited,
         onAskBee = { offer -> loaded?.chat?.let { viewModel.askBee(it.otherId(profile.uid), offer) } },
+        onOpenGarden = onOpenGarden,
     )
 }
 
@@ -260,7 +193,8 @@ fun ChatScreen(
  * message (with whether you asked it); by default it follows the live request. Whichever way
  * round the two aren't yet each other's Bumblebee, [onAskBee] asks (or offers, when true) unless
  * that's already [invited]. [onSendPicture] gets a photo or GIF, picked or from the keyboard;
- * [pictureFile] fetches one to show (null once it's gone).
+ * [pictureFile] fetches one to show (null once it's gone). Up top, [onOpenGarden] opens the garden
+ * of someone I look after, and a Bumblebee of mine can be removed (or kept, while leaving).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -277,6 +211,7 @@ fun ChatContent(
     invited: Boolean = false,
     onAskBee: suspend (offer: Boolean) -> Unit = {},
     onSendPicture: (Uri) -> Unit = {},
+    onOpenGarden: (uid: String) -> Unit = {},
     pictureFile: suspend (path: String) -> File? = { AppGraph.chatMedia.file(it) },
     requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
@@ -308,7 +243,9 @@ fun ChatContent(
 
     Column(Modifier.fillMaxSize().imePadding()) {
         val title = chat?.otherName(profile.uid).orEmpty()
-        BackTopBar(title, onBack = onBack)
+        BackTopBar(title, onBack = onBack) {
+            if (chat != null) PersonActions(chat.otherId(profile.uid), title, profile, onOpenGarden)
+        }
         if (chat != null) BeeAsks(chat, profile, invited, onAskBee)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (chat == null && !loading) {
@@ -583,6 +520,56 @@ private fun BeeAsks(chat: Chat, profile: UserProfile, invited: Boolean, onAsk: s
                 }) { Text(stringResource(if (offer) R.string.chat_offer_confirm else R.string.chat_ask_confirm)) }
             },
             dismissButton = { TextButton(onClick = { confirming = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+/**
+ * What I can do about [uid] from our chat: see their garden if I look after it, and remove them
+ * as my Bumblebee (it takes a day, so until then, keep them).
+ */
+@Composable
+private fun PersonActions(uid: String, name: String, profile: UserProfile, onOpenGarden: (String) -> Unit) {
+    if (uid in profile.approveeIds) {
+        IconButton(onClick = { onOpenGarden(uid) }) {
+            Icon(Icons.Outlined.LocalFlorist, contentDescription = stringResource(R.string.chat_see_garden, name))
+        }
+    }
+    if (uid !in profile.approverIds) return
+    var menu by remember { mutableStateOf(false) }
+    var confirm by rememberSaveable { mutableStateOf(false) }
+    val action = rememberAction()
+    val removing = stringResource(R.string.circle_bee_removing, name)
+    val kept = stringResource(R.string.circle_bee_kept, name)
+    val leaving = uid in profile.pendingRemovals
+    Box {
+        IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            if (leaving) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.chat_keep_bee)) }, onClick = {
+                    menu = false
+                    action.run(successMessage = kept) { AppGraph.social.cancelRemoval(uid) }
+                })
+            } else {
+                DropdownMenuItem(text = { Text(stringResource(R.string.chat_remove_bee)) }, onClick = {
+                    menu = false
+                    confirm = true
+                })
+            }
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.circle_remove_title, name)) },
+            text = { Text(stringResource(R.string.circle_remove_body_delayed, name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    action.run(successMessage = removing) { AppGraph.social.removeApprover(uid) }
+                }) { Text(stringResource(R.string.action_remove)) }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.action_keep)) } },
         )
     }
 }

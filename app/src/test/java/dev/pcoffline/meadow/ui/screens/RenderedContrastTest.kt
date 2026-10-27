@@ -35,7 +35,7 @@ import dev.pcoffline.meadow.ui.MeadowTabBar
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
-import dev.pcoffline.meadow.ui.circle.CircleContent
+import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
@@ -138,8 +138,8 @@ class RenderedContrastTest : ScreenTest() {
     fun `stats without usage access`() = sweep { StatsContent(DemoGarden.stats.copy(hasPermission = false)) }
 
     @Test
-    fun `the circle`() = sweep {
-        CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList())
+    fun `people`() = sweep {
+        PeopleContent(DemoGarden.robin, DemoGarden.people)
     }
 
     @Test

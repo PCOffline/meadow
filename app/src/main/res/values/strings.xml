@@ -44,9 +44,7 @@
     <!-- Tabs -->
     <string name="tab_garden">Garden</string>
     <string name="tab_growth">Growth</string>
-    <string name="tab_requests">Requests</string>
-    <string name="tab_circle">Circle</string>
-    <string name="tab_chats">Chats</string>
+    <string name="tab_people">People</string>
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong. Please try again.</string>

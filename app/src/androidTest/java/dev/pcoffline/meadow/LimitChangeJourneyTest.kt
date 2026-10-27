@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -96,9 +97,10 @@ class LimitChangeJourneyTest : EndToEndTest() {
             sam.call("decideRequest", mapOf("requestId" to second, "approve" to true))
             waitForBackend(limit) { it.int("dailyMinutes") == 60 }
             eventually("the new limit on this phone") { AppGraph.store.limits.value.single { it.packageName == pebbles }.dailyMinutes == 60 }
-            node(R.string.tab_requests).performClick()
-            node(R.string.requests_tab_yours).performClick()
+            // Answered, the request lives on in the chat with Sam.
+            openChatWith("Sam")
             waitForText(text(R.string.request_decided_yes, "Sam"))
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
             // Asking to remove it: Sam says not today, with a word why, and it stays.
             node(R.string.tab_garden).performClick()
@@ -111,8 +113,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             assertEquals("remove_limit", backendDoc("requests/$third")!!.string("type"))
             sam.call("decideRequest", mapOf("requestId" to third, "approve" to false, "note" to "Not tonight"))
             waitForBackend("requests/$third") { it.string("status") == "denied" }
-            node(R.string.tab_requests).performClick()
-            node(R.string.requests_tab_yours).performClick()
+            openChatWith("Sam")
             waitForText(text(R.string.request_decided_with_note, text(R.string.request_decided_no, "Sam"), "Not tonight"))
             assertNotNull(backendDoc(limit))
             assertNotNull(AppGraph.store.limits.value.singleOrNull { it.packageName == pebbles })

@@ -5,9 +5,7 @@ import kotlinx.serialization.Serializable
 /** Type-safe navigation destinations. */
 @Serializable data object GardenRoute
 @Serializable data object StatsRoute
-@Serializable data object RequestsRoute
-@Serializable data object CircleRoute
-@Serializable data object ChatsRoute
+@Serializable data object PeopleRoute
 @Serializable data object SetupRoute
 @Serializable data object SettingsRoute
 @Serializable data object PickAppRoute
@@ -38,8 +36,8 @@ object DeepLinks {
     fun askFor(link: String): String? = link.takeIf { it.startsWith("ask/") }?.removePrefix("ask/")?.takeIf { it.isNotBlank() }
 
     fun toRoute(link: String): Any? = when {
-        link == "requests" -> RequestsRoute
-        link == "circle" -> CircleRoute
+        // Requests and the circle both live with People now; older notifications still say which.
+        link == "requests" || link == "circle" -> PeopleRoute
         link == "settings" -> SettingsRoute
         link == "troubleshoot" -> TroubleshootRoute
         link.startsWith("chat/") -> link.removePrefix("chat/").takeIf { it.isNotBlank() }?.let(::ChatRoute)

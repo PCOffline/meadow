@@ -76,7 +76,8 @@ class BumblebeeJourneyTest : EndToEndTest() {
                     "message" to "Finishing a message to my sister", "dayKey" to today, "usedMinutes" to 29, "allowedMinutes" to 30,
                 ),
             )!!["requestId"] as String
-            node(R.string.tab_requests).performClick()
+            node(R.string.tab_people).performClick()
+            waitFor(R.string.people_waiting)
             waitForText(text(R.string.request_they_ask, "Sam"))
             waitForText("Finishing a message to my sister", substring = true)
             compose.onAllNodesWithText(text(R.string.request_say_yes)).onFirst().performScrollTo().performClick()
@@ -86,10 +87,11 @@ class BumblebeeJourneyTest : EndToEndTest() {
             val grant = backendDoc("users/${sam.uid}/grants/$requestId")!!
             assertEquals("15", grant.getJSONObject("minutes").getString("integerValue"))
             assertEquals(me, grant.getJSONObject("grantedBy").getString("stringValue"))
-            waitFor(R.string.request_status_yes)
+            waitFor(R.string.request_sent_yes)
+            // Answered, it leaves what's waiting.
+            eventually("the answered request gone from People") { !showing(text(R.string.people_waiting)) }
 
             // Sam's garden: each part Sam shares.
-            node(R.string.tab_circle).performClick()
             openGardenOf("Sam")
             waitForText(text(R.string.friend_screen_time, app.resources.minutesText(42)))
             waitForText(text(R.string.progress_kept, 6, 7))

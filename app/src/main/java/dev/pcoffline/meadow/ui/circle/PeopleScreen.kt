@@ -2,37 +2,37 @@
 
 package dev.pcoffline.meadow.ui.circle
 
-import dev.pcoffline.meadow.data.Avatar
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,18 +42,23 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -61,109 +66,228 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.ui.components.TabTitle
-import dev.pcoffline.meadow.ui.components.asHeading
+import dev.pcoffline.meadow.data.Avatar
+import dev.pcoffline.meadow.data.Chat
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.Invite
 import dev.pcoffline.meadow.data.InviteLinks
+import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.ProfileState
+import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
+import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
-import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.SectionTitle
-import dev.pcoffline.meadow.ui.relativeTime
+import dev.pcoffline.meadow.ui.components.TabTitle
+import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.ui.durationText
+import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
+import dev.pcoffline.meadow.ui.requests.AskForTimeDialog
+import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 
-
-class CircleViewModel(uid: String) : ViewModel() {
+class PeopleViewModel(uid: String) : ViewModel() {
     private val profile = AppGraph.sync.profile.mapNotNull { (it as? ProfileState.Ready)?.profile }
 
     /** People who look after my garden. */
-    val bumblebees: StateFlow<List<UserProfile>> = profile.map { it.approverIds }.distinctUntilChanged()
-        .flatMapLatest { AppGraph.social.profiles(it) }
-        .stateWhileVisible(this, emptyList())
+    private val bumblebees = profile.map { it.approverIds }.distinctUntilChanged().flatMapLatest { AppGraph.social.profiles(it) }
 
     /** People whose gardens I look after. */
-    val lookingAfter: StateFlow<List<UserProfile>> = profile.map { it.approveeIds }.distinctUntilChanged()
-        .flatMapLatest { AppGraph.social.profiles(it) }
-        .stateWhileVisible(this, emptyList())
+    private val lookingAfter = profile.map { it.approveeIds }.distinctUntilChanged().flatMapLatest { AppGraph.social.profiles(it) }
 
-    val incomingInvites: StateFlow<List<Invite>> = AppGraph.social.incomingInvites(uid).stateWhileVisible(this, emptyList())
-    val outgoingInvites: StateFlow<List<Invite>> = AppGraph.social.outgoingInvites(uid).stateWhileVisible(this, emptyList())
+    private val invites = combine(AppGraph.social.incomingInvites(uid), AppGraph.social.outgoingInvites(uid)) { i, o -> i to o }
+
+    /** Only what's still waiting: answered requests live on in their chats. */
+    private val requests = combine(AppGraph.requests.incoming(uid), AppGraph.requests.outgoing(uid)) { i, o ->
+        i.filter { it.status == RequestStatus.PENDING } to o.filter { it.status == RequestStatus.PENDING }
+    }
+
+    val people: StateFlow<People> = combine(bumblebees, lookingAfter, invites, AppGraph.chats.chats(uid), requests) { bees, gardens, (i, o), chats, (ri, ro) ->
+        People(bees, gardens, i, o, chats, ri, ro)
+    }.stateWhileVisible(this, People())
 }
 
+/**
+ * Everyone in my circle and what's going on with them: [incomingRequests] and [outgoingRequests]
+ * are the ones still waiting for an answer.
+ */
+data class People(
+    val bumblebees: List<UserProfile> = emptyList(),
+    val lookingAfter: List<UserProfile> = emptyList(),
+    val incomingInvites: List<Invite> = emptyList(),
+    val outgoingInvites: List<Invite> = emptyList(),
+    val chats: List<Chat> = emptyList(),
+    val incomingRequests: List<LimitRequest> = emptyList(),
+    val outgoingRequests: List<LimitRequest> = emptyList(),
+)
+
 @Composable
-fun CircleScreen(
+fun PeopleScreen(
     profile: UserProfile,
     onOpenChat: (String) -> Unit,
-    onOpenFriend: (String) -> Unit,
-    viewModel: CircleViewModel = viewModel(key = "circle-${profile.uid}") { CircleViewModel(profile.uid) },
+    onOpenBeeStats: () -> Unit,
+    viewModel: PeopleViewModel = viewModel(key = "people-${profile.uid}") { PeopleViewModel(profile.uid) },
 ) {
-    val bumblebees by viewModel.bumblebees.collectAsStateWithLifecycle()
-    val lookingAfter by viewModel.lookingAfter.collectAsStateWithLifecycle()
-    val incoming by viewModel.incomingInvites.collectAsStateWithLifecycle()
-    val outgoing by viewModel.outgoingInvites.collectAsStateWithLifecycle()
-    CircleContent(profile, bumblebees, lookingAfter, incoming, outgoing, onOpenChat, onOpenFriend)
+    val people by viewModel.people.collectAsStateWithLifecycle()
+    PeopleContent(profile, people, onOpenChat, onOpenBeeStats)
 }
 
-/** The circle, drawn from plain state (also used for previews and screenshots). */
+/**
+ * Everyone in one place, drawn from plain state (also used for tests and screenshots): what's
+ * waiting for an answer first, then Bumblebees and gardens, each opening their chat, where
+ * requests, their garden and Bumblebee choices are too.
+ */
 @Composable
-fun CircleContent(
+fun PeopleContent(
     profile: UserProfile,
-    bumblebees: List<UserProfile>,
-    lookingAfter: List<UserProfile>,
-    incoming: List<Invite>,
-    outgoing: List<Invite>,
+    people: People,
     onOpenChat: (String) -> Unit = {},
-    onOpenFriend: (String) -> Unit = {},
+    onOpenBeeStats: () -> Unit = {},
 ) {
-    LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { TabTitle(stringResource(R.string.circle_title)) }
-        item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
+    var asking by rememberSaveable { mutableStateOf(false) }
+    val chats = people.chats.associateBy { it.id }
+    fun chatWith(uid: String) = ChatRepository.chatIdFor(profile.uid, uid)
+    // Sections show only with someone in them, judged by the profile too (it's already here), so
+    // they don't flash in while friends load.
+    val (offers, asks) = people.outgoingInvites.partition { it.offer }
+    val hasBees = profile.approverIds.isNotEmpty() || people.bumblebees.isNotEmpty() || asks.isNotEmpty()
+    val hasGardens = profile.approveeIds.isNotEmpty() || people.lookingAfter.isNotEmpty() || offers.isNotEmpty()
+    val nobody = !hasBees && !hasGardens && people.incomingInvites.isEmpty()
 
-        if (incoming.isNotEmpty()) {
-            item { SectionTitle(stringResource(R.string.circle_invites_for_you), Modifier.padding(horizontal = 20.dp)) }
-            items(incoming, key = { it.id }) { IncomingInvite(it, Modifier.animateItem()) }
-        }
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { TabTitle(stringResource(R.string.people_title)) }
+            // With nobody yet, inviting is the one thing to do here.
+            if (nobody) item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
 
-        // Sections show only with someone in them, judged by the profile too (it's already here),
-        // so they don't flash in while friends load.
-        if (profile.approverIds.isNotEmpty() || bumblebees.isNotEmpty() || outgoing.isNotEmpty()) {
-            item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
+            if (people.incomingInvites.isNotEmpty() || people.incomingRequests.isNotEmpty()) {
+                item { SectionTitle(stringResource(R.string.people_waiting), Modifier.padding(horizontal = 20.dp)) }
+                items(people.incomingRequests, key = { "ask-" + it.id }) {
+                    RequestCard(it, myUid = profile.uid, modifier = Modifier.animateItem().padding(horizontal = 20.dp))
+                }
+                items(people.incomingInvites, key = { it.id }) { IncomingInvite(it, Modifier.animateItem()) }
+            }
+            if (people.outgoingRequests.isNotEmpty()) {
+                item { SectionTitle(stringResource(R.string.people_your_asks), Modifier.padding(horizontal = 20.dp)) }
+                items(people.outgoingRequests, key = { "mine-" + it.id }) {
+                    RequestCard(it, myUid = profile.uid, modifier = Modifier.animateItem().padding(horizontal = 20.dp), compact = true)
+                }
+            }
+
+            if (hasBees) item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
+            items(people.bumblebees, key = { "bee-" + it.uid }) { bee ->
+                PersonRow(
+                    bee, chats[chatWith(bee.uid)], profile.uid, Modifier.animateItem(),
+                    role = stringResource(R.string.circle_bee_role),
+                    leavingAt = profile.pendingRemovals[bee.uid],
+                ) { onOpenChat(chatWith(bee.uid)) }
+            }
+            items(asks, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
+
+            if (hasGardens) {
+                item {
+                    SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(start = 20.dp, end = 8.dp)) {
+                        TextButton(onClick = onOpenBeeStats) { Text(stringResource(R.string.bee_stats_open)) }
+                    }
+                }
+            }
+            items(people.lookingAfter, key = { "garden-" + it.uid }) { friend ->
+                PersonRow(friend, chats[chatWith(friend.uid)], profile.uid, Modifier.animateItem(), role = stringResource(R.string.circle_garden_role)) {
+                    onOpenChat(chatWith(friend.uid))
+                }
+            }
+            items(offers, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
+
+            if (!nobody) {
+                item { SectionTitle(stringResource(R.string.people_invite_more), Modifier.padding(horizontal = 20.dp)) }
+                item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
+            }
+            item { SectionTitle(stringResource(R.string.circle_join_title), Modifier.padding(horizontal = 20.dp)) }
+            item { JoinCard(profile, Modifier.padding(horizontal = 20.dp)) }
+            item { Spacer(Modifier.height(if (profile.approverIds.isNotEmpty()) 88.dp else 24.dp)) }
         }
-        items(bumblebees, key = { "bee-" + it.uid }) { bee ->
-            BumblebeeRow(bee, leavingAt = profile.pendingRemovals[bee.uid], modifier = Modifier.animateItem()) {
-                onOpenChat(ChatRepository.chatIdFor(profile.uid, bee.uid))
+        // Asking for time is the one thing to do with Bumblebees from here; their chats hold the rest.
+        if (profile.approverIds.isNotEmpty()) {
+            val label = stringResource(R.string.requests_ask_button)
+            // Snackbars sit above the button rather than over it (they'd take its taps), only while it's here.
+            val clearance = LocalSnackbarClearance.current
+            val density = LocalDensity.current
+            DisposableEffect(clearance) { onDispose { clearance.height = 0.dp } }
+            ExtendedFloatingActionButton(
+                onClick = { asking = true },
+                icon = { Icon(Icons.Outlined.MoreTime, contentDescription = null) },
+                text = { Text(label) },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                // Material keeps the label's text from screen readers, so the button names itself.
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp)
+                    .onSizeChanged { clearance.height = with(density) { it.height.toDp() } + 20.dp }
+                    .semantics { contentDescription = label },
+            )
+        }
+    }
+    if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })
+}
+
+/**
+ * Someone in my circle, opening our chat: the latest message (bolder while unread), or failing
+ * that what they are to me. A Bumblebee [leavingAt] some time says so, with a way to keep them.
+ */
+@Composable
+private fun PersonRow(
+    person: UserProfile,
+    chat: Chat?,
+    myUid: String,
+    modifier: Modifier,
+    role: String,
+    leavingAt: Long? = null,
+    onOpen: () -> Unit,
+) {
+    val action = rememberAction()
+    val kept = stringResource(R.string.circle_bee_kept, person.displayName)
+    val unread = chat?.isUnread(myUid) == true
+    val last = chat?.lastMessage?.takeIf { it.isNotBlank() }
+    PersonCard(
+        avatar = person.avatar,
+        name = person.displayName,
+        about = when {
+            leavingAt != null -> stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
+            last != null -> last
+            else -> person.bio.ifBlank { role }
+        },
+        aboutIsWarning = leavingAt != null,
+        aboutIsNew = unread && leavingAt == null,
+        modifier = modifier,
+        error = action.error,
+        onClick = onOpen,
+    ) {
+        if (leavingAt != null) {
+            TextButton(onClick = { action.run(successMessage = kept) { AppGraph.social.cancelRemoval(person.uid) } }, enabled = !action.busy) {
+                Text(stringResource(R.string.circle_bee_keep))
             }
         }
-        // Asks to be my Bumblebee wait among my Bumblebees; offers to look after a garden, among gardens.
-        val (offers, asks) = outgoing.partition { it.offer }
-        items(asks, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
-
-        if (profile.approveeIds.isNotEmpty() || lookingAfter.isNotEmpty() || offers.isNotEmpty()) {
-            item { SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(horizontal = 20.dp)) }
+        if (unread) {
+            val unreadLabel = stringResource(R.string.chats_unread)
+            Box(
+                Modifier.semantics { contentDescription = unreadLabel }
+                    .padding(horizontal = 6.dp).size(10.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondary),
+            )
         }
-        items(lookingAfter, key = { "garden-" + it.uid }) { friend ->
-            GardenRow(friend, Modifier.animateItem(), onChat = { onOpenChat(ChatRepository.chatIdFor(profile.uid, friend.uid)) }) {
-                onOpenFriend(friend.uid)
-            }
-        }
-        items(offers, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
-
-        item { SectionTitle(stringResource(R.string.circle_join_title), Modifier.padding(horizontal = 20.dp)) }
-        item { JoinCard(profile, Modifier.padding(horizontal = 20.dp)) }
-        item { Spacer(Modifier.height(24.dp)) }
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -304,78 +428,6 @@ private fun OutgoingInvite(invite: Invite, modifier: Modifier) {
     }
 }
 
-@Composable
-private fun BumblebeeRow(bee: UserProfile, leavingAt: Long?, modifier: Modifier, onChat: () -> Unit) {
-    var menu by remember { mutableStateOf(false) }
-    var confirm by rememberSaveable { mutableStateOf(false) }
-    val action = rememberAction()
-    val removing = stringResource(R.string.circle_bee_removing, bee.displayName)
-    val kept = stringResource(R.string.circle_bee_kept, bee.displayName)
-    PersonCard(
-        avatar = bee.avatar,
-        name = bee.displayName,
-        about = leavingAt?.let { stringResource(R.string.circle_bee_leaving, durationText(it - System.currentTimeMillis())) }
-            ?: bee.bio.ifBlank { stringResource(R.string.circle_bee_role) },
-        aboutIsWarning = leavingAt != null,
-        modifier = modifier,
-        error = action.error,
-    ) {
-        if (leavingAt != null) {
-            TextButton(onClick = { action.run(successMessage = kept) { AppGraph.social.cancelRemoval(bee.uid) } }, enabled = !action.busy) {
-                Text(stringResource(R.string.circle_bee_keep))
-            }
-        }
-        IconButton(onClick = onChat) {
-            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, bee.displayName))
-        }
-        // Removing is the menu's only choice, so while a removal is under way there's no menu:
-        // it used to open empty.
-        if (leavingAt == null) {
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.action_remove)) }, onClick = { menu = false; confirm = true })
-                }
-            }
-        }
-    }
-    if (confirm) {
-        AlertDialog(
-            onDismissRequest = { confirm = false },
-            title = { Text(stringResource(R.string.circle_remove_title, bee.displayName)) },
-            text = { Text(stringResource(R.string.circle_remove_body_delayed, bee.displayName)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirm = false
-                    action.run(successMessage = removing) { AppGraph.social.removeApprover(bee.uid) }
-                }) { Text(stringResource(R.string.action_remove)) }
-            },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.action_keep)) } },
-        )
-    }
-}
-
-@Composable
-private fun GardenRow(friend: UserProfile, modifier: Modifier, onChat: () -> Unit, onClick: () -> Unit) {
-    // Only the name card: how their phone is set up is theirs to know.
-    PersonCard(
-        avatar = friend.avatar,
-        name = friend.displayName,
-        about = friend.bio.ifBlank { stringResource(R.string.circle_garden_role) },
-        modifier = modifier,
-        onClick = onClick,
-    ) {
-        IconButton(onClick = onChat) {
-            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, friend.displayName))
-        }
-        Icon(
-            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 /**
  * One person in the circle, the same for Bumblebees and gardens: their picture and name, one line
  * about them, and [actions] at the end.
@@ -387,6 +439,7 @@ private fun PersonCard(
     about: String,
     modifier: Modifier,
     aboutIsWarning: Boolean = false,
+    aboutIsNew: Boolean = false,
     error: String? = null,
     onClick: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
@@ -401,6 +454,7 @@ private fun PersonCard(
                     about,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (aboutIsWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (aboutIsNew) FontWeight.SemiBold else null,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

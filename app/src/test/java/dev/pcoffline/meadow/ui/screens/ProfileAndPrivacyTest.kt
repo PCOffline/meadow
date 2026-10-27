@@ -31,7 +31,8 @@ import dev.pcoffline.meadow.data.Privacy
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.AccountEntry
 import dev.pcoffline.meadow.ui.components.LocalAccount
-import dev.pcoffline.meadow.ui.requests.RequestsContent
+import dev.pcoffline.meadow.ui.circle.People
+import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
@@ -63,7 +64,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
             CompositionLocalProvider(LocalAccount provides AccountEntry(robin.avatar) { opened++ }) {
                 when (tab) {
                     0 -> StatsContent(DemoGarden.stats)
-                    else -> RequestsContent(robin, incoming = emptyList(), outgoing = emptyList())
+                    else -> PeopleContent(robin, People())
                 }
             }
         }
