@@ -95,7 +95,8 @@ class ProfileAndPrivacyTest : ScreenTest() {
         val heights = GardenTheme.entries.map { theme ->
             compose.onNode(hasText(text(theme.label), substring = true) and hasClickAction()).fetchSemanticsNode().boundsInRoot.height
         }
-        assertEquals(heights.toString(), 1, heights.distinct().size)
+        // Within a pixel: sizes in dp land on fractions of a pixel, rounded either way.
+        assertTrue(heights.toString(), heights.max() - heights.min() <= 1f)
         val modes = DarkMode.entries.map { node(it.label).fetchSemanticsNode().boundsInRoot.height }
         assertEquals(modes.toString(), 1, modes.distinct().size)
     }
@@ -144,6 +145,9 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     private fun switch(@StringRes title: Int) = compose.onNode(isToggleable() and hasText(text(title)))
 
+    /** The progress card's title, not the switch that shares it. */
+    private fun progressCard() = compose.onNode(hasText(text(R.string.progress_title)) and !isToggleable())
+
     @Test
     fun `the preview shows each part that's shared`() {
         preview()
@@ -152,7 +156,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         }
         node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).performScrollTo().assertExists()
         compose.onNodeWithText("Maps").performScrollTo().assertExists()
-        node(R.string.progress_title).performScrollTo().assertExists()
+        progressCard().performScrollTo().assertExists()
         node(R.string.progress_kept, 5, 7).performScrollTo().assertExists()
         node(R.string.friend_limits).performScrollTo().assertExists()
         compose.onNodeWithText(robin.bio).performScrollTo().assertExists()
@@ -167,7 +171,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         // Top apps stay, without the limits that are now private.
         compose.onNodeWithText("Maps").performScrollTo().assertExists()
         node(R.string.friend_used_of, app.resources.minutesText(52), app.resources.minutesText(60)).assertDoesNotExist()
-        node(R.string.progress_title).performScrollTo().assertExists()
+        progressCard().performScrollTo().assertExists()
     }
 
     @Test

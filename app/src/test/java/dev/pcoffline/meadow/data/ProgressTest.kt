@@ -22,8 +22,8 @@ class ProgressTest {
 
     @Test
     fun `calmer weeks count back while each week had less than the one before`() {
-        // Last week first: 300 < 400 < 500, then 600 isn't less than 550.
-        assertEquals(3, Progress.calmerWeeks(listOf(300L, 400L, 500L, 550L, 600L)))
+        // Last week first: 300 < 400 < 500 < 650, then 650 isn't less than 600.
+        assertEquals(3, Progress.calmerWeeks(listOf(300L, 400L, 500L, 650L, 600L)))
         assertEquals(0, Progress.calmerWeeks(listOf(500L, 400L)))
         // A week the phone has no full record of ends the run: it can't be compared.
         assertEquals(1, Progress.calmerWeeks(listOf(300L, 400L, null, 600L)))
