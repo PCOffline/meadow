@@ -6,7 +6,7 @@ import { onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { pushes } from "./copy";
 import {
-  accountRef, chats, consumeRate, db, friendCodes, heartbeats, inboxRef, inviteLinks, invites, loadPerson, notify, rateLimits,
+  accountRef, chats, consumeRate, db, deleteChatMedia, friendCodes, heartbeats, inboxRef, inviteLinks, invites, loadPerson, notify, rateLimits,
   removals, requests, requireAuth, requireRecentSignIn, users,
 } from "./db";
 
@@ -156,6 +156,7 @@ export const deleteAccount = onCall({ timeoutSeconds: 300 }, async (req) => {
 
   for (const chat of (await chats().where("participants", "array-contains", uid).get()).docs) {
     await db().recursiveDelete(chat.ref);
+    await deleteChatMedia(chat.id);
   }
   await db().recursiveDelete(userRef);
   await getStorage().bucket().file(`avatars/${uid}`).delete({ ignoreNotFound: true })

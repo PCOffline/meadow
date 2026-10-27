@@ -408,6 +408,21 @@ describe("chats", () => {
     await assertFails(addDoc(messages, { senderId: "sam", text: "", kind: "text", createdAt: serverTimestamp() }));
   });
 
+  test("a photo message points at the sender's own file in this chat, and nothing else", async () => {
+    const messages = collection(as("sam"), "chats/bee_sam/messages");
+    const photo = { senderId: "sam", kind: "image", path: "chats/bee_sam/sam/abc12345.jpg", width: 800, height: 600, gif: false, createdAt: serverTimestamp() };
+    await assertSucceeds(addDoc(messages, photo));
+    await assertSucceeds(addDoc(messages, { ...photo, path: "chats/bee_sam/sam/abc12345.gif", gif: true }));
+    // Someone else's file, another chat's, or anywhere else in Storage.
+    for (const path of ["chats/bee_sam/bee/abc12345.jpg", "chats/other_sam/sam/abc12345.jpg", "avatars/bee", "chats/bee_sam/sam/../bee/x.jpg", "chats/bee_sam/sam/abc12345.html"]) {
+      await assertFails(addDoc(messages, { ...photo, path }));
+    }
+    await assertFails(addDoc(messages, { ...photo, width: 0 }));
+    await assertFails(addDoc(messages, { ...photo, height: 9000 }));
+    await assertFails(addDoc(messages, { ...photo, text: "caption" }));
+    await assertFails(addDoc(messages, { ...photo, senderId: "bee", path: "chats/bee_sam/bee/abc12345.jpg" }));
+  });
+
   test("chat summaries only change in the allowed ways", async () => {
     const chat = doc(as("sam"), "chats/bee_sam");
     await assertSucceeds(updateDoc(chat, { lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: "sam" }));

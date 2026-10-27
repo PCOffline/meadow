@@ -77,6 +77,12 @@ export const chatNotes = {
   emergency: (headline: string, scope: string, reason: string) => `${headline}. Lifted ${scope}. Reason: “${reason}”`,
 };
 
+/** What a chat notification says for a message that is a picture. Matches the app's chat_photo / chat_gif. */
+export const chatMedia = {
+  photo: "📷 Photo",
+  gif: "GIF",
+};
+
 /** Push notification texts. Titles are short; bodies say what to do next. */
 export const pushes = {
   invite: (owner: Person) => ({

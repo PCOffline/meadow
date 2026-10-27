@@ -57,6 +57,30 @@ test("your circle can see your photo; strangers and signed-out visitors can't", 
   await assertFails(getBytes(ref(storageOf(null), "avatars/sam")));
 });
 
+test("chat photos are seen only by the two in the chat, and added only by each to their own folder", async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "chats/bee_sam"), { participants: ["bee", "sam"] }));
+  const gif = { contentType: "image/gif" };
+  await assertSucceeds(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/photo1234.jpg"), jpeg(), image));
+  await assertSucceeds(uploadBytes(ref(storageOf("bee"), "chats/bee_sam/bee/funny123.gif"), jpeg(), gif));
+  await assertSucceeds(getBytes(ref(storageOf("bee"), "chats/bee_sam/sam/photo1234.jpg")));
+  await assertSucceeds(getBytes(ref(storageOf("sam"), "chats/bee_sam/bee/funny123.gif")));
+  await assertFails(getBytes(ref(storageOf("stranger"), "chats/bee_sam/sam/photo1234.jpg")));
+  await assertFails(getBytes(ref(storageOf(null), "chats/bee_sam/sam/photo1234.jpg")));
+  // Not in someone else's folder, not into a chat you're not in, not replaced or removed.
+  await assertFails(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/bee/fake1234.jpg"), jpeg(), image));
+  await assertFails(uploadBytes(ref(storageOf("stranger"), "chats/bee_sam/stranger/x1234567.jpg"), jpeg(), image));
+  await assertFails(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/photo1234.jpg"), jpeg(), image));
+  await assertFails(deleteObject(ref(storageOf("sam"), "chats/bee_sam/sam/photo1234.jpg")));
+  // Only photos and GIFs under 5 MB.
+  await assertFails(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/big12345.jpg"), jpeg(5 * 1024 * 1024 + 1), image));
+  await assertFails(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/page1234.jpg"), jpeg(), { contentType: "text/html" }));
+});
+
+test("a closed chat takes no new photos", async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "chats/lee_sam"), { participants: ["lee", "sam"], closed: true }));
+  await assertFails(uploadBytes(ref(storageOf("sam"), "chats/lee_sam/sam/photo1234.jpg"), jpeg(), image));
+});
+
 test("nothing outside avatars is reachable", async () => {
   await assertFails(uploadBytes(ref(storageOf("sam"), "other/sam"), jpeg(), image));
   await assertFails(getBytes(ref(storageOf("sam"), "other/thing")));

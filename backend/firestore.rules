@@ -249,14 +249,27 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if participant();
+        function textMessage() {
+          return request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
+            && request.resource.data.kind == 'text'
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000;
+        }
+        // A photo or GIF the sender uploaded to this chat's own folder in Storage.
+        function imageMessage() {
+          return request.resource.data.keys().hasOnly(['senderId', 'kind', 'createdAt', 'path', 'width', 'height', 'gif'])
+            && request.resource.data.kind == 'image'
+            && request.resource.data.path is string
+            && request.resource.data.path.matches('chats/' + chatId + '/' + me() + '/[A-Za-z0-9_-]{8,64}[.](jpg|gif)')
+            && request.resource.data.width is int && request.resource.data.width > 0 && request.resource.data.width <= 8192
+            && request.resource.data.height is int && request.resource.data.height > 0 && request.resource.data.height <= 8192
+            && request.resource.data.gif is bool;
+        }
         allow create: if participant() && isOpen()
-          && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
           && request.resource.data.senderId == me()
-          && request.resource.data.kind == 'text'
           && request.resource.data.createdAt == request.time
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
+          && (textMessage() || imageMessage());
         allow update, delete: if false;
       }
     }

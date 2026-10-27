@@ -229,7 +229,10 @@ data class Chat(
         lastMessageAtMillis > (lastReadMillis[me] ?: 0L)
 }
 
-enum class MessageKind { TEXT, REQUEST, SYSTEM }
+enum class MessageKind { TEXT, IMAGE, REQUEST, SYSTEM }
+
+/** A photo or GIF sent in a chat: where it is in Storage, and its size to lay it out before it loads. */
+data class ChatPicture(val path: String, val width: Int, val height: Int, val gif: Boolean)
 
 data class ChatMessage(
     val id: String,
@@ -239,6 +242,8 @@ data class ChatMessage(
     val requestId: String?,
     val createdAtMillis: Long,
     val pending: Boolean,
+    /** Set for [MessageKind.IMAGE]. */
+    val picture: ChatPicture? = null,
 )
 
 /** Today's usage of a person, as uploaded for their Bumblebees. */

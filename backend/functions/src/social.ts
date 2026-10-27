@@ -5,7 +5,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
 import {
-  accountOf, accountRef, chats, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
+  accountOf, accountRef, chats, consumeRate, db, deleteChatMedia, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
   postToChat, projectId, removals, requireAuth, users,
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken, withPhotoToken } from "./format";
@@ -310,7 +310,7 @@ export async function partWays(ownerUid: string, beeUid: string, endedBy: "owner
   }
   await batch.commit();
 
-  if (parting) await Promise.all([renewPhotoLink(ownerUid), renewPhotoLink(beeUid)]);
+  if (parting) await Promise.all([renewPhotoLink(ownerUid), renewPhotoLink(beeUid), deleteChatMedia(chatId)]);
   if (endedBy === "owner") {
     await postToChat(chatId, { senderId: ownerUid, kind: "system", text: chatNotes.removedBumblebee(owner.profile, bee.profile) }, { evenIfClosed: true });
     await notify([beeUid], { type: "approver_left", uid: ownerUid, ...pushes.removedBumblebee(owner.profile) });

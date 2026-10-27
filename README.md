@@ -43,6 +43,7 @@ arrive at five minutes and one minute left.
 Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee
 gets a chat with you, and your requests appear in it as cards they can answer with one tap.
+Send photos and GIFs (straight from your keyboard too), and long-press a message to copy it.
 From a chat you can ask them to be your Bumblebee too, or offer to be theirs. When someone stops
 being your Bumblebee, your chat with them closes.
 
@@ -80,7 +81,7 @@ you, or a password. You choose what your Bumblebees see, part by part (your limi
 screen time, top apps and your progress over the weeks), and Settings shows your page exactly as
 they see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
 person affected is told when you add or remove a Bumblebee. Download everything Meadow holds about
-you, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
+you, with the photos from your chats, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
 
 ### Kind to everyone
 Built for TalkBack, large text and switch access: every control is labelled, touch targets are

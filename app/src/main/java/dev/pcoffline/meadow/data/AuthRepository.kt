@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.data
 
+import dev.pcoffline.meadow.AppGraph
 import com.google.firebase.auth.ActionCodeSettings
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.EmailAuthProvider
@@ -203,6 +204,8 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
             )
         }
         backend.auth.signOut()
+        // Chat pictures are only for whoever was signed in.
+        runCatching { ChatMedia.clearCache(AppGraph.app) }
     }
 
     private companion object {

@@ -121,8 +121,8 @@ Collections appear on their own as people use the app.
 
 Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which lets
 people change only their own photo, lets their Bumblebees and the people they look after see it,
-and keeps each export file to its owner, and sets the bucket's lifecycle
-rule.
+keeps each chat's photos and GIFs (under `chats/`) to its two people, and keeps each export file
+to its owner, and sets the bucket's lifecycle rule. A chat's pictures are deleted when it closes.
 
 ### 2.6 Cloud Messaging
 

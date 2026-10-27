@@ -11,6 +11,7 @@ import com.google.firebase.storage.FirebaseStorage
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.Connectivity
+import dev.pcoffline.meadow.data.ChatMedia
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.DayUsage
 import dev.pcoffline.meadow.data.EmergencyRepository
@@ -67,6 +68,7 @@ object AppGraph {
     val limits by lazy { LimitsRepository(backend, store, requests) }
     val social by lazy { SocialRepository(backend) { protection.current().strictReady } }
     val chats by lazy { ChatRepository(backend) }
+    val chatMedia by lazy { ChatMedia(app) }
     val share by lazy { UsageShareRepository(backend) }
     val tracker by lazy { UsageTracker(app) }
     val catalog by lazy { AppCatalog(app) }

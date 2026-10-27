@@ -1,5 +1,6 @@
 /** Firestore and FCM plumbing shared by every function. */
 import { getFirestore, FieldPath, FieldValue, type DocumentSnapshot, type DocumentReference, type SetOptions, type DocumentData, type Transaction } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
@@ -214,6 +215,16 @@ export async function postToChat(
  */
 export function pushPayload(uid: string, data: Record<string, string>): Record<string, string> {
   return { ...data, to: uid };
+}
+
+/**
+ * Deletes every photo and GIF sent in a chat. Chat pictures last only as long as the chat is
+ * open: closing it (the two parted ways) or deleting it (an account was deleted) removes them.
+ * Never throws: whatever caused it has already happened.
+ */
+export async function deleteChatMedia(chatId: string): Promise<void> {
+  await getStorage().bucket().deleteFiles({ prefix: `chats/${chatId}/` })
+    .catch((e) => logger.warn("Chat media delete failed", { chatId, error: String(e) }));
 }
 
 /** What one push to one person did: how many of their phones there were, how many got it, and why others didn't. */

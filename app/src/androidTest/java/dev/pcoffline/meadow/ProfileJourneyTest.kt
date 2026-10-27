@@ -30,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.zip.ZipFile
 
 /**
  * End to end: someone makes their profile their own (name, critter, colour, a photo that's later
@@ -98,7 +99,7 @@ class ProfileJourneyTest : EndToEndTest() {
 
     @Test
     fun allMyDataDownloadsAsOneFile() {
-        val saved = File(app.cacheDir, "meadow-data.json").apply { delete() }
+        val saved = File(app.cacheDir, "meadow-data.zip").apply { delete() }
         intending(hasAction(Intent.ACTION_CREATE_DOCUMENT)).respondWith(ActivityResult(Activity.RESULT_OK, Intent().setData(Uri.fromFile(saved))))
 
         ActivityScenario.launch(MainActivity::class.java).use {
@@ -106,7 +107,7 @@ class ProfileJourneyTest : EndToEndTest() {
             compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
             node(R.string.settings_export).performScrollTo().performClick()
             waitFor(R.string.settings_export_done)
-            val data = saved.readText()
+            val data = ZipFile(saved).use { zip -> zip.getInputStream(zip.getEntry("meadow-data.json")).readBytes().decodeToString() }
             JSONObject(data)
             assertTrue("The download doesn't have the profile in it: ${data.take(500)}", "Robin" in data)
         }

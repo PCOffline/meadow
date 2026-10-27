@@ -4,7 +4,7 @@ import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
-import { pushes } from "./copy";
+import { chatMedia, pushes } from "./copy";
 import { accountOf, accountRef, chats, db, heartbeats, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
 import { finishDueRemovals } from "./social";
@@ -12,10 +12,11 @@ import { finishDueRemovals } from "./social";
 const ALERT_COOLDOWN_MS = 2 * 60_000;
 const STALE_HEARTBEAT_MS = 6 * 60 * 60_000;
 
-/** Pushes new chat messages to the other person, while the chat is open. */
+/** Pushes new chat messages, words or pictures, to the other person, while the chat is open. */
 export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data?.data();
-  if (message?.kind !== "text") return;
+  if (message?.kind !== "text" && message?.kind !== "image") return;
+  const text = message.kind === "image" ? (message.gif === true ? chatMedia.gif : chatMedia.photo) : String(message.text ?? "");
   const chat = await chats().doc(event.params.chatId).get();
   if (!chat.exists || chat.get("closed") === true) return;
   const participants = (chat.get("participants") as string[] | undefined) ?? [];
@@ -26,7 +27,7 @@ export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{message
   await notify(participants.filter((p) => p !== sender), {
     type: "chat",
     chatId: event.params.chatId,
-    ...pushes.chat(person, String(message.text ?? "").slice(0, 300)),
+    ...pushes.chat(person, text.slice(0, 300)),
   });
 });
 

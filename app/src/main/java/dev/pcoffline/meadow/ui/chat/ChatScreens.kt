@@ -1,5 +1,44 @@
 package dev.pcoffline.meadow.ui.chat
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.content.MediaType
+import androidx.compose.foundation.content.consume
+import androidx.compose.foundation.content.contentReceiver
+import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
+import coil3.decode.BitmapFactoryDecoder
+import coil3.request.ImageRequest
+import dev.pcoffline.meadow.data.ChatPicture
+import dev.pcoffline.meadow.data.runCatchingCancellable
+import dev.pcoffline.meadow.ui.components.rememberReducedMotion
+import java.io.File
 import androidx.compose.material3.AssistChip
 import androidx.compose.foundation.horizontalScroll
 import android.content.ClipData
@@ -162,7 +201,7 @@ internal fun ChatRow(chat: Chat, uid: String, onOpen: () -> Unit, modifier: Modi
 /** A chat once loaded; [chat] is null when it's closed (the friendship ended). */
 data class LoadedChat(val chat: Chat?)
 
-class ChatViewModel(private val chatId: String, myUid: String) : ViewModel() {
+class ChatViewModel(private val chatId: String, private val myUid: String) : ViewModel() {
     /** Null until the chat has loaded, so loading isn't mistaken for a closed chat. */
     val chat: StateFlow<LoadedChat?> = AppGraph.chats.chat(chatId).map { LoadedChat(it) }.stateWhileVisible(this, null)
     val messages: StateFlow<List<ChatMessage>> = AppGraph.chats.messages(chatId).stateWhileVisible(this, emptyList())
@@ -174,6 +213,15 @@ class ChatViewModel(private val chatId: String, myUid: String) : ViewModel() {
     suspend fun askBee(uid: String, offer: Boolean) = AppGraph.social.inviteFromChat(uid, offer)
 
     suspend fun send(text: String) = AppGraph.chats.send(chatId, text)
+
+    /** Shrinks [uri] (a GIF goes as it is), uploads it to this chat's folder, then sends it. */
+    suspend fun sendPicture(uri: Uri) {
+        val media = AppGraph.chatMedia
+        val picture = media.prepare(uri)
+        val path = media.upload(myUid, chatId, picture)
+        val summary = AppGraph.app.getString(if (picture.gif) R.string.chat_gif else R.string.chat_photo)
+        AppGraph.chats.sendPicture(chatId, ChatPicture(path, picture.width, picture.height, picture.gif), summary)
+    }
 
     fun markRead() {
         viewModelScope.launch { AppGraph.chats.markRead(chatId) }
@@ -196,6 +244,7 @@ fun ChatScreen(
         sending = sending.busy,
         error = sending.error,
         onSend = { text, sent -> sending.run(onSuccess = sent) { viewModel.send(text) } },
+        onSendPicture = { uri -> sending.run { viewModel.sendPicture(uri) } },
         onSeen = viewModel::markRead,
         onBack = onBack,
         invited = loaded?.chat?.otherId(profile.uid) in invited,
@@ -210,8 +259,10 @@ fun ChatScreen(
  * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
  * message (with whether you asked it); by default it follows the live request. Whichever way
  * round the two aren't yet each other's Bumblebee, [onAskBee] asks (or offers, when true) unless
- * that's already [invited].
+ * that's already [invited]. [onSendPicture] gets a photo or GIF, picked or from the keyboard;
+ * [pictureFile] fetches one to show (null once it's gone).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatContent(
     profile: UserProfile,
@@ -225,9 +276,14 @@ fun ChatContent(
     onBack: () -> Unit = {},
     invited: Boolean = false,
     onAskBee: suspend (offer: Boolean) -> Unit = {},
+    onSendPicture: (Uri) -> Unit = {},
+    pictureFile: suspend (path: String) -> File? = { AppGraph.chatMedia.file(it) },
     requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
-    var draft by rememberSaveable { mutableStateOf("") }
+    val draft = rememberTextFieldState()
+    val canSend = chat != null && !sending
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(onSendPicture) }
+    var viewing by remember { mutableStateOf<ViewedPicture?>(null) }
     val listState = rememberLazyListState()
 
     // Keyed on the newest message, not the count: only the latest 300 are loaded, so once a
@@ -264,31 +320,163 @@ fun ChatContent(
                         MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
                         MessageKind.SYSTEM -> SystemMessage(message)
                         MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
+                        MessageKind.IMAGE -> PictureBubble(message, mine = message.senderId == profile.uid, pictureFile) { viewing = it }
                     }
                 }
             }
         }
         ErrorNote(error, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = canSend) {
+                Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = stringResource(R.string.chat_add_picture))
+            }
             OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it.take(2000) },
+                state = draft,
                 placeholder = { Text(stringResource(R.string.chat_placeholder)) },
-                modifier = Modifier.weight(1f),
+                // GIFs and stickers from the keyboard, and pasted pictures, are sent as pictures.
+                modifier = Modifier.weight(1f).contentReceiver { content ->
+                    if (!canSend || !content.hasMediaType(MediaType.Image)) return@contentReceiver content
+                    content.consume { item -> item.uri?.also(onSendPicture) != null }
+                },
                 shape = RoundedCornerShape(24.dp),
-                maxLines = 4,
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 4),
+                inputTransformation = InputTransformation.maxLength(2000),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 enabled = chat != null || loading,
             )
             Spacer(Modifier.width(8.dp))
             FilledIconButton(
                 onClick = {
-                    val text = draft
+                    val text = draft.text.toString()
                     // Anything typed while it was sending stays.
-                    onSend(text) { if (draft == text) draft = "" }
+                    onSend(text) { if (draft.text.toString() == text) draft.clearText() }
                 },
-                enabled = draft.isNotBlank() && chat != null && !sending,
+                enabled = draft.text.isNotBlank() && canSend,
             ) { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.action_send)) }
+        }
+    }
+    viewing?.let { PictureViewer(it, onDismiss = { viewing = null }) }
+}
+
+/** A picture opened full screen: its file, and what it is for a screen reader. */
+private class ViewedPicture(val file: File, val description: String)
+
+/** What a picture bubble shows while its file is fetched. */
+private sealed interface PictureLoad {
+    data object Loading : PictureLoad
+    data class Ready(val file: File) : PictureLoad
+    data object Gone : PictureLoad
+    data object Failed : PictureLoad
+}
+
+/**
+ * A photo or GIF, laid out at its own shape before it loads so the chat doesn't jump. Tapping
+ * opens it full screen; if it couldn't load, tapping tries again. Once its chat has closed it's
+ * deleted, and says so.
+ */
+@Composable
+private fun PictureBubble(message: ChatMessage, mine: Boolean, file: suspend (String) -> File?, onOpen: (ViewedPicture) -> Unit) {
+    val picture = message.picture ?: return
+    var attempt by remember { mutableIntStateOf(0) }
+    val load by produceState<PictureLoad>(PictureLoad.Loading, picture.path, attempt) {
+        value = PictureLoad.Loading
+        value = runCatchingCancellable { file(picture.path) }
+            .fold({ found -> found?.let { PictureLoad.Ready(it) } ?: PictureLoad.Gone }, { PictureLoad.Failed })
+    }
+    val description = stringResource(if (picture.gif) R.string.chat_gif else R.string.chat_picture_photo)
+    val openLabel = stringResource(R.string.chat_picture_open)
+    val retryLabel = stringResource(R.string.action_try_again)
+    val shape = RoundedCornerShape(
+        topStart = 20.dp, topEnd = 20.dp,
+        bottomStart = if (mine) 20.dp else 6.dp,
+        bottomEnd = if (mine) 6.dp else 20.dp,
+    )
+    val reduced = rememberReducedMotion()
+    val context = LocalContext.current
+    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
+        Column(horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
+            Box(
+                Modifier.width(240.dp)
+                    // Very tall or wide pictures are cropped to a shape that still fits a phone.
+                    .aspectRatio((picture.width.toFloat() / picture.height).coerceIn(0.6f, 1.8f))
+                    .clip(shape)
+                    .background(if (mine) MaterialTheme.colorScheme.primaryContainer else Garden.colors.cardTint)
+                    .then(
+                        when (val now = load) {
+                            is PictureLoad.Ready -> Modifier.clickable(onClickLabel = openLabel) { onOpen(ViewedPicture(now.file, description)) }
+                            PictureLoad.Failed -> Modifier.clickable(onClickLabel = retryLabel) { attempt++ }
+                            else -> Modifier
+                        },
+                    )
+                    .alpha(if (message.pending) 0.6f else 1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                when (val now = load) {
+                    PictureLoad.Loading -> CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
+                    is PictureLoad.Ready -> AsyncImage(
+                        model = pictureRequest(context, now.file, still = reduced),
+                        contentDescription = description,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    PictureLoad.Gone, PictureLoad.Failed -> Text(
+                        stringResource(if (now == PictureLoad.Gone) R.string.chat_picture_gone else R.string.chat_picture_failed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+            Text(
+                if (message.pending) stringResource(R.string.chat_sending) else relativeTime(message.createdAtMillis),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+/** Loads [file]; with animations off a GIF shows its first frame and stays still. */
+private fun pictureRequest(context: Context, file: File, still: Boolean): ImageRequest =
+    ImageRequest.Builder(context).data(file).apply { if (still) decoderFactory(BitmapFactoryDecoder.Factory()) }.build()
+
+/** A picture on its own, as big as the screen allows: pinch to zoom, double-tap to zoom back out. */
+@Composable
+private fun PictureViewer(picture: ViewedPicture, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val reduced = rememberReducedMotion()
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val zoom = rememberTransformableState { change, pan, _ ->
+        scale = (scale * change).coerceIn(1f, 5f)
+        offset = if (scale == 1f) Offset.Zero else offset + pan
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AsyncImage(
+                model = pictureRequest(context, picture.file, still = reduced),
+                contentDescription = picture.description,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = {
+                            scale = 1f
+                            offset = Offset.Zero
+                        })
+                    }
+                    .transformable(zoom)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+            )
+            FilledTonalIconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) {
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_close))
+            }
         }
     }
 }

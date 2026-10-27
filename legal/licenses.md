@@ -11,6 +11,7 @@ Source: github.com/PCOffline/meadow
 
 - **Fraunces** by Undercase Type, SIL Open Font License 1.1
 - **Nunito** by Vernon Adams, Cyreal and Jacques Le Bailly, SIL Open Font License 1.1
+- **Noto Color Emoji** by Google, SIL Open Font License 1.1
 
 ## Libraries
 

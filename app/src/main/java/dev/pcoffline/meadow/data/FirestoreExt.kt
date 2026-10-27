@@ -217,11 +217,20 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
     kind = when (getString("kind")) {
         "request" -> MessageKind.REQUEST
         "system" -> MessageKind.SYSTEM
+        "image" -> MessageKind.IMAGE
         else -> MessageKind.TEXT
     },
     requestId = getString("requestId"),
     createdAtMillis = millis("createdAt"),
     pending = metadata.hasPendingWrites(),
+    picture = getString("path")?.let { path ->
+        ChatPicture(
+            path = path,
+            width = (getLong("width") ?: 1L).toInt().coerceAtLeast(1),
+            height = (getLong("height") ?: 1L).toInt().coerceAtLeast(1),
+            gif = getBoolean("gif") == true,
+        )
+    },
 )
 
 fun DocumentSnapshot.toSharedApps(): List<SharedAppUsage> =

@@ -382,8 +382,9 @@ describe("asking from a chat", () => {
     // Accepting an offer makes whoever offered the Bumblebee, and tells them.
     assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approverIds, [sam.uid]);
     assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approveeIds, [bee.uid]);
-    const [told] = await outbox(sam.uid, "invite_accepted");
-    assert.match(told.title, /You're Bee's Bumblebee now/);
+    // Sam already heard that Bee became theirs when they were linked; this one is the other way round.
+    const told = await outbox(sam.uid, "invite_accepted");
+    assert.ok(told.some((push) => /You're Bee's Bumblebee now/.test(push.title)), JSON.stringify(told));
     await rejects(sam.call("inviteFromChat", { uid: bee.uid, offer: true }), "already-exists", /already Bee's Bumblebee/);
   });
 
@@ -886,6 +887,33 @@ describe("chat and alerts", () => {
     }));
     await eventually(async () => assert.equal((await outbox(bee.uid, "chat")).length, 1));
     assert.equal((await outbox(sam.uid, "chat")).length, 0);
+  });
+
+  test("a photo is pushed as a photo, and the chat's pictures go when the chat closes", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
+    const path = `chats/${chatId}/${sam.uid}/photo1234.jpg`;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      for (const bucket of BUCKETS) await uploadBytes(storageRef(ctx.storage(`gs://${bucket}`), path), new Uint8Array([255, 216, 255]), { contentType: "image/jpeg" });
+    });
+    await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
+      senderId: sam.uid, kind: "image", path, width: 640, height: 480, gif: false, createdAt: serverTimestamp(),
+    }));
+    const [push] = await eventually(async () => {
+      const sent = await outbox(bee.uid, "chat");
+      assert.equal(sent.length, 1);
+      return sent;
+    });
+    assert.equal(push.body, "📷 Photo");
+    // Uploaded to both possible default buckets (see readFile): the backend's own copy goes.
+    const copies = async () => (await Promise.all(BUCKETS.map(async (bucket) =>
+      (await fetch(`http://127.0.0.1:9199/v0/b/${bucket}/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } })).ok))).filter(Boolean).length;
+    assert.equal(await copies(), 2);
+
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    assert.equal(await copies(), 1);
   });
 
   test("a protection alert reaches every Bumblebee, without saying which setting changed", async () => {

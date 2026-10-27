@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.FriendlyException
 import dev.pcoffline.meadow.data.Emergency
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.SecureAccountCard
@@ -292,13 +293,13 @@ private fun DataCard(onOpenLegal: (LegalDoc) -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
     val action = rememberAction()
     val exported = stringResource(R.string.settings_export_done)
-    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    // A zip: the data as JSON, plus the photos and GIFs from your chats.
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         action.run(successMessage = exported) {
-            val json = AppGraph.profiles.exportData()
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
-            }
+            val out = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                ?: throw FriendlyException(R.string.error_generic)
+            out.use { AppGraph.profiles.exportTo(it) }
         }
     }
     MeadowCard(Modifier.fillMaxWidth()) {
@@ -306,7 +307,7 @@ private fun DataCard(onOpenLegal: (LegalDoc) -> Unit, onDelete: () -> Unit) {
         LegalDoc.entries.forEach { doc ->
             LinkRow(stringResource(doc.title)) { onOpenLegal(doc) }
         }
-        LinkRow(stringResource(R.string.settings_export), enabled = !action.busy) { save.launch("meadow-data.json") }
+        LinkRow(stringResource(R.string.settings_export), enabled = !action.busy) { save.launch("meadow-data.zip") }
         LinkRow(stringResource(R.string.settings_delete), danger = true, onClick = onDelete)
         ErrorNote(action.error)
     }
