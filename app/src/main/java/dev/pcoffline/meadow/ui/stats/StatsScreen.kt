@@ -92,6 +92,11 @@ data class Selection(val period: Period = Period.WEEK, val offset: Int = 0) {
 
     /** History older than [UsageHistory.KEEP_DAYS] is gone, so there's nothing earlier to show. */
     fun hasEarlier(today: LocalDate): Boolean = range(today).first.isAfter(today.minusDays(UsageHistory.KEEP_DAYS))
+
+    companion object {
+        /** [day] on its own; a day still to come shows today instead. */
+        fun ofDay(day: LocalDate, today: LocalDate) = Selection(Period.DAY, ChronoUnit.DAYS.between(today, day).toInt().coerceAtMost(0))
+    }
 }
 
 /** [canLimit] is false for the phone, settings and apps since uninstalled, which can't be limited. */
@@ -156,6 +161,11 @@ class StatsViewModel : ViewModel() {
         selection.value = Selection(period, 0)
     }
 
+    /** Shows [day] on its own. */
+    fun openDay(day: LocalDate) {
+        selection.value = Selection.ofDay(day, Days.today())
+    }
+
     fun shift(by: Int) {
         val current = selection.value
         if (by < 0 && !current.hasEarlier(Days.today())) return
@@ -205,7 +215,14 @@ class StatsViewModel : ViewModel() {
 @Composable
 fun StatsScreen(onOpenSetup: () -> Unit, onOpenApp: (String) -> Unit, viewModel: StatsViewModel = viewModel { StatsViewModel() }) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    StatsContent(state, onSelect = viewModel::select, onShift = viewModel::shift, onOpenSetup = onOpenSetup, onOpenApp = onOpenApp)
+    StatsContent(
+        state,
+        onSelect = viewModel::select,
+        onShift = viewModel::shift,
+        onOpenSetup = onOpenSetup,
+        onOpenApp = onOpenApp,
+        onOpenDay = viewModel::openDay,
+    )
 }
 
 /** The statistics, drawn from plain state (also used for previews and screenshots). */
@@ -216,6 +233,7 @@ fun StatsContent(
     onShift: (Int) -> Unit = {},
     onOpenSetup: () -> Unit = {},
     onOpenApp: (String) -> Unit = {},
+    onOpenDay: (LocalDate) -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         TabTitle(stringResource(R.string.stats_title))
@@ -244,13 +262,13 @@ fun StatsContent(
                 action = { Button(onClick = onOpenSetup) { Text(stringResource(R.string.stats_no_access_action)) } },
             )
         } else {
-            StatsBody(state, onShift, onOpenApp)
+            StatsBody(state, onShift, onOpenApp, onOpenDay)
         }
     }
 }
 
 @Composable
-private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit, onOpenApp: (String) -> Unit) {
+private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit, onOpenApp: (String) -> Unit, onOpenDay: (LocalDate) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PeriodNavigator(
             title = periodTitle(state.selection, state.stats),
@@ -270,7 +288,7 @@ private fun StatsBody(state: StatsUiState, onShift: (Int) -> Unit, onOpenApp: (S
             label = "period",
         ) { selection ->
             val stats = state.stats?.takeIf { it.selection == selection }
-            if (stats == null) Loading() else PeriodContent(stats, state.progress.takeIf { selection.offset == 0 }, onOpenApp)
+            if (stats == null) Loading() else PeriodContent(stats, state.progress.takeIf { selection.offset == 0 }, onOpenApp, onOpenDay)
         }
     }
 }
@@ -294,12 +312,12 @@ private fun periodTitle(selection: Selection, stats: PeriodStats?): String {
 }
 
 @Composable
-private fun PeriodContent(s: PeriodStats, progress: Progress?, onOpenApp: (String) -> Unit) {
+private fun PeriodContent(s: PeriodStats, progress: Progress?, onOpenApp: (String) -> Unit, onOpenDay: (LocalDate) -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Summary(s) }
         // The summary already compares this period with the last.
         if (progress != null) item { ProgressCard(progress, Modifier.padding(horizontal = 20.dp), showWeekChange = false) }
-        if (s.selection.period != Period.DAY) item { Chart(s) }
+        if (s.selection.period != Period.DAY) item { Chart(s, onOpenDay) }
         item { SectionTitle(stringResource(R.string.stats_where_time_went), Modifier.padding(horizontal = 20.dp)) }
         if (s.apps.isEmpty()) {
             item { EmptyState("🌾", stringResource(R.string.stats_quiet_title), stringResource(R.string.stats_quiet_body)) }
@@ -355,7 +373,7 @@ private fun Summary(s: PeriodStats) {
 }
 
 @Composable
-private fun Chart(s: PeriodStats) {
+private fun Chart(s: PeriodStats, onOpenDay: (LocalDate) -> Unit) {
     val today = Days.today()
     MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
         val minutes = s.days.map { (it.second ?: 0L) / 60_000f }
@@ -373,12 +391,19 @@ private fun Chart(s: PeriodStats) {
                 missing = missing,
             )
         } else {
+            val locale = currentLocale()
+            val dayName = DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "EEEEd"), locale)
+            val noRecord = stringResource(R.string.stats_day_no_record)
             MonthHeatmap(
                 values = minutes,
                 labels = s.days.map { it.first.dayOfMonth.toString() },
                 firstDay = s.firstDay,
                 firstDayOffset = Math.floorMod(s.from.dayOfWeek.value - s.firstDay.value, 7),
                 missing = missing,
+                descriptions = s.days.map { (day, ms) -> "${day.format(dayName)}, ${ms?.let { durationText(it) } ?: noRecord}" },
+                selectLabel = stringResource(R.string.stats_open_day),
+                canSelect = { !s.days[it].first.isAfter(today) },
+                onSelect = { onOpenDay(s.days[it].first) },
             )
             Spacer(Modifier.height(12.dp))
             StalkBarChart(

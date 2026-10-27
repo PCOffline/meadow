@@ -36,7 +36,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import dev.pcoffline.meadow.ui.theme.contentOn
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -176,6 +184,10 @@ fun GrowthBar(fraction: Float, modifier: Modifier = Modifier, height: Dp = 10.dp
 /**
  * A month at a glance: one soft square per day, deeper green for more screen time; [missing] days
  * have no record. Weeks run from [firstDay]; the month's first day sits [firstDayOffset] squares in.
+ *
+ * With [onSelect], a tap on a day for which [canSelect] holds picks it. A square is narrower than a
+ * touch target, so the tap counts anywhere in its column, gaps included; screen readers get the
+ * day's [descriptions] and pick it with an action named [selectLabel].
  */
 @Composable
 fun MonthHeatmap(
@@ -185,10 +197,15 @@ fun MonthHeatmap(
     firstDay: DayOfWeek = DayOfWeek.MONDAY,
     firstDayOffset: Int = 0,
     missing: Set<Int> = emptySet(),
+    descriptions: List<String> = labels,
+    selectLabel: String = "",
+    canSelect: (Int) -> Boolean = { true },
+    onSelect: ((Int) -> Unit)? = null,
 ) {
     val garden = Garden.colors
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
     val cells = List(firstDayOffset) { null } + values.indices.toList()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (i in 0L until 7L) {
@@ -199,10 +216,30 @@ fun MonthHeatmap(
             }
         }
         cells.chunked(7).forEach { week ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val taps = if (onSelect == null) {
+                Modifier
+            } else {
+                Modifier.pointerInput(week, rtl) {
+                    detectTapGestures { at ->
+                        val column = (at.x / size.width * 7).toInt().coerceIn(0, 6)
+                        week.getOrNull(if (rtl) 6 - column else column)?.takeIf(canSelect)?.let(onSelect)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().then(taps), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (slot in 0 until 7) {
                     val index = week.getOrNull(slot)
-                    Box(Modifier.weight(1f).height(34.dp), contentAlignment = Alignment.Center) {
+                    val day = if (index == null) {
+                        Modifier
+                    } else {
+                        Modifier.clearAndSetSemantics {
+                            contentDescription = descriptions[index]
+                            if (onSelect != null && canSelect(index)) {
+                                customActions = listOf(CustomAccessibilityAction(selectLabel) { onSelect(index); true })
+                            }
+                        }
+                    }
+                    Box(Modifier.weight(1f).height(40.dp).then(day), contentAlignment = Alignment.Center) {
                         if (index != null && index in missing) {
                             Box(
                                 Modifier.fillMaxWidth().fillMaxHeight()
