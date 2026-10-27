@@ -2,9 +2,11 @@ package dev.pcoffline.meadow.data
 
 import android.app.Application
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowNetwork
+import org.robolectric.shadows.ShadowNetworkCapabilities
 
 /** Whether the phone is online follows the network in use, whatever order Android reports changes in. */
 @RunWith(AndroidJUnit4::class)
@@ -19,6 +22,14 @@ import org.robolectric.shadows.ShadowNetwork
 class ConnectivityTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val cm = app.getSystemService(ConnectivityManager::class.java)
+
+    @Before
+    fun reachesTheInternet() {
+        // As on a phone: the network in use says it reaches the internet (Robolectric's doesn't by default).
+        val caps = ShadowNetworkCapabilities.newInstance()
+        shadowOf(caps).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        shadowOf(cm).setNetworkCapabilities(cm.activeNetwork, caps)
+    }
 
     @After
     fun backOnline() = Connectivity.set(true)

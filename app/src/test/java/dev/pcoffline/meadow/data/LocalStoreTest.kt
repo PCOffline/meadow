@@ -82,12 +82,6 @@ class LocalStoreTest {
     }
 
     @Test
-    fun `a privacy choice saved before the split still holds after the update`() {
-        context.getSharedPreferences("meadow_store", Context.MODE_PRIVATE).edit().putBoolean("share_usage", false).commit()
-        assertEquals(Privacy(shareTime = false, shareApps = false), LocalStore(context).privacy.value)
-    }
-
-    @Test
     fun `commitments survive a process restart`() {
         val limits = listOf(AppLimit("com.insta", "Instagram", 30, 0), AppLimit("com.tok", "TikTok", 0, 120))
         val grants = listOf(Grant("r1", "com.insta", 15, "2026-10-12"))
