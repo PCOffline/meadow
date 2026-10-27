@@ -111,6 +111,9 @@ android {
     // Kotlin sources, so they're added as Kotlin source dirs (AGP's built-in Kotlin).
     sourceSets["test"].kotlin.directories.add("src/sharedTest/java")
     sourceSets["androidTest"].kotlin.directories.add("src/sharedTest/java")
+    // Made-up data for the screen gallery (debug builds only), which the tests draw on too.
+    sourceSets["debug"].kotlin.directories.add("src/demo/java")
+    sourceSets["testRelease"].kotlin.directories.add("src/demo/java")
 
     testCoverage {
         jacocoVersion = libs.versions.jacoco.get()
