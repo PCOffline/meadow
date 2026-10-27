@@ -18,11 +18,16 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -137,6 +142,24 @@ class OtherScreensTest : ScreenTest() {
         // The garden keeper and notification access are the two Android holds back.
         assertEquals(2, compose.onAllNodesWithText(text(R.string.setup_restricted_action)).fetchSemanticsNodes().size)
         assertEquals(2, compose.onAllNodesWithText(text(R.string.setup_restricted_hint)).fetchSemanticsNodes().size)
+        assertAccessible()
+    }
+
+    @Test
+    fun `setup has one way out, into the garden only once the essentials are on`() {
+        var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
+        var left = 0
+        // A new state starts the screen afresh, as coming back from Android's settings would.
+        show { key(state) { SetupScreen(onDone = { left++ }, read = { state }) } }
+        assertEquals(3, compose.onAllNodesWithText(text(R.string.setup_step_required)).fetchSemanticsNodes().size)
+        node(R.string.setup_done).assertDoesNotExist()
+        node(R.string.setup_later).performScrollTo().performClick()
+
+        state = ProtectionState(true, true, false, false, false, false, notificationListener = true)
+        node(R.string.setup_step_required).assertDoesNotExist()
+        node(R.string.setup_later).assertDoesNotExist()
+        node(R.string.setup_done).performScrollTo().performClick()
+        assertEquals(2, left)
         assertAccessible()
     }
 
