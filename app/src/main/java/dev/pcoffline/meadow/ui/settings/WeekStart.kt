@@ -25,8 +25,24 @@ import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.currentLocale
+import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+
+/** Saturday, Sunday or Monday, side by side. */
+@Composable
+internal fun WeekStartPicker(selected: DayOfWeek, modifier: Modifier = Modifier, onSelect: (DayOfWeek) -> Unit) {
+    val locale = currentLocale()
+    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+        WeekRule.CHOICES.forEachIndexed { i, day ->
+            SegmentedButton(
+                selected = day == selected,
+                onClick = { onSelect(day) },
+                shape = SegmentedButtonDefaults.itemShape(i, WeekRule.CHOICES.size),
+            ) { Text(day.getDisplayName(TextStyle.SHORT, locale), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+    }
+}
 
 /** The day weeks start on, for Growth and weekly limits. */
 @Composable
@@ -36,15 +52,7 @@ internal fun WeekStartCard() {
     MeadowCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.settings_week_start), style = MaterialTheme.typography.titleMedium)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                WeekRule.CHOICES.forEachIndexed { i, day ->
-                    SegmentedButton(
-                        selected = day == rule.first,
-                        onClick = { AppGraph.store.setWeekStart(day) },
-                        shape = SegmentedButtonDefaults.itemShape(i, WeekRule.CHOICES.size),
-                    ) { Text(day.getDisplayName(TextStyle.SHORT, locale), maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                }
-            }
+            WeekStartPicker(rule.first) { AppGraph.store.setWeekStart(it) }
             // Only while a change is waiting for the current week to end: otherwise a weekly limit
             // would seem to ignore the choice just made.
             rule.pendingOn(Days.today())?.let { from ->

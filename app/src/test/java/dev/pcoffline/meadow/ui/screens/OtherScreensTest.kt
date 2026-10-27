@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isSelectable
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -16,7 +19,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.auth.AuthScreen
@@ -29,6 +34,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class, qualifiers = "w411dp-h891dp-xxhdpi")
@@ -47,6 +55,22 @@ class OtherScreensTest : ScreenTest() {
         plant.assertIsNotEnabled() // Still needs the terms accepted.
         node(R.string.legal_agree).performScrollTo().performClick()
         plant.assertIsEnabled()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a first run starts weeks the region's way, and can pick another day`() {
+        show { AuthScreen() }
+        // Robolectric runs as en-US, where weeks start on Sunday.
+        compose.waitUntil(5_000) { AppGraph.store.weekStartSet }
+        assertEquals(WeekRule(DayOfWeek.SUNDAY), AppGraph.store.weekRule.value)
+        repeat(2) { node(R.string.intro_next).performClick() }
+        node(R.string.intro_begin).performClick()
+        node(R.string.settings_week_start).performScrollTo()
+        compose.onNode(hasText(DayOfWeek.SUNDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())) and isSelectable()).assertIsSelected()
+        compose.onNodeWithText(DayOfWeek.MONDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())).performScrollTo().performClick()
+        // Nothing to keep yet, so at once.
+        assertEquals(WeekRule(DayOfWeek.MONDAY), AppGraph.store.weekRule.value)
         assertAccessible()
     }
 

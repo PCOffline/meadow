@@ -69,4 +69,10 @@ class WeekRuleTest {
         assertEquals(LocalDate.of(2026, 10, 26), rule.limitStart(wednesday))
         assertEquals(LocalDate.of(2026, 11, 2), rule.pendingOn(wednesday))
     }
+
+    @Test
+    fun `a region's first day maps to the nearest choice`() {
+        WeekRule.CHOICES.forEach { assertEquals(it, WeekRule.nearest(it)) }
+        assertEquals(DayOfWeek.MONDAY, WeekRule.nearest(DayOfWeek.FRIDAY))
+    }
 }

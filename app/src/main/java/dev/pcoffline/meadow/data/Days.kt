@@ -5,6 +5,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
+import java.util.Locale
 
 object Days {
     private val zone: ZoneId get() = ZoneId.systemDefault()
@@ -24,6 +25,16 @@ object Days {
     fun weekStart(date: LocalDate, first: DayOfWeek = DayOfWeek.MONDAY): LocalDate = date.with(TemporalAdjusters.previousOrSame(first))
 
     fun dateOf(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+
+    /**
+     * The day weeks start on where the phone is set to, including a first day picked in the
+     * phone's regional settings, as one of [WeekRule.CHOICES].
+     */
+    fun regionalWeekStart(locale: Locale = Locale.getDefault()): DayOfWeek {
+        // ICU's Calendar counts Sunday as 1.
+        val first = android.icu.util.Calendar.getInstance(locale).firstDayOfWeek
+        return WeekRule.nearest(DayOfWeek.SUNDAY.plus(first - 1L))
+    }
 }
 
 /**
@@ -57,5 +68,8 @@ data class WeekRule(
     companion object {
         /** The days a week can start on. */
         val CHOICES = listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY, DayOfWeek.MONDAY)
+
+        /** [day] if weeks can start on it, or else Monday, the international standard. */
+        fun nearest(day: DayOfWeek): DayOfWeek = day.takeIf { it in CHOICES } ?: DayOfWeek.MONDAY
     }
 }

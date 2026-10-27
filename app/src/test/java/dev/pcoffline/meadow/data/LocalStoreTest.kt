@@ -38,11 +38,47 @@ class LocalStoreTest {
     @Test
     fun `the first day of the week, and a change still waiting, survive a restart and a wipe`() {
         val wednesday = java.time.LocalDate.of(2026, 10, 28)
-        LocalStore(context).setWeekStart(java.time.DayOfWeek.SUNDAY, wednesday)
+        LocalStore(context).apply {
+            setLimits(listOf(AppLimit("com.example.app", "Example", dailyMinutes = 0, weeklyMinutes = 300)))
+            setWeekStart(java.time.DayOfWeek.SUNDAY, wednesday)
+        }
         val restarted = LocalStore(context)
         assertEquals(WeekRule().changedTo(java.time.DayOfWeek.SUNDAY, wednesday), restarted.weekRule.value)
         restarted.clearAll()
         assertEquals(WeekRule(), LocalStore(context).weekRule.value)
+        assertFalse(LocalStore(context).weekStartSet)
+    }
+
+    @Test
+    fun `without a weekly limit, a new first day applies at once`() {
+        val store = LocalStore(context)
+        store.setLimits(listOf(AppLimit("com.example.app", "Example", dailyMinutes = 30, weeklyMinutes = 0)))
+        store.setWeekStart(java.time.DayOfWeek.SATURDAY, java.time.LocalDate.of(2026, 10, 28))
+        assertEquals(WeekRule(java.time.DayOfWeek.SATURDAY), store.weekRule.value)
+    }
+
+    @Test
+    fun `a first run takes the region's first day, but never overrides one already set`() {
+        val fresh = LocalStore(context)
+        assertFalse(fresh.weekStartSet)
+        assertEquals(WeekRule(), fresh.weekRule.value)
+        fresh.adoptWeekStart(java.time.DayOfWeek.SUNDAY)
+        assertTrue(fresh.weekStartSet)
+        assertEquals(WeekRule(java.time.DayOfWeek.SUNDAY), LocalStore(context).weekRule.value)
+
+        fresh.setWeekStart(java.time.DayOfWeek.MONDAY)
+        fresh.adoptWeekStart(java.time.DayOfWeek.SATURDAY)
+        assertEquals(java.time.DayOfWeek.MONDAY, LocalStore(context).weekRule.value.first)
+    }
+
+    @Test
+    fun `the region decides the first day, among Saturday, Sunday and Monday`() {
+        assertEquals(java.time.DayOfWeek.SUNDAY, Days.regionalWeekStart(java.util.Locale.US))
+        assertEquals(java.time.DayOfWeek.MONDAY, Days.regionalWeekStart(java.util.Locale.UK))
+        assertEquals(java.time.DayOfWeek.MONDAY, Days.regionalWeekStart(java.util.Locale.GERMANY))
+        assertEquals(java.time.DayOfWeek.SATURDAY, Days.regionalWeekStart(java.util.Locale.forLanguageTag("ar-EG")))
+        // The Maldives start on Friday, which Meadow doesn't offer: Monday, the international standard.
+        assertEquals(java.time.DayOfWeek.MONDAY, Days.regionalWeekStart(java.util.Locale.forLanguageTag("dv-MV")))
     }
 
     @Test

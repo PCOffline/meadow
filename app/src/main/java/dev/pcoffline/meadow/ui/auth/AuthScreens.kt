@@ -83,6 +83,7 @@ import androidx.compose.ui.semantics.semantics
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
+import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.FlowerAvatars
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -98,6 +99,8 @@ import dev.pcoffline.meadow.ui.legal.ConsentLinks
 import dev.pcoffline.meadow.ui.legal.LegalDialog
 import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.rememberAction
+import dev.pcoffline.meadow.ui.settings.WeekStartPicker
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.launch
 
@@ -110,6 +113,8 @@ private enum class Step { INTRO, NAME, SIGN_IN }
 @Composable
 fun AuthScreen() {
     var step by rememberSaveable { mutableStateOf(Step.INTRO) }
+    // A new phone starts its weeks the way its region does; signing in to a garden keeps that too.
+    LaunchedEffect(Unit) { AppGraph.store.adoptWeekStart(Days.regionalWeekStart()) }
     // Back walks back through onboarding instead of closing the app on a half-typed name.
     BackHandler(enabled = step != Step.INTRO) { step = Step.INTRO }
     AnimatedContent(
@@ -261,6 +266,7 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
+        WeekStartChoice()
         ConsentCheckbox(agreed, onChange = { agreed = it }, onOpen = { reading = it })
         ErrorNote(action.error)
         Button(
@@ -276,6 +282,26 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
         TextButton(onClick = onSignIn) { Text(stringResource(R.string.intro_have_garden)) }
     }
     reading?.let { LegalDialog(it, onDismiss = { reading = null }) }
+}
+
+/**
+ * The day weeks start on, set for the phone's region until it's changed here or in Settings.
+ * Shown before there's a garden, so it applies at once.
+ */
+@Composable
+private fun WeekStartChoice() {
+    val rule by AppGraph.store.weekRule.collectAsStateWithLifecycle()
+    val regional = remember { Days.regionalWeekStart() }
+    // Shows the region's day from the first frame, before it's stored.
+    var adopted by remember { mutableStateOf(AppGraph.store.weekStartSet) }
+    LaunchedEffect(Unit) {
+        AppGraph.store.adoptWeekStart(regional)
+        adopted = true
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.settings_week_start), style = MaterialTheme.typography.titleSmall)
+        WeekStartPicker(if (adopted) rule.first else regional) { AppGraph.store.setWeekStart(it) }
+    }
 }
 
 /** "I've read and agree…" with links to read both documents first. */
@@ -521,6 +547,7 @@ fun ProfileSetupScreen() {
             modifier = Modifier.fillMaxWidth(),
         )
         FlowerPicker(flower) { flower = it }
+        WeekStartChoice()
         ConsentCheckbox(agreed, onChange = { agreed = it }, onOpen = { reading = it })
         ErrorNote(action.error)
         Button(

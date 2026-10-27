@@ -24,6 +24,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
@@ -39,6 +40,7 @@ import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -100,6 +102,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     @Test
     fun `the week can start on Saturday, Sunday or Monday, and weekly limits follow when the week ends`() {
+        AppGraph.store.setLimits(listOf(AppLimit("com.example.app", "Example", dailyMinutes = 0, weeklyMinutes = 300)))
         AppGraph.store.setWeekStart(DayOfWeek.MONDAY)
         show { WeekStartCard() }
         val sunday = DayOfWeek.SUNDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())
@@ -115,6 +118,16 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.onNodeWithText(DayOfWeek.MONDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())).performClick()
         assertEquals(WeekRule(), AppGraph.store.weekRule.value)
         node(R.string.settings_week_start_pending, date).assertDoesNotExist()
+    }
+
+    @Test
+    fun `with no weekly limit, a new first day needs no explaining`() {
+        AppGraph.store.setLimits(emptyList())
+        AppGraph.store.setWeekStart(DayOfWeek.MONDAY)
+        show { WeekStartCard() }
+        compose.onNodeWithText(DayOfWeek.SATURDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())).performClick()
+        assertEquals(WeekRule(DayOfWeek.SATURDAY), AppGraph.store.weekRule.value)
+        assertTrue(compose.onAllNodesWithText(text(R.string.settings_week_start_pending, "").substringBefore(",").trim(), substring = true).fetchSemanticsNodes().isEmpty())
     }
 
     @Test

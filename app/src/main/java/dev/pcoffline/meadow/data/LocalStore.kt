@@ -90,8 +90,21 @@ class LocalStore(context: Context) {
     /** The day weeks start on, for Growth and weekly limits. */
     val weekRule: StateFlow<WeekRule> = _weekRule.asStateFlow()
 
+    /** Whether the first day of the week was ever set here; until it is, weeks start on Monday. */
+    val weekStartSet: Boolean get() = prefs.contains(KEY_WEEK_FIRST)
+
+    /** Weeks start on [day], unless a first day was already set here. For first runs. */
+    fun adoptWeekStart(day: DayOfWeek) {
+        if (!weekStartSet) setWeekStart(day)
+    }
+
+    /**
+     * Weeks start on [day] from [today] on. With no weekly limit there's nothing to keep, so at
+     * once; otherwise this week's limits keep the start they began with ([WeekRule.changedTo]).
+     */
     fun setWeekStart(day: DayOfWeek, today: LocalDate = Days.today()) {
-        val rule = _weekRule.value.changedTo(day, today)
+        val weekly = _limits.value.any { it.weeklyMinutes > 0 }
+        val rule = if (weekly) _weekRule.value.changedTo(day, today) else WeekRule(day)
         prefs.edit {
             putInt(KEY_WEEK_FIRST, rule.first.value)
             putInt(KEY_WEEK_PREVIOUS, rule.previous.value)
