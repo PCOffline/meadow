@@ -11,9 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.up
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
@@ -31,7 +29,6 @@ import dev.pcoffline.meadow.ui.MeadowTabBar
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.home.GardenState
-import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
@@ -66,28 +63,14 @@ class LimitFlowTest : ScreenTest() {
     )
 
     @Test
-    fun `a limit needs at least one part turned on, and says so`() {
+    fun `a limit needs at least one part turned on`() {
         editor(LimitEditorState())
-        node(R.string.limit_editor_pick_one).assertDoesNotExist()
         node(R.string.limit_editor_plant).assertIsEnabled()
 
         // Daily is on for a new limit; turning it off leaves nothing to plant.
         compose.onNodeWithText(text(R.string.limit_editor_daily)).performClick()
-        node(R.string.limit_editor_pick_one).performScrollTo().assertExists()
-        node(R.string.limit_editor_plant).assertIsNotEnabled()
+        node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
         assertAccessible()
-    }
-
-    @Test
-    fun `a weekly limit below the daily one is pointed out`() {
-        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 120, weeklyMinutes = 60)))
-        node(R.string.limit_editor_weekly_below_daily).performScrollTo().assertExists()
-    }
-
-    @Test
-    fun `a sensible weekly limit gets no warning`() {
-        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 180)))
-        node(R.string.limit_editor_weekly_below_daily).assertDoesNotExist()
     }
 
     @Test
@@ -172,15 +155,6 @@ class LimitFlowTest : ScreenTest() {
         } finally {
             Connectivity.set(true)
         }
-    }
-
-    @Test
-    fun `searching for an app that isn't there says so`() {
-        show { AppPickerScreen(onBack = {}, onPick = {}) }
-        compose.onNode(hasSetTextAction()).performTextInput("zzqx")
-        // The app list loads in the background.
-        compose.waitUntil(5_000) { shows(text(R.string.picker_no_match_title)) }
-        node(R.string.picker_no_match_body, "zzqx").assertExists()
     }
 
     @Test

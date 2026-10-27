@@ -341,11 +341,6 @@ private fun SignInStep(onBack: () -> Unit) {
     ) {
         TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
         Text(stringResource(R.string.sign_in_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.asHeading())
-        Text(
-            stringResource(R.string.sign_in_body),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         SignInOptions(
             passwordButton = R.string.sign_in_button,
             linkSent = R.string.auth_email_link_sent,

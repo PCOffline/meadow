@@ -108,15 +108,16 @@ class BumblebeeJourneyTest : EndToEndTest() {
             await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to false, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
             openGardenOf("Sam")
-            waitForText(text(R.string.friend_nothing_shared, "Sam"))
+            waitForText(text(R.string.friend_step_down, "Sam"))
+            eventually("Sam's page read") { !showing(text(R.string.loading_garden)) }
             assertEquals(0, compose.onAllNodesWithText(text(R.string.friend_limits)).fetchSemanticsNodes().size)
 
             // Stepping down ends it on Sam's side too, and goes back to the circle, saying so.
             compose.onNode(hasText(text(R.string.friend_step_down, "Sam"))).performScrollTo().performClick()
             node(R.string.friend_step_down_confirm).performClick()
             waitFor(R.string.friend_stepped_down)
-            // The circle keeps its scroll, so its title may be out of sight; Sam's garden is gone.
-            waitFor(R.string.circle_looking_after_empty)
+            // Sam's garden is gone from the circle.
+            eventually("Sam's garden gone") { !showing(text(R.string.circle_garden_role)) }
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds").isEmpty() }
             waitForBackend("users/$me/private/account") { it.strings("approveeIds").isEmpty() }
         }

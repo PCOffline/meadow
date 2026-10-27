@@ -34,8 +34,7 @@
 
     <string name="trouble_title">Keep Meadow awake</string>
     <string name="trouble_button">Troubleshoot</string>
-    <string name="trouble_intro">Android, and many phone makers on top of it, stop apps in the background to save battery. These steps keep Meadow running on this phone. Nobody else sees how your phone is set up.</string>
-    <string name="trouble_essentials">Usage access, the garden keeper and notification access need to be on first.</string>
+    <string name="trouble_essentials">Turn on the essentials in Protections first.</string>
     <string name="trouble_step">%1$d. %2$s</string>
     <string name="trouble_open">Open settings</string>
     <string name="trouble_more_help">More help for this phone</string>
@@ -59,10 +58,10 @@
     <string name="trouble_asus_body">In Mobile Manager › Auto-start, allow Meadow.</string>
 
     <string name="strict_gate_title">Strict mode needs a hand</string>
-    <string name="strict_gate_body">Strict mode only works while Android can\'t put Meadow to sleep and the garden keeper can reach notifications. Turn those on, or turn strict mode off. Nobody else is told either way.</string>
+    <string name="strict_gate_body">Strict mode needs unrestricted battery and notification access.</string>
     <string name="strict_gate_battery">Open battery settings</string>
     <string name="strict_gate_listener">Allow notification access</string>
     <string name="strict_gate_turn_off">Turn off strict mode</string>
     <string name="strict_needs_title">Almost ready</string>
-    <string name="strict_needs_body">Strict mode needs unrestricted battery and notification access, so Meadow can\'t be put to sleep. Turn them on in Protections first.</string>
+    <string name="strict_needs_body">Turn on unrestricted battery and notification access in Protections first.</string>
 </resources>

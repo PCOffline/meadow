@@ -65,7 +65,6 @@ import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.AppIcon
-import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -115,12 +114,6 @@ fun RequestsContent(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             TabTitle(stringResource(R.string.requests_title))
-            Text(
-                stringResource(R.string.requests_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
             val waiting = incoming?.count { it.status == RequestStatus.PENDING } ?: 0
             PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 8.dp)) {
                 Tab(
@@ -137,15 +130,6 @@ fun RequestsContent(
                     item {
                         TextButton(onClick = onOpenBeeStats, modifier = Modifier.padding(horizontal = 12.dp)) {
                             Text(stringResource(R.string.bee_stats_open))
-                        }
-                    }
-                }
-                if (list != null && list.isEmpty()) {
-                    item {
-                        if (tab == 0) {
-                            EmptyState("🌤️", stringResource(R.string.requests_empty_for_you_title), stringResource(R.string.requests_empty_for_you_body))
-                        } else {
-                            EmptyState("🌱", stringResource(R.string.requests_empty_yours_title), stringResource(R.string.requests_empty_yours_body))
                         }
                     }
                 }

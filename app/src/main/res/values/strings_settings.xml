@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_secure_reason">Your garden isn\'t linked to an email yet. Add one so you can sign in on a new phone and invite Bumblebees.</string>
+    <string name="settings_secure_reason">Add an email to sign in on another phone.</string>
     <string name="settings_week_start">Week starts on</string>
     <string name="settings_week_start_pending">Weekly limits switch over on %1$s, when this week ends.</string>
     <string name="settings_strict_title">Strict mode</string>
@@ -38,7 +38,7 @@
     <string name="settings_updates_install">Update</string>
     <string name="settings_updates_downloading">Downloading… %1$d%%</string>
     <string name="settings_updates_installing">Waiting for Android to install…</string>
-    <string name="settings_updates_allow">Android needs your OK for Meadow to install updates. Allow it, then come back and tap Update.</string>
+    <string name="settings_updates_allow">Allow Meadow to install updates.</string>
     <string name="settings_updates_allow_button">Allow updates</string>
 
     <string name="settings_legal_title">Your data and the small print</string>
@@ -46,7 +46,7 @@
     <string name="settings_export_done">Your data is saved 📦</string>
     <string name="settings_delete">Delete my account</string>
     <string name="settings_delete_title">Delete your account?</string>
-    <string name="settings_delete_body">This removes your profile, limits, requests, chats and photo from Meadow for good, and signs you out on this phone. The people you look after, and your Bumblebees, will see you\'ve left. It can\'t be undone.</string>
+    <string name="settings_delete_body">Your profile, limits, requests, chats and photo are deleted for good. Your circle will see you\'ve left.</string>
     <string name="settings_delete_confirm_hint">Type DELETE to confirm</string>
     <string name="settings_delete_confirm_word">DELETE</string>
     <string name="settings_delete_button">Delete for good</string>
@@ -54,7 +54,7 @@
 
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_sign_out_title">Sign out?</string>
-    <string name="settings_sign_out_body">Your limits keep working on this phone while you\'re signed out, but you won\'t be able to ask for extra time.</string>
+    <string name="settings_sign_out_body">Limits keep working, but you can\'t ask for extra time until you sign in again.</string>
     <string name="settings_sign_out_stay">Stay</string>
 
     <string name="share_title">Share</string>

@@ -29,7 +29,6 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.BeeStats
 import dev.pcoffline.meadow.data.UserProfile
-import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
@@ -65,10 +64,10 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
     val res = LocalResources.current
     Column(Modifier.fillMaxSize()) {
         BackTopBar(stringResource(R.string.bee_stats_title), onBack = onBack)
-        when {
-            stats == null -> Loading()
-            stats.asked == 0 -> EmptyState("🐝", stringResource(R.string.bee_stats_empty_title), stringResource(R.string.bee_stats_empty_body))
-            else -> Column(
+        if (stats == null) {
+            Loading()
+        } else {
+            Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -100,7 +99,7 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
                     if (stats.missed > 0) StatLine(stringResource(R.string.bee_stats_missed), stats.missed.toString())
                     if (stats.waiting > 0) StatLine(stringResource(R.string.bee_stats_waiting), stats.waiting.toString())
                 }
-                Text(stringResource(R.string.bee_stats_by_person), style = MaterialTheme.typography.titleMedium)
+                if (stats.people.isNotEmpty()) Text(stringResource(R.string.bee_stats_by_person), style = MaterialTheme.typography.titleMedium)
                 stats.people.forEach { person ->
                     MeadowCard(Modifier.fillMaxWidth()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {

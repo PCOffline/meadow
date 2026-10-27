@@ -237,12 +237,6 @@ fun StatsContent(
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         TabTitle(stringResource(R.string.stats_title))
-        Text(
-            stringResource(R.string.stats_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Period.entries.forEachIndexed { i, p ->
                 SegmentedButton(
@@ -258,7 +252,6 @@ fun StatsContent(
             EmptyState(
                 "📊",
                 stringResource(R.string.stats_no_access_title),
-                stringResource(R.string.stats_no_access_body),
                 action = { Button(onClick = onOpenSetup) { Text(stringResource(R.string.stats_no_access_action)) } },
             )
         } else {
@@ -318,10 +311,7 @@ private fun PeriodContent(s: PeriodStats, progress: Progress?, onOpenApp: (Strin
         // The summary already compares this period with the last.
         if (progress != null) item { ProgressCard(progress, Modifier.padding(horizontal = 20.dp), showWeekChange = false) }
         if (s.selection.period != Period.DAY) item { Chart(s, onOpenDay) }
-        item { SectionTitle(stringResource(R.string.stats_where_time_went), Modifier.padding(horizontal = 20.dp)) }
-        if (s.apps.isEmpty()) {
-            item { EmptyState("🌾", stringResource(R.string.stats_quiet_title), stringResource(R.string.stats_quiet_body)) }
-        }
+        if (s.apps.isNotEmpty()) item { SectionTitle(stringResource(R.string.stats_where_time_went), Modifier.padding(horizontal = 20.dp)) }
         val max = s.apps.firstOrNull()?.ms ?: 1L
         items(s.apps, key = { it.packageName }) { app -> AppRow(app, max, s.totalMs, { onOpenApp(app.packageName) }.takeIf { app.canLimit }, Modifier.animateItem()) }
         item { Spacer(Modifier.height(24.dp)) }

@@ -132,11 +132,8 @@ fun EmergencyDialog(packageName: String?, appName: String?, onDismiss: () -> Uni
                         label = { Text(stringResource(R.string.emergency_dialog_reason)) },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                         // Says what's still needed: the unlock button stays off until then.
-                        supportingText = {
-                            Text(
-                                if (reasonOk) stringResource(R.string.emergency_dialog_reason_seen)
-                                else pluralStringResource(R.plurals.emergency_dialog_reason_needed, missing, missing),
-                            )
+                        supportingText = if (reasonOk) null else {
+                            { Text(pluralStringResource(R.plurals.emergency_dialog_reason_needed, missing, missing)) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )

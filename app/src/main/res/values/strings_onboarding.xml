@@ -16,7 +16,6 @@
     <string name="onboarding_planting">Planting…</string>
 
     <string name="sign_in_title">Welcome back 🌼</string>
-    <string name="sign_in_body">Sign in the way you set up your garden.</string>
     <string name="sign_in_button">Sign in</string>
     <string name="sign_in_busy">Signing in…</string>
     <string name="sign_in_forgot">Forgot your password?</string>

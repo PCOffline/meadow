@@ -45,7 +45,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -122,7 +121,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composa
 }
 
 @Composable
-fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null) {
+fun EmptyState(emoji: String, title: String, body: String? = null, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null) {
     Column(
         modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -133,12 +132,14 @@ fun EmptyState(emoji: String, title: String, body: String, modifier: Modifier = 
         )
         Text(emoji, fontSize = 44.sp, modifier = Modifier.graphicsLayer { translationY = (bob?.value ?: 0f).dp.toPx() })
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.asHeading())
-        Text(
-            body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        if (body != null) {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (action != null) {
             Spacer(Modifier.height(4.dp))
             action()

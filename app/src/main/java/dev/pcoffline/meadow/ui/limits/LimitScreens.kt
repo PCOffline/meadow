@@ -84,7 +84,6 @@ import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
-import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.OfflineNote
 import dev.pcoffline.meadow.ui.components.Loading
@@ -170,9 +169,6 @@ fun AppPickerScreen(
         } else {
             val filtered = remember(list, query) { list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) } }
             LazyColumn(Modifier.fillMaxSize().imePadding()) {
-                if (filtered.isEmpty() && query.isNotBlank()) {
-                    item { EmptyState("🔍", stringResource(R.string.picker_no_match_title), stringResource(R.string.picker_no_match_body, query.trim())) }
-                }
                 items(filtered, key = { it.packageName }) { row ->
                     ListItem(
                         headlineContent = { Text(row.label) },
@@ -310,14 +306,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 MinutesStepper(weekly, step = 30, min = 30, max = 100 * 60, editable) { weekly = it }
                 PresetChips(listOf(120, 180, 300, 420, 600), weekly, editable) { weekly = it }
             }
-            if (dailyOn && weeklyOn && weekly < daily) {
-                Text(
-                    stringResource(R.string.limit_editor_weekly_below_daily),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
         }
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn, editable) { hoursOn = it }
@@ -333,7 +321,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         } else if (needsApproval) {
             MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
                 Text(stringResource(R.string.limit_editor_loosens_title), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.limit_editor_loosens_body), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = message, onValueChange = { message = it.take(280) },
                     label = { Text(stringResource(R.string.limit_editor_note)) },
@@ -343,21 +330,8 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 )
                 BumblebeePicker(picks, Modifier.padding(top = 8.dp))
             }
-        } else if (existing == null && hasBees) {
-            Text(
-                stringResource(R.string.limit_editor_locked_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
 
-        if (!anyLimitOn) {
-            Text(
-                stringResource(R.string.limit_editor_pick_one),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         if (!online && needsConnection) OfflineNote()
         ErrorNote(action.error)
         Button(

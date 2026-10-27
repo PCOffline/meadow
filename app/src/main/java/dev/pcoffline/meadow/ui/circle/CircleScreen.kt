@@ -64,7 +64,6 @@ import dev.pcoffline.meadow.data.InviteLinks
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
-import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.PersonAvatar
@@ -125,17 +124,7 @@ fun CircleContent(
     onOpenFriend: (String) -> Unit = {},
 ) {
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Column {
-                TabTitle(stringResource(R.string.circle_title))
-                Text(
-                    stringResource(R.string.circle_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-            }
-        }
+        item { TabTitle(stringResource(R.string.circle_title)) }
         item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
 
         if (incoming.isNotEmpty()) {
@@ -143,10 +132,10 @@ fun CircleContent(
             items(incoming, key = { it.id }) { IncomingInvite(it, Modifier.animateItem()) }
         }
 
-        item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
-        // Judged by the profile, which is already here, so it doesn't flash while friends load.
-        if (profile.approverIds.isEmpty() && bumblebees.isEmpty() && outgoing.isEmpty()) {
-            item { EmptyState("🐝", stringResource(R.string.circle_no_bees_title), stringResource(R.string.circle_no_bees_body)) }
+        // Sections show only with someone in them, judged by the profile too (it's already here),
+        // so they don't flash in while friends load.
+        if (profile.approverIds.isNotEmpty() || bumblebees.isNotEmpty() || outgoing.isNotEmpty()) {
+            item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
         }
         items(bumblebees, key = { "bee-" + it.uid }) { bee ->
             BumblebeeRow(bee, leavingAt = profile.pendingRemovals[bee.uid], modifier = Modifier.animateItem()) {
@@ -155,16 +144,8 @@ fun CircleContent(
         }
         items(outgoing, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
 
-        item { SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(horizontal = 20.dp)) }
-        if (profile.approveeIds.isEmpty() && lookingAfter.isEmpty()) {
-            item {
-                Text(
-                    stringResource(R.string.circle_looking_after_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-            }
+        if (profile.approveeIds.isNotEmpty() || lookingAfter.isNotEmpty()) {
+            item { SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(horizontal = 20.dp)) }
         }
         items(lookingAfter, key = { "garden-" + it.uid }) { friend ->
             GardenRow(friend, Modifier.animateItem()) { onOpenFriend(friend.uid) }

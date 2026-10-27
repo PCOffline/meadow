@@ -106,7 +106,7 @@ class DecidingJourneyTest : EndToEndTest() {
                 posted != null
             }
             posted!!.contentIntent.send()
-            waitFor(R.string.requests_subtitle)
+            waitFor(R.string.requests_tab_yours)
             posted!!.actions.single { it.title.toString() == text(R.string.request_say_yes) }.actionIntent.send()
             waitForBackend("requests/$third") { it.string("status") == "approved" }
             assertEquals(5, backendDoc("users/${sam.uid}/grants/$third")!!.int("minutes"))

@@ -91,7 +91,7 @@ fun FriendScreen(
         BackTopBar(friend?.displayName.orEmpty(), onBack = onBack)
         val f = friend
         if (f == null && loaded) {
-            EmptyState("🍂", stringResource(R.string.friend_gone_title), stringResource(R.string.friend_gone_body))
+            EmptyState("🍂", stringResource(R.string.friend_gone_title))
         } else if (f == null) {
             Loading()
         } else {
@@ -165,15 +165,7 @@ fun FriendPage(page: SharedPage, waiting: Boolean = false, action: @Composable (
         }
         page.progress?.let { ProgressCard(it) }
         if (page.minutes != null || page.apps != null) TodayCard(page.minutes, page.apps.orEmpty())
-        page.limits?.let { LimitsCard(it) }
-        val nothing = page.progress?.isEmpty != false && page.minutes == null && page.apps.isNullOrEmpty() && page.limits == null
-        if (nothing) {
-            Text(
-                stringResource(R.string.friend_nothing_shared, f.displayName),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        page.limits?.takeIf { it.isNotEmpty() }?.let { LimitsCard(it) }
     }
 }
 
@@ -214,7 +206,6 @@ private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>) {
 private fun LimitsCard(limits: List<AppLimit>) {
     MeadowCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.friend_limits), style = MaterialTheme.typography.titleMedium)
-        if (limits.isEmpty()) Text(stringResource(R.string.friend_no_limits), style = MaterialTheme.typography.bodySmall)
         limits.forEach { limit ->
             Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(limit.packageName, size = 28.dp)

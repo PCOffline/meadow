@@ -46,7 +46,6 @@ class EmergencyJourneyTest : EndToEndTest() {
         waitForText(text(R.string.emergency_dialog_unlock))
         inDialog(text(R.string.emergency_dialog_unlock)).assertIsNotEnabled()
         compose.onNode(reasonField).performTextReplacement("Lost my way home")
-        inDialog(text(R.string.emergency_dialog_reason_seen)).assertExists()
         inDialog(text(R.string.emergency_dialog_unlock)).assertIsEnabled()
     }
 

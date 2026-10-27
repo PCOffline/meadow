@@ -88,16 +88,11 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `the garden points to unfinished setup and to inviting a first Bumblebee`() {
+    fun `the garden points to unfinished setup`() {
         var setup = 0
-        var circle = 0
-        val lonely = DemoGarden.robin.copy(approverIds = emptyList())
-        show {
-            GardenContent(lonely, DemoGarden.garden.copy(essentialsReady = false), onOpenSetup = { setup++ }, onOpenCircle = { circle++ })
-        }
+        show { GardenContent(DemoGarden.robin, DemoGarden.garden.copy(essentialsReady = false), onOpenSetup = { setup++ }) }
         node(R.string.garden_notice_setup_action).performClick()
-        node(R.string.garden_notice_no_bees_action).performClick()
-        assertEquals(1 to 1, setup to circle)
+        assertEquals(1, setup)
         assertAccessible()
     }
 
@@ -212,6 +207,9 @@ class MainScreensTest : ScreenTest() {
         show { CircleContent(DemoGarden.robin.copy(approverIds = emptyList(), approveeIds = emptyList()), emptyList(), emptyList(), emptyList(), emptyList()) }
         node(R.string.invite_title).assertExists()
         node(R.string.invite_code_title).assertExists()
+        // Nobody in the circle yet: no empty sections, just ways to fill them.
+        node(R.string.circle_your_bees).assertDoesNotExist()
+        node(R.string.circle_looking_after).assertDoesNotExist()
         assertAccessible()
     }
 

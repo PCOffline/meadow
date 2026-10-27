@@ -268,7 +268,6 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                                 onOpenSetup = { nav.navigate(SetupRoute) },
                                 onPlantLimit = { nav.navigate(PickAppRoute) },
                                 onOpenLimit = { nav.navigate(LimitRoute(it)) },
-                                onOpenCircle = { nav.switchTab(CircleRoute) },
                                 onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
                             )
                         }
