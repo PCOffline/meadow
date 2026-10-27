@@ -43,7 +43,8 @@ arrive at five minutes and one minute left.
 Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee
 gets a chat with you, and your requests appear in it as cards they can answer with one tap.
-When someone stops being your Bumblebee, your chat with them closes.
+From a chat you can ask them to be your Bumblebee too, or offer to be theirs. When someone stops
+being your Bumblebee, your chat with them closes.
 
 <p align="center">
   <img src="docs/images/screen-circle.png" alt="Your circle: two Bumblebees, and a friend whose garden you look after" width="250">

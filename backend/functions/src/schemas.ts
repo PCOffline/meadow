@@ -32,6 +32,8 @@ export const InviteByCodeInput = z.object({
   friendCode: z.string().trim().toUpperCase().min(4, errors.codeRequired).max(12).regex(/^[A-Z0-9]+$/, errors.codeUnknown),
 });
 export const RespondInviteInput = z.object({ inviteId: id, accept: z.boolean() });
+/** From a chat: ask the other person to be your Bumblebee, or offer to be theirs. */
+export const InviteFromChatInput = z.object({ uid: id, offer: z.boolean() });
 export const InviteIdInput = z.object({ inviteId: id });
 export const InviteTokenInput = z.object({ token: inviteToken });
 export const RemoveBumblebeeInput = z.object({ approverUid: id });

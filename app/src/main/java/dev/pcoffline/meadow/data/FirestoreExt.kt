@@ -188,6 +188,7 @@ fun DocumentSnapshot.toInvite() = Invite(
         else -> InviteStatus.PENDING
     },
     createdAtMillis = millis("createdAt"),
+    offer = getBoolean("offer") == true,
 )
 
 fun DocumentSnapshot.toChat() = Chat(

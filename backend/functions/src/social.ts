@@ -10,7 +10,7 @@ import {
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken, withPhotoToken } from "./format";
 import {
-  CancelRemovalInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
+  CancelRemovalInput, InviteByCodeInput, InviteFromChatInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
   RespondInviteInput, StepDownInput,
 } from "./schemas";
 
@@ -86,9 +86,11 @@ function joinUp(tx: Transaction, owner: Person, bee: Person): string {
   return chatId;
 }
 
-async function announceNewBumblebee(chatId: string, owner: Person, bee: Person) {
+/** Notes the new Bumblebee in their chat, and tells whoever asked ([asker]) that it worked. */
+async function announceNewBumblebee(chatId: string, owner: Person, bee: Person, asker: "owner" | "bee" = "owner") {
   await postToChat(chatId, { senderId: bee.uid, kind: "system", text: chatNotes.newBumblebee(bee.profile, owner.profile) });
-  await notify([owner.uid], { type: "invite_accepted", ...pushes.inviteAccepted(bee.profile) });
+  if (asker === "owner") await notify([owner.uid], { type: "invite_accepted", ...pushes.inviteAccepted(bee.profile) });
+  else await notify([bee.uid], { type: "invite_accepted", ...pushes.offerAccepted(owner.profile) });
 }
 
 /**
@@ -202,6 +204,49 @@ export const sendInvite = onCall(async (req) => {
   return { ok: true };
 });
 
+/**
+ * From a chat: asks the other person to be the caller's Bumblebee, or ([offer]) offers to be
+ * theirs. Only between two people who already share an open chat, so it reaches nobody a friend
+ * code or link hasn't reached first.
+ */
+export const inviteFromChat = onCall(async (req) => {
+  const uid = requireAuth(req);
+  const { uid: otherUid, offer } = parse(InviteFromChatInput, req.data);
+  if (otherUid === uid) throw new HttpsError("invalid-argument", errors.noSharedChat);
+  const chat = await chats().doc(chatIdFor(uid, otherUid)).get();
+  if (!chat.exists || chat.get("closed") === true) throw new HttpsError("failed-precondition", errors.noSharedChat);
+
+  const ref = invites().doc();
+  const me = await db().runTransaction(async (tx) => {
+    const [me, other] = await Promise.all([loadPerson(uid, tx), loadPerson(otherUid, tx)]);
+    if (offer && other.account.approverIds.includes(uid)) {
+      throw new HttpsError("already-exists", errors.alreadyTheirBumblebee(other.profile.displayName));
+    }
+    if (!offer && me.account.approverIds.includes(otherUid)) {
+      throw new HttpsError("already-exists", errors.alreadyBumblebee(other.profile.displayName));
+    }
+    const commitRate = await consumeRate(tx, uid, "invite", INVITES_PER_DAY, DAY_MS);
+    const waiting = await tx.get(invites().where("toUid", "==", otherUid).where("status", "==", "pending").limit(PENDING_INVITES_PER_PERSON));
+    if (waiting.docs.some((d) => d.get("fromUid") === uid)) throw new HttpsError("already-exists", errors.alreadyInvited(other.profile.displayName));
+    if (waiting.size >= PENDING_INVITES_PER_PERSON) throw new HttpsError("resource-exhausted", errors.inviteeBusy(other.profile.displayName));
+    commitRate();
+    tx.set(ref, {
+      fromUid: uid,
+      fromName: me.profile.displayName,
+      fromFlower: me.profile.flower,
+      toUid: otherUid,
+      toName: other.profile.displayName,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+      // An offer makes whoever sent it the Bumblebee; a plain invite, whoever accepts it.
+      offer,
+    });
+    return me;
+  });
+  await notify([otherUid], { type: "invite", inviteId: ref.id, ...(offer ? pushes.offer(me.profile) : pushes.invite(me.profile)) });
+  return { ok: true };
+});
+
 export const respondInvite = onCall(async (req) => {
   const uid = requireAuth(req);
   const { inviteId, accept } = parse(RespondInviteInput, req.data);
@@ -211,13 +256,15 @@ export const respondInvite = onCall(async (req) => {
     const invite = await tx.get(inviteRef);
     if (!invite.exists || invite.get("toUid") !== uid) throw new HttpsError("not-found", errors.inviteGone);
     if (invite.get("status") !== "pending") throw new HttpsError("failed-precondition", errors.inviteAnswered);
-    const [owner, bee] = await Promise.all([loadPerson(invite.get("fromUid") as string, tx), loadPerson(uid, tx)]);
+    const offer = invite.get("offer") === true;
+    const [sender, me] = await Promise.all([loadPerson(invite.get("fromUid") as string, tx), loadPerson(uid, tx)]);
+    const [owner, bee] = offer ? [me, sender] : [sender, me];
     tx.update(inviteRef, { status: accept ? "accepted" : "declined", answeredAt: FieldValue.serverTimestamp() });
     if (!accept) return null;
-    return { chatId: joinUp(tx, owner, bee), owner, bee };
+    return { chatId: joinUp(tx, owner, bee), owner, bee, asker: offer ? "bee" as const : "owner" as const };
   });
 
-  if (result) await announceNewBumblebee(result.chatId, result.owner, result.bee);
+  if (result) await announceNewBumblebee(result.chatId, result.owner, result.bee, result.asker);
   return { ok: true };
 });
 

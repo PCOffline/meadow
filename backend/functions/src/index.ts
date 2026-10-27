@@ -11,7 +11,7 @@ if (!region) throw new Error("Set MEADOW_REGION in backend/functions/.env, e.g. 
 setGlobalOptions({ region, maxInstances: 10 });
 
 export {
-  createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, respondInvite, cancelInvite,
+  createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, inviteFromChat, respondInvite, cancelInvite,
   removeApprover, cancelRemoval, stepDown,
 } from "./social";
 export { createRequest, decideRequest, cancelRequest, saveLimit } from "./requests";

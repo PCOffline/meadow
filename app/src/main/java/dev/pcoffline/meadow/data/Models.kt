@@ -199,6 +199,8 @@ data class Invite(
     val toName: String,
     val status: InviteStatus,
     val createdAtMillis: Long,
+    /** The sender offers to be the Bumblebee, rather than asking the receiver to be theirs. */
+    val offer: Boolean = false,
 )
 
 /** A one-time link that makes whoever accepts it the creator's Bumblebee. */

@@ -2,6 +2,11 @@
 
 package dev.pcoffline.meadow.ui.circle
 
+import dev.pcoffline.meadow.data.Avatar
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Box
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -142,14 +147,19 @@ fun CircleContent(
                 onOpenChat(ChatRepository.chatIdFor(profile.uid, bee.uid))
             }
         }
-        items(outgoing, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
+        // Asks to be my Bumblebee wait among my Bumblebees; offers to look after a garden, among gardens.
+        val (offers, asks) = outgoing.partition { it.offer }
+        items(asks, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
 
-        if (profile.approveeIds.isNotEmpty() || lookingAfter.isNotEmpty()) {
+        if (profile.approveeIds.isNotEmpty() || lookingAfter.isNotEmpty() || offers.isNotEmpty()) {
             item { SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(horizontal = 20.dp)) }
         }
         items(lookingAfter, key = { "garden-" + it.uid }) { friend ->
-            GardenRow(friend, Modifier.animateItem()) { onOpenFriend(friend.uid) }
+            GardenRow(friend, Modifier.animateItem(), onChat = { onOpenChat(ChatRepository.chatIdFor(profile.uid, friend.uid)) }) {
+                onOpenFriend(friend.uid)
+            }
         }
+        items(offers, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
 
         item { SectionTitle(stringResource(R.string.circle_join_title), Modifier.padding(horizontal = 20.dp)) }
         item { JoinCard(profile, Modifier.padding(horizontal = 20.dp)) }
@@ -247,13 +257,16 @@ private fun JoinCard(profile: UserProfile, modifier: Modifier) {
 private fun IncomingInvite(invite: Invite, modifier: Modifier) {
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
-    val accepted = stringResource(R.string.circle_invite_accepted, invite.fromName)
+    val accepted = stringResource(if (invite.offer) R.string.circle_offer_accepted else R.string.circle_invite_accepted, invite.fromName)
     MeadowCard(modifier.padding(horizontal = 20.dp).fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             FlowerAvatar(invite.fromFlower)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.circle_invite_title, invite.fromName), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(if (invite.offer) R.string.circle_offer_title else R.string.circle_invite_title, invite.fromName),
+                    style = MaterialTheme.typography.titleSmall,
+                )
             }
         }
         ErrorNote(action.error, Modifier.padding(top = 8.dp))
@@ -280,7 +293,10 @@ private fun OutgoingInvite(invite: Invite, modifier: Modifier) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(invite.toName, style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(R.string.circle_invite_sent_at, relativeTime(invite.createdAtMillis)), style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(if (invite.offer) R.string.circle_offer_sent_at else R.string.circle_invite_sent_at, relativeTime(invite.createdAtMillis)),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         TextButton(onClick = { action.run { AppGraph.social.cancelInvite(invite.id) } }, enabled = !action.busy) {
             Text(stringResource(R.string.action_cancel))
@@ -295,37 +311,33 @@ private fun BumblebeeRow(bee: UserProfile, leavingAt: Long?, modifier: Modifier,
     val action = rememberAction()
     val removing = stringResource(R.string.circle_bee_removing, bee.displayName)
     val kept = stringResource(R.string.circle_bee_kept, bee.displayName)
-    Column(modifier) {
-        Row(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            PersonAvatar(bee.avatar)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(bee.displayName, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    leavingAt?.let { stringResource(R.string.circle_bee_leaving, durationText(it - System.currentTimeMillis())) }
-                        ?: stringResource(R.string.circle_bee_role),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (leavingAt != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    PersonCard(
+        avatar = bee.avatar,
+        name = bee.displayName,
+        about = leavingAt?.let { stringResource(R.string.circle_bee_leaving, durationText(it - System.currentTimeMillis())) }
+            ?: bee.bio.ifBlank { stringResource(R.string.circle_bee_role) },
+        aboutIsWarning = leavingAt != null,
+        modifier = modifier,
+        error = action.error,
+    ) {
+        if (leavingAt != null) {
+            TextButton(onClick = { action.run(successMessage = kept) { AppGraph.social.cancelRemoval(bee.uid) } }, enabled = !action.busy) {
+                Text(stringResource(R.string.circle_bee_keep))
             }
-            if (leavingAt != null) {
-                TextButton(onClick = { action.run(successMessage = kept) { AppGraph.social.cancelRemoval(bee.uid) } }, enabled = !action.busy) {
-                    Text(stringResource(R.string.circle_bee_keep))
-                }
-            }
-            IconButton(onClick = onChat) {
-                Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, bee.displayName))
-            }
-            // Removing is the menu's only choice, so while a removal is under way there's no menu:
-            // it used to open empty.
-            if (leavingAt == null) {
+        }
+        IconButton(onClick = onChat) {
+            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, bee.displayName))
+        }
+        // Removing is the menu's only choice, so while a removal is under way there's no menu:
+        // it used to open empty.
+        if (leavingAt == null) {
+            Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.action_remove)) }, onClick = { menu = false; confirm = true })
                 }
             }
         }
-        ErrorNote(action.error, Modifier.padding(horizontal = 20.dp))
     }
     if (confirm) {
         AlertDialog(
@@ -344,22 +356,58 @@ private fun BumblebeeRow(bee: UserProfile, leavingAt: Long?, modifier: Modifier,
 }
 
 @Composable
-private fun GardenRow(friend: UserProfile, modifier: Modifier, onClick: () -> Unit) {
+private fun GardenRow(friend: UserProfile, modifier: Modifier, onChat: () -> Unit, onClick: () -> Unit) {
     // Only the name card: how their phone is set up is theirs to know.
+    PersonCard(
+        avatar = friend.avatar,
+        name = friend.displayName,
+        about = friend.bio.ifBlank { stringResource(R.string.circle_garden_role) },
+        modifier = modifier,
+        onClick = onClick,
+    ) {
+        IconButton(onClick = onChat) {
+            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = stringResource(R.string.circle_chat_with, friend.displayName))
+        }
+        Icon(
+            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * One person in the circle, the same for Bumblebees and gardens: their picture and name, one line
+ * about them, and [actions] at the end.
+ */
+@Composable
+private fun PersonCard(
+    avatar: Avatar,
+    name: String,
+    about: String,
+    modifier: Modifier,
+    aboutIsWarning: Boolean = false,
+    error: String? = null,
+    onClick: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit,
+) {
     MeadowCard(modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PersonAvatar(friend.avatar)
+            PersonAvatar(avatar)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(friend.displayName, style = MaterialTheme.typography.titleMedium)
+                Text(name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    friend.bio.ifBlank { stringResource(R.string.circle_garden_role) },
+                    about,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (aboutIsWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            actions()
         }
+        ErrorNote(error, Modifier.padding(top = 8.dp))
     }
 }
 

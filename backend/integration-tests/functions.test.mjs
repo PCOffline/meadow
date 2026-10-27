@@ -353,6 +353,58 @@ describe("friend codes", () => {
   });
 });
 
+describe("asking from a chat", () => {
+  test("you can ask someone you chat with to be your Bumblebee too", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Bee looks after Sam's garden; now Bee asks Sam to look after theirs.
+    await bee.call("inviteFromChat", { uid: sam.uid, offer: false });
+    await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: false }), "already-exists");
+    const [invite] = await outbox(sam.uid, "invite");
+    assert.match(invite.title, /would like you as their Bumblebee/);
+    await sam.call("respondInvite", { inviteId: invite.inviteId, accept: true });
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approverIds, [sam.uid]);
+    assert.equal((await outbox(bee.uid, "invite_accepted")).length, 1);
+    await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: false }), "already-exists", /already your Bumblebee/);
+  });
+
+  test("you can offer to be the Bumblebee of someone you chat with", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Sam is looked after by Bee, and offers to look after Bee's garden in return.
+    await sam.call("inviteFromChat", { uid: bee.uid, offer: true });
+    const [offer] = await outbox(bee.uid, "invite");
+    assert.match(offer.title, /offers to be your Bumblebee/);
+    assert.equal((await read(`invites/${offer.inviteId}`)).offer, true);
+    await bee.call("respondInvite", { inviteId: offer.inviteId, accept: true });
+    // Accepting an offer makes whoever offered the Bumblebee, and tells them.
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approverIds, [sam.uid]);
+    assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approveeIds, [bee.uid]);
+    const [told] = await outbox(sam.uid, "invite_accepted");
+    assert.match(told.title, /You're Bee's Bumblebee now/);
+    await rejects(sam.call("inviteFromChat", { uid: bee.uid, offer: true }), "already-exists", /already Bee's Bumblebee/);
+  });
+
+  test("nobody you don't already chat with can be reached this way", async () => {
+    const sam = await person("Sam");
+    const stranger = await person("Stranger");
+    await rejects(sam.call("inviteFromChat", { uid: stranger.uid, offer: false }), "failed-precondition");
+    await rejects(sam.call("inviteFromChat", { uid: stranger.uid, offer: true }), "failed-precondition");
+    await rejects(sam.call("inviteFromChat", { uid: sam.uid, offer: true }), "invalid-argument");
+    assert.equal((await outbox(stranger.uid)).length, 0);
+  });
+
+  test("a closed chat can't be used to ask either", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: true }), "failed-precondition");
+  });
+});
+
 describe("managing Bumblebees is your own business", () => {
   test("removing a Bumblebee waits a day, tells only that Bumblebee straight away, and can be undone", async () => {
     const sam = await person("Sam");
@@ -1097,7 +1149,7 @@ describe("invites by code can be withdrawn", () => {
 
 describe("every callable is safe to call wrongly", () => {
   const CALLABLES = [
-    "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "respondInvite", "cancelInvite",
+    "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "inviteFromChat", "respondInvite", "cancelInvite",
     "removeApprover", "cancelRemoval", "stepDown", "createRequest", "decideRequest", "cancelRequest", "saveLimit",
     "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush",
   ];

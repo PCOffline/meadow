@@ -60,6 +60,7 @@ export const errors = {
   removalPending: "That Bumblebee is already leaving.",
   noRemoval: "That Bumblebee isn't leaving.",
   needsAYes: "That would loosen the limit, so it needs a Bumblebee's approval.",
+  noSharedChat: "You can only do this with someone you already chat with.",
 };
 
 export const chatNotes = {
@@ -81,6 +82,15 @@ export const pushes = {
   invite: (owner: Person) => ({
     title: `${owner.flower} ${owner.displayName} would like you as their Bumblebee`,
     body: "Open Meadow to approve. You'll get to decide whenever they ask for extra time.",
+  }),
+  /** Someone you chat with offers to look after your garden. */
+  offer: (bee: Person) => ({
+    title: `${bee.flower} ${bee.displayName} offers to be your Bumblebee`,
+    body: "Open Meadow to approve. They'd get to decide whenever you ask for extra time.",
+  }),
+  offerAccepted: (owner: Person) => ({
+    title: `${owner.flower} You're ${owner.displayName}'s Bumblebee now`,
+    body: "You'll get to decide whenever they ask for extra time. 🐝",
   }),
   inviteAccepted: (bee: Person) => ({
     title: `${bee.flower} ${bee.displayName} is your Bumblebee now`,

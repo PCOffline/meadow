@@ -8,6 +8,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -229,6 +236,28 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `Bumblebees and gardens look alike, each with a chat and a line about them`() {
+        val chats = mutableListOf<String>()
+        show { CircleContent(DemoGarden.robin, listOf(DemoGarden.maya), listOf(DemoGarden.ana), emptyList(), emptyList(), onOpenChat = { chats += it }) }
+        compose.onNodeWithContentDescription(text(R.string.circle_chat_with, "Ana")).performScrollTo().performClick()
+        assertEquals(listOf("ana_robin"), chats)
+        compose.onNodeWithText(DemoGarden.maya.bio).assertExists()
+        compose.onNodeWithText(DemoGarden.ana.bio).assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `an offer to be your Bumblebee says so, and offers you've made wait among gardens`() {
+        val offerToRobin = DemoGarden.inviteToRobin.copy(offer = true)
+        val offerFromRobin = DemoGarden.inviteFromRobin.copy(offer = true)
+        show { CircleContent(DemoGarden.robin, emptyList(), emptyList(), listOf(offerToRobin), listOf(offerFromRobin)) }
+        node(R.string.circle_offer_title, "Ana").assertExists()
+        node(R.string.circle_looking_after).assertExists()
+        compose.onNodeWithText("Offered", substring = true).performScrollTo().assertExists()
+        assertAccessible()
+    }
+
+    @Test
     fun `a garden without an email can invite too`() {
         show { CircleContent(DemoGarden.robin.copy(approverIds = emptyList(), approveeIds = emptyList()), emptyList(), emptyList(), emptyList(), emptyList()) }
         node(R.string.invite_title).assertExists()
@@ -269,6 +298,62 @@ class MainScreensTest : ScreenTest() {
         assertEquals(listOf("See you tomorrow"), sent)
         compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertDoesNotExist()
         assertAccessible()
+    }
+
+    @Test
+    fun `a long press on a message copies it whole or opens it to select part of it`() {
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, requestCard = { id, _ -> Text("Request $id") }) }
+        compose.onNodeWithText("Thank you! 💛").performTouchInput { longClick() }
+        node(R.string.chat_copy).performClick()
+        val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
+        compose.waitUntil(5_000) { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "Thank you! 💛" }
+
+        // As a screen reader's long-press does it.
+        compose.onAllNodes(SemanticsMatcher("has message options") {
+            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
+        }).onFirst().performSemanticsAction(SemanticsActions.OnLongClick)
+        node(R.string.chat_select_text).performClick()
+        node(R.string.action_close).assertExists()
+        assertAccessible(requireHeading = false)
+        node(R.string.action_close).performClick()
+        node(R.string.action_close).assertDoesNotExist()
+    }
+
+    @Test
+    fun `from a chat you can offer to be their Bumblebee too, after a confirmation`() {
+        val asked = mutableListOf<Boolean>()
+        var invited by mutableStateOf(false)
+        show {
+            ChatContent(
+                DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, invited = invited, onAskBee = { asked += it },
+                requestCard = { id, _ -> Text("Request $id") },
+            )
+        }
+        // Maya already looks after Robin's garden, so there's only the other way round to offer.
+        node(R.string.chat_ask_bee, "Maya").assertDoesNotExist()
+        node(R.string.chat_offer_bee, "Maya").performClick()
+        node(R.string.chat_offer_title, "Maya").assertExists()
+        node(R.string.action_cancel).performClick()
+        assertEquals(emptyList<Boolean>(), asked)
+
+        node(R.string.chat_offer_bee, "Maya").performClick()
+        node(R.string.chat_offer_confirm).performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(true), asked)
+        assertAccessible()
+
+        invited = true
+        compose.waitForIdle()
+        node(R.string.chat_offer_bee, "Maya").assertDoesNotExist()
+        node(R.string.chat_ask_waiting, "Maya").assertExists()
+    }
+
+    @Test
+    fun `two who look after each other aren't offered anything more`() {
+        val both = DemoGarden.robin.copy(approveeIds = DemoGarden.robin.approveeIds + DemoGarden.maya.uid)
+        show { ChatContent(both, DemoGarden.chat, DemoGarden.messages, requestCard = { id, _ -> Text("Request $id") }) }
+        node(R.string.chat_offer_bee, "Maya").assertDoesNotExist()
+        node(R.string.chat_ask_bee, "Maya").assertDoesNotExist()
     }
 
     @Test
