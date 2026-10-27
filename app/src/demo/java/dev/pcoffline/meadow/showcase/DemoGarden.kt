@@ -52,9 +52,9 @@ object DemoGarden {
         Days.todayKey(),
         totalMinutes = 134,
         apps = listOf(
-            SharedAppUsage("demo.youtube", "YouTube", 52, 60),
-            SharedAppUsage("demo.instagram", "Instagram", 47, 45),
-            SharedAppUsage("demo.maps", "Maps", 21, 0),
+            SharedAppUsage("demo.youtube", "YouTube", 52),
+            SharedAppUsage("demo.instagram", "Instagram", 47),
+            SharedAppUsage("demo.maps", "Maps", 21),
         ),
     )
 

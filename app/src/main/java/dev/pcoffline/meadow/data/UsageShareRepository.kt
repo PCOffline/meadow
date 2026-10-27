@@ -19,33 +19,48 @@ private const val TAG = "MeadowFirestore"
 class UsageShareRepository(private val backend: Backend) {
 
     /**
-     * Uploads each part [privacy] shares for [dayKey], and takes down that day's copy of each part
-     * it doesn't: a choice turned off while offline still ends up off. [today] and [progress] are
-     * only read for parts that are shared.
+     * Uploads today's copy of each part [privacy] shares, over yesterday's: only the latest is ever
+     * kept, so earlier days never leave the phone. [today] and [progress] are only read for parts
+     * that are shared. A part that isn't shared was taken down when it was turned off ([takeDown]).
      */
-    suspend fun share(privacy: Privacy, dayKey: String, today: () -> SharedUsage, progress: () -> Progress) {
+    suspend fun share(privacy: Privacy, today: () -> SharedUsage, progress: () -> Progress) {
         val uid = backend.uid ?: return
         val user = backend.user(uid)
         val usage = if (privacy.shareTime || privacy.shareApps) today() else null
         val updatedAt = "updatedAt" to FieldValue.serverTimestamp()
-        val time = user.collection(TIME).document(dayKey)
-        val minutes = usage?.let { Sharing.minutes(privacy, it) }
-        if (minutes != null) time.set(mapOf("dayKey" to dayKey, "totalMinutes" to minutes, updatedAt)).await() else time.delete().await()
-        val apps = user.collection(APPS).document(dayKey)
-        val top = usage?.let { Sharing.apps(privacy, it) }
-        if (top != null) apps.set(mapOf("dayKey" to dayKey, "apps" to top.map { it.toFirestore() }, updatedAt)).await() else apps.delete().await()
-        val growth = user.collection(PROGRESS).document(PROGRESS_DOC)
-        if (privacy.shareProgress) growth.set(progress().toFirestore() + updatedAt).await() else growth.delete().await()
-    }
-
-    /** Removes everything already shared of each part [privacy] doesn't share. */
-    suspend fun takeDown(privacy: Privacy) {
-        val uid = backend.uid ?: return
-        val parts = listOfNotNull(TIME.takeIf { !privacy.shareTime }, APPS.takeIf { !privacy.shareApps }, PROGRESS.takeIf { !privacy.shareProgress })
+        val parts = listOfNotNull(
+            usage?.let { u ->
+                Sharing.minutes(privacy, u)?.let { user.collection(TIME).document(TODAY) to mapOf("dayKey" to u.dayKey, "totalMinutes" to it, updatedAt) }
+            },
+            usage?.let { u ->
+                Sharing.apps(privacy, u)?.let { apps ->
+                    user.collection(APPS).document(TODAY) to mapOf("dayKey" to u.dayKey, "apps" to apps.map { it.toFirestore() }, updatedAt)
+                }
+            },
+            if (privacy.shareProgress) user.collection(PROGRESS).document(PROGRESS_DOC) to progress().toFirestore() + updatedAt else null,
+        )
         if (parts.isEmpty()) return
         val batch = backend.db.batch()
-        parts.forEach { part -> backend.user(uid).collection(part).get().await().documents.forEach { batch.delete(it.reference) } }
-        batch.commit().await()
+        parts.forEach { (doc, data) -> batch.set(doc, data) }
+        batch.commit().awaitWrite()
+    }
+
+    /**
+     * Takes down what's shared of each part [privacy] doesn't share. Offline, it's kept and done
+     * once back online, even if Meadow is closed meanwhile.
+     */
+    suspend fun takeDown(privacy: Privacy) {
+        val uid = backend.uid ?: return
+        val user = backend.user(uid)
+        val parts = listOfNotNull(
+            user.collection(TIME).document(TODAY).takeIf { !privacy.shareTime },
+            user.collection(APPS).document(TODAY).takeIf { !privacy.shareApps },
+            user.collection(PROGRESS).document(PROGRESS_DOC).takeIf { !privacy.shareProgress },
+        )
+        if (parts.isEmpty()) return
+        val batch = backend.db.batch()
+        parts.forEach { batch.delete(it) }
+        batch.commit().awaitWrite()
     }
 
     /** Tells the backend this phone is alive. Only when, never what is switched on. */
@@ -71,16 +86,16 @@ class UsageShareRepository(private val backend: Backend) {
         ).await()
     }
 
-    /** A friend's screen time on [dayKey]; null while it isn't shared, or there's none yet. */
+    /** A friend's screen time on [dayKey]; null while it isn't shared, or there's none for that day yet. */
     fun minutes(uid: String, dayKey: String): Flow<Int?> =
-        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(dayKey).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
-            if (it.exists()) it.int("totalMinutes") else null
+        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(TODAY).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
+            if (it.exists() && it.getString("dayKey") == dayKey) it.int("totalMinutes") else null
         }
 
-    /** A friend's top apps on [dayKey]; null while they aren't shared, or there are none yet. */
+    /** A friend's top apps on [dayKey]; null while they aren't shared, or there are none for that day yet. */
     fun apps(uid: String, dayKey: String): Flow<List<SharedAppUsage>?> =
-        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(dayKey).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
-            if (it.exists()) it.toSharedApps() else null
+        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(TODAY).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
+            if (it.exists() && it.getString("dayKey") == dayKey) it.toSharedApps() else null
         }
 
     /** A friend's progress; null while it isn't shared, or there's none yet. */
@@ -103,9 +118,10 @@ class UsageShareRepository(private val backend: Backend) {
          * what used to be shared is never shown. [listen] must include metadata changes: a cached copy
          * the server agrees with otherwise never comes again as confirmed.
          */
-        internal fun <S, T> sharedPart(label: String, listen: () -> Flow<S>, fromCache: (S) -> Boolean, read: (S) -> T?): Flow<T?> {
-            var unconfirmed = true
-            return flow {
+        internal fun <S, T> sharedPart(label: String, listen: () -> Flow<S>, fromCache: (S) -> Boolean, read: (S) -> T?): Flow<T?> =
+            flow {
+                // Per listen: each time the part is watched again, the server has to say so again.
+                var unconfirmed = true
                 emitAll(
                     listen().filter { !(unconfirmed && fromCache(it)) }.map {
                         unconfirmed = false
@@ -115,12 +131,10 @@ class UsageShareRepository(private val backend: Backend) {
             }.retryWhen { cause, _ ->
                 val refused = refusal(cause) ?: return@retryWhen false
                 Log.w(TAG, "$label unreadable", refused)
-                unconfirmed = true
                 emit(null)
                 delay(RECHECK_MS)
                 true
             }
-        }
 
         /**
          * The Firestore error behind [cause], if that's what ended a listener. The SDK's listeners
@@ -131,6 +145,9 @@ class UsageShareRepository(private val backend: Backend) {
 
         /** Today's total, read while "Today's screen time" is shared. */
         const val TIME = "usage"
+
+        /** The one document of [TIME] and [APPS]: the latest day, which says which day it is. */
+        const val TODAY = "today"
 
         /** Today's top apps, read while they're shared. */
         const val APPS = "appUsage"

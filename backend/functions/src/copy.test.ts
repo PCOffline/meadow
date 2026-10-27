@@ -41,6 +41,7 @@ function everything() {
   const fns: Record<string, () => unknown> = {
     "errors.alreadyBumblebee": () => errors.alreadyBumblebee("Maya"),
     "errors.alreadyInvited": () => errors.alreadyInvited("Maya"),
+    "errors.inviteeBusy": () => errors.inviteeBusy("Maya"),
     "errors.alreadyTheirBumblebee": () => errors.alreadyTheirBumblebee("Maya"),
     "errors.emergencyUsedUp": () => errors.emergencyUsedUp(3),
     "chatNotes.newBumblebee": () => chatNotes.newBumblebee(maya, sam),

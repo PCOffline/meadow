@@ -27,6 +27,7 @@ export const errors = {
   tooManyCodes: "You've tried a lot of friend codes today. Please try again tomorrow, or send an invite link instead. 🐝",
   alreadyBumblebee: (name: string) => `${name} is already your Bumblebee.`,
   alreadyInvited: (name: string) => `You've already invited ${name}.`,
+  inviteeBusy: (name: string) => `${name} has lots of invites waiting already. Please try again later.`,
   inviteGone: "That invite isn't around anymore.",
   inviteAnswered: "That invite was already answered.",
   linkGone: "That invite link isn't valid anymore. Ask for a new one.",

@@ -14,7 +14,6 @@ import com.google.firebase.storage.UploadTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -78,7 +77,7 @@ class ProfileRepository(
         val uid = backend.requireUid()
         store.setPrivacy(privacy)
         backend.account(uid).update("privacy", privacy.toFirestore()).awaitWrite()
-        withTimeoutOrNull(WRITE_TIMEOUT_MS) { share.takeDown(privacy) }
+        share.takeDown(privacy)
     }
 
     /** Records that the person accepted [version] of the terms and privacy notice. */

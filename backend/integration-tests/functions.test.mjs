@@ -324,6 +324,19 @@ describe("friend codes", () => {
     await rejects(sam.call("createInviteLink"), "resource-exhausted");
   });
 
+  test("nobody can be flooded with invites, however many accounts send them", async () => {
+    const bee = await person("Bee");
+    const code = await friendCodeOf(bee);
+    for (let i = 0; i < 10; i++) await (await person(`Guest ${i}`, { anonymous: true })).call("sendInvite", { friendCode: code });
+    const late = await person("Late", { anonymous: true });
+    await rejects(late.call("sendInvite", { friendCode: code }), "resource-exhausted", /lots of invites waiting/);
+    assert.equal((await outbox(bee.uid, "invite")).length, 10);
+    // Answering one makes room.
+    const [first] = await outbox(bee.uid, "invite");
+    await bee.call("respondInvite", { inviteId: first.inviteId, accept: false });
+    await late.call("sendInvite", { friendCode: code });
+  });
+
   test("own and unknown codes are refused", async () => {
     const sam = await person("Sam");
     await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(sam) }), "invalid-argument");
@@ -845,8 +858,8 @@ describe("your data", () => {
     await admin(async (db) => {
       await updateDoc(doc(db, `users/${sam.uid}/private/account`), { pushIds: arrayUnion("secret-phone-id"), fcmTokens: ["secret-old-token"] });
       await setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
-      await setDoc(doc(db, `users/${sam.uid}/usage/2026-10-27`), { dayKey: "2026-10-27", totalMinutes: 42 });
-      await setDoc(doc(db, `users/${sam.uid}/appUsage/2026-10-27`), { dayKey: "2026-10-27", apps: [] });
+      await setDoc(doc(db, `users/${sam.uid}/usage/today`), { dayKey: "2026-10-27", totalMinutes: 42 });
+      await setDoc(doc(db, `users/${sam.uid}/appUsage/today`), { dayKey: "2026-10-27", apps: [] });
       await setDoc(doc(db, `users/${sam.uid}/progress/current`), { weekChange: -12, calmerWeeks: 2, keptDays: 6, limitDays: 7 });
     });
     const { path } = await sam.call("exportMyData");
@@ -872,7 +885,7 @@ describe("your data", () => {
     await link(friend, bystander); // bystander also looks after friend, but has nothing to do with sam
     const code = await friendCodeOf(sam);
     await admin(async (db) => {
-      await setDoc(doc(db, `users/${sam.uid}/appUsage/2026-10-27`), { dayKey: "2026-10-27", apps: [] });
+      await setDoc(doc(db, `users/${sam.uid}/appUsage/today`), { dayKey: "2026-10-27", apps: [] });
       await setDoc(doc(db, `users/${sam.uid}/progress/current`), { weekChange: null, calmerWeeks: 0, keptDays: 0, limitDays: 0 });
     });
 
@@ -882,7 +895,7 @@ describe("your data", () => {
     assert.equal(await read(`users/${sam.uid}/private/account`), undefined);
     assert.equal(await read(`friendCodes/${code}`), undefined);
     assert.equal(await read(`heartbeats/${sam.uid}`), undefined);
-    assert.equal(await read(`users/${sam.uid}/appUsage/2026-10-27`), undefined);
+    assert.equal(await read(`users/${sam.uid}/appUsage/today`), undefined);
     assert.equal(await read(`users/${sam.uid}/progress/current`), undefined);
     assert.equal(await read(`chats/${[sam.uid, bee.uid].toSorted().join("_")}`), undefined);
     assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approveeIds, []);

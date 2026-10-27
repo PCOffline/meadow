@@ -20,22 +20,17 @@ service cloud.firestore {
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
     // Whether the owner shares [part] ("shareLimits", "shareTime", "shareApps", "shareProgress")
-    // with their Bumblebees. Before the parts were split, one choice ("shareUsage") covered
-    // today's usage; it still holds for today's time and apps. Limits were always shared; progress
-    // sums up earlier days, so it's only shared once chosen.
+    // with their Bumblebees. Progress sums up earlier days, so it's only shared once chosen.
     function shares(uid, part) {
-      let privacy = account(uid).get('privacy', {});
-      let unset = part == 'shareLimits' ? true : (part == 'shareProgress' ? false : privacy.get('shareUsage', true));
-      return privacy.get(part, unset) == true;
+      return account(uid).get('privacy', {}).get(part, part != 'shareProgress') == true;
     }
 
     function validPrivacy(p) {
-      return p is map && p.keys().hasOnly(['shareLimits', 'shareTime', 'shareApps', 'shareProgress', 'shareUsage'])
+      return p is map && p.keys().hasOnly(['shareLimits', 'shareTime', 'shareApps', 'shareProgress'])
         && (!('shareLimits' in p) || p.shareLimits is bool)
         && (!('shareTime' in p) || p.shareTime is bool)
         && (!('shareApps' in p) || p.shareApps is bool)
-        && (!('shareProgress' in p) || p.shareProgress is bool)
-        && (!('shareUsage' in p) || p.shareUsage is bool);
+        && (!('shareProgress' in p) || p.shareProgress is bool);
     }
     function isString(v, max) { return v is string && v.size() <= max; }
 
@@ -136,21 +131,24 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // What the owner shares with their Bumblebees, each part in documents of its own so these
+      // What the owner shares with their Bumblebees, each part in a document of its own so these
       // rules can hold each choice: today's total (usage), today's top apps (appUsage) and how
-      // the weeks compare (progress). Each document holds only its part.
-      match /usage/{day} {
+      // the weeks compare (progress). Each holds only its part, and only the latest copy: one
+      // document, "today", that says which day it is. Earlier days never leave the phone.
+      match /usage/{docId} {
         allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareTime')));
-        allow create, update: if signedIn() && me() == uid
+        allow create, update: if signedIn() && me() == uid && docId == 'today'
           && request.resource.data.keys().hasOnly(['dayKey', 'totalMinutes', 'updatedAt'])
-          && request.resource.data.totalMinutes is int;
+          && isString(request.resource.data.dayKey, 10)
+          && request.resource.data.totalMinutes is int && request.resource.data.totalMinutes >= 0 && request.resource.data.totalMinutes <= 1440;
         allow delete: if signedIn() && me() == uid;
       }
 
-      match /appUsage/{day} {
+      match /appUsage/{docId} {
         allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareApps')));
-        allow create, update: if signedIn() && me() == uid
+        allow create, update: if signedIn() && me() == uid && docId == 'today'
           && request.resource.data.keys().hasOnly(['dayKey', 'apps', 'updatedAt'])
+          && isString(request.resource.data.dayKey, 10)
           && request.resource.data.apps is list && request.resource.data.apps.size() <= 15;
         allow delete: if signedIn() && me() == uid;
       }

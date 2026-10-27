@@ -5,7 +5,8 @@ import java.net.URLDecoder
 
 /**
  * A sign-in link that opened in the browser (Android didn't hand it to Meadow) lands on the
- * `/signed-in` page, which offers it back as `meadow://signin?link=<the link>`.
+ * `/signed-in` page, which offers it back as `meadow://signin?link=<the link>`, addressed to
+ * Meadow's package so no other app can take it.
  */
 object SignInLinks {
     fun fromApp(uri: String): String? {

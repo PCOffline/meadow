@@ -53,19 +53,13 @@ data class Privacy(
         mapOf("shareLimits" to shareLimits, "shareTime" to shareTime, "shareApps" to shareApps, "shareProgress" to shareProgress)
 
     companion object {
-        /**
-         * Reads the choices through [field] ("shareTime" and so on). Before they were split, one
-         * choice ("shareUsage") covered today's usage; it still holds for today's time and apps.
-         */
-        fun read(field: (String) -> Boolean?): Privacy {
-            val usage = field("shareUsage") ?: true
-            return Privacy(
-                shareLimits = field("shareLimits") ?: true,
-                shareTime = field("shareTime") ?: usage,
-                shareApps = field("shareApps") ?: usage,
-                shareProgress = field("shareProgress") ?: false,
-            )
-        }
+        /** Reads the choices through [field] ("shareTime" and so on); one never made is the default. */
+        fun read(field: (String) -> Boolean?): Privacy = Privacy(
+            shareLimits = field("shareLimits") ?: true,
+            shareTime = field("shareTime") ?: true,
+            shareApps = field("shareApps") ?: true,
+            shareProgress = field("shareProgress") ?: false,
+        )
     }
 }
 
@@ -245,7 +239,7 @@ data class ChatMessage(
     val pending: Boolean,
 )
 
-/** Per-app usage of a person for one day, as uploaded for their Bumblebees. */
+/** Today's usage of a person, as uploaded for their Bumblebees. */
 data class SharedUsage(
     val dayKey: String,
     val totalMinutes: Int,
@@ -256,7 +250,6 @@ data class SharedAppUsage(
     val packageName: String,
     val appName: String,
     val minutes: Int,
-    val limitMinutes: Int,
 )
 
 /** Emoji people can pick as their avatar. Must match FLOWERS in the backend's schemas.ts. */

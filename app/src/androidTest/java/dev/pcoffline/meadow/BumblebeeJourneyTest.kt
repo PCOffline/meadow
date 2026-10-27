@@ -46,14 +46,14 @@ class BumblebeeJourneyTest : EndToEndTest() {
                 .update("privacy", mapOf("shareLimits" to true, "shareTime" to true, "shareApps" to true, "shareProgress" to true)),
         )
         await(
-            sam.db.document("users/${sam.uid}/usage/$today")
+            sam.db.document("users/${sam.uid}/usage/today")
                 .set(mapOf("dayKey" to today, "totalMinutes" to 42, "updatedAt" to FieldValue.serverTimestamp())),
         )
         await(
-            sam.db.document("users/${sam.uid}/appUsage/$today").set(
+            sam.db.document("users/${sam.uid}/appUsage/today").set(
                 mapOf(
                     "dayKey" to today,
-                    "apps" to listOf(mapOf("packageName" to "com.instagram.android", "appName" to "Instagram", "minutes" to 42, "limitMinutes" to 30)),
+                    "apps" to listOf(mapOf("packageName" to "com.instagram.android", "appName" to "Instagram", "minutes" to 42)),
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),
             ),

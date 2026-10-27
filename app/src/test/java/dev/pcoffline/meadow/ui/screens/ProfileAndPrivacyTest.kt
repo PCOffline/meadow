@@ -156,6 +156,8 @@ class ProfileAndPrivacyTest : ScreenTest() {
         }
         node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).performScrollTo().assertExists()
         compose.onNodeWithText("Maps").performScrollTo().assertExists()
+        // A top app with a limit shows its time against it, from the shared limits.
+        node(R.string.friend_used_of, app.resources.minutesText(52), app.resources.minutesText(60)).performScrollTo().assertExists()
         progressCard().performScrollTo().assertExists()
         node(R.string.progress_kept, 5, 7).performScrollTo().assertExists()
         node(R.string.friend_limits).performScrollTo().assertExists()

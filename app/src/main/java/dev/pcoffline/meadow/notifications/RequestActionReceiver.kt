@@ -5,9 +5,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
@@ -28,16 +31,7 @@ import kotlinx.coroutines.withContext
 class RequestActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val requestId = intent.getStringExtra(EXTRA_REQUEST) ?: return
-        val request = OneTimeWorkRequestBuilder<AnswerRequestWorker>()
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .setInputData(
-                workDataOf(
-                    EXTRA_REQUEST to requestId,
-                    EXTRA_APPROVE to intent.getBooleanExtra(EXTRA_APPROVE, false),
-                    EXTRA_NOTIFICATION to intent.getIntExtra(EXTRA_NOTIFICATION, 0),
-                ),
-            )
-            .build()
+        val request = answer(requestId, intent.getBooleanExtra(EXTRA_APPROVE, false), intent.getIntExtra(EXTRA_NOTIFICATION, 0))
         WorkManager.getInstance(context).enqueueUniqueWork("answer-$requestId", ExistingWorkPolicy.KEEP, request)
     }
 
@@ -45,6 +39,14 @@ class RequestActionReceiver : BroadcastReceiver() {
         internal const val EXTRA_REQUEST = "request_id"
         internal const val EXTRA_APPROVE = "approve"
         internal const val EXTRA_NOTIFICATION = "notification_id"
+
+        /** The work that sends an answer: it waits for a connection, so an answer given offline isn't lost. */
+        internal fun answer(requestId: String, approve: Boolean, notificationId: Int): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<AnswerRequestWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setInputData(workDataOf(EXTRA_REQUEST to requestId, EXTRA_APPROVE to approve, EXTRA_NOTIFICATION to notificationId))
+                .build()
 
         fun intent(context: Context, requestId: String, notificationId: Int, approve: Boolean): PendingIntent {
             val intent = Intent(context, RequestActionReceiver::class.java)

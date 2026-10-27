@@ -114,20 +114,14 @@ class LocalStore(context: Context) {
     }
 
     private val _privacy = MutableStateFlow(
-        Privacy.read { name ->
-            val key = if (name == "shareUsage") KEY_SHARE_USAGE else name
-            if (prefs.contains(key)) prefs.getBoolean(key, true) else null
-        },
+        Privacy.read { name -> if (prefs.contains(name)) prefs.getBoolean(name, true) else null },
     )
 
     /** Mirrors the profile's privacy choices so background work can respect them offline. */
     val privacy: StateFlow<Privacy> = _privacy.asStateFlow()
 
     fun setPrivacy(privacy: Privacy) {
-        prefs.edit {
-            remove(KEY_SHARE_USAGE)
-            privacy.toFirestore().forEach { (name, on) -> putBoolean(name, on) }
-        }
+        prefs.edit { privacy.toFirestore().forEach { (name, on) -> putBoolean(name, on) } }
         _privacy.value = privacy
     }
 
@@ -285,7 +279,6 @@ class LocalStore(context: Context) {
         const val KEY_WEEK_PREVIOUS = "week_previous"
         const val KEY_WEEK_LIMITS_FROM = "week_limits_from"
         /** Before privacy was split into parts; the parts are kept under their own names. */
-        const val KEY_SHARE_USAGE = "share_usage"
         const val KEY_TERMS = "accepted_terms_version"
         const val KEY_NOTIFIED_UPDATE = "notified_update"
         const val KEY_LINK_EMAIL = "link_email"

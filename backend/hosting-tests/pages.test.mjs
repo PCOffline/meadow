@@ -18,12 +18,15 @@ function open(name, href) {
 
 const shown = (document, id) => !document.getElementById(id).hidden;
 
-test("a sign-in link that opened in the browser is handed back to Meadow whole", () => {
+const { packageName } = JSON.parse(readFileSync(new URL("../app-links.json", import.meta.url), "utf8"));
+const handBack = (link) => `intent://signin?link=${encodeURIComponent(link)}#Intent;scheme=meadow;package=${packageName};end`;
+
+test("a sign-in link that opened in the browser is handed back whole, to Meadow and no other app", () => {
   const link = "https://x.web.app/signed-in?apiKey=k&oobCode=c0de&mode=signIn&lang=en";
   const page = open("signed-in.html", link);
   assert.ok(shown(page, "open"));
   assert.ok(!shown(page, "broken"));
-  assert.equal(page.getElementById("open").getAttribute("href"), `meadow://signin?link=${encodeURIComponent(link)}`);
+  assert.equal(page.getElementById("open").getAttribute("href"), handBack(link));
 });
 
 test("without a sign-in code, the page says the link is broken and offers nothing", () => {
@@ -36,8 +39,8 @@ test("whatever a sign-in link carries stays inside Meadow's link, as text", () =
   const evil = `https://x.web.app/signed-in?mode=signIn&oobCode=c&x="><img src=x onerror=alert(1)>&y=javascript:alert(1)#"><script>alert(1)</script>`;
   const page = open("signed-in.html", evil);
   const href = page.getElementById("open").getAttribute("href");
-  assert.ok(href.startsWith("meadow://signin?link="));
-  assert.doesNotMatch(href.slice("meadow://signin?link=".length), /[<>"'\s]/);
+  assert.equal(href, handBack(page.location.href));
+  assert.doesNotMatch(href, /[<>"'\s]/);
   assert.equal(page.querySelectorAll("img").length, 0);
   assert.equal(page.querySelectorAll("script:not([src])").length, 0);
 });

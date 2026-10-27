@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow.ui.screens
 
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.performSemanticsAction
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -116,15 +118,39 @@ class StatsTest : ScreenTest() {
         val opened = mutableListOf<LocalDate>()
         show { StatsContent(StatsUiState(month, stats), onOpenDay = { opened += it }) }
 
-        val pickable = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+        val openDay = text(R.string.stats_open_day)
+        val pickable = compose.onAllNodes(SemanticsMatcher("opens a day") { it.config.getOrNull(SemanticsActions.OnClick)?.label == openDay })
         assertEquals(today.dayOfMonth, pickable.fetchSemanticsNodes().size)
         pickable[0].performTouchInput { click() }
-        val last = pickable[today.dayOfMonth - 1].fetchSemanticsNode()
-        assertTrue(last.config[SemanticsProperties.ContentDescription].single().endsWith(", 30m"))
-        compose.runOnUiThread { last.config[SemanticsActions.CustomActions].single().action() }
-        compose.waitForIdle()
+        val last = pickable[today.dayOfMonth - 1]
+        assertTrue(last.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single().endsWith(", 30m"))
+        // As a screen reader's double tap does it.
+        last.performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf(from, today), opened)
         assertAccessible()
+    }
+
+    @Test
+    fun `after moving to another month, a tap opens a day of that month`() {
+        val today = Days.today()
+        fun month(back: Long): StatsUiState {
+            val from = today.withDayOfMonth(1).minusMonths(back)
+            val to = from.plusMonths(1).minusDays(1)
+            val days = generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }.map { it to 30 * min }.toList()
+            val selection = Selection(Period.MONTH, -back.toInt())
+            return StatsUiState(selection, PeriodStats(selection, from, to, days, apps = emptyList(), totalMs = days.size * 30 * min, previousTotalMs = null))
+        }
+        var state by mutableStateOf(month(2))
+        val opened = mutableListOf<LocalDate>()
+        show { StatsContent(state, onOpenDay = { opened += it }) }
+        val openDay = text(R.string.stats_open_day)
+        val firstDay = { compose.onAllNodes(SemanticsMatcher("opens a day") { it.config.getOrNull(SemanticsActions.OnClick)?.label == openDay })[0] }
+
+        firstDay().performTouchInput { click() }
+        state = month(1)
+        compose.waitForIdle()
+        firstDay().performTouchInput { click() }
+        assertEquals(listOf(today.withDayOfMonth(1).minusMonths(2), today.withDayOfMonth(1).minusMonths(1)), opened)
     }
 
     @Test

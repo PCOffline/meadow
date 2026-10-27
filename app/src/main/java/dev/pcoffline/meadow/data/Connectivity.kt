@@ -21,20 +21,28 @@ object Connectivity {
 
     fun watch(context: Context) {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return
-        _online.value = cm.activeNetwork != null && cm.getNetworkCapabilities(cm.activeNetwork)?.hasInternet() != false
+        // Each change is read from the network in use now, not from the one the callback names:
+        // switching networks can report the old one lost after the new one is already up.
+        val update = { _online.value = isOnline(cm) }
+        update()
         runCatching {
             cm.registerDefaultNetworkCallback(
                 object : ConnectivityManager.NetworkCallback() {
-                    override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                        _online.value = caps.hasInternet()
-                    }
+                    override fun onAvailable(network: Network) = update()
 
-                    override fun onLost(network: Network) {
-                        _online.value = false
-                    }
+                    override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = update()
+
+                    override fun onLost(network: Network) = update()
                 },
             )
         }
+    }
+
+    @VisibleForTesting
+    internal fun isOnline(cm: ConnectivityManager): Boolean {
+        val network = cm.activeNetwork ?: return false
+        // Unknown capabilities count as online, like everything else unknown here.
+        return cm.getNetworkCapabilities(network)?.hasInternet() != false
     }
 
     @VisibleForTesting

@@ -10,10 +10,8 @@ object Sharing {
     /** Today's screen time, while it's shared. */
     fun minutes(privacy: Privacy, today: SharedUsage): Int? = today.totalMinutes.takeIf { privacy.shareTime }
 
-    /** Today's top apps, while they're shared; their limits only while limits are. */
-    fun apps(privacy: Privacy, today: SharedUsage): List<SharedAppUsage>? =
-        if (!privacy.shareApps) null
-        else today.apps.map { if (privacy.shareLimits) it else it.copy(limitMinutes = 0) }
+    /** Today's top apps, while they're shared. Their limits are only ever read from [limits]. */
+    fun apps(privacy: Privacy, today: SharedUsage): List<SharedAppUsage>? = today.apps.takeIf { privacy.shareApps }
 
     /** Limits, while they're shared. */
     fun limits(privacy: Privacy, limits: List<AppLimit>): List<AppLimit>? =

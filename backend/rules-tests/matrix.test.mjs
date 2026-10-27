@@ -37,8 +37,8 @@ before(async () => {
     await setDoc(doc(db, "users/sam/inbox/r9"), { requesterId: "ward", status: "pending" });
     await setDoc(doc(db, "users/sam/limits/com.insta"), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 });
     await setDoc(doc(db, "users/sam/grants/g1"), { packageName: "com.insta", minutes: 15, byUid: "bee" });
-    await setDoc(doc(db, "users/sam/usage/2026-10-12"), { dayKey: "2026-10-12", totalMinutes: 42 });
-    await setDoc(doc(db, "users/sam/appUsage/2026-10-12"), { dayKey: "2026-10-12", apps: [] });
+    await setDoc(doc(db, "users/sam/usage/today"), { dayKey: "2026-10-12", totalMinutes: 42 });
+    await setDoc(doc(db, "users/sam/appUsage/today"), { dayKey: "2026-10-12", apps: [] });
     await setDoc(doc(db, "users/sam/progress/current"), { weekChange: -10, calmerWeeks: 1, keptDays: 5, limitDays: 7 });
     await setDoc(doc(db, "users/sam/emergencies/e1"), { minutes: 30, reason: "Maps" });
     await setDoc(doc(db, "users/sam/alerts/a1"), { kind: "protection_off", createdAt: Timestamp.now() });
@@ -93,8 +93,8 @@ describe("reading", () => {
     ["sam's Bumblebee inbox", "users/sam/inbox/r9", ["sam"]],
     ["sam's limits", "users/sam/limits/com.insta", ["sam", "bee"]],
     ["sam's extra-time grants", "users/sam/grants/g1", ["sam"]],
-    ["sam's shared screen time", "users/sam/usage/2026-10-12", ["sam", "bee"]],
-    ["sam's shared top apps", "users/sam/appUsage/2026-10-12", ["sam", "bee"]],
+    ["sam's shared screen time", "users/sam/usage/today", ["sam", "bee"]],
+    ["sam's shared top apps", "users/sam/appUsage/today", ["sam", "bee"]],
     ["sam's shared progress", "users/sam/progress/current", ["sam", "bee"]],
     ["sam's emergency unlocks", "users/sam/emergencies/e1", ["sam", "bee"]],
     ["sam's protection alerts", "users/sam/alerts/a1", []],
@@ -123,8 +123,8 @@ describe("writing someone else's data", () => {
     ["inbox", "users/sam/inbox/r9", { status: "approved" }, []],
     ["limit", "users/sam/limits/com.insta", { dailyMinutes: 20 }, ["sam"]],
     ["grant", "users/sam/grants/g1", { minutes: 600 }, []],
-    ["usage", "users/sam/usage/2026-10-12", { totalMinutes: 1 }, ["sam"]],
-    ["top apps", "users/sam/appUsage/2026-10-12", { apps: [] }, ["sam"]],
+    ["usage", "users/sam/usage/today", { totalMinutes: 1 }, ["sam"]],
+    ["top apps", "users/sam/appUsage/today", { apps: [] }, ["sam"]],
     ["progress", "users/sam/progress/current", { keptDays: 6 }, ["sam"]],
     ["emergency", "users/sam/emergencies/e1", { minutes: 60 }, []],
     ["heartbeat", "heartbeats/sam", { staleNotified: true }, []],
@@ -162,7 +162,7 @@ describe("writing someone else's data", () => {
   test("nobody creates documents in another person's space", async () => {
     const wrong = [];
     const paths = [
-      "users/sam/limits/com.new", "users/sam/usage/2026-10-13", "users/sam/appUsage/2026-10-13", "users/sam/progress/current2",
+      "users/sam/limits/com.new", "users/sam/usage/today", "users/sam/appUsage/today", "users/sam/progress/current2",
       "users/sam/alerts/a2", "users/sam/inbox/r2", "users/sam/grants/g2",
     ];
     for (const path of paths) {

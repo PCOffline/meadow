@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow.ui.screens
 
+import dev.pcoffline.meadow.data.SharedPage
+import dev.pcoffline.meadow.ui.circle.FriendPage
 import dev.pcoffline.meadow.ui.chat.ChatListContent
 import android.app.Application
 import androidx.compose.material3.Text
@@ -164,6 +166,17 @@ class MainScreensTest : ScreenTest() {
         assertAccessible()
         chats = listOf(DemoGarden.chat)
         node(R.string.chats_empty_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `offline, a friend's page waits quietly for parts that can't come yet`() {
+        var offline by mutableStateOf(false)
+        show { FriendPage(SharedPage(DemoGarden.maya, null, null, null, null), waiting = true, offline = offline) }
+        node(R.string.loading_garden).assertExists()
+        offline = true
+        node(R.string.loading_garden).assertDoesNotExist()
+        // Not knowing isn't the same as nothing shared.
+        node(R.string.friend_nothing_shared, DemoGarden.maya.displayName).assertDoesNotExist()
     }
 
     @Test

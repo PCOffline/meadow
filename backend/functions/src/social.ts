@@ -28,6 +28,11 @@ const INVITES_PER_DAY = 20;
 const REMOVALS_PER_DAY = 10;
 /** Friend codes looked up, found or not, so codes can't be guessed by trying them all. */
 export const CODE_LOOKUPS_PER_DAY = 30;
+/**
+ * Unanswered invites one person can have waiting. Rate limits count per account, and guest
+ * accounts cost nothing to make, so this is what keeps anyone from being flooded with them.
+ */
+export const PENDING_INVITES_PER_PERSON = 10;
 
 /** Creates the caller's profile and claims a unique friend code. Safe to call twice. */
 export const createProfile = onCall(async (req) => {
@@ -178,9 +183,9 @@ export const sendInvite = onCall(async (req) => {
     }
     const commitRate = await consumeRate(tx, uid, "invite", INVITES_PER_DAY, DAY_MS);
     // Checked in the same transaction as the rate counter, so a double tap invites once.
-    const pending = await tx.get(invites()
-      .where("fromUid", "==", uid).where("toUid", "==", targetUid).where("status", "==", "pending").limit(1));
-    if (!pending.empty) throw new HttpsError("already-exists", errors.alreadyInvited(target.profile.displayName));
+    const waiting = await tx.get(invites().where("toUid", "==", targetUid).where("status", "==", "pending").limit(PENDING_INVITES_PER_PERSON));
+    if (waiting.docs.some((d) => d.get("fromUid") === uid)) throw new HttpsError("already-exists", errors.alreadyInvited(target.profile.displayName));
+    if (waiting.size >= PENDING_INVITES_PER_PERSON) throw new HttpsError("resource-exhausted", errors.inviteeBusy(target.profile.displayName));
     commitRate();
     tx.set(ref, {
       fromUid: uid,

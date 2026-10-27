@@ -62,6 +62,19 @@ class SharedPartTest {
     }
 
     @Test
+    fun `watched again, the cached copy waits for the server again`() = runTest {
+        val shared = part {
+            flow {
+                emit(Snap(1, fromCache = true))
+                emit(Snap(2, fromCache = false))
+            }
+        }
+        assertEquals(listOf(2), shared.toList())
+        // Leaving the page and coming back: what's cached may no longer be shared.
+        assertEquals(listOf(2), shared.toList())
+    }
+
+    @Test
     fun `a part the server refuses reads as not shared`() = runTest {
         // As the SDK's listener ends: its producer cancelled with the refusal as the cause.
         val refused = part {

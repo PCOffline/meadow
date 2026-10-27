@@ -230,12 +230,11 @@ fun DocumentSnapshot.toSharedApps(): List<SharedAppUsage> =
             packageName = map["packageName"] as? String ?: return@mapNotNull null,
             appName = map["appName"] as? String ?: "",
             minutes = (map["minutes"] as? Number)?.toInt() ?: 0,
-            limitMinutes = (map["limitMinutes"] as? Number)?.toInt() ?: 0,
         )
     } ?: emptyList()
 
 fun SharedAppUsage.toFirestore(): Map<String, Any> =
-    mapOf("packageName" to packageName, "appName" to appName, "minutes" to minutes, "limitMinutes" to limitMinutes)
+    mapOf("packageName" to packageName, "appName" to appName, "minutes" to minutes)
 
 fun DocumentSnapshot.toProgress() = Progress(
     weekChange = getLong("weekChange")?.toInt(),

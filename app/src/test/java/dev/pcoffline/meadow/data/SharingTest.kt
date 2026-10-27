@@ -3,7 +3,6 @@ package dev.pcoffline.meadow.data
 import dev.pcoffline.meadow.showcase.DemoGarden
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** One place decides what Bumblebees see, part by part; the upload and the preview both ask it. */
@@ -35,10 +34,9 @@ class SharingTest {
     }
 
     @Test
-    fun `with limits private, top apps don't give them away`() {
-        val apps = page(Privacy(shareLimits = false)).apps.orEmpty()
-        assertTrue(today.apps.any { it.limitMinutes > 0 })
-        assertTrue(apps.isNotEmpty() && apps.all { it.limitMinutes == 0 })
+    fun `top apps carry no limits: those come only with the limits, while they're shared`() {
+        val shared = Sharing.apps(Privacy(shareLimits = false), today).orEmpty().first().toFirestore()
+        assertEquals(setOf("packageName", "appName", "minutes"), shared.keys)
     }
 
     @Test
@@ -55,13 +53,10 @@ class SharingTest {
     }
 
     @Test
-    fun `choices from before the split still hold for today's time and apps, and progress waits to be chosen`() {
-        val old = mapOf("shareUsage" to false)
-        assertEquals(Privacy(shareLimits = true, shareTime = false, shareApps = false, shareProgress = false), Privacy.read { old[it] })
-        assertEquals(false, Privacy.read { mapOf("shareUsage" to true)[it] }.shareProgress)
+    fun `a choice never made is the default, and progress waits to be chosen`() {
         assertEquals(Privacy(), Privacy.read { null })
-        // A newer choice wins over the old one.
-        val mixed = mapOf("shareUsage" to false, "shareApps" to true)
-        assertEquals(true, Privacy.read { mixed[it] }.shareApps)
+        assertEquals(false, Privacy.read { null }.shareProgress)
+        val some = mapOf("shareApps" to false)
+        assertEquals(Privacy(shareApps = false), Privacy.read { some[it] })
     }
 }
