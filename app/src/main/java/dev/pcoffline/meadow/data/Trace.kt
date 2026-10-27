@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.snapshots
@@ -50,17 +51,17 @@ object Trace {
 }
 
 /** The document's live snapshots, with each one (and the listener's start, end and failure) traced. */
-fun DocumentReference.tracedSnapshots(): Flow<DocumentSnapshot> =
-    if (!Trace.enabled) snapshots() else snapshots().traced("doc $path") { doc ->
+fun DocumentReference.tracedSnapshots(metadataChanges: MetadataChanges = MetadataChanges.EXCLUDE): Flow<DocumentSnapshot> =
+    if (!Trace.enabled) snapshots(metadataChanges) else snapshots(metadataChanges).traced("doc $path") { doc ->
         "exists=${doc.exists()} fromCache=${doc.metadata.isFromCache} pendingWrites=${doc.metadata.hasPendingWrites()} data=${doc.data}"
     }
 
 /** The query's live results, traced like [tracedSnapshots]. */
-fun Query.tracedSnapshots(): Flow<QuerySnapshot> {
-    if (!Trace.enabled) return snapshots()
+fun Query.tracedSnapshots(metadataChanges: MetadataChanges = MetadataChanges.EXCLUDE): Flow<QuerySnapshot> {
+    if (!Trace.enabled) return snapshots(metadataChanges)
     // Filtered queries don't expose their path; the changes listed show where they read from.
     val label = (this as? CollectionReference)?.let { "collection $path" } ?: "query"
-    return snapshots().traced(label) { snapshot ->
+    return snapshots(metadataChanges).traced(label) { snapshot ->
         "${snapshot.size()} docs fromCache=${snapshot.metadata.isFromCache} pendingWrites=${snapshot.metadata.hasPendingWrites()} " +
             "changes=${snapshot.documentChanges.joinToString { "${it.type} ${it.document.reference.path}" }}"
     }

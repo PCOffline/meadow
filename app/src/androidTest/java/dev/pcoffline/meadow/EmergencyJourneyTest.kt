@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -69,7 +70,10 @@ class EmergencyJourneyTest : EndToEndTest() {
             waitForText(text(R.string.emergency_banner_all, ""), substring = true)
             assertEquals(0, compose.onAllNodes(isDialog()).fetchSemanticsNodes().size)
 
-            // Ending it early brings the limits back, here and in the backend.
+            // Ending it early brings the limits back, here and in the backend. The unlock's message
+            // sits over the bottom of the screen, where the banner is, so it goes first.
+            val unlocked = app.getString(R.string.emergency_unlocked).substringBefore("%1")
+            compose.waitUntil(15_000) { compose.onAllNodesWithText(unlocked, substring = true).fetchSemanticsNodes().isEmpty() }
             node(R.string.emergency_banner_end).performScrollTo().performClick()
             waitFor(R.string.emergency_ended)
             waitForBackend("users/$uid/private/account") { (it.millis("emergencyUntil") ?: Long.MAX_VALUE) <= System.currentTimeMillis() + CLOCK_SLACK_MS }

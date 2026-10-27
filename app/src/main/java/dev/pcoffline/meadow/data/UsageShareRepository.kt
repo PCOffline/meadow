@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.data
 import android.util.Log
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.MetadataChanges.INCLUDE
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -72,60 +73,61 @@ class UsageShareRepository(private val backend: Backend) {
 
     /** A friend's screen time on [dayKey]; null while it isn't shared, or there's none yet. */
     fun minutes(uid: String, dayKey: String): Flow<Int?> =
-        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(dayKey).tracedSnapshots() }, { it.metadata.isFromCache }) {
+        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(dayKey).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
             if (it.exists()) it.int("totalMinutes") else null
         }
 
     /** A friend's top apps on [dayKey]; null while they aren't shared, or there are none yet. */
     fun apps(uid: String, dayKey: String): Flow<List<SharedAppUsage>?> =
-        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(dayKey).tracedSnapshots() }, { it.metadata.isFromCache }) {
+        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(dayKey).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
             if (it.exists()) it.toSharedApps() else null
         }
 
     /** A friend's progress; null while it isn't shared, or there's none yet. */
     fun progress(uid: String): Flow<Progress?> =
-        sharedPart("Shared progress", { backend.user(uid).collection(PROGRESS).document(PROGRESS_DOC).tracedSnapshots() }, { it.metadata.isFromCache }) {
+        sharedPart("Shared progress", { backend.user(uid).collection(PROGRESS).document(PROGRESS_DOC).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
             if (it.exists()) it.toProgress() else null
         }
 
     /** A friend's limits; null while they aren't shared. */
     fun limits(uid: String): Flow<List<AppLimit>?> =
-        sharedPart("Shared limits", { backend.user(uid).collection("limits").tracedSnapshots() }, { it.metadata.isFromCache }) { snapshot ->
+        sharedPart("Shared limits", { backend.user(uid).collection("limits").tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) { snapshot ->
             snapshot.documents.map { it.toLimit() }.sortedBy { it.appName.lowercase() }
         }
 
-    /**
-     * A part of a friend's page. When it can't be read (they stopped sharing it, or you're no
-     * longer their Bumblebee) it reads as not shared, and it's tried again now and then, in case
-     * it's shared again. Until the server has said it may be read, this phone's cached copy of
-     * what used to be shared is never shown.
-     */
-    private fun <S, T> sharedPart(label: String, listen: () -> Flow<S>, fromCache: (S) -> Boolean, read: (S) -> T?): Flow<T?> {
-        var unconfirmed = true
-        return flow {
-            emitAll(
-                listen().filter { !(unconfirmed && fromCache(it)) }.map {
-                    unconfirmed = false
-                    read(it)
-                },
-            )
-        }.retryWhen { cause, _ ->
-            val refused = refusal(cause) ?: return@retryWhen false
-            Log.w(TAG, "$label unreadable", refused)
-            unconfirmed = true
-            emit(null)
-            delay(RECHECK_MS)
-            true
-        }
-    }
-
     companion object {
         /**
+         * A part of a friend's page. When it can't be read (they stopped sharing it, or you're no
+         * longer their Bumblebee) it reads as not shared, and it's tried again now and then, in case
+         * it's shared again. Until the server has said it may be read, this phone's cached copy of
+         * what used to be shared is never shown. [listen] must include metadata changes: a cached copy
+         * the server agrees with otherwise never comes again as confirmed.
+         */
+        internal fun <S, T> sharedPart(label: String, listen: () -> Flow<S>, fromCache: (S) -> Boolean, read: (S) -> T?): Flow<T?> {
+            var unconfirmed = true
+            return flow {
+                emitAll(
+                    listen().filter { !(unconfirmed && fromCache(it)) }.map {
+                        unconfirmed = false
+                        read(it)
+                    },
+                )
+            }.retryWhen { cause, _ ->
+                val refused = refusal(cause) ?: return@retryWhen false
+                Log.w(TAG, "$label unreadable", refused)
+                unconfirmed = true
+                emit(null)
+                delay(RECHECK_MS)
+                true
+            }
+        }
+
+        /**
          * The Firestore error behind [cause], if that's what ended a listener. The SDK's listeners
-         * end with a cancellation wrapping it.
+         * end with a cancellation wrapping it, possibly more than once.
          */
         internal fun refusal(cause: Throwable): FirebaseFirestoreException? =
-            cause as? FirebaseFirestoreException ?: cause.cause as? FirebaseFirestoreException
+            generateSequence(cause) { it.cause }.take(MAX_CAUSES).filterIsInstance<FirebaseFirestoreException>().firstOrNull()
 
         /** Today's total, read while "Today's screen time" is shared. */
         const val TIME = "usage"
@@ -137,5 +139,6 @@ class UsageShareRepository(private val backend: Backend) {
         const val PROGRESS = "progress"
         const val PROGRESS_DOC = "current"
         private const val RECHECK_MS = 30_000L
+        private const val MAX_CAUSES = 8
     }
 }
