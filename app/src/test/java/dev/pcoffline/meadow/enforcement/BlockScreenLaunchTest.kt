@@ -44,6 +44,7 @@ class BlockScreenLaunchTest {
         shadowOf(app).clearNextStartedActivities()
         // What an earlier test showed must not count here.
         BlockActivity.markShown("")
+        BlockActivity.showing = null
     }
 
     @After
@@ -85,6 +86,25 @@ class BlockScreenLaunchTest {
         BlockActivity.markShown("com.example.other")
 
         waitUntil { blockScreensOpened().size >= 2 }
+    }
+
+    @Test
+    fun `an app already behind the block screen isn't blocked again, so the screen doesn't flicker or go Home`() {
+        BlockActivity.showing = APP
+        service.block(APP)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(emptyList<String>(), blockScreensOpened())
+        assertEquals(emptyList<Int>(), shadow.globalActionsPerformed)
+    }
+
+    @Test
+    fun `the block screen showing for another app doesn't stop this one being blocked`() {
+        BlockActivity.showing = "com.example.other"
+        service.block(APP)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(listOf(APP), blockScreensOpened())
     }
 
     /** Collects the block screens started since the last call. */

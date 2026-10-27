@@ -118,7 +118,15 @@ class BlockActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        packageState.value?.let { markShown(it) }
+        packageState.value?.let {
+            markShown(it)
+            showing = it
+        }
+    }
+
+    override fun onPause() {
+        showing = null
+        super.onPause()
     }
 
     /** Home, fading out the same way however it's asked for, instead of the launcher's zoom. */
@@ -148,6 +156,12 @@ class BlockActivity : ComponentActivity() {
 
         /** The app the screen last showed for, and when (elapsed realtime). */
         @Volatile private var lastShown: Pair<String, Long>? = null
+
+        /** The app the screen is on screen for right now, if it is. */
+        @Volatile internal var showing: String? = null
+
+        /** Whether the screen is on screen for [packageName] right now. */
+        fun isShowingFor(packageName: String): Boolean = showing == packageName
 
         internal fun markShown(packageName: String) {
             lastShown = packageName to SystemClock.elapsedRealtime()
