@@ -8,7 +8,11 @@ if (process.env.NODE_V8_COVERAGE) process.once("SIGTERM", () => process.exit(0))
 // Set once in backend/functions/.env, which Firebase loads when deploying and running.
 const region = process.env.MEADOW_REGION?.trim();
 if (!region) throw new Error("Set MEADOW_REGION in backend/functions/.env, e.g. MEADOW_REGION=europe-west1");
-setGlobalOptions({ region, maxInstances: 10 });
+// A whole CPU rather than the default sixth of one: starting up (loading the Admin SDK) and each
+// call are several times faster, and one instance answers many calls at once (concurrency needs a
+// whole CPU), so far fewer calls wait for a new one to start. Billing is per request, so a small
+// group still stays inside the free allowance.
+setGlobalOptions({ region, maxInstances: 10, cpu: 1, memory: "512MiB", concurrency: 80 });
 
 export {
   createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, inviteFromChat, respondInvite, cancelInvite,

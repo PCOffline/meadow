@@ -19,11 +19,15 @@ class AppCatalog(private val context: Context) {
     private val labelCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val iconCache = LruCache<String, ImageBitmap>(120)
 
+    @Volatile private var appsCache: List<InstalledApp>? = null
     @Volatile private var launchableCache: Set<String>? = null
     @Volatile private var homeCache: Set<String>? = null
     @Volatile private var essentialCache: Set<String>? = null
 
-    fun launchableApps(): List<InstalledApp> {
+    /** Kept until apps are installed or removed: reading every app's name takes a moment. */
+    fun launchableApps(): List<InstalledApp> = appsCache ?: queryLaunchableApps().also { appsCache = it }
+
+    private fun queryLaunchableApps(): List<InstalledApp> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         return pm.queryActivities(intent)
             .map { it.activityInfo.packageName }
@@ -84,6 +88,7 @@ class AppCatalog(private val context: Context) {
 
     /** Forgets cached app lists; called when apps are installed or removed. */
     fun invalidate() {
+        appsCache = null
         launchableCache = null
         homeCache = null
         essentialCache = null
