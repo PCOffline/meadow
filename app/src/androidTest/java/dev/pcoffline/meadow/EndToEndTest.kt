@@ -91,7 +91,8 @@ abstract class EndToEndTest {
     protected fun waitFor(@StringRes id: Int, substring: Boolean = false) = waitForText(text(id), substring)
     protected fun waitForText(value: String, substring: Boolean = false, timeout: Long = 60_000) {
         try {
-            compose.waitUntil(timeout) { compose.onAllNodesWithText(value, substring).fetchSemanticsNodes().isNotEmpty() }
+            // No Compose screen in front yet (another app's, before Meadow's cover) is "not yet", not a failure.
+            compose.waitUntil(timeout) { runCatching { showing(value, substring) }.getOrDefault(false) }
         } catch (e: ComposeTimeoutException) {
             // One line, so CI logs show where it stopped and what was on screen instead.
             throw AssertionError("Never saw \"$value\". On screen: ${screenText()}", e)
