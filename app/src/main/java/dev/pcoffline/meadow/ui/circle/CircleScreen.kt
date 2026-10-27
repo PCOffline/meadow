@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -58,13 +59,11 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.TabTitle
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.ChatRepository
-import dev.pcoffline.meadow.data.FriendlyException
 import dev.pcoffline.meadow.data.Invite
 import dev.pcoffline.meadow.data.InviteLinks
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
-import dev.pcoffline.meadow.ui.auth.SecureAccountCard
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
@@ -111,8 +110,7 @@ fun CircleScreen(
     val lookingAfter by viewModel.lookingAfter.collectAsStateWithLifecycle()
     val incoming by viewModel.incomingInvites.collectAsStateWithLifecycle()
     val outgoing by viewModel.outgoingInvites.collectAsStateWithLifecycle()
-    val anonymous by AppGraph.auth.anonymous.collectAsStateWithLifecycle()
-    CircleContent(profile, bumblebees, lookingAfter, incoming, outgoing, anonymous, onOpenChat, onOpenFriend)
+    CircleContent(profile, bumblebees, lookingAfter, incoming, outgoing, onOpenChat, onOpenFriend)
 }
 
 /** The circle, drawn from plain state (also used for previews and screenshots). */
@@ -123,7 +121,6 @@ fun CircleContent(
     lookingAfter: List<UserProfile>,
     incoming: List<Invite>,
     outgoing: List<Invite>,
-    anonymous: Boolean,
     onOpenChat: (String) -> Unit = {},
     onOpenFriend: (String) -> Unit = {},
 ) {
@@ -139,13 +136,7 @@ fun CircleContent(
                 )
             }
         }
-        item {
-            if (anonymous) {
-                SecureAccountCard(R.string.circle_secure_reason, Modifier.padding(horizontal = 20.dp))
-            } else {
-                InviteCard(Modifier.padding(horizontal = 20.dp))
-            }
-        }
+        item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
 
         if (incoming.isNotEmpty()) {
             item { SectionTitle(stringResource(R.string.circle_invites_for_you), Modifier.padding(horizontal = 20.dp)) }
@@ -185,7 +176,10 @@ fun CircleContent(
     }
 }
 
-/** Asks someone to be my Bumblebee: by link (the main way) or by their friend code. */
+/**
+ * Asks someone to be my Bumblebee: by a link to send them, or by their friend code. A pasted
+ * invite link works here too, for when one opened in the browser instead of in Meadow.
+ */
 @Composable
 private fun InviteCard(modifier: Modifier) {
     val context = LocalContext.current
@@ -195,9 +189,10 @@ private fun InviteCard(modifier: Modifier) {
     val codeAction = rememberAction()
     val shareTitle = stringResource(R.string.invite_share_title)
     val sent = stringResource(R.string.invite_code_sent)
+    val pastedLink = InviteLinks.tokenFromText(code)
+    val friendCode = code.uppercase().filter { it.isLetterOrDigit() }
     MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.primaryContainer) {
         Text(stringResource(R.string.invite_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
-        Text(stringResource(R.string.invite_body), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
         Button(
             onClick = {
                 var url: String? = null
@@ -215,54 +210,38 @@ private fun InviteCard(modifier: Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
             OutlinedTextField(
                 value = code,
-                onValueChange = { code = it.uppercase().filter { c -> c.isLetterOrDigit() }.take(8) },
+                onValueChange = { code = it.take(200) },
                 placeholder = { Text(stringResource(R.string.invite_code_placeholder)) },
                 singleLine = true,
+                enabled = !codeAction.busy,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
             OutlinedButton(
-                onClick = { codeAction.run(successMessage = sent, onSuccess = { code = "" }) { AppGraph.social.invite(code) } },
-                enabled = code.length >= 4 && !codeAction.busy,
+                onClick = {
+                    if (pastedLink != null) {
+                        AppGraph.store.setPendingInvite(pastedLink)
+                        code = ""
+                    } else {
+                        codeAction.run(successMessage = sent, onSuccess = { code = "" }) { AppGraph.social.invite(friendCode) }
+                    }
+                },
+                enabled = (pastedLink != null || friendCode.length in 4..8) && !codeAction.busy,
             ) { Text(stringResource(R.string.invite_code_button)) }
         }
         ErrorNote(codeAction.error, Modifier.padding(top = 8.dp))
     }
 }
 
-/** For becoming someone else's Bumblebee: paste their link, or give them my code. */
+/** My friend code, for a friend who'd like me as their Bumblebee to invite me with. */
 @Composable
 private fun JoinCard(profile: UserProfile, modifier: Modifier) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    var pasted by rememberSaveable { mutableStateOf("") }
     val action = rememberAction()
     val copied = stringResource(R.string.join_code_copied)
     MeadowCard(modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.join_link_title), style = MaterialTheme.typography.titleSmall)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-            OutlinedTextField(
-                value = pasted,
-                onValueChange = { pasted = it.take(200) },
-                placeholder = { Text(stringResource(R.string.join_link_placeholder)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(
-                onClick = {
-                    action.run(onSuccess = { pasted = "" }) {
-                        val token = InviteLinks.tokenFromText(pasted) ?: throw FriendlyException(R.string.error_bad_invite_link)
-                        AppGraph.store.setPendingInvite(token)
-                    }
-                },
-                enabled = pasted.isNotBlank() && !action.busy,
-            ) { Text(stringResource(R.string.join_link_button)) }
-        }
-        ErrorNote(action.error, Modifier.padding(top = 8.dp))
-
-        HorizontalDivider(Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.join_code_title), style = MaterialTheme.typography.labelLarge)
@@ -276,6 +255,9 @@ private fun JoinCard(profile: UserProfile, modifier: Modifier) {
                     .setPrimaryClip(ClipData.newPlainText(resources.getString(R.string.join_code_title), profile.friendCode))
                 action.toast(copied)
             }) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.join_code_copy)) }
+            IconButton(onClick = {
+                context.shareText(resources.getString(R.string.join_code_share_text, profile.friendCode), resources.getString(R.string.join_code_share))
+            }) { Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.join_code_share)) }
         }
     }
 }

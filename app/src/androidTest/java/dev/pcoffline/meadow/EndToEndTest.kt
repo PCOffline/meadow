@@ -278,18 +278,18 @@ abstract class EndToEndTest {
     }
 
     /**
-     * Becomes [friend]'s Bumblebee by pasting their invite link on the circle screen (below the
-     * fold, so scrolled to first) and saying yes. Returns the uid of the person on this phone.
+     * Becomes [friend]'s Bumblebee by pasting their invite link into the circle's friend code
+     * field (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
      */
     protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
         val token = friend.call("createInviteLink")!!["token"] as String
         val me = FirebaseAuth.getInstance().currentUser!!.uid
         node(R.string.tab_circle).performClick()
         waitFor(R.string.circle_title)
-        val joinField = hasSetTextAction() and hasText(text(R.string.join_link_placeholder))
+        val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
         typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
-        node(R.string.join_link_button).performClick()
+        node(R.string.invite_code_button).performClick()
         waitForText(text(R.string.accept_invite_title, friendName))
         compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()
         waitForBackend("users/${friend.uid}/private/account") { it.strings("approverIds") == listOf(me) }

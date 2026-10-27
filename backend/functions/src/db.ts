@@ -60,13 +60,6 @@ export function requireAuth(req: CallableRequest<unknown>): string {
   return uid;
 }
 
-/** Commitments must survive a reinstall, so inviting Bumblebees needs an account with an email. */
-export function requireEmailAccount(req: CallableRequest<unknown>): void {
-  if (req.auth?.token.firebase?.sign_in_provider === "anonymous") {
-    throw new HttpsError("failed-precondition", errors.needsEmail);
-  }
-}
-
 /** How long a sign-in counts as recent, for steps that can't be undone. */
 export const RECENT_SIGN_IN_MS = 5 * 60_000;
 

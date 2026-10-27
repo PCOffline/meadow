@@ -2,15 +2,13 @@
 <resources>
     <string name="circle_title">Your circle</string>
     <string name="circle_subtitle">Your Bumblebees look after your garden, and you look after theirs.</string>
-    <string name="circle_secure_reason">Before inviting a Bumblebee, add an email. That way your limits and friends come back if you change phones, and reinstalling can\'t wipe them.</string>
 
     <string name="invite_title">Invite a Bumblebee 🐝</string>
-    <string name="invite_body">Send a friend a link. Once they say yes, they look after your garden, and only they can give you extra time.</string>
     <string name="invite_link_button">Share an invite link</string>
     <string name="invite_link_busy">Making a link…</string>
     <string name="invite_share_title">Invite a Bumblebee</string>
     <string name="invite_share_text">Will you be my Bumblebee? 🐝 I\'m keeping my screen time in check with Meadow, and I\'d love you to look after my garden: %1$s</string>
-    <string name="invite_code_title">Have their friend code instead?</string>
+    <string name="invite_code_title">Got a friend code?</string>
     <string name="invite_code_placeholder">Their code</string>
     <string name="invite_code_button">Invite</string>
     <string name="invite_code_sent">Invite sent 💌</string>
@@ -33,12 +31,11 @@
     <string name="circle_looking_after_empty">None yet. When a friend sends you an invite link and you say yes, their garden shows up here.</string>
 
     <string name="circle_join_title">Be someone\'s Bumblebee</string>
-    <string name="join_link_title">Got an invite link?</string>
-    <string name="join_link_placeholder">Paste it here</string>
-    <string name="join_link_button">Open</string>
     <string name="join_code_title">Your friend code</string>
     <string name="join_code_copy">Copy your friend code</string>
     <string name="join_code_copied">Code copied</string>
+    <string name="join_code_share">Share your friend code</string>
+    <string name="join_code_share_text">Want me as your Bumblebee on Meadow? 🐝 My friend code is %1$s</string>
 
     <string name="accept_invite_loading_title">Opening your invite…</string>
     <string name="accept_invite_title">Be %1$s\'s Bumblebee?</string>

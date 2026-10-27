@@ -6,7 +6,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { chatNotes, errors, pushes } from "./copy";
 import {
   accountOf, accountRef, chats, consumeRate, db, ensureChat, friendCodes, heartbeats, inviteLinks, invites, loadPerson, notify, parse, type Person,
-  postToChat, projectId, removals, requireAuth, requireEmailAccount, users,
+  postToChat, projectId, removals, requireAuth, users,
 } from "./db";
 import { chatIdFor, inviteUrl, randomFriendCode, randomInviteToken, withPhotoToken } from "./format";
 import {
@@ -92,7 +92,6 @@ async function announceNewBumblebee(chatId: string, owner: Person, bee: Person) 
  */
 export const createInviteLink = onCall(async (req) => {
   const uid = requireAuth(req);
-  requireEmailAccount(req);
   const token = randomInviteToken();
   const expiresAt = Date.now() + INVITE_LINK_TTL_MS;
   await db().runTransaction(async (tx) => {
@@ -158,7 +157,6 @@ export const acceptInviteLink = onCall(async (req) => {
 /** Asks the person with this friend code to be the caller's Bumblebee. */
 export const sendInvite = onCall(async (req) => {
   const uid = requireAuth(req);
-  requireEmailAccount(req);
   const { friendCode } = parse(InviteByCodeInput, req.data);
 
   // Counted before looking, and kept even when no one has the code.

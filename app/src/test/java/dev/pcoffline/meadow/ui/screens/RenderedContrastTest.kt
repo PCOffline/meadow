@@ -118,7 +118,7 @@ class RenderedContrastTest : ScreenTest() {
 
     @Test
     fun `the circle`() = sweep {
-        CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList(), anonymous = false)
+        CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList())
     }
 
     @Test

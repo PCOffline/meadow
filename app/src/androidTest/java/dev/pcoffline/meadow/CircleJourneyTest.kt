@@ -12,7 +12,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.Intents.intending
@@ -169,17 +168,12 @@ class CircleJourneyTest : EndToEndTest() {
                 throw AssertionError("${e.message} Started: ${Intents.getIntents().map { "${it.action} ${it.extras?.keySet()}" }}", e)
             }
 
-            // Pasting something that isn't a link says so.
-            val join = hasSetTextAction() and hasText(text(R.string.join_link_placeholder))
-            compose.onNode(hasScrollToNodeAction()).performScrollToNode(join)
-            typeInto(join, "see you at the park")
-            node(R.string.join_link_button).performClick()
-            waitFor(R.string.error_bad_invite_link, substring = true)
-
-            // Kai's own link can't make Kai their own Bumblebee.
+            // Kai's own link, pasted into the friend code field, can't make Kai their own Bumblebee.
             val token = kai.call("createInviteLink")!!["token"] as String
-            compose.onNode(hasSetTextAction() and hasText("see you at the park")).performTextReplacement("https://${BuildConfig.LINK_HOST}/i/$token")
-            node(R.string.join_link_button).performClick()
+            val field = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(field)
+            typeInto(field, "https://${BuildConfig.LINK_HOST}/i/$token")
+            node(R.string.invite_code_button).performClick()
             waitFor(R.string.accept_invite_own)
             inDialog(text(R.string.action_ok)).performClick()
             assertTrue(backendDoc("users/${kai.uid}/private/account")!!.strings("approverIds").isEmpty())

@@ -282,9 +282,13 @@ describe("invite links", () => {
     await rejects(bee.call("acceptInviteLink", { token: "short" }), "invalid-argument");
   });
 
-  test("gardens without an email can't invite yet", async () => {
+  test("gardens without an email can invite, by link and by code", async () => {
     const anon = await person("Anon", { anonymous: true });
-    await rejects(anon.call("createInviteLink"), "failed-precondition", /email/i);
+    const bee = await person("Bee");
+    const { token } = await anon.call("createInviteLink");
+    await bee.call("acceptInviteLink", { token });
+    const other = await person("Other");
+    await anon.call("sendInvite", { friendCode: await friendCodeOf(other) });
   });
 });
 

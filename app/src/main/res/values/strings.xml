@@ -68,7 +68,6 @@
     <string name="error_email_required">Enter your email first.</string>
     <string name="error_set_a_limit">Set a daily or weekly limit.</string>
     <string name="error_photo">That picture couldn\'t be opened. Try another one.</string>
-    <string name="error_bad_invite_link">That doesn\'t look like a Meadow invite link.</string>
     <string name="error_emergency_minutes">Pick 15, 30 or 60 minutes.</string>
     <string name="error_emergency_reason">Please say briefly what the emergency is.</string>
     <string name="error_emergency_offline_used">You can\'t reach Meadow right now, and this month\'s offline emergency unlock is used up.</string>
