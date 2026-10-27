@@ -4,26 +4,28 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { JSDOM } from "jsdom";
 import { render } from "../render-legal.mjs";
 
 const docs = ["privacy_notice.md", "terms_of_use.md", "licenses.md"];
 const read = (name) => readFileSync(new URL(`../../legal/${name}`, import.meta.url), "utf8");
+const parse = (html) => new JSDOM(html).window.document;
 
 for (const name of docs) {
   test(`${name} renders to a complete page`, () => {
-    const html = render(read(name));
-    assert.match(html, /^<!doctype html>/);
-    assert.match(html, /<html lang="en">/, "pages declare their language");
-    assert.match(html, /<meta name="viewport"/, "pages work on phones");
-    assert.equal((html.match(/<h1>/g) ?? []).length, 1, "exactly one main heading");
-    assert.match(html, /<title>[^<]+ · Meadow<\/title>/);
-    assert.doesNotMatch(html, /\*\*|^#+ /m, "no Markdown left unrendered");
+    const page = parse(render(read(name)));
+    assert.equal(page.doctype?.name, "html");
+    assert.equal(page.documentElement.lang, "en", "pages declare their language");
+    assert.ok(page.querySelector('meta[name="viewport"]'), "pages work on phones");
+    assert.equal(page.querySelectorAll("h1").length, 1, "exactly one main heading");
+    assert.match(page.title, /^.+ · Meadow$/);
+    assert.doesNotMatch(page.body.textContent, /\*\*|^#+ /m, "no Markdown left unrendered");
   });
 }
 
 test("headings never skip a level", () => {
   for (const name of docs) {
-    const levels = [...render(read(name)).matchAll(/<h([1-6])>/g)].map((m) => Number(m[1]));
+    const levels = [...parse(render(read(name))).querySelectorAll("h1, h2, h3, h4, h5, h6")].map((h) => Number(h.tagName[1]));
     levels.forEach((level, i) => {
       if (i > 0) assert.ok(level <= levels[i - 1] + 1, `${name}: h${levels[i - 1]} is followed by h${level}`);
     });
@@ -31,16 +33,16 @@ test("headings never skip a level", () => {
 });
 
 test("tables get header cells, and the title comes from the first heading", () => {
-  const html = render("# Hello\n\n| What | Who |\n|---|---|\n| Name | Bees |\n");
-  assert.match(html, /<th>What<\/th>/);
-  assert.match(html, /<td>Bees<\/td>/);
-  assert.match(html, /<title>Hello · Meadow<\/title>/);
+  const page = parse(render("# Hello\n\n| What | Who |\n|---|---|\n| Name | Bees |\n"));
+  assert.deepEqual([...page.querySelectorAll("th")].map((c) => c.textContent), ["What", "Who"]);
+  assert.deepEqual([...page.querySelectorAll("td")].map((c) => c.textContent), ["Name", "Bees"]);
+  assert.equal(page.title, "Hello · Meadow");
 });
 
 test("the privacy notice says who to contact and names its processors", () => {
-  const html = render(read("privacy_notice.md"));
-  assert.match(html, /github\.com\/PCOffline\/meadow/);
-  assert.match(html, /Firebase|Google/);
+  const page = parse(render(read("privacy_notice.md")));
+  assert.match(page.body.textContent, /github\.com\/PCOffline\/meadow/);
+  assert.match(page.body.textContent, /Firebase|Google/);
 });
 
 test("app links list every signing key, and refuse anything that isn't a fingerprint", async () => {
