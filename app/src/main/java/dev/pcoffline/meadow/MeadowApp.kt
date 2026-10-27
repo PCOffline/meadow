@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
+import androidx.emoji2.bundled.BundledEmojiCompatConfig
+import androidx.emoji2.text.EmojiCompat
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.update.UpdateCheckWorker
 import dev.pcoffline.meadow.work.SyncWorker
@@ -13,6 +15,9 @@ import dev.pcoffline.meadow.work.SyncWorker
 class MeadowApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Meadow's own emoji font for every emoji, so flowers and icons look the same on every
+        // phone rather than each maker's own (or missing) version. Compose text picks it up.
+        EmojiCompat.init(BundledEmojiCompatConfig(this).setReplaceAll(true))
         AppGraph.init(this)
         AppGraph.notifier.createChannels()
         if (AppGraph.backendReady) AppGraph.sync.start()

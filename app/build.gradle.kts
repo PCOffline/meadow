@@ -161,6 +161,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.emoji2.bundled)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

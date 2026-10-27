@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -188,8 +190,9 @@ private fun IntroStep(onStart: () -> Unit, onSignIn: () -> Unit) {
                 onClick = { if (last) onStart() else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } },
                 modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(54.dp),
             ) { Text(stringResource(if (last) R.string.intro_begin else R.string.intro_next), style = MaterialTheme.typography.titleMedium) }
-            TextButton(onClick = onSignIn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp)) {
-                Text(stringResource(R.string.intro_have_garden))
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(onClick = onSignIn, modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp).fillMaxWidth().heightIn(min = 54.dp)) {
+                Text(stringResource(R.string.intro_have_garden), style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -279,7 +282,9 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             enabled = !action.busy && name.isNotBlank() && agreed,
             modifier = Modifier.fillMaxWidth().height(54.dp),
         ) { Text(stringResource(if (action.busy) R.string.onboarding_planting else R.string.onboarding_plant), style = MaterialTheme.typography.titleMedium) }
-        TextButton(onClick = onSignIn) { Text(stringResource(R.string.intro_have_garden)) }
+        OutlinedButton(onClick = onSignIn, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+            Text(stringResource(R.string.intro_have_garden), style = MaterialTheme.typography.titleMedium)
+        }
     }
     reading?.let { LegalDialog(it, onDismiss = { reading = null }) }
 }
@@ -426,14 +431,18 @@ fun SecureAccountCard(@StringRes reason: Int, modifier: Modifier = Modifier) {
     MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
         Text(stringResource(R.string.secure_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.asHeading())
         Text(stringResource(reason), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
-        SignInOptions(
-            passwordButton = R.string.secure_button,
-            linkSent = R.string.secure_link_sent,
-            offerPasswordReset = false,
-            onPassword = { email, password -> AppGraph.auth.addEmail(email, password) },
-        )
+        SecureAccountForm()
     }
 }
+
+/** The form inside [SecureAccountCard], for places that already say why. */
+@Composable
+fun SecureAccountForm() = SignInOptions(
+    passwordButton = R.string.secure_button,
+    linkSent = R.string.secure_link_sent,
+    offerPasswordReset = false,
+    onPassword = { email, password -> AppGraph.auth.addEmail(email, password) },
+)
 
 /** Finishes signing in from an emailed link, asking which address it went to if this phone doesn't know. */
 @Composable

@@ -147,6 +147,41 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `each step not done yet says exactly where to tap, and done ones don't`() {
+        val hows = listOf(
+            R.string.setup_usage_how, R.string.setup_keeper_how, R.string.setup_listener_how, R.string.setup_overlay_how, R.string.setup_admin_how,
+        )
+        var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
+        show { key(state) { SetupScreen(onDone = {}, read = { state }, anonymous = false) } }
+        hows.forEach { node(it).assertExists() }
+        assertAccessible()
+
+        state = ProtectionState(true, true, true, true, true, true, notificationListener = true)
+        compose.waitForIdle()
+        hows.forEach { node(it).assertDoesNotExist() }
+    }
+
+    @Test
+    fun `setup offers to save a garden started without an email, in place`() {
+        show { SetupScreen(onDone = {}, anonymous = true) }
+        node(R.string.setup_account_title).performScrollTo().assertExists()
+        node(R.string.auth_email_link).assertDoesNotExist()
+        node(R.string.setup_account_action).performScrollTo().performClick()
+        node(R.string.setup_account_action).assertDoesNotExist()
+        node(R.string.auth_email_link).performScrollTo().assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a garden with an email shows as saved in setup`() {
+        val all = ProtectionState(true, true, true, true, true, true, notificationListener = true)
+        show { SetupScreen(onDone = {}, read = { all }, anonymous = false) }
+        node(R.string.setup_account_action).assertDoesNotExist()
+        // Seven protections and the account.
+        assertEquals(8, compose.onAllNodesWithText(text(R.string.setup_step_done)).fetchSemanticsNodes().size)
+    }
+
+    @Test
     fun `setup has one way out, into the garden only once the essentials are on`() {
         var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
         var left = 0
