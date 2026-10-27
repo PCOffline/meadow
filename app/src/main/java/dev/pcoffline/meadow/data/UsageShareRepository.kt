@@ -110,8 +110,8 @@ class UsageShareRepository(private val backend: Backend) {
                 },
             )
         }.retryWhen { cause, _ ->
-            if (cause !is FirebaseFirestoreException) return@retryWhen false
-            Log.w(TAG, "$label unreadable", cause)
+            val refused = refusal(cause) ?: return@retryWhen false
+            Log.w(TAG, "$label unreadable", refused)
             unconfirmed = true
             emit(null)
             delay(RECHECK_MS)
@@ -120,6 +120,13 @@ class UsageShareRepository(private val backend: Backend) {
     }
 
     companion object {
+        /**
+         * The Firestore error behind [cause], if that's what ended a listener. The SDK's listeners
+         * end with a cancellation wrapping it.
+         */
+        internal fun refusal(cause: Throwable): FirebaseFirestoreException? =
+            cause as? FirebaseFirestoreException ?: cause.cause as? FirebaseFirestoreException
+
         /** Today's total, read while "Today's screen time" is shared. */
         const val TIME = "usage"
 

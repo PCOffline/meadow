@@ -189,6 +189,9 @@ abstract class EndToEndTest {
                 throw AssertionError("$path never changed. Now: ${runCatching(read).getOrNull()}. On screen: ${screenText()}")
             }
             Thread.sleep(250)
+            // Keeps the app's own clock in step, so a pause it takes before saving (the privacy
+            // switches settle first) runs out while the test waits for what it saves.
+            compose.mainClock.advanceTimeBy(250)
         }
     }
 

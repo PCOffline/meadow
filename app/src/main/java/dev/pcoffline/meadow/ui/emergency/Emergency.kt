@@ -215,5 +215,7 @@ fun EmergencyBanner(modifier: Modifier = Modifier, viewModel: EmergencyBannerVie
                 Text(stringResource(R.string.emergency_banner_end))
             }
         }
+        // Otherwise a failed attempt to end it would look like a button that does nothing.
+        ErrorNote(action.error)
     }
 }
