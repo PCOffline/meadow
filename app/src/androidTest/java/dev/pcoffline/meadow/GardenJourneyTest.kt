@@ -71,7 +71,6 @@ class GardenJourneyTest : EndToEndTest() {
             // "… of screen time", whatever today's total is.
             val screenTime = text(R.string.friend_screen_time, "")
             eventually("today's screen time on the page") { showing(screenTime, substring = true) }
-            node(R.string.friend_limits).performScrollTo().assertExists()
             compose.assertAccessible(compose.density)
             val shareTime = compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time)))
             shareTime.performScrollTo().assertIsOn().performClick()

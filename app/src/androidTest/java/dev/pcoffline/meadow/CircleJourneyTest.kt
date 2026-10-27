@@ -97,8 +97,8 @@ class CircleJourneyTest : EndToEndTest() {
             // The message sits over the bottom of the list, where Sam's garden is.
             waitForSnackbarToGo(R.string.circle_invite_accepted, "Sam")
             tapInCircle(hasText(text(R.string.circle_garden_role)) and hasClickAction())
-            // Sam has no time to share yet; the limits are shared from the start.
-            waitFor(R.string.friend_limits)
+            // Sam's page, with nothing planted yet to show.
+            waitForText(text(R.string.friend_step_down, "Sam"))
         }
     }
 

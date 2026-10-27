@@ -77,8 +77,8 @@ class FormatTest {
 
     @Test
     fun `counts agree with their nouns`() {
-        assertEquals(true, res.getQuantityString(R.plurals.stats_missing_days, 1, 1).startsWith("No record for 1 day."))
-        assertEquals(true, res.getQuantityString(R.plurals.stats_missing_days, 4, 4).startsWith("No record for 4 days."))
+        assertEquals("No record for 1 day", res.getQuantityString(R.plurals.stats_missing_days, 1, 1))
+        assertEquals("No record for 4 days", res.getQuantityString(R.plurals.stats_missing_days, 4, 4))
         assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 1, 1).contains("your 1 emergency unlock for"))
         assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 3, 3).contains("all 3 emergency unlocks"))
         assertEquals("Answer at least 1 request to see how you lean.", res.getQuantityString(R.plurals.bee_stats_leniency_unknown, 1, 1))

@@ -48,6 +48,7 @@ class GalleryTest : ScreenTest() {
     fun `the list opens a state, and pretending to be offline shows the strip`() {
         show { Gallery() }
         compose.onNode(hasText("Offline") and hasClickAction()).performClick()
+        compose.waitForIdle()
         assertFalse(Connectivity.online.value)
         compose.onNode(hasText("Nothing planted yet")).performScrollTo().performClick()
         node(R.string.garden_empty_title).assertExists()

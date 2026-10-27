@@ -59,8 +59,10 @@ class LimitJourneyTest : EndToEndTest() {
             // From the empty garden to the picker; a search narrows the apps down.
             node(R.string.garden_empty_title).performScrollTo().performClick()
             waitFor(R.string.picker_title)
+            // Pebbles may sit below the fold, so it's found by searching.
+            typeInto(hasSetTextAction(), "pebb")
             waitForText("Pebbles")
-            typeInto(hasSetTextAction(), "zzz")
+            compose.onNode(hasSetTextAction()).performTextReplacement("zzz")
             eventually("Pebbles filtered out") { !showing("Pebbles") }
             compose.onNode(hasSetTextAction()).performTextReplacement("pebb")
             waitForText("Pebbles")
