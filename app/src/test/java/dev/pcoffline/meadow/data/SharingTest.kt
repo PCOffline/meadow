@@ -34,7 +34,7 @@ class SharingTest {
     }
 
     @Test
-    fun `top apps carry no limits: those come only with the limits, while they're shared`() {
+    fun `top apps carry no limits, those come only with the limits, while they're shared`() {
         val shared = Sharing.apps(Privacy(shareLimits = false), today).orEmpty().first().toFirestore()
         assertEquals(setOf("packageName", "appName", "minutes"), shared.keys)
     }
