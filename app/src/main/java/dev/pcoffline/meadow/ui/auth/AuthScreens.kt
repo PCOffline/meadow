@@ -273,12 +273,6 @@ private fun NameStep(onBack: () -> Unit, onSignIn: () -> Unit) {
             enabled = !action.busy && name.isNotBlank() && agreed,
             modifier = Modifier.fillMaxWidth().height(54.dp),
         ) { Text(stringResource(if (action.busy) R.string.onboarding_planting else R.string.onboarding_plant), style = MaterialTheme.typography.titleMedium) }
-        Text(
-            stringResource(R.string.onboarding_no_email),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
         TextButton(onClick = onSignIn) { Text(stringResource(R.string.intro_have_garden)) }
     }
     reading?.let { LegalDialog(it, onDismiss = { reading = null }) }

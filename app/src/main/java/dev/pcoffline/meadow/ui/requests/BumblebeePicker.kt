@@ -78,10 +78,5 @@ fun BumblebeeChips(bees: List<UserProfile>, chosen: List<String>, modifier: Modi
                 )
             }
         }
-        Text(
-            stringResource(R.string.ask_who_private),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

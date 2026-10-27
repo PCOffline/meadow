@@ -298,11 +298,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 MinutesStepper(weekly, step = 30, min = 30, max = 100 * 60) { weekly = it }
                 PresetChips(listOf(120, 180, 300, 420, 600), weekly) { weekly = it }
             }
-            Text(
-                stringResource(R.string.limit_editor_weekly_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             if (dailyOn && weeklyOn && weekly < daily) {
                 Text(
                     stringResource(R.string.limit_editor_weekly_below_daily),

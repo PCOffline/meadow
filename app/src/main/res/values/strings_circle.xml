@@ -17,7 +17,6 @@
 
     <string name="circle_invites_for_you">Waiting for your answer</string>
     <string name="circle_invite_title">%1$s would like you as their Bumblebee</string>
-    <string name="circle_invite_body">You\'ll get to decide whenever they ask for extra time.</string>
     <string name="circle_invite_accept">Say yes</string>
     <string name="circle_invite_decline">Not now</string>
     <string name="circle_invite_accepted">You\'re %1$s\'s Bumblebee now 🐝</string>
@@ -38,7 +37,6 @@
     <string name="join_link_placeholder">Paste it here</string>
     <string name="join_link_button">Open</string>
     <string name="join_code_title">Your friend code</string>
-    <string name="join_code_body">A friend can type this code to ask you to be their Bumblebee.</string>
     <string name="join_code_copy">Copy your friend code</string>
     <string name="join_code_copied">Code copied</string>
 

@@ -29,7 +29,6 @@
     <string name="limit_editor_usage">%1$s today · %2$s this week</string>
     <string name="limit_editor_daily">Daily limit</string>
     <string name="limit_editor_weekly">Weekly limit</string>
-    <string name="limit_editor_weekly_hint">Weeks start on Monday. Whichever limit runs out first wins.</string>
     <string name="limit_editor_weekly_below_daily">This week\'s limit is less than a single day\'s, so the daily limit will never be the one that counts.</string>
     <string name="limit_editor_pick_one">Turn on at least one of these to plant a limit.</string>
     <string name="limit_editor_pending_title">Waiting for your Bumblebees 💌</string>

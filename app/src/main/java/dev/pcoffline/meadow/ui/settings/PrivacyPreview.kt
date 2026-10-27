@@ -72,11 +72,6 @@ fun PrivacyPreviewContent(profile: UserProfile, today: SharedUsage?, limits: Lis
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             PrivacyCard(profile)
-            Text(
-                stringResource(R.string.privacy_preview_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             // Framed, so it reads as a look at another screen rather than part of this one.
             val frame = RoundedCornerShape(28.dp)
             Column(Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outline, frame).padding(16.dp)) {

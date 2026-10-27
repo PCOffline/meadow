@@ -110,11 +110,6 @@ fun SettingsScreen(
             MeadowCard(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.emergency_title), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    pluralStringResource(R.plurals.settings_emergency_body, Emergency.ALLOWANCE, Emergency.ALLOWANCE),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
                     pluralStringResource(R.plurals.settings_emergency_left, profile.emergenciesLeft, profile.emergenciesLeft, Emergency.ALLOWANCE),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.secondary,
@@ -129,11 +124,6 @@ fun SettingsScreen(
 
             MeadowCard(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.settings_protections_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.settings_protections_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onOpenSetup) { Text(stringResource(R.string.settings_protections_button)) }
                     TextButton(onClick = onOpenTroubleshoot) { Text(stringResource(R.string.trouble_button)) }
@@ -143,16 +133,14 @@ fun SettingsScreen(
             PrivacyCard(profile, onPreview = onOpenPrivacyPreview)
             UpdatesCard()
 
-            MeadowCard(Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.settings_promises_title), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.settings_promises_body), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
-            }
-
             DataCard(onOpenLegal = onOpenLegal, onDelete = { confirmDelete = true })
 
             ErrorNote(action.error)
-            OutlinedButton(onClick = { confirmSignOut = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.settings_sign_out))
+            // A guest has nothing to sign back in with, so there's no signing out; securing comes first.
+            if (!anonymous) {
+                OutlinedButton(onClick = { confirmSignOut = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_sign_out))
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -191,20 +179,14 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
             title = { Text(stringResource(R.string.settings_sign_out_title)) },
-            text = { Text(stringResource(if (anonymous) R.string.settings_sign_out_anonymous else R.string.settings_sign_out_body)) },
+            text = { Text(stringResource(R.string.settings_sign_out_body)) },
             confirmButton = {
-                if (anonymous) {
-                    TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.action_ok)) }
-                } else {
-                    TextButton(onClick = {
-                        confirmSignOut = false
-                        action.run { AppGraph.auth.signOut() }
-                    }) { Text(stringResource(R.string.settings_sign_out)) }
-                }
+                TextButton(onClick = {
+                    confirmSignOut = false
+                    action.run { AppGraph.auth.signOut() }
+                }) { Text(stringResource(R.string.settings_sign_out)) }
             },
-            dismissButton = {
-                if (!anonymous) TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.settings_sign_out_stay)) }
-            },
+            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.settings_sign_out_stay)) } },
         )
     }
     if (confirmDelete) DeleteAccountDialog(onDismiss = { confirmDelete = false })
@@ -244,12 +226,6 @@ internal fun PrivacyCard(profile: UserProfile, onPreview: (() -> Unit)? = null) 
     val privacy = profile.privacy
     MeadowCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.settings_privacy_title), style = MaterialTheme.typography.titleMedium)
-        Text(
-            stringResource(R.string.settings_privacy_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp),
-        )
         SwitchRow(
             title = stringResource(R.string.settings_share_usage),
             body = stringResource(R.string.settings_share_usage_body),
@@ -284,7 +260,6 @@ private fun UpdatesCard() {
         )
         SwitchRow(
             title = stringResource(R.string.settings_updates_auto),
-            body = stringResource(R.string.settings_updates_auto_body),
             checked = auto,
             onChange = AppGraph.store::setAutoUpdate,
         )
@@ -394,7 +369,7 @@ private fun DeleteAccountDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(title: String, body: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+private fun SwitchRow(title: String, body: String? = null, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     // The whole row is one switch, so it's an easy target and reads as one control to TalkBack.
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -403,7 +378,7 @@ private fun SwitchRow(title: String, body: String, checked: Boolean, enabled: Bo
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (body != null) Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }

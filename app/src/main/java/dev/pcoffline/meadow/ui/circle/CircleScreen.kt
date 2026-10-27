@@ -277,11 +277,6 @@ private fun JoinCard(profile: UserProfile, modifier: Modifier) {
                 action.toast(copied)
             }) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.join_code_copy)) }
         }
-        Text(
-            stringResource(R.string.join_code_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -296,7 +291,6 @@ private fun IncomingInvite(invite: Invite, modifier: Modifier) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.circle_invite_title, invite.fromName), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(R.string.circle_invite_body), style = MaterialTheme.typography.bodySmall)
             }
         }
         ErrorNote(action.error, Modifier.padding(top = 8.dp))

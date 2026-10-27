@@ -14,7 +14,6 @@
     <string name="onboarding_name_label">Your name</string>
     <string name="onboarding_plant">Plant my garden 🌱</string>
     <string name="onboarding_planting">Planting…</string>
-    <string name="onboarding_no_email">No email needed to start. You\'ll add one before inviting your first Bumblebee, so your garden can\'t get lost.</string>
 
     <string name="sign_in_title">Welcome back 🌼</string>
     <string name="sign_in_body">Sign in the way you set up your garden.</string>

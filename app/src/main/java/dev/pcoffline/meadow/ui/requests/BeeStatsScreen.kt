@@ -72,11 +72,6 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    stringResource(R.string.bee_stats_private),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 MeadowCard(Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.bee_stats_leniency), style = MaterialTheme.typography.titleMedium)
                     val leaning = stats.leaning
@@ -93,12 +88,6 @@ fun BeeStatsContent(stats: BeeStats?, onBack: () -> Unit = {}) {
                             color = MaterialTheme.colorScheme.secondary,
                         )
                         GrowthBar(stats.leniency / 100f, color = Garden.colors.growth, modifier = Modifier.padding(top = 6.dp))
-                        Text(
-                            stringResource(R.string.bee_stats_leniency_how),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
                     }
                 }
                 MeadowCard(Modifier.fillMaxWidth()) {
