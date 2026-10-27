@@ -173,17 +173,27 @@ fun GrowthBar(fraction: Float, modifier: Modifier = Modifier, height: Dp = 10.dp
     }
 }
 
-/** A month at a glance: one soft square per day, deeper green for more screen time; [missing] days have no record. */
+/**
+ * A month at a glance: one soft square per day, deeper green for more screen time; [missing] days
+ * have no record. Weeks run from [firstDay]; the month's first day sits [firstDayOffset] squares in.
+ */
 @Composable
-fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier = Modifier, firstDayOffset: Int = 0, missing: Set<Int> = emptySet()) {
+fun MonthHeatmap(
+    values: List<Float>,
+    labels: List<String>,
+    modifier: Modifier = Modifier,
+    firstDay: DayOfWeek = DayOfWeek.MONDAY,
+    firstDayOffset: Int = 0,
+    missing: Set<Int> = emptySet(),
+) {
     val garden = Garden.colors
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(1f)
     val cells = List(firstDayOffset) { null } + values.indices.toList()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, currentLocale()) }.forEach {
+            for (i in 0L until 7L) {
                 Text(
-                    it, Modifier.weight(1f), textAlign = TextAlign.Center,
+                    firstDay.plus(i).getDisplayName(java.time.format.TextStyle.NARROW, currentLocale()), Modifier.weight(1f), textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

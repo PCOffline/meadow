@@ -36,6 +36,16 @@ class LocalStoreTest {
     }
 
     @Test
+    fun `the first day of the week, and a change still waiting, survive a restart and a wipe`() {
+        val wednesday = java.time.LocalDate.of(2026, 10, 28)
+        LocalStore(context).setWeekStart(java.time.DayOfWeek.SUNDAY, wednesday)
+        val restarted = LocalStore(context)
+        assertEquals(WeekRule().changedTo(java.time.DayOfWeek.SUNDAY, wednesday), restarted.weekRule.value)
+        restarted.clearAll()
+        assertEquals(WeekRule(), LocalStore(context).weekRule.value)
+    }
+
+    @Test
     fun `commitments survive a process restart`() {
         val limits = listOf(AppLimit("com.insta", "Instagram", 30, 0), AppLimit("com.tok", "TikTok", 0, 120))
         val grants = listOf(Grant("r1", "com.insta", 15, "2026-10-12"))

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_secure_reason">Your garden isn\'t linked to an email yet. Add one so you can sign in on a new phone and invite Bumblebees.</string>
+    <string name="settings_week_start">Week starts on</string>
+    <string name="settings_week_start_pending">Weekly limits switch over on %1$s, when this week ends.</string>
     <string name="settings_strict_title">Strict mode</string>
     <string name="settings_strict_body">Keeps Meadow\'s settings, uninstalling and the clock out of reach.</string>
     <string name="settings_strict_on">Strict mode on 🌿</string>

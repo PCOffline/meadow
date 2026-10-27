@@ -72,6 +72,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -82,10 +83,10 @@ enum class Period { DAY, WEEK, MONTH }
 
 /** Which stretch of time is shown: [offset] periods back from the current one. */
 data class Selection(val period: Period = Period.WEEK, val offset: Int = 0) {
-    /** The first and last day of this stretch, counted from [today]. */
-    fun range(today: LocalDate): Pair<LocalDate, LocalDate> = when (period) {
+    /** The first and last day of this stretch, counted from [today], with weeks starting on [firstDay]. */
+    fun range(today: LocalDate, firstDay: DayOfWeek = DayOfWeek.MONDAY): Pair<LocalDate, LocalDate> = when (period) {
         Period.DAY -> today.plusDays(offset.toLong()).let { it to it }
-        Period.WEEK -> Days.weekStart(today).plusWeeks(offset.toLong()).let { it to it.plusDays(6) }
+        Period.WEEK -> Days.weekStart(today, firstDay).plusWeeks(offset.toLong()).let { it to it.plusDays(6) }
         Period.MONTH -> today.withDayOfMonth(1).plusMonths(offset.toLong()).let { it to it.plusMonths(1).minusDays(1) }
     }
 
@@ -108,6 +109,8 @@ data class PeriodStats(
     val apps: List<AppTime>,
     val totalMs: Long,
     val previousTotalMs: Long?,
+    /** The day weeks start on, for laying out the month. */
+    val firstDay: DayOfWeek = DayOfWeek.MONDAY,
 ) {
     /** Days up to today, so the days still to come don't pull the average down. */
     private fun counted(today: LocalDate) = days.filter { (day, ms) -> ms != null && !day.isAfter(today) }
@@ -127,7 +130,9 @@ data class StatsUiState(
 class StatsViewModel : ViewModel() {
     private val selection = MutableStateFlow(Selection())
 
-    private val loaded = selection.mapLatest { load(it) }.flowOn(Dispatchers.IO)
+    private val loaded = combine(selection, AppGraph.store.weekRule) { sel, week -> sel to week.first }
+        .mapLatest { (sel, firstDay) -> load(sel, firstDay) }
+        .flowOn(Dispatchers.IO)
 
     val state: StateFlow<StatsUiState> = combine(selection, loaded, AppGraph.store.limits) { sel, stats, limits ->
         val byPackage = limits.associateBy { it.packageName }
@@ -148,9 +153,9 @@ class StatsViewModel : ViewModel() {
         selection.value = current.copy(offset = (current.offset + by).coerceAtMost(0))
     }
 
-    private fun load(sel: Selection): PeriodStats {
+    private fun load(sel: Selection, firstDay: DayOfWeek): PeriodStats {
         val today = Days.today()
-        val (from, to) = sel.range(today)
+        val (from, to) = sel.range(today, firstDay)
         val history = AppGraph.history
         val days = history.range(from, to)
         val limitable = AppGraph.catalog.launchablePackages()
@@ -183,6 +188,7 @@ class StatsViewModel : ViewModel() {
             totalMs = perApp.values.sum(),
             // Days with no record in this stretch would make any comparison look better than it is.
             previousTotalMs = previous.takeIf { days.none { (d, apps) -> apps == null && !d.isAfter(today) } },
+            firstDay = firstDay,
         )
     }
 }
@@ -364,7 +370,8 @@ private fun Chart(s: PeriodStats) {
             MonthHeatmap(
                 values = minutes,
                 labels = s.days.map { it.first.dayOfMonth.toString() },
-                firstDayOffset = s.from.dayOfWeek.value - 1,
+                firstDay = s.firstDay,
+                firstDayOffset = Math.floorMod(s.from.dayOfWeek.value - s.firstDay.value, 7),
                 missing = missing,
             )
             Spacer(Modifier.height(12.dp))

@@ -63,6 +63,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.widthIn
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -309,14 +315,10 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         }
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn) { hoursOn = it }
-            Text(
-                stringResource(R.string.limit_editor_hours_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             if (hoursOn) {
+                val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
                 Spacer(Modifier.height(8.dp))
-                ScheduleEditor(schedule) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
+                ScheduleEditor(schedule, firstDay = week.first) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
             }
         }
 
@@ -480,11 +482,30 @@ private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, onChange: 
         RepeatingIconButton(onStep = { onChange((current - step).coerceAtLeast(min)) }, enabled = value > min) {
             Icon(Icons.Outlined.Remove, contentDescription = stringResource(R.string.limit_editor_less))
         }
-        Text(minutesText(value), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 24.dp))
+        // As wide as the widest value it can show, so the buttons stay put as "5h" becomes "5h 30m".
+        val style = MaterialTheme.typography.headlineMedium
+        val ragged = generateSequence(max) { it - step }.takeWhile { it >= min }.firstOrNull { it % 60 != 0 }
+        val widest = widestLabel(listOfNotNull(min, max, ragged), style)
+        Text(
+            minutesText(value),
+            style = style,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 16.dp).widthIn(min = widest),
+        )
         RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = value < max) {
             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))
         }
     }
+}
+
+/** The width of the widest of [minutes] as text, in [style]. */
+@Composable
+private fun widestLabel(minutes: List<Int>, style: TextStyle): Dp {
+    val measurer = rememberTextMeasurer()
+    val labels = minutes.map { minutesText(it) }
+    val widest = remember(labels, style) { labels.maxOf { measurer.measure(it, style).size.width } }
+    return with(LocalDensity.current) { widest.toDp() }
 }
 
 /**

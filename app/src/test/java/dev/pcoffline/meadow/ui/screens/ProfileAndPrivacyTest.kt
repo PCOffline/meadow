@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import android.text.format.DateFormat
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -16,7 +17,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Days
+import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.AccountEntry
@@ -25,6 +29,7 @@ import dev.pcoffline.meadow.ui.requests.RequestsContent
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
+import dev.pcoffline.meadow.ui.settings.WeekStartCard
 import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
@@ -32,6 +37,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.DayOfWeek
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 /** The way to one's profile from every tab, the look in Settings, and the preview of what Bumblebees see. */
 @RunWith(AndroidJUnit4::class)
@@ -82,6 +91,25 @@ class ProfileAndPrivacyTest : ScreenTest() {
         assertEquals(heights.toString(), 1, heights.distinct().size)
         val modes = DarkMode.entries.map { node(it.label).fetchSemanticsNode().boundsInRoot.height }
         assertEquals(modes.toString(), 1, modes.distinct().size)
+    }
+
+    @Test
+    fun `the week can start on Saturday, Sunday or Monday, and weekly limits follow when the week ends`() {
+        AppGraph.store.setWeekStart(DayOfWeek.MONDAY)
+        show { WeekStartCard() }
+        val sunday = DayOfWeek.SUNDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        compose.onNodeWithText(sunday).performClick()
+        assertEquals(DayOfWeek.SUNDAY, AppGraph.store.weekRule.value.first)
+        // This week's limits stay as they are, and the card says until when.
+        val from = AppGraph.store.weekRule.value.pendingOn(Days.today())!!
+        val date = from.format(DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEMMMMd")))
+        node(R.string.settings_week_start_pending, date).assertExists()
+        assertAccessible(requireHeading = false)
+
+        // Back to the day in force: nothing waits any more.
+        compose.onNodeWithText(DayOfWeek.MONDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())).performClick()
+        assertEquals(WeekRule(), AppGraph.store.weekRule.value)
+        node(R.string.settings_week_start_pending, date).assertDoesNotExist()
     }
 
     @Test

@@ -35,6 +35,7 @@ import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.minutesText
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -103,6 +104,17 @@ class LimitFlowTest : ScreenTest() {
         compose.waitForIdle()
         // Held for well past the start delay: several more steps than the one a tap gives.
         assertTrue((50..16 * 60 step 5).any { shows(app.resources.minutesText(it)) })
+    }
+
+    @Test
+    fun `the stepper's buttons stay put as the value grows from whole hours to hours and minutes`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 0, weeklyMinutes = 5 * 60)))
+        val less = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0]
+        val more = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0]
+        val before = less.fetchSemanticsNode().boundsInRoot to more.fetchSemanticsNode().boundsInRoot
+        more.performClick()
+        compose.onNodeWithText(app.resources.minutesText(5 * 60 + 30)).assertExists()
+        assertEquals(before, less.fetchSemanticsNode().boundsInRoot to more.fetchSemanticsNode().boundsInRoot)
     }
 
     @Test

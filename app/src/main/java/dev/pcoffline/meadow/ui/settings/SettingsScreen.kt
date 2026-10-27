@@ -87,6 +87,7 @@ fun SettingsScreen(
         ) {
             ProfileCard(profile, onOpenProfile)
             AppearanceCard()
+            WeekStartCard()
 
             if (anonymous) SecureAccountCard(R.string.settings_secure_reason)
 
