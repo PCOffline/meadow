@@ -21,7 +21,7 @@
     <string name="theme_sunflower">Sunflower</string>
     <string name="theme_pond">Lily pond</string>
     <string name="theme_mushroom">Mushroom forest</string>
-    <string name="dark_mode_system">Follow phone</string>
+    <string name="dark_mode_system">Auto</string>
     <string name="dark_mode_light">Day</string>
     <string name="dark_mode_dark">Night</string>
     <string name="avatar_color_leaf">Leaf green</string>

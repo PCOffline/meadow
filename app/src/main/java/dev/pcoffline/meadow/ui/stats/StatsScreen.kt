@@ -39,11 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -355,23 +351,13 @@ private fun Chart(s: PeriodStats) {
         val highlight = s.days.indexOfFirst { it.first == today }
         if (s.selection.period == Period.WEEK) {
             val average = s.dailyAverageMs(today)
-            val averageLabel = stringResource(R.string.stats_average_tag)
-            val averageText = durationText(average)
             StalkBarChart(
                 values = minutes,
                 labels = s.days.map { it.first.dayOfWeek.getDisplayName(TextStyle.SHORT, currentLocale()) },
                 highlightIndex = highlight,
-                // Named on the line itself: "a day on average", then how much.
+                // The daily average above, drawn across the week and named where it ends.
                 referenceLine = (average / 60_000f).takeIf { it > 0f },
-                referenceLabel = if (average > 0) {
-                    buildAnnotatedString {
-                        append(averageLabel)
-                        append('\n')
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(averageText) }
-                    }
-                } else {
-                    null
-                },
+                referenceLabel = stringResource(R.string.stats_average_tag).takeIf { average > 0 },
                 missing = missing,
             )
         } else {

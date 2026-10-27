@@ -20,15 +20,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownTable
+import com.mikepenz.markdown.compose.elements.MarkdownTableHeader
+import com.mikepenz.markdown.compose.elements.MarkdownTableRow
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.elements.MarkdownCheckBox
+import com.mikepenz.markdown.model.markdownDimens
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.Loading
@@ -92,11 +100,37 @@ private fun LegalBody(doc: LegalDoc, modifier: Modifier) {
     }
 }
 
-/** Renders Markdown (GitHub flavour, with tables) in the app's typography and colours. */
+/**
+ * Renders Markdown (GitHub flavour, with tables) in the app's typography and colours. Tables keep
+ * readable columns that wrap their text, and scroll sideways when they're wider than the screen.
+ */
 @Composable
 fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
-    Markdown(content = markdown, modifier = modifier)
+    Markdown(
+        content = markdown,
+        modifier = modifier,
+        dimens = markdownDimens(tableCellWidth = TABLE_COLUMN_WIDTH),
+        components = markdownComponents(
+            checkbox = { MarkdownCheckBox(it.content, it.node, it.typography.text) },
+            table = { model ->
+                MarkdownTable(
+                    model.content,
+                    model.node,
+                    style = model.typography.table,
+                    headerBlock = { content, header, width, style ->
+                        MarkdownTableHeader(content, header, width, style, maxLines = Int.MAX_VALUE, overflow = TextOverflow.Clip)
+                    },
+                    rowBlock = { content, row, width, style ->
+                        MarkdownTableRow(content, row, width, style, verticalAlignment = Alignment.Top, maxLines = Int.MAX_VALUE, overflow = TextOverflow.Clip)
+                    },
+                )
+            },
+        ),
+    )
 }
+
+/** Wide enough for a few words a line; two columns are then wider than a phone, so the table scrolls. */
+private val TABLE_COLUMN_WIDTH = 220.dp
 
 /** Asks to accept the terms again after they change. It can't be dismissed without agreeing. */
 @Composable

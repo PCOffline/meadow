@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
@@ -28,11 +29,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.AppGraph
@@ -86,7 +89,7 @@ internal fun AppearanceCard() {
                         selected = mode == darkMode,
                         onClick = { pick(mode = mode.key) },
                         shape = SegmentedButtonDefaults.itemShape(i, DarkMode.entries.size),
-                    ) { Text(stringResource(mode.label)) }
+                    ) { Text(stringResource(mode.label), maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
             }
         }
@@ -113,6 +116,10 @@ private fun ThemeCard(theme: GardenTheme, selected: Boolean, modifier: Modifier,
             }
         }
         BloomFlower(1f, Garden.colors.petalPink, Modifier.size(44.dp, 60.dp), sway = false, growIn = false)
-        Text("${theme.emoji} $label", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 2)
+        // Room for two lines on every card, so a long name doesn't make its card taller than the rest.
+        val style = MaterialTheme.typography.labelMedium
+        Box(Modifier.heightIn(min = with(LocalDensity.current) { (style.lineHeight * 2).toDp() }), contentAlignment = Alignment.Center) {
+            Text("${theme.emoji} $label", style = style, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
     }
 }

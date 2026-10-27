@@ -22,9 +22,11 @@ import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.AccountEntry
 import dev.pcoffline.meadow.ui.components.LocalAccount
 import dev.pcoffline.meadow.ui.requests.RequestsContent
+import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.stats.StatsContent
+import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -69,6 +71,17 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.onNode(hasText(text(GardenTheme.LAVENDER.label), substring = true) and hasClickAction()).performScrollTo().assertExists()
         node(R.string.dark_mode_dark).performScrollTo().assertExists()
         assertAccessible()
+    }
+
+    @Test
+    fun `every theme card is as tall as the rest, whatever the length of its name`() {
+        show { AppearanceCard() }
+        val heights = GardenTheme.entries.map { theme ->
+            compose.onNode(hasText(text(theme.label), substring = true) and hasClickAction()).fetchSemanticsNode().boundsInRoot.height
+        }
+        assertEquals(heights.toString(), 1, heights.distinct().size)
+        val modes = DarkMode.entries.map { node(it.label).fetchSemanticsNode().boundsInRoot.height }
+        assertEquals(modes.toString(), 1, modes.distinct().size)
     }
 
     @Test

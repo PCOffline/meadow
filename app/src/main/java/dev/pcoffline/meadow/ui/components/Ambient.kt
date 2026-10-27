@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -202,9 +204,11 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier) {
                 }
             } else {
                 val path = t * 0.25f
+                val beat = 0.5f + 0.5f * sin(t * 11f)
                 val x = size.width * (0.5f + 0.38f * sin(path))
-                val y = size.height * (0.5f + 0.12f * sin(path * 2.3f))
-                butterfly(Offset(x, y), 9.dp.toPx(), flap = abs(sin(t * 9f)), color = garden.petalLavender)
+                // Each downbeat lifts it a little; it banks toward where it's heading.
+                val y = size.height * (0.5f + 0.12f * sin(path * 2.3f)) - beat * 2.dp.toPx()
+                butterfly(Offset(x, y), 9.dp.toPx(), flap = beat, color = garden.petalLavender, tilt = 20f * cos(path))
             }
         }
     }
@@ -248,17 +252,54 @@ private fun DrawScope.cloud(at: Offset, scale: Float, alpha: Float) {
     )
 }
 
-/** A two-tone butterfly; [flap] 0..1 folds the wings. */
-fun DrawScope.butterfly(at: Offset, size: Float, flap: Float, color: Color) {
-    val wing = 0.25f + 0.75f * flap
+/**
+ * A butterfly seen from above, flying up the screen: rounded fore- and hindwings with a pale spot
+ * and a darker edge, a slim body and curled antennae. [flap] 0..1 opens the wings (1 is wide
+ * open); [tilt] banks it, in degrees, toward where it's heading.
+ */
+fun DrawScope.butterfly(at: Offset, size: Float, flap: Float, color: Color, tilt: Float = 0f) {
+    val edge = lerp(color, Color.Black, 0.35f)
+    val hind = lerp(color, edge, 0.3f)
+    val spot = lerp(color, Color.White, 0.6f)
+    val body = Color(0xFF4A3F37)
+    val forewing = Path().apply {
+        moveTo(size * 0.05f, -size * 0.3f)
+        cubicTo(size * 0.35f, -size * 1.25f, size * 1.3f, -size * 1.2f, size * 1.15f, -size * 0.5f)
+        cubicTo(size * 1.08f, -size * 0.12f, size * 0.5f, 0f, size * 0.05f, 0f)
+        close()
+    }
+    val hindwing = Path().apply {
+        moveTo(size * 0.05f, -size * 0.02f)
+        cubicTo(size * 0.75f, -size * 0.02f, size * 0.98f, size * 0.55f, size * 0.7f, size * 0.85f)
+        cubicTo(size * 0.45f, size * 1.1f, size * 0.1f, size * 0.75f, size * 0.05f, size * 0.35f)
+        close()
+    }
+    val outline = Stroke(size * 0.07f)
     translate(at.x, at.y) {
-        scale(scaleX = wing, scaleY = 1f, pivot = Offset.Zero) {
-            drawOval(color, topLeft = Offset(-size * 1.1f, -size), size = Size(size * 1.1f, size * 1.1f))
-            drawOval(color, topLeft = Offset(0f, -size), size = Size(size * 1.1f, size * 1.1f))
-            drawOval(color.copy(alpha = 0.8f), topLeft = Offset(-size * 0.85f, 0f), size = Size(size * 0.85f, size * 0.8f))
-            drawOval(color.copy(alpha = 0.8f), topLeft = Offset(0f, 0f), size = Size(size * 0.85f, size * 0.8f))
+        rotate(tilt, pivot = Offset.Zero) {
+            // The far side of each wing folds toward the body as it beats, never quite flat.
+            val open = 0.18f + 0.82f * flap
+            for (side in floatArrayOf(-1f, 1f)) {
+                scale(scaleX = side * open, scaleY = 1f, pivot = Offset.Zero) {
+                    drawPath(hindwing, hind)
+                    drawPath(hindwing, edge, style = outline)
+                    drawPath(forewing, color)
+                    drawPath(forewing, edge, style = outline)
+                    drawCircle(spot, radius = size * 0.17f, center = Offset(size * 0.72f, -size * 0.6f))
+                }
+            }
+            drawOval(body, topLeft = Offset(-size * 0.09f, -size * 0.5f), size = Size(size * 0.18f, size * 1.2f))
+            drawCircle(body, radius = size * 0.13f, center = Offset(0f, -size * 0.58f))
+            for (side in floatArrayOf(-1f, 1f)) {
+                val tip = Offset(side * size * 0.38f, -size * 1.12f)
+                val antenna = Path().apply {
+                    moveTo(side * size * 0.04f, -size * 0.66f)
+                    quadraticTo(side * size * 0.1f, -size * 1.05f, tip.x, tip.y)
+                }
+                drawPath(antenna, body, style = Stroke(size * 0.06f, cap = StrokeCap.Round))
+                drawCircle(body, radius = size * 0.07f, center = tip)
+            }
         }
-        drawLine(Color(0xFF5A4E44), Offset(0f, -size * 0.7f), Offset(0f, size * 0.7f), strokeWidth = size * 0.22f, cap = StrokeCap.Round)
     }
 }
 

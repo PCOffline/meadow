@@ -33,7 +33,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import dev.pcoffline.meadow.ui.theme.contentOn
@@ -47,7 +46,7 @@ import dev.pcoffline.meadow.ui.theme.Garden
 
 /**
  * Rounded "stalk" bars. The highlighted bar (usually today) is drawn in petal pink; an optional
- * dashed line marks a limit or average, named by [referenceLabel] at its end. Days in [missing]
+ * dashed line marks a limit or average, named by a short [referenceLabel] just past its end. Days in [missing]
  * have no record and are drawn as empty outlines, so they don't read as days without use.
  */
 @Composable
@@ -57,7 +56,7 @@ fun StalkBarChart(
     modifier: Modifier = Modifier,
     highlightIndex: Int = -1,
     referenceLine: Float? = null,
-    referenceLabel: AnnotatedString? = null,
+    referenceLabel: String? = null,
     missing: Set<Int> = emptySet(),
     height: Dp = 160.dp,
     showEveryNthLabel: Int = 1,
@@ -65,13 +64,12 @@ fun StalkBarChart(
     val garden = Garden.colors
     val outline = MaterialTheme.colorScheme.outline
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
-    val tagColor = MaterialTheme.colorScheme.surfaceVariant
-    val tagStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+    val tagStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val measurer = rememberTextMeasurer()
     val tag = remember(referenceLabel, tagStyle) { referenceLabel?.let { measurer.measure(it, tagStyle) } }
     val density = LocalDensity.current
-    // The line's name sits in a gutter after the last bar, where it can't cover one.
-    val gutter = with(density) { tag?.let { (it.size.width + TAG_PADDING.roundToPx() * 2).toDp() + 6.dp } ?: 0.dp }
+    // The line's name sits just past its end, in a narrow gutter where it can't cover a bar.
+    val gutter = with(density) { tag?.let { it.size.width.toDp() + TAG_GAP } ?: 0.dp }
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, tween(700)) }
     val max = (values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f).coerceAtLeast(1f)
@@ -121,12 +119,8 @@ fun StalkBarChart(
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
                 )
                 tag?.let { t ->
-                    val pad = TAG_PADDING.toPx()
-                    val tagSize = Size(t.size.width + pad * 2, t.size.height + pad)
-                    val top = (y - tagSize.height / 2f).coerceIn(0f, size.height - tagSize.height)
-                    val left = size.width - tagSize.width
-                    drawRoundRect(tagColor, Offset(left, top), tagSize, CornerRadius(tagSize.height / 2f))
-                    drawText(t, topLeft = Offset(left + pad, top + pad / 2f))
+                    val top = (y - t.size.height / 2f).coerceIn(0f, size.height - t.size.height)
+                    drawText(t, topLeft = Offset(size.width - t.size.width, top))
                 }
             }
         }
@@ -226,4 +220,4 @@ fun MonthHeatmap(values: List<Float>, labels: List<String>, modifier: Modifier =
     }
 }
 
-private val TAG_PADDING = 6.dp
+private val TAG_GAP = 6.dp
