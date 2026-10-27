@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -73,6 +74,7 @@ sealed interface PushTest {
 @Composable
 fun TroubleshootScreen(onBack: () -> Unit, onOpenSetup: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var state by remember { mutableStateOf(AppGraph.protection.current()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { state = AppGraph.protection.current() }
     val brand = remember { PhoneMaker.brand() }
@@ -94,7 +96,7 @@ fun TroubleshootScreen(onBack: () -> Unit, onOpenSetup: () -> Unit) {
         },
         onTestPush = {
             if (AppGraph.backend.uid == null) {
-                PushTest.Failed(context.getString(R.string.error_sign_in_first))
+                PushTest.Failed(resources.getString(R.string.error_sign_in_first))
             } else if (runCatchingCancellable { AppGraph.sync.registerThisPhone() }.isFailure) {
                 PushTest.NoPhone
             } else {

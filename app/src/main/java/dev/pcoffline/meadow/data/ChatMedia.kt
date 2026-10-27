@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
+import androidx.core.graphics.scale
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
@@ -52,7 +53,7 @@ class ChatMedia(private val context: Context) {
         }
         val bitmap = decode(uri)
         val (width, height) = scaledSize(bitmap.width, bitmap.height, MAX_SIDE)
-        val scaled = if (width == bitmap.width) bitmap else Bitmap.createScaledBitmap(bitmap, width, height, true)
+        val scaled = if (width == bitmap.width) bitmap else bitmap.scale(width, height)
         val bytes = ByteArrayOutputStream().use { out ->
             scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
             out.toByteArray()

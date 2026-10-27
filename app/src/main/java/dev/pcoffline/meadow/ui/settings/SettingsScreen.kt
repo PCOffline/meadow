@@ -297,9 +297,9 @@ private fun DataCard(onOpenLegal: (LegalDoc) -> Unit, onDelete: () -> Unit) {
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         action.run(successMessage = exported) {
-            val out = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                ?.use { AppGraph.profiles.exportTo(it) }
                 ?: throw FriendlyException(R.string.error_generic)
-            out.use { AppGraph.profiles.exportTo(it) }
         }
     }
     MeadowCard(Modifier.fillMaxWidth()) {

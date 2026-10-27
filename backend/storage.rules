@@ -21,7 +21,9 @@ service firebase.storage {
         return firestore.get(/databases/(default)/documents/chats/$(chatId)).data;
       }
       allow read: if request.auth != null && request.auth.uid in chat().participants;
+      // Never over a picture already there (the app names each one anew).
       allow create: if request.auth != null && request.auth.uid == uid
+        && resource == null
         && uid in chat().participants
         && !chat().get('closed', false)
         && request.resource.size < 5 * 1024 * 1024
