@@ -7,8 +7,6 @@ import com.google.firebase.firestore.FieldValue
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Emergency unlocks lift limits right away, without waiting for an approver. They're rationed
@@ -93,7 +91,7 @@ class EmergencyRepository(
             return
         }
         val uid = backend.uid ?: return
-        withTimeoutOrNull(8_000L) { backend.account(uid).update("emergencyUntil", FieldValue.serverTimestamp()).await() }
+        backend.account(uid).update("emergencyUntil", FieldValue.serverTimestamp()).awaitWrite()
     }
 
     companion object {

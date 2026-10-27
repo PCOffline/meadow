@@ -38,6 +38,8 @@ class Backend {
      * [timeoutSeconds] must cover the function's own timeout, or a slow call looks like being offline.
      */
     suspend fun call(name: String, data: Map<String, Any?> = emptyMap(), timeoutSeconds: Long = DEFAULT_TIMEOUT_S): Map<String, Any?> {
+        // Offline, say so at once rather than after the call's timeout.
+        if (!Connectivity.online.value) throw CallFailed("", unreachable = true, code = null, cause = null)
         try {
             val callable = functions.getHttpsCallable(name).apply { setTimeout(timeoutSeconds, TimeUnit.SECONDS) }
             val result = Trace.request<HttpsCallableResult>("call $name $data", describe = { it.data.toString() }) { callable.call(data).await() }

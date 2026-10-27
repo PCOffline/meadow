@@ -77,6 +77,7 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChangeOutcome
+import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.LimitsRepository
 import dev.pcoffline.meadow.enforcement.AppBudget
@@ -85,6 +86,7 @@ import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
+import dev.pcoffline.meadow.ui.components.OfflineNote
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
@@ -263,6 +265,10 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         schedule = if (hoursOn) schedule else null,
     )
     val needsApproval = existing != null && hasBees && LimitsRepository.isLooser(existing, proposed)
+    val online by Connectivity.online.collectAsStateWithLifecycle()
+    // Asking, and hours with Bumblebees, go through the backend; the rest is saved offline too.
+    val needsConnection = needsApproval || (existing != null && hasBees && existing.schedule != proposed.schedule)
+    val editable = !action.busy
     // The backend takes one open question per app, so another has to wait for its answer.
     val waiting = state.pending
     val anyLimitOn = dailyOn || weeklyOn || hoursOn
@@ -292,17 +298,17 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         }
 
         MeadowCard(Modifier.fillMaxWidth()) {
-            ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn) { dailyOn = it }
+            ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn, editable) { dailyOn = it }
             if (dailyOn) {
-                MinutesStepper(daily, step = 5, min = 5, max = 16 * 60) { daily = it }
-                PresetChips(listOf(15, 30, 45, 60, 90, 120), daily) { daily = it }
+                MinutesStepper(daily, step = 5, min = 5, max = 16 * 60, editable) { daily = it }
+                PresetChips(listOf(15, 30, 45, 60, 90, 120), daily, editable) { daily = it }
             }
         }
         MeadowCard(Modifier.fillMaxWidth()) {
-            ToggleRow(stringResource(R.string.limit_editor_weekly), weeklyOn) { weeklyOn = it }
+            ToggleRow(stringResource(R.string.limit_editor_weekly), weeklyOn, editable) { weeklyOn = it }
             if (weeklyOn) {
-                MinutesStepper(weekly, step = 30, min = 30, max = 100 * 60) { weekly = it }
-                PresetChips(listOf(120, 180, 300, 420, 600), weekly) { weekly = it }
+                MinutesStepper(weekly, step = 30, min = 30, max = 100 * 60, editable) { weekly = it }
+                PresetChips(listOf(120, 180, 300, 420, 600), weekly, editable) { weekly = it }
             }
             if (dailyOn && weeklyOn && weekly < daily) {
                 Text(
@@ -314,11 +320,11 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             }
         }
         MeadowCard(Modifier.fillMaxWidth()) {
-            ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn) { hoursOn = it }
+            ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn, editable) { hoursOn = it }
             if (hoursOn) {
                 val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
                 Spacer(Modifier.height(8.dp))
-                ScheduleEditor(schedule, firstDay = week.first) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
+                ScheduleEditor(schedule, firstDay = week.first, enabled = editable) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
             }
         }
 
@@ -332,6 +338,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                     value = message, onValueChange = { message = it.take(280) },
                     label = { Text(stringResource(R.string.limit_editor_note)) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    enabled = editable,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
                 BumblebeePicker(picks, Modifier.padding(top = 8.dp))
@@ -351,6 +358,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        if (!online && needsConnection) OfflineNote()
         ErrorNote(action.error)
         Button(
             onClick = {
@@ -366,7 +374,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                     )
                 }
             },
-            enabled = !action.busy && anyLimitOn && proposed != existing && !(needsApproval && waiting != null),
+            enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && waiting != null) && (online || !needsConnection),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text(
@@ -409,6 +417,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(if (hasBees) R.string.limit_remove_body_ask else R.string.limit_remove_body_now))
+                    if (hasBees && !online) OfflineNote()
                     if (hasBees) {
                         OutlinedTextField(
                             value = removeNote, onValueChange = { removeNote = it.take(280) },
@@ -421,7 +430,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(enabled = online || !hasBees, onClick = {
                     confirmRemove = false
                     action.run(onSuccess = onDone) {
                         val outcome = AppGraph.limits.remove(existing, removeNote, if (hasBees) BeePicks.commit(picks.value) else null)
@@ -460,18 +469,18 @@ private fun PendingCard(request: LimitRequest, action: ActionState) {
 
 /** The whole row switches, not just the switch: the label is the bigger, more obvious target. */
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(checked, role = Role.Switch, onValueChange = onChange),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = null)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
 @Composable
-private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: Boolean, onChange: (Int) -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -479,7 +488,7 @@ private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, onChange: 
     ) {
         // Read through the latest value, so holding a button keeps counting from where it is.
         val current by rememberUpdatedState(value)
-        RepeatingIconButton(onStep = { onChange((current - step).coerceAtLeast(min)) }, enabled = value > min) {
+        RepeatingIconButton(onStep = { onChange((current - step).coerceAtLeast(min)) }, enabled = enabled && value > min) {
             Icon(Icons.Outlined.Remove, contentDescription = stringResource(R.string.limit_editor_less))
         }
         // As wide as the widest value it can show, so the buttons stay put as "5h" becomes "5h 30m".
@@ -493,7 +502,7 @@ private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, onChange: 
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 16.dp).widthIn(min = widest),
         )
-        RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = value < max) {
+        RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = enabled && value < max) {
             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))
         }
     }
@@ -548,10 +557,10 @@ private const val HOLD_FAST_REPEAT_MS = 50L
 private const val HOLD_FAST_AFTER = 8
 
 @Composable
-private fun PresetChips(options: List<Int>, selected: Int, onSelect: (Int) -> Unit) {
+private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { minutes ->
-            FilterChip(selected = minutes == selected, onClick = { onSelect(minutes) }, label = { Text(minutesText(minutes)) })
+            FilterChip(selected = minutes == selected, onClick = { onSelect(minutes) }, label = { Text(minutesText(minutes)) }, enabled = enabled)
         }
     }
 }

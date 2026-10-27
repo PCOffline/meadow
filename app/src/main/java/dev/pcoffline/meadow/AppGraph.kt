@@ -10,6 +10,7 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
+import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.DayUsage
 import dev.pcoffline.meadow.data.EmergencyRepository
@@ -80,6 +81,7 @@ object AppGraph {
 
     fun init(application: Application) {
         app = application
+        Connectivity.watch(application)
         val emulatorHost = BuildConfig.EMULATOR_HOST
         if (emulatorHost.isNotEmpty()) useEmulators(application, emulatorHost)
         backendReady = (BuildConfig.HAS_FIREBASE_CONFIG || emulatorHost.isNotEmpty()) && FirebaseApp.getApps(application).isNotEmpty()

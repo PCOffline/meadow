@@ -58,6 +58,7 @@ const val MAX_BACKOFF_MS = 60_000L
  * there's nothing to wait for. A write the server rejects still throws.
  */
 suspend fun <T> Task<T>.awaitWrite(timeoutMs: Long = WRITE_TIMEOUT_MS) {
+    if (!Connectivity.online.value) return
     withTimeoutOrNull(timeoutMs) { await() }
 }
 

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsOn
@@ -173,6 +174,14 @@ class EditorsTest : ScreenTest() {
         compose.onNodeWithText(text(R.string.schedule_per_day)).assertIsSelected()
         node(R.string.schedule_every_day).performClick()
         assertEquals(Schedule.everyDay(TimeWindow(8 * 60, 20 * 60)), schedule)
+    }
+
+    @Test
+    fun `while saving, nothing in the hours can be changed`() {
+        show { ScheduleEditor(Schedule.everyDay(TimeWindow(9 * 60, 17 * 60)), enabled = false) {} }
+        val actionable = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+        assertTrue(actionable.isNotEmpty())
+        actionable.forEach { assertTrue(SemanticsProperties.Disabled in it.config) }
     }
 
     @Test

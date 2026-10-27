@@ -50,6 +50,8 @@
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="offline_bar">You\'re offline</string>
+    <string name="offline_needs_connection">This needs a connection.</string>
     <string name="error_offline">You seem to be offline. Check your connection and try again.</string>
     <string name="error_unavailable">Meadow isn\'t available right now. Please try again later.</string>
     <string name="error_server_busy">Meadow is very busy right now. Please try again in a few minutes.</string>

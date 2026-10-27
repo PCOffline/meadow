@@ -18,6 +18,7 @@ import androidx.compose.ui.test.up
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
@@ -139,6 +140,38 @@ class LimitFlowTest : ScreenTest() {
         compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
         node(R.string.action_save).performScrollTo().assertIsEnabled()
         assertAccessible()
+    }
+
+    @Test
+    fun `offline, a tighter limit still saves, but asking a Bumblebee says it needs a connection`() {
+        Connectivity.set(false)
+        try {
+            editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1))
+            compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
+            node(R.string.action_save).performScrollTo().assertIsEnabled()
+            node(R.string.offline_needs_connection).assertDoesNotExist()
+
+            // Up past where it was: a looser limit, which only a Bumblebee's yes allows.
+            repeat(2) { compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick() }
+            node(R.string.offline_needs_connection).performScrollTo().assertExists()
+            node(R.string.limit_editor_ask).performScrollTo().assertIsNotEnabled()
+        } finally {
+            Connectivity.set(true)
+        }
+    }
+
+    @Test
+    fun `offline with no Bumblebees, a limit can be loosened and removed`() {
+        Connectivity.set(false)
+        try {
+            editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)))
+            compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick()
+            node(R.string.action_save).performScrollTo().assertIsEnabled()
+            node(R.string.limit_editor_remove).performScrollTo().assertIsEnabled()
+            node(R.string.offline_needs_connection).assertDoesNotExist()
+        } finally {
+            Connectivity.set(true)
+        }
     }
 
     @Test

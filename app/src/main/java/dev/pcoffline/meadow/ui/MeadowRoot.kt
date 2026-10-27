@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
@@ -74,6 +75,7 @@ import dev.pcoffline.meadow.ui.circle.CircleScreen
 import dev.pcoffline.meadow.ui.circle.FriendScreen
 import dev.pcoffline.meadow.ui.components.AccountEntry
 import dev.pcoffline.meadow.ui.components.LocalAccount
+import dev.pcoffline.meadow.ui.components.OfflineBar
 import dev.pcoffline.meadow.ui.components.PetalBurst
 import dev.pcoffline.meadow.ui.home.GardenScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -240,84 +242,87 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
             },
         ) { padding ->
             // Consumed, so screens' own status bar and keyboard padding doesn't add the bars twice.
-            Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                NavHost(
-                    nav,
-                    startDestination = GardenRoute,
-                    enterTransition = { fadeIn(tween(260)) + slideInVertically(tween(320)) { it / 28 } },
-                    exitTransition = { fadeOut(tween(180)) },
-                    popEnterTransition = { fadeIn(tween(260)) },
-                    popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
-                ) {
-                    composable<SetupRoute> {
-                        SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
+            Column(Modifier.padding(padding).consumeWindowInsets(padding)) {
+                OfflineBar()
+                Box(Modifier.weight(1f)) {
+                    NavHost(
+                        nav,
+                        startDestination = GardenRoute,
+                        enterTransition = { fadeIn(tween(260)) + slideInVertically(tween(320)) { it / 28 } },
+                        exitTransition = { fadeOut(tween(180)) },
+                        popEnterTransition = { fadeIn(tween(260)) },
+                        popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
+                    ) {
+                        composable<SetupRoute> {
+                            SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
+                        }
+                        composable<TroubleshootRoute> {
+                            TroubleshootScreen(onBack = { nav.popBackStack() }, onOpenSetup = { nav.navigate(SetupRoute) })
+                        }
+                        composable<BeeStatsRoute> { BeeStatsScreen(profile, onBack = { nav.popBackStack() }) }
+                        composable<GardenRoute> {
+                            GardenScreen(
+                                profile = profile,
+                                onOpenSettings = { nav.navigate(SettingsRoute) },
+                                onOpenProfile = { nav.navigate(ProfileRoute) },
+                                onOpenSetup = { nav.navigate(SetupRoute) },
+                                onPlantLimit = { nav.navigate(PickAppRoute) },
+                                onOpenLimit = { nav.navigate(LimitRoute(it)) },
+                                onOpenCircle = { nav.switchTab(CircleRoute) },
+                                onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
+                            )
+                        }
+                        composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }, onOpenApp = { nav.navigate(LimitRoute(it)) }) }
+                        composable<RequestsRoute> {
+                            RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
+                        }
+                        composable<CircleRoute> {
+                            CircleScreen(
+                                profile = profile,
+                                onOpenChat = { nav.navigate(ChatRoute(it)) },
+                                onOpenFriend = { nav.navigate(FriendRoute(it)) },
+                            )
+                        }
+                        composable<ChatsRoute> { ChatListScreen(profile, onOpenChat = { nav.navigate(ChatRoute(it)) }) }
+                        composable<SettingsRoute> {
+                            SettingsScreen(
+                                profile = profile,
+                                onBack = { nav.popBackStack() },
+                                onOpenSetup = { nav.navigate(SetupRoute) },
+                                onOpenProfile = { nav.navigate(ProfileRoute) },
+                                onOpenLegal = { nav.navigate(LegalRoute(it.name)) },
+                                onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
+                                onOpenPrivacyPreview = { nav.navigate(PrivacyPreviewRoute) },
+                            )
+                        }
+                        composable<PrivacyPreviewRoute> { PrivacyPreviewScreen(profile, onBack = { nav.popBackStack() }) }
+                        composable<ProfileRoute> { ProfileScreen(profile, onBack = { nav.popBackStack() }) }
+                        composable<LegalRoute> { entry ->
+                            LegalScreen(LegalDoc.fromName(entry.toRoute<LegalRoute>().doc), onBack = { nav.popBackStack() })
+                        }
+                        composable<PickAppRoute> {
+                            AppPickerScreen(
+                                onBack = { nav.popBackStack() },
+                                onPick = { nav.navigate(LimitRoute(it)) { popUpTo<PickAppRoute> { inclusive = true } } },
+                            )
+                        }
+                        composable<LimitRoute> { entry ->
+                            LimitEditorScreen(entry.toRoute<LimitRoute>().packageName, onDone = { nav.popBackStack() })
+                        }
+                        composable<ChatRoute> { entry ->
+                            ChatScreen(profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() })
+                        }
+                        composable<FriendRoute> { entry ->
+                            FriendScreen(
+                                me = profile,
+                                uid = entry.toRoute<FriendRoute>().uid,
+                                onBack = { nav.popBackStack() },
+                                onOpenChat = { nav.navigate(ChatRoute(it)) },
+                            )
+                        }
                     }
-                    composable<TroubleshootRoute> {
-                        TroubleshootScreen(onBack = { nav.popBackStack() }, onOpenSetup = { nav.navigate(SetupRoute) })
-                    }
-                    composable<BeeStatsRoute> { BeeStatsScreen(profile, onBack = { nav.popBackStack() }) }
-                    composable<GardenRoute> {
-                        GardenScreen(
-                            profile = profile,
-                            onOpenSettings = { nav.navigate(SettingsRoute) },
-                            onOpenProfile = { nav.navigate(ProfileRoute) },
-                            onOpenSetup = { nav.navigate(SetupRoute) },
-                            onPlantLimit = { nav.navigate(PickAppRoute) },
-                            onOpenLimit = { nav.navigate(LimitRoute(it)) },
-                            onOpenCircle = { nav.switchTab(CircleRoute) },
-                            onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
-                        )
-                    }
-                    composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }, onOpenApp = { nav.navigate(LimitRoute(it)) }) }
-                    composable<RequestsRoute> {
-                        RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
-                    }
-                    composable<CircleRoute> {
-                        CircleScreen(
-                            profile = profile,
-                            onOpenChat = { nav.navigate(ChatRoute(it)) },
-                            onOpenFriend = { nav.navigate(FriendRoute(it)) },
-                        )
-                    }
-                    composable<ChatsRoute> { ChatListScreen(profile, onOpenChat = { nav.navigate(ChatRoute(it)) }) }
-                    composable<SettingsRoute> {
-                        SettingsScreen(
-                            profile = profile,
-                            onBack = { nav.popBackStack() },
-                            onOpenSetup = { nav.navigate(SetupRoute) },
-                            onOpenProfile = { nav.navigate(ProfileRoute) },
-                            onOpenLegal = { nav.navigate(LegalRoute(it.name)) },
-                            onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
-                            onOpenPrivacyPreview = { nav.navigate(PrivacyPreviewRoute) },
-                        )
-                    }
-                    composable<PrivacyPreviewRoute> { PrivacyPreviewScreen(profile, onBack = { nav.popBackStack() }) }
-                    composable<ProfileRoute> { ProfileScreen(profile, onBack = { nav.popBackStack() }) }
-                    composable<LegalRoute> { entry ->
-                        LegalScreen(LegalDoc.fromName(entry.toRoute<LegalRoute>().doc), onBack = { nav.popBackStack() })
-                    }
-                    composable<PickAppRoute> {
-                        AppPickerScreen(
-                            onBack = { nav.popBackStack() },
-                            onPick = { nav.navigate(LimitRoute(it)) { popUpTo<PickAppRoute> { inclusive = true } } },
-                        )
-                    }
-                    composable<LimitRoute> { entry ->
-                        LimitEditorScreen(entry.toRoute<LimitRoute>().packageName, onDone = { nav.popBackStack() })
-                    }
-                    composable<ChatRoute> { entry ->
-                        ChatScreen(profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() })
-                    }
-                    composable<FriendRoute> { entry ->
-                        FriendScreen(
-                            me = profile,
-                            uid = entry.toRoute<FriendRoute>().uid,
-                            onBack = { nav.popBackStack() },
-                            onOpenChat = { nav.navigate(ChatRoute(it)) },
-                        )
-                    }
+                    PetalBurst(celebration, Modifier.fillMaxSize())
                 }
-                PetalBurst(celebration, Modifier.fillMaxSize())
             }
         }
         askFor?.let { AskForTimeDialog(packageName = it, onDismiss = { askFor = null }) }
