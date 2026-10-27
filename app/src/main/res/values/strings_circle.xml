@@ -45,6 +45,7 @@
     <string name="accept_invite_done">You\'re %1$s\'s Bumblebee now 🐝</string>
     <string name="friend_gone_title">This garden isn\'t here any more</string>
     <string name="friend_today">Today</string>
+    <string name="friend_nothing_shared">%1$s isn\'t sharing anything.</string>
     <string name="friend_screen_time">%1$s of screen time</string>
     <string name="friend_used_of">%1$s of %2$s</string>
     <string name="friend_limits">Their limits</string>

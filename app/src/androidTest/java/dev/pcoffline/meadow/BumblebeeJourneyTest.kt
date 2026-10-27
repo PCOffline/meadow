@@ -110,6 +110,7 @@ class BumblebeeJourneyTest : EndToEndTest() {
             openGardenOf("Sam")
             waitForText(text(R.string.friend_step_down, "Sam"))
             eventually("Sam's page read") { !showing(text(R.string.loading_garden)) }
+            waitForText(text(R.string.friend_nothing_shared, "Sam"))
             assertEquals(0, compose.onAllNodesWithText(text(R.string.friend_limits)).fetchSemanticsNodes().size)
 
             // Stepping down ends it on Sam's side too, and goes back to the circle, saying so.

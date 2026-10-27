@@ -1,5 +1,8 @@
 package dev.pcoffline.meadow.ui.screens
 
+import dev.pcoffline.meadow.ui.limits.AppPickerScreen
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performTextInput
 import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertCountEquals
@@ -63,14 +66,42 @@ class LimitFlowTest : ScreenTest() {
     )
 
     @Test
-    fun `a limit needs at least one part turned on`() {
+    fun `a limit needs at least one part turned on, and says so`() {
         editor(LimitEditorState())
         node(R.string.limit_editor_plant).assertIsEnabled()
+        node(R.string.limit_editor_pick_one).assertDoesNotExist()
 
         // Daily is on for a new limit; turning it off leaves nothing to plant.
         compose.onNodeWithText(text(R.string.limit_editor_daily)).performClick()
         node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
+        node(R.string.limit_editor_pick_one).performScrollTo().assertExists()
         assertAccessible()
+    }
+
+    @Test
+    fun `a new limit says loosening it will need a Bumblebee, when there is one`() {
+        editor(LimitEditorState(bumblebeeCount = 1))
+        node(R.string.limit_editor_locked_hint).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `with no Bumblebees, a new limit makes no promise about loosening`() {
+        editor(LimitEditorState())
+        node(R.string.limit_editor_locked_hint).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a planted limit doesn't repeat the loosening note`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1))
+        node(R.string.limit_editor_locked_hint).assertDoesNotExist()
+    }
+
+    @Test
+    fun `searching for an app that isn't there says so`() {
+        show { AppPickerScreen(onBack = {}, onPick = {}) }
+        compose.onNode(hasSetTextAction()).performTextInput("zzqx")
+        // The app list loads in the background.
+        compose.waitUntil(5_000) { shows(text(R.string.picker_no_match, "zzqx")) }
     }
 
     @Test

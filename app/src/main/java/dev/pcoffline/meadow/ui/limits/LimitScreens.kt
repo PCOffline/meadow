@@ -85,6 +85,7 @@ import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.ErrorNote
+import dev.pcoffline.meadow.ui.components.Hint
 import dev.pcoffline.meadow.ui.components.OfflineNote
 import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -168,6 +169,9 @@ fun AppPickerScreen(
             Loading()
         } else {
             val filtered = remember(list, query) { list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) } }
+            if (filtered.isEmpty() && query.isNotBlank()) {
+                Hint(stringResource(R.string.picker_no_match, query.trim()), Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            }
             LazyColumn(Modifier.fillMaxSize().imePadding()) {
                 items(filtered, key = { it.packageName }) { row ->
                     ListItem(
@@ -332,6 +336,11 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             }
         }
 
+        if (!anyLimitOn) {
+            Hint(stringResource(R.string.limit_editor_pick_one))
+        } else if (existing == null && hasBees) {
+            Hint(stringResource(R.string.limit_editor_locked_hint))
+        }
         if (!online && needsConnection) OfflineNote()
         ErrorNote(action.error)
         Button(

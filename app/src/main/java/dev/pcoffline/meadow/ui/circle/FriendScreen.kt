@@ -41,6 +41,7 @@ import dev.pcoffline.meadow.data.SharedPage
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.ErrorNote
+import dev.pcoffline.meadow.ui.components.Hint
 import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.Loading
@@ -163,6 +164,8 @@ fun FriendPage(page: SharedPage, waiting: Boolean = false, action: @Composable (
             Loading(Modifier.height(140.dp))
             return@Column
         }
+        val nothing = page.progress == null && page.minutes == null && page.apps == null && page.limits == null
+        if (nothing) Hint(stringResource(R.string.friend_nothing_shared, f.displayName))
         page.progress?.let { ProgressCard(it) }
         if (page.minutes != null || page.apps != null) TodayCard(page.minutes, page.apps.orEmpty())
         page.limits?.takeIf { it.isNotEmpty() }?.let { LimitsCard(it) }

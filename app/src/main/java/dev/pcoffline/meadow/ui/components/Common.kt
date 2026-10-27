@@ -120,6 +120,12 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composa
     }
 }
 
+/** A short, quiet line that says what the screen around it can't show by itself. */
+@Composable
+fun Hint(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
+}
+
 @Composable
 fun EmptyState(emoji: String, title: String, body: String? = null, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null) {
     Column(

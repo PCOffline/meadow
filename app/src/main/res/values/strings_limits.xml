@@ -17,6 +17,7 @@
     <!-- App picker -->
     <string name="picker_title">Choose an app</string>
     <string name="picker_search">Search apps</string>
+    <string name="picker_no_match">No apps match “%1$s”</string>
     <string name="picker_used_today">%1$s today</string>
     <string name="picker_not_opened">Not opened today</string>
     <string name="picker_planted">Planted</string>
@@ -32,6 +33,8 @@
     <string name="limit_editor_less">Less time</string>
     <string name="limit_editor_more">More time</string>
     <string name="limit_editor_loosens_title">This loosens your limit 💌</string>
+    <string name="limit_editor_locked_hint">Loosening it later needs a Bumblebee\'s yes.</string>
+    <string name="limit_editor_pick_one">Turn on at least one.</string>
     <string name="limit_editor_note">A note for them (optional)</string>
     <string name="limit_editor_plant">Plant this limit</string>
     <string name="limit_editor_ask">Ask my Bumblebees</string>

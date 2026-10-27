@@ -17,7 +17,6 @@ import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -161,6 +160,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         node(R.string.progress_kept, 5, 7).performScrollTo().assertExists()
         node(R.string.friend_limits).performScrollTo().assertExists()
         compose.onNodeWithText(robin.bio).performScrollTo().assertExists()
+        node(R.string.friend_nothing_shared, robin.displayName).assertDoesNotExist()
         assertAccessible()
     }
 
@@ -176,9 +176,9 @@ class ProfileAndPrivacyTest : ScreenTest() {
     }
 
     @Test
-    fun `with nothing shared, the preview shows only who you are`() {
+    fun `with nothing shared, the preview says so`() {
         preview(Privacy(shareLimits = false, shareTime = false, shareApps = false, shareProgress = false))
-        compose.onAllNodesWithText(robin.displayName).onFirst().assertExists()
+        node(R.string.friend_nothing_shared, robin.displayName).performScrollTo().assertExists()
         node(R.string.friend_limits).assertDoesNotExist()
         compose.onAllNodesWithText("Maps").assertCountEquals(0)
         assertAccessible()

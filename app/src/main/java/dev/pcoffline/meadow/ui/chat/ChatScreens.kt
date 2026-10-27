@@ -87,9 +87,16 @@ fun ChatListScreen(
     viewModel: ChatListViewModel = viewModel(key = "chats-${profile.uid}") { ChatListViewModel(profile.uid) },
 ) {
     val chats by viewModel.chats.collectAsStateWithLifecycle()
+    ChatListContent(profile, chats, onOpenChat)
+}
+
+/** The chat list itself, given the chats ([chats] is null while they load). */
+@Composable
+fun ChatListContent(profile: UserProfile, chats: List<Chat>?, onOpenChat: (String) -> Unit = {}) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         TabTitle(stringResource(R.string.chats_title))
         LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
+            if (chats?.isEmpty() == true) item { EmptyState("🕊️", stringResource(R.string.chats_empty_title)) }
             items(chats.orEmpty(), key = { it.id }) { chat ->
                 ChatRow(chat, profile.uid, onOpen = { onOpenChat(chat.id) }, Modifier.animateItem())
             }

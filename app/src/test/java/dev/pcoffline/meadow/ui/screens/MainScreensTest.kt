@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.screens
 
+import dev.pcoffline.meadow.ui.chat.ChatListContent
 import android.app.Application
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -151,6 +152,18 @@ class MainScreensTest : ScreenTest() {
         show { ChatRow(chat, uid = "robin", onOpen = { opened++ }) }
         compose.onNodeWithContentDescription(text(R.string.chats_unread)).performClick()
         assertEquals(1, opened)
+    }
+
+    @Test
+    fun `no chats says so, and loading or a chat doesn't`() {
+        var chats by mutableStateOf<List<Chat>?>(null)
+        show { ChatListContent(DemoGarden.robin, chats) }
+        node(R.string.chats_empty_title).assertDoesNotExist()
+        chats = emptyList()
+        node(R.string.chats_empty_title).assertExists()
+        assertAccessible()
+        chats = listOf(DemoGarden.chat)
+        node(R.string.chats_empty_title).assertDoesNotExist()
     }
 
     @Test

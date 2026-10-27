@@ -65,6 +65,7 @@ import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.AppIcon
+import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -131,6 +132,12 @@ fun RequestsContent(
                         TextButton(onClick = onOpenBeeStats, modifier = Modifier.padding(horizontal = 12.dp)) {
                             Text(stringResource(R.string.bee_stats_open))
                         }
+                    }
+                }
+                if (list?.isEmpty() == true) {
+                    item {
+                        if (tab == 0) EmptyState("🌤️", stringResource(R.string.requests_empty_for_you_title))
+                        else EmptyState("🌱", stringResource(R.string.requests_empty_yours_title))
                     }
                 }
                 items(list.orEmpty(), key = { it.id }) { request ->

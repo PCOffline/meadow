@@ -58,6 +58,7 @@ import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
+import dev.pcoffline.meadow.ui.chat.ChatListContent
 import dev.pcoffline.meadow.ui.circle.CircleContent
 import dev.pcoffline.meadow.ui.circle.FriendPage
 import dev.pcoffline.meadow.ui.components.OfflineBar
@@ -302,6 +303,8 @@ internal object Scenarios {
         Scenario("Circle", "A friend's garden, nothing shared") { FriendDemo(SharedPage(d.ana, null, null, null, null)) },
         Scenario("Circle", "A friend's garden, loading") { FriendDemo(d.anaPage, waiting = true) },
 
+        Scenario("Chats", "Your chats") { WithTabs(Tab.CHATS) { ChatListContent(d.robin, listOf(d.chat)) } },
+        Scenario("Chats", "No chats yet") { WithTabs(Tab.CHATS) { ChatListContent(nobody, emptyList()) } },
         Scenario("Chats", "A conversation") { Page { ChatDemo() } },
         Scenario("Chats", "A message that didn't send") { Page { ChatDemo(error = "Something went wrong. Please try again.") } },
         Scenario("Chats", "A closed chat") { Page { ChatContent(d.robin, null, emptyList()) } },

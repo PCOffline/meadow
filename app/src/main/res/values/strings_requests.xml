@@ -4,6 +4,8 @@
     <string name="requests_tab_for_you">For you</string>
     <string name="requests_tab_for_you_count">For you (%1$d)</string>
     <string name="requests_tab_yours">Yours</string>
+    <string name="requests_empty_for_you_title">Nothing to answer</string>
+    <string name="requests_empty_yours_title">No requests yet</string>
     <string name="requests_ask_button">Ask for extra time</string>
     <string name="requests_invite_button">Invite a Bumblebee</string>
 
