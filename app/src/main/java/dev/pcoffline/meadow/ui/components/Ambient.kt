@@ -252,7 +252,8 @@ private fun SkyMood.under(weather: Weather?): SkyMood {
  * tiny flowers, the theme's two butterflies by day and fireflies and stars by night. The sun or
  * moon sits at [celestial] (fractions of the width and height), clear of whatever is on top, and
  * the butterflies keep below [clearAbove] (a fraction of the height) so they don't cross it. With
- * a [horizon] (a fraction of the height), the hills rise no higher than it, leaving the sky above.
+ * a [horizon] (a fraction of the height), the hills rise no higher than it, leaving the sky above,
+ * and the clouds keep between the two.
  * The [SkyMood.weather] brings more clouds, fog, rain, snow or a storm; the butterflies and
  * fireflies shelter from rain and snow.
  */
@@ -291,7 +292,7 @@ fun SkyScene(
                 sun(Offset(size.width * (celestial.x + 0.02f), size.height * (celestial.y - 0.02f)), 20.dp.toPx(), t, garden.sun)
             }
             CLOUD_PATHS.take(clouds.count).forEach { (speed, offset, height, scale) ->
-                cloud(Offset(((t * speed + size.width * offset) % (size.width + 240f)) - 120f, size.height * height), scale, clouds.alpha, clouds.color)
+                cloud(Offset(((t * speed + size.width * offset) % (size.width + 240f)) - 120f, size.height * cloudHeight(height, clearAbove, horizon)), scale, clouds.alpha, clouds.color)
             }
             if (weather == Weather.FOG) fog(t, mood.night)
         }
@@ -396,6 +397,14 @@ private val CLOUD_PATHS = listOf(
 )
 
 private data class CloudPath(val speed: Float, val offset: Float, val height: Float, val scale: Float)
+
+/**
+ * How far down the sky a cloud on a path at [height] floats. Given the sky's open band, from
+ * [clearAbove] down to the [horizon], it keeps within the band, so it never drifts across the
+ * words above or below it.
+ */
+internal fun cloudHeight(height: Float, clearAbove: Float, horizon: Float): Float =
+    if (horizon <= clearAbove) height else clearAbove + (horizon - clearAbove) * (0.15f + 1.6f * height)
 
 private val rainDrops = List(46) { Offset(Random(it * 13 + 5).nextFloat(), Random(it * 29 + 1).nextFloat()) }
 private val snowFlakes = List(36) { Offset(Random(it * 11 + 7).nextFloat(), Random(it * 23 + 2).nextFloat()) }

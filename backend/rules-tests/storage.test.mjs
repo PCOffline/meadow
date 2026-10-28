@@ -29,7 +29,7 @@ after(async () => {
 
 const storageOf = (uid) => (uid ? env.authenticatedContext(uid) : env.unauthenticatedContext()).storage();
 /** Notes a chat picture before it's uploaded, as the app does. */
-const note = (path) => env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `chatUploads/${path.replaceAll("/", "|")}`), { path, at: serverTimestamp() }));
+const note = (path) => env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `chatUploads/${path.replaceAll("/", "~")}`), { path, at: serverTimestamp() }));
 
 test("you can set and remove your own photo", async () => {
   await assertSucceeds(uploadBytes(ref(storageOf("sam"), "avatars/sam"), jpeg(), image));

@@ -19,6 +19,7 @@ Every commit follows [Conventional Commits](https://www.conventionalcommits.org/
 
 One branch, one task. A branch changes only what its task needs, plus the tests for it.
 
+- Open its pull request as soon as the branch is pushed, so CI and review follow it from the start.
 - No drive-by refactors, renames, formatting or dependency bumps. Put them on their own branch.
 - Something unrelated that needs fixing gets its own branch and pull request.
 - Keep the diff as small as the task allows.
@@ -47,6 +48,17 @@ in-app copy, and comments in code.
 
 - Don't document what isn't built. Remove what no longer exists.
 - Commands, paths, versions and settings in docs must work as written.
+
+## In-app copy
+
+Say what people need to act, nothing more.
+
+- No implementation details: no services, providers, error codes, browsers, accuracy figures or
+  how a feature works. Those belong in the README, `docs/` and the legal documents.
+- Keep notes and descriptions to a minimum. A setting's description, if it has one, is a few
+  words, for example "Requires location services".
+- No side notes, caveats or reassurances under controls. The exceptions are the disclosures
+  Android and Google Play require before asking for a sensitive permission.
 
 ## Legal documents
 

@@ -115,8 +115,8 @@ class ChatMedia(private val context: Context) {
         /** Where a picture goes: the chat's folder, then the sender's, as storage.rules requires. */
         fun pathFor(chatId: String, uid: String, id: String, gif: Boolean) = "chats/$chatId/$uid/$id.${if (gif) "gif" else "jpg"}"
 
-        /** The id of the note of a picture at [path]: its path, with "|" for "/" (see firestore.rules). */
-        fun noteIdFor(path: String) = path.replace('/', '|')
+        /** The id of the note of a picture at [path]: its path, with "~" for "/" (see firestore.rules). */
+        fun noteIdFor(path: String) = path.replace('/', '~')
 
         /** Whether a picture is a GIF, by its type or else by its first bytes ("GIF8"). */
         fun isGif(mimeType: String?, head: ByteArray): Boolean =

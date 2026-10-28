@@ -62,9 +62,9 @@ class TroubleshootTest : ScreenTest() {
         node(R.string.trouble_notify_test).performClick()
         node(R.string.trouble_notify_no_phone).performScrollTo().assertExists()
 
-        next = PushTest.Undelivered(listOf("invalid-argument"))
+        next = PushTest.Undelivered
         node(R.string.trouble_notify_test).performClick()
-        node(R.string.trouble_notify_undelivered, "invalid-argument").assertExists()
+        node(R.string.trouble_notify_undelivered).assertExists()
 
         next = PushTest.Failed("You seem to be offline.")
         node(R.string.trouble_notify_test).performClick()
@@ -72,12 +72,9 @@ class TroubleshootTest : ScreenTest() {
     }
 
     @Test
-    fun `a test counts as sent when any phone got it, and drops FCM's prefix from reasons`() {
-        assertEquals(PushTest.Sent, PushTest.of(phones = 2, delivered = 1, errors = listOf("messaging/x")))
-        assertEquals(PushTest.NoPhone, PushTest.of(phones = 0, delivered = 0, errors = emptyList()))
-        assertEquals(
-            PushTest.Undelivered(listOf("invalid-argument")),
-            PushTest.of(phones = 2, delivered = 0, errors = listOf("messaging/invalid-argument", "messaging/invalid-argument")),
-        )
+    fun `a test counts as sent when any phone got it`() {
+        assertEquals(PushTest.Sent, PushTest.of(phones = 2, delivered = 1))
+        assertEquals(PushTest.NoPhone, PushTest.of(phones = 0, delivered = 0))
+        assertEquals(PushTest.Undelivered, PushTest.of(phones = 2, delivered = 0))
     }
 }
