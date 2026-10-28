@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.ui.screens
 import android.app.Application
 import dev.pcoffline.meadow.ui.settings.PRIVACY_SETTLE_MS
 import dev.pcoffline.meadow.ui.minutesText
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.annotation.StringRes
