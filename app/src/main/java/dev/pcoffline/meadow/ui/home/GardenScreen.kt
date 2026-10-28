@@ -286,7 +286,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
     }
     MeadowCard(modifier, onClick = onClick) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.restingByHours)
+            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
             AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
             if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
         }
@@ -301,7 +301,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
         Text(
             when {
                 budget.emergency -> stringResource(R.string.garden_tile_emergency)
-                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                budget.sleeping -> budget.wakesInMs
                     ?.let { stringResource(R.string.garden_tile_resting_until, opensAtText(it)) }
                     ?: stringResource(R.string.garden_tile_resting_hours)
                 budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)

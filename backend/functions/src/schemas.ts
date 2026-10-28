@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { errors } from "./copy";
 import { INVITE_TOKEN_LENGTH } from "./format";
-import { ScheduleSchema } from "./schedule";
+import { CapsSchema, DayMinutesSchema, ScheduleSchema } from "./schedule";
 
 /** Must match FlowerAvatars in the app's Models.kt. */
 export const FLOWERS = [
@@ -54,9 +54,13 @@ const limitShape = {
   dailyMinutes: z.number().int().min(0).max(1440),
   weeklyMinutes: z.number().int().min(0).max(10080),
   schedule,
+  dayMinutes: DayMinutesSchema.nullish(),
+  caps: CapsSchema.nullish(),
 };
-const hasALimit = (r: { dailyMinutes: number; weeklyMinutes: number; schedule?: unknown }) =>
-  r.dailyMinutes > 0 || r.weeklyMinutes > 0 || r.schedule != null;
+type Holds = { dailyMinutes: number; weeklyMinutes: number; schedule?: unknown; dayMinutes?: Record<string, number | undefined> | null; caps?: unknown[] | null };
+const hasALimit = (r: Holds) =>
+  r.dailyMinutes > 0 || r.weeklyMinutes > 0 || r.schedule != null
+  || Object.values(r.dayMinutes ?? {}).some((m) => (m ?? 0) > 0) || (r.caps?.length ?? 0) > 0;
 
 export const CreateRequestInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("extra_time"), packageName, appName, minutes: z.number().int().min(1).max(240), message: note, dayKey, approverIds: askWho, ...usage }),
@@ -65,7 +69,7 @@ export const CreateRequestInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("remove_limit"), packageName, appName, message: note, dayKey, approverIds: askWho, ...usage }),
 ], { error: errors.unknownRequest });
 
-/** A limit saved through the backend: a schedule change while someone has Bumblebees. */
+/** A limit saved through the backend: hours, days or caps changed while someone has Bumblebees. */
 export const SaveLimitInput = z.object(limitShape).refine(hasALimit, errors.setALimit);
 
 export const DecideRequestInput = z.object({

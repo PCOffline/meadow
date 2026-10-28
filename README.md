@@ -39,6 +39,12 @@ Every app you limit is a flower that blooms while there's time left, wilts as it
 sleeps outside the hours you allow it. The sky follows your day, from a peach sunrise to a starry night with fireflies. Gentle reminders
 arrive at five minutes and one minute left.
 
+### Limits that fit your week
+Set a daily limit, then give some days their own: 30 minutes on weekdays, two hours at weekends.
+Add a weekly limit, the hours an app may be used (or all day, in one tap), and caps within hours,
+like up to 30 minutes between 10:00 and 16:00. Every one of them applies, and the app rests as
+soon as any is used up. Pick times on a clock, and set several days at once.
+
 ### Friends who have your back
 Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee

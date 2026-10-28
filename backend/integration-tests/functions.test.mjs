@@ -705,6 +705,32 @@ describe("requests", () => {
     assert.equal(limit.dailyMinutes, 20);
   });
 
+  test("days' own limits and caps: tightening goes through saveLimit, loosening needs a yes, and a yes applies them", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    const path = `users/${sam.uid}/limits/com.insta`;
+    const cap = { days: [5, 1, 2, 3, 4], from: 600, to: 960, minutes: 20 };
+    const save = (extra) => sam.call("saveLimit", { packageName: "com.insta", dailyMinutes: 30, weeklyMinutes: 0, ...extra });
+    await save({ dayMinutes: { "6": 15 }, caps: [cap] });
+    let limit = await read(path);
+    assert.deepEqual(limit.dayMinutes, { "6": 15 });
+    assert.deepEqual(limit.caps, [{ ...cap, days: [1, 2, 3, 4, 5] }], "days come back in order");
+    await save({ dayMinutes: { "6": 10 }, caps: [{ ...cap, minutes: 15 }] });
+    await rejects(save({ dayMinutes: { "6": 60 }, caps: [{ ...cap, minutes: 15 }] }), "failed-precondition");
+    await rejects(save({ dayMinutes: { "6": 10 }, caps: [] }), "failed-precondition");
+    await rejects(save({ dayMinutes: { "6": 10 }, caps: [{ ...cap, minutes: 15, days: [1] }] }), "failed-precondition");
+
+    const { requestId } = await sam.call("createRequest", {
+      type: "change_limit", packageName: "com.insta", dailyMinutes: 30, weeklyMinutes: 0, dayMinutes: { "6": 120, "7": 120 }, caps: [], dayKey: today(),
+    });
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.title + push.body, /2h at weekends/);
+    assert.deepEqual((await read(`users/${bee.uid}/inbox/${requestId}`)).dayMinutes, { "6": 120, "7": 120 });
+    await bee.call("decideRequest", { requestId, approve: true });
+    limit = await read(path);
+    assert.deepEqual(limit.dayMinutes, { "6": 120, "7": 120 });
+    assert.equal(limit.caps, undefined);
+  });
+
   test("Bumblebees are told the app the request is really about, whatever name the phone gives", async () => {
     const { sam, bee } = await gardenWithLimit();
     const { requestId } = await sam.call("createRequest", {

@@ -65,6 +65,16 @@ test("a request can name the Bumblebees to ask, and a new limit can be only hour
   assert.ok(!CreateRequestInput.safeParse({ type: "change_limit", packageName: "a.b", dailyMinutes: 30, weeklyMinutes: 0, schedule: { "9": [] }, dayKey }).success);
 });
 
+test("a limit can be only some days' own limits, or only a cap within hours", () => {
+  const base = { packageName: "a.b", dailyMinutes: 0, weeklyMinutes: 0 };
+  assert.ok(SaveLimitInput.safeParse({ ...base, dayMinutes: { "6": 120 } }).success);
+  assert.equal(firstError(SaveLimitInput.safeParse({ ...base, dayMinutes: { "6": 0 } })), "Set a daily or weekly limit.", "no limit on one day is no limit");
+  assert.ok(SaveLimitInput.safeParse({ ...base, caps: [{ days: [1], from: 600, to: 960, minutes: 30 }] }).success);
+  assert.equal(firstError(SaveLimitInput.safeParse({ ...base, caps: [] })), "Set a daily or weekly limit.");
+  assert.ok(SaveLimitInput.safeParse({ ...base, dailyMinutes: 30, dayMinutes: null, caps: null }).success);
+  assert.ok(!SaveLimitInput.safeParse({ ...base, dailyMinutes: 30, caps: [{ days: [1], from: 600, to: 960, minutes: 400 }] }).success);
+});
+
 test("a request can say how the day stands", () => {
   const dayKey = "2026-10-12";
   const ask = { type: "extra_time", packageName: "a.b", minutes: 15, dayKey };

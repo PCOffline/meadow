@@ -5,7 +5,7 @@ import { inChunks } from "./chunks";
 import { chatNotes, errors, pushes } from "./copy";
 import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
 import { chatIdFor, formatMinutes, type RequestType, storedAppName, summarize } from "./format";
-import { isScheduleStricter, normalize, type Schedule } from "./schedule";
+import { type Cap, CapsSchema, type DayMinutes, DayMinutesSchema, isLimitStricter, normalize, normalizeCaps, normalizeDayMinutes, type Schedule } from "./schedule";
 import { CreateRequestInput, DecideRequestInput, RequestIdInput, SaveLimitInput } from "./schemas";
 
 const MAX_PENDING = 10;
@@ -33,6 +33,9 @@ export interface RequestDoc {
   dailyMinutes: number;
   weeklyMinutes: number;
   schedule: Schedule | null;
+  /** Days with their own daily limit, and caps within hours; missing on older requests. */
+  dayMinutes?: DayMinutes | null;
+  caps?: Cap[] | null;
   message: string;
   status: RequestStatus;
   approverIds: string[];
@@ -81,6 +84,8 @@ function inboxCopy(id: string, r: RequestDoc, requesterFlower: string) {
     dailyMinutes: r.dailyMinutes,
     weeklyMinutes: r.weeklyMinutes,
     schedule: r.schedule,
+    dayMinutes: r.dayMinutes ?? null,
+    caps: r.caps ?? null,
     message: r.message,
     status: r.status,
     dayKey: r.dayKey,
@@ -160,6 +165,8 @@ export const createRequest = onCall(async (call) => {
       dailyMinutes: input.type === "change_limit" ? input.dailyMinutes : 0,
       weeklyMinutes: input.type === "change_limit" ? input.weeklyMinutes : 0,
       schedule: input.type === "change_limit" ? normalize(input.schedule) : null,
+      dayMinutes: input.type === "change_limit" ? normalizeDayMinutes(input.dayMinutes) : null,
+      caps: input.type === "change_limit" ? normalizeCaps(input.caps) : null,
       message: input.message,
       status: "pending",
       approverIds,
@@ -246,6 +253,8 @@ function applyApproval(tx: Transaction, requestId: string, r: RequestDoc, decide
           dailyMinutes: r.dailyMinutes,
           weeklyMinutes: r.weeklyMinutes,
           schedule: r.schedule ?? FieldValue.delete(),
+          dayMinutes: r.dayMinutes ?? FieldValue.delete(),
+          caps: r.caps ?? FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },
@@ -330,9 +339,9 @@ export const cancelRequest = onCall(async (call) => {
 });
 
 /**
- * Saves a limit whose allowed hours changed while the person has Bumblebees. Phones write other
- * limit changes themselves, but rules can't compare schedules, so this checks the change only
- * makes things stricter. Anything looser needs a request.
+ * Saves a limit whose allowed hours, own days or caps changed while the person has Bumblebees.
+ * Phones write other limit changes themselves, but rules can't compare these, so this checks the
+ * change only makes things stricter. Anything looser needs a request.
  */
 export const saveLimit = onCall(async (call) => {
   const uid = requireAuth(call);
@@ -341,12 +350,19 @@ export const saveLimit = onCall(async (call) => {
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const schedule = normalize(input.schedule);
+    const dayMinutes = normalizeDayMinutes(input.dayMinutes);
+    const caps = normalizeCaps(input.caps);
     const old = snap.data();
     if (old) {
-      const minutesStricter = (o: number, n: number) => o === 0 || (n > 0 && n <= o);
-      const stricter = minutesStricter(old.dailyMinutes ?? 0, input.dailyMinutes)
-        && minutesStricter(old.weeklyMinutes ?? 0, input.weeklyMinutes)
-        && isScheduleStricter(old.schedule ?? null, schedule);
+      const before = {
+        dailyMinutes: old.dailyMinutes ?? 0,
+        weeklyMinutes: old.weeklyMinutes ?? 0,
+        schedule: old.schedule ?? null,
+        // Read as the phone reads them: anything malformed holds nothing back.
+        dayMinutes: DayMinutesSchema.safeParse(old.dayMinutes).data ?? null,
+        caps: CapsSchema.safeParse(old.caps).data ?? null,
+      };
+      const stricter = isLimitStricter(before, { dailyMinutes: input.dailyMinutes, weeklyMinutes: input.weeklyMinutes, schedule, dayMinutes, caps });
       if (!stricter) {
         const me = await loadPerson(uid, tx);
         if (me.account.approverIds.length > 0) throw new HttpsError("failed-precondition", errors.needsAYes);
@@ -359,6 +375,8 @@ export const saveLimit = onCall(async (call) => {
       dailyMinutes: input.dailyMinutes,
       weeklyMinutes: input.weeklyMinutes,
       schedule: schedule ?? FieldValue.delete(),
+      dayMinutes: dayMinutes ?? FieldValue.delete(),
+      caps: caps ?? FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
       ...(snap.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
     }, { merge: true });

@@ -82,6 +82,15 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `an app whose cap within hours is used up sleeps until they end`() {
+        val capped = DemoGarden.budget("demo.news", "News", daily = 60, usedToday = 20)
+            .copy(capRemainingMs = 0, untilCapEndsMs = 90 * 60_000L)
+        show { GardenContent(DemoGarden.robin, GardenState(listOf(capped), loaded = true, essentialsReady = true)) }
+        compose.onAllNodes(SemanticsMatcher.expectValue(FlowerAsleep, true), useUnmergedTree = true).assertCountEquals(1)
+        compose.onNodeWithText(text(R.string.garden_tile_resting_until, ""), substring = true).assertExists()
+    }
+
+    @Test
     fun `the rest screen's flower sleeps while the app rests outside its hours`() {
         val night = DemoGarden.tiktok.copy(usedTodayMs = 0, outsideHours = true, untilScheduleChangeMs = 60 * 60_000L)
         show { RestContent("demo.tiktok", DemoGarden.rest.copy(budget = night)) }

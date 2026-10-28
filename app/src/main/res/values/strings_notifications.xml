@@ -41,4 +41,5 @@
 
     <string name="notify_warning_ask">Ask for more</string>
     <string name="notify_warning_body_hours">%1$s\'s allowed hours end soon.</string>
+    <string name="notify_warning_body_cap">Your %1$s time for these hours is almost up. It opens again once they end.</string>
 </resources>

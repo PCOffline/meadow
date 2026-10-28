@@ -8,6 +8,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import dev.pcoffline.meadow.data.TimeCap
 import androidx.compose.ui.test.down
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -186,6 +194,91 @@ class LimitFlowTest : ScreenTest() {
         } finally {
             Connectivity.set(true)
         }
+    }
+
+    private fun chip(day: String) = compose.onNodeWithContentDescription(day)
+
+    @Test
+    fun `some days can have their own limit, picked together, and more time on them asks first`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1))
+        node(R.string.limit_editor_days_add).performScrollTo().performClick()
+        // No days picked yet: nothing changes.
+        node(R.string.limit_editor_loosens_title).assertDoesNotExist()
+        chip("Saturday").performScrollTo().performClick()
+        chip("Sunday").performScrollTo().performClick()
+        // An hour on weekends is more than the everyday 30m.
+        node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
+        node(R.string.limit_editor_days_no_limit).performScrollTo().performClick()
+        node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
+        // Every day is taken once picked, so another group can't pick the weekend again.
+        node(R.string.limit_editor_days_add).performScrollTo().performClick()
+        compose.onAllNodesWithContentDescription("Saturday")[1].assertIsNotEnabled()
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_days_remove))[0].performClick()
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_days_remove))[0].performClick()
+        node(R.string.limit_editor_loosens_title).assertDoesNotExist()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a day's own limit shows with its days picked`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 30, 0, dayMinutes = mapOf(6 to 120, 7 to 120))))
+        chip("Saturday").performScrollTo().assertIsSelected()
+        chip("Sunday").assertIsSelected()
+        chip("Monday").assertIsNotSelected()
+        // Their two hours, beside the everyday presets' "2h".
+        compose.onAllNodesWithText("2h").assertCountEquals(2)
+    }
+
+    @Test
+    fun `a cap within hours is added from a dialog that only saves one that makes sense`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 60, weeklyMinutes = 0), bumblebeeCount = 1))
+        node(R.string.limit_editor_cap_add).performScrollTo().performClick()
+        node(R.string.limit_editor_cap_title).assertExists()
+        // Weekdays, 10:00–16:00 and 30 minutes to start with.
+        listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday").forEach { chip(it).assertIsSelected().performClick() }
+        node(R.string.limit_editor_cap_pick_days).assertExists()
+        node(R.string.action_ok).assertIsNotEnabled()
+        chip("Monday").performClick()
+        node(R.string.action_ok).assertIsEnabled().performClick()
+        compose.onNodeWithText("Up to 30m", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText(text(R.string.days_some, "Mon"), substring = true, ignoreCase = true).assertExists()
+        // A new cap is stricter: no asking.
+        node(R.string.limit_editor_loosens_title).assertDoesNotExist()
+        assertAccessible()
+    }
+
+    @Test
+    fun `removing a cap loosens the limit`() {
+        val cap = TimeCap(listOf(1, 2, 3, 4, 5), 600, 960, 30)
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 60, 0, caps = listOf(cap)), bumblebeeCount = 1))
+        compose.onNodeWithText("Up to 30m", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText(text(R.string.days_weekdays), substring = true, ignoreCase = true).assertExists()
+        compose.onNodeWithContentDescription(text(R.string.limit_editor_cap_remove)).performClick()
+        node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `a cap alone is enough to plant a limit`() {
+        editor(LimitEditorState())
+        compose.onNodeWithText(text(R.string.limit_editor_daily)).performClick()
+        node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
+        node(R.string.limit_editor_cap_add).performScrollTo().performClick()
+        node(R.string.action_ok).performClick()
+        node(R.string.limit_editor_plant).performScrollTo().assertIsEnabled()
+        node(R.string.limit_editor_pick_one).assertDoesNotExist()
+    }
+
+    @Test
+    fun `the daily limit can be picked on a clock`() {
+        editor(LimitEditorState())
+        val pick = text(R.string.limit_editor_pick_time)
+        compose.onAllNodes(SemanticsMatcher("opens a clock") { it.config.getOrNull(SemanticsActions.OnClick)?.label == pick })
+            .onFirst().performClick()
+        // The dialog is titled with what it sets, and keeps the value when confirmed.
+        compose.onAllNodesWithText(text(R.string.limit_editor_daily)).assertCountEquals(2)
+        node(R.string.action_ok).performClick()
+        compose.onAllNodesWithText(text(R.string.limit_editor_daily)).assertCountEquals(1)
+        compose.onAllNodesWithText("30m").assertCountEquals(2)
     }
 
     @Test

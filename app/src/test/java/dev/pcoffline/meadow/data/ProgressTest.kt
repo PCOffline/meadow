@@ -49,6 +49,22 @@ class ProgressTest {
     }
 
     @Test
+    fun `each day is judged by its own limit when it has one`() {
+        // 30m a day, but 2h on Saturday and no limit on Sunday.
+        val saturday = monday.plusDays(5)
+        val limits = listOf(AppLimit("insta", "Instagram", 30, 0, dayMinutes = mapOf(6 to 120, 7 to 0)))
+        val days = listOf(
+            monday to mapOf("insta" to 40 * min),
+            saturday to mapOf("insta" to 100 * min),
+            saturday.plusDays(1) to mapOf("insta" to 500 * min),
+        )
+        assertEquals(2 to 3, Progress.keptDays(days, limits) { _, _ -> 0 })
+        // Only some days' own limits still count as daily limits.
+        val weekendsOnly = listOf(AppLimit("insta", "Instagram", 0, 0, dayMinutes = mapOf(6 to 60)))
+        assertEquals(2 to 3, Progress.keptDays(days, weekendsOnly) { _, _ -> 0 })
+    }
+
+    @Test
     fun `without daily limits there's nothing to keep`() {
         val (kept, judged) = Progress.keptDays(listOf(monday to emptyMap()), listOf(AppLimit("tok", "TikTok", 0, 120))) { _, _ -> 0 }
         assertEquals(0 to 0, kept to judged)

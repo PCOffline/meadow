@@ -6,11 +6,13 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.InviteLinks
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.ProfileRepository
+import dev.pcoffline.meadow.data.TimeCap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -45,6 +47,23 @@ class FormatTest {
         assertEquals(true, res.limitText(30, 0).contains("30m"))
         assertEquals(true, res.limitText(0, 180).contains("3h"))
         res.limitText(30, 180).let { assertEquals(true, "30m" in it && "3h" in it) }
+    }
+
+    @Test
+    fun `limits describe days with their own limit and caps within hours`() {
+        val limit = AppLimit(
+            "pkg", "App", 30, 0,
+            dayMinutes = mapOf(7 to 120, 6 to 120, 3 to 0),
+            caps = listOf(TimeCap(listOf(1, 2, 3, 4, 5), 600, 960, 20)),
+        )
+        val text = res.limitText(limit)
+        assertEquals(text, true, text.startsWith("30m a day, no limit on Wed, 2h at weekends, up to 20m "))
+        assertEquals(text, true, text.endsWith(" on weekdays"))
+        assertEquals("every day", res.daysText((1..7).toList()))
+        assertEquals("on Mon, Thu", res.daysText(listOf(4, 1, 1)))
+        assertEquals("at weekends", res.daysText(listOf(7, 6)))
+        // Only a cap still reads as a limit.
+        assertEquals(true, res.limitText(AppLimit("pkg", "App", 0, 0, caps = limit.caps)).startsWith("up to 20m"))
     }
 
     private fun request(type: RequestType, minutes: Int = 0, app: String? = "Instagram") = LimitRequest(

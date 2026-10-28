@@ -102,4 +102,44 @@ class AppBudgetTest {
         assertEquals(15 * minute, b.remainingMs)
         assertFalse(b.exhausted)
     }
+
+    @Test
+    fun `a day's own limit replaces the everyday one`() {
+        val b = AppBudget(AppLimit("app", "App", 30, 0), 40 * minute, 40 * minute, 0, 0, dailyMinutesToday = 120)
+        assertEquals(80 * minute, b.remainingMs)
+        assertEquals(120 * minute, b.dailyAllowedMs)
+        val free = AppBudget(AppLimit("app", "App", 30, 0), 40 * minute, 40 * minute, 0, 0, dailyMinutesToday = 0)
+        assertEquals(null, free.allowedTodayMs)
+        assertFalse(free.exhausted)
+    }
+
+    @Test
+    fun `a used-up cap rests the app until its hours end, and it sleeps rather than wilts`() {
+        val b = AppBudget(AppLimit("app", "App", 60, 0), 30 * minute, 30 * minute, 0, 0, capRemainingMs = 0, untilCapEndsMs = 90 * minute)
+        assertEquals(0L, b.remainingMs)
+        assertTrue(b.exhausted)
+        assertTrue(b.restingByCap)
+        assertTrue(b.sleeping)
+        assertEquals(90 * minute, b.wakesInMs)
+        assertFalse(b.restingByHours)
+        // The tightest of everything decides.
+        val tight = AppBudget(AppLimit("app", "App", 60, 0), 50 * minute, 50 * minute, 0, 0, capRemainingMs = 20 * minute, untilCapEndsMs = 60 * minute)
+        assertEquals(10 * minute, tight.remainingMs)
+        assertFalse(tight.restingByCap)
+        // With the day used up as well, it's simply used up: it wilts.
+        val done = AppBudget(AppLimit("app", "App", 60, 0), 60 * minute, 60 * minute, 0, 0, capRemainingMs = 0, untilCapEndsMs = 60 * minute)
+        assertFalse(done.sleeping)
+        // An emergency unlock keeps it awake.
+        val unlocked = b.copy(emergencyUntilMillis = System.currentTimeMillis() + 60 * minute)
+        assertFalse(unlocked.restingByCap)
+        assertFalse(unlocked.sleeping)
+    }
+
+    @Test
+    fun `outside its hours it sleeps until they start`() {
+        val b = AppBudget(AppLimit("app", "App", 30, 0), 0, 0, 0, 0, outsideHours = true, untilScheduleChangeMs = 60 * minute)
+        assertTrue(b.sleeping)
+        assertEquals(60 * minute, b.wakesInMs)
+        assertEquals(null, b.copy(untilScheduleChangeMs = Long.MAX_VALUE / 2).wakesInMs)
+    }
 }

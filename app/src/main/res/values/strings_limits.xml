@@ -50,6 +50,15 @@
     <string name="limit_remove_ask">Ask</string>
 
     <string name="limit_and_hours">%1$s, %2$s</string>
+    <!-- "2h at weekends", "no limit on Sun". -->
+    <string name="limit_on_days">%1$s %2$s</string>
+    <string name="limit_no_limit">no limit</string>
+    <!-- "up to 30m 10:00–16:00 on weekdays". -->
+    <string name="limit_cap">up to %1$s %2$s %3$s</string>
+    <string name="days_every">every day</string>
+    <string name="days_weekdays">on weekdays</string>
+    <string name="days_weekends">at weekends</string>
+    <string name="days_some">on %1$s</string>
     <string name="limit_editor_hours">Allowed hours</string>
     <string name="limit_editor_share">Share this commitment</string>
     <string name="schedule_every_day">Every day</string>
@@ -68,4 +77,22 @@
     <string name="schedule_add_window">Add hours</string>
     <string name="schedule_remove_window">Remove these hours</string>
     <string name="schedule_bad_window">The end has to be after the start.</string>
+    <string name="schedule_all_day_chip">All day</string>
+    <string name="schedule_copy">Copy</string>
+    <string name="schedule_copy_description">Copy %1$s\'s hours to other days</string>
+    <string name="schedule_copy_title">Use %1$s\'s hours on</string>
+    <string name="limit_editor_pick_time">Pick on a clock</string>
+    <string name="limit_editor_days_own">Days with their own limit</string>
+    <string name="limit_editor_days_add">Different on some days</string>
+    <string name="limit_editor_days_remove">Remove these days</string>
+    <string name="limit_editor_days_no_limit">No limit these days</string>
+    <string name="limit_editor_caps">Caps within hours</string>
+    <string name="limit_editor_cap_add">Add a cap</string>
+    <string name="limit_editor_cap_row">Up to %1$s, %2$s</string>
+    <string name="limit_editor_cap_edit">Change this cap</string>
+    <string name="limit_editor_cap_remove">Remove this cap</string>
+    <string name="limit_editor_cap_title">Cap within hours</string>
+    <string name="limit_editor_cap_minutes">Up to</string>
+    <string name="limit_editor_cap_pick_days">Pick at least one day.</string>
+    <string name="limit_editor_cap_too_long">A cap has to be shorter than its hours.</string>
 </resources>

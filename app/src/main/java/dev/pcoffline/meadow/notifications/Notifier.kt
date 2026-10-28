@@ -84,13 +84,15 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         }
         val today = Days.todayKey()
         // Extra time from a Bumblebee changes the allowance, and earns its own reminders.
-        val key = "${budget.limit.packageName}|$today|$threshold|${budget.dailyAllowedMs}/${budget.weeklyAllowedMs}"
+        // Each cap's hours earn their own reminders, too.
+        val key = "${budget.limit.packageName}|$today|$threshold|${budget.dailyAllowedMs}/${budget.weeklyAllowedMs}|${budget.cap?.from}"
         val warned = store.warnedKeys
         if (key in warned) return
         store.warnedKeys = warned.filter { it.contains("|$today|") }.toSet() + key
         val app = budget.limit.appName
         val body = when {
             budget.untilScheduleChangeMs != null && budget.untilScheduleChangeMs <= remaining -> R.string.notify_warning_body_hours
+            budget.capRemainingMs != null && budget.capRemainingMs <= remaining -> R.string.notify_warning_body_cap
             budget.weeklyIsTighter -> R.string.notify_warning_body_week
             else -> R.string.notify_warning_body_today
         }

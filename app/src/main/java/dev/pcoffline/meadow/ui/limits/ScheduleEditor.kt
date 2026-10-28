@@ -89,9 +89,17 @@ fun ScheduleEditor(schedule: Schedule, firstDay: DayOfWeek = DayOfWeek.MONDAY, e
             }
         }
         if (perDay) {
+            var copying by rememberSaveable { mutableStateOf<Int?>(null) }
             week.forEachIndexed { i, day ->
                 if (i > 0) HorizontalDivider()
-                DayRow(day, schedule.windowsOn(day), opening, enabled) { onChange(Schedule(schedule.fullDays() + (day to it))) }
+                DayRow(day, schedule.windowsOn(day), opening, enabled, onCopy = { copying = day }) { onChange(Schedule(schedule.fullDays() + (day to it))) }
+            }
+            copying?.let { from ->
+                CopyDaysDialog(from, schedule, firstDay, onDismiss = { copying = null }) { days ->
+                    copying = null
+                    val windows = schedule.windowsOn(from)
+                    onChange(Schedule(schedule.fullDays() + days.associateWith { windows }))
+                }
             }
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -123,13 +131,22 @@ private fun presetLabel(preset: List<TimeWindow>): String {
 }
 
 /**
- * One weekday: its name and a switch for whether the app may be used that day at all, then its
- * hours while it is. Switching a day on gives it [opening], the hours of another open day.
+ * One weekday: its name and a switch for whether the app may be used that day at all, then
+ * whether that's all day or set hours. Switching a day on gives it [opening], the hours of
+ * another open day. [onCopy] gives this day's hours to others.
  */
 @Composable
-private fun DayRow(day: Int, windows: List<TimeWindow>, opening: List<TimeWindow>, enabled: Boolean, onChange: (List<TimeWindow>) -> Unit) {
+private fun DayRow(
+    day: Int,
+    windows: List<TimeWindow>,
+    opening: List<TimeWindow>,
+    enabled: Boolean,
+    onCopy: () -> Unit,
+    onChange: (List<TimeWindow>) -> Unit,
+) {
     val name = DayOfWeek.of(day).getDisplayName(TextStyle.FULL, currentLocale())
     val allowed = stringResource(R.string.schedule_day_allowed, name)
+    val allDay = windows == listOf(TimeWindow.ALL_DAY)
     Column {
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -142,6 +159,10 @@ private fun DayRow(day: Int, windows: List<TimeWindow>, opening: List<TimeWindow
                     )
                 }
             }
+            val copy = stringResource(R.string.schedule_copy_description, name)
+            TextButton(onClick = onCopy, enabled = enabled, modifier = Modifier.semantics { contentDescription = copy }) {
+                Text(stringResource(R.string.schedule_copy), style = MaterialTheme.typography.labelMedium)
+            }
             Switch(
                 checked = windows.isNotEmpty(),
                 onCheckedChange = { on -> onChange(if (on) opening else emptyList()) },
@@ -149,8 +170,35 @@ private fun DayRow(day: Int, windows: List<TimeWindow>, opening: List<TimeWindow
                 modifier = Modifier.semantics { contentDescription = allowed },
             )
         }
-        if (windows.isNotEmpty()) HoursEditor(windows, enabled, onChange)
+        if (windows.isNotEmpty()) {
+            val allDayLabel = stringResource(R.string.schedule_all_day_chip)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = allDay,
+                    onClick = { onChange(if (allDay) opening.takeIf { it != listOf(TimeWindow.ALL_DAY) } ?: PRESETS.first() else listOf(TimeWindow.ALL_DAY)) },
+                    label = { Text(allDayLabel) },
+                    enabled = enabled,
+                    modifier = Modifier.semantics { contentDescription = "$allDayLabel, $name" },
+                )
+            }
+            if (!allDay) HoursEditor(windows, enabled, onChange)
+        }
     }
+}
+
+/** Gives [from]'s hours to the days picked, several at once. */
+@Composable
+private fun CopyDaysDialog(from: Int, schedule: Schedule, firstDay: DayOfWeek, onDismiss: () -> Unit, onCopy: (List<Int>) -> Unit) {
+    val name = DayOfWeek.of(from).getDisplayName(TextStyle.FULL, currentLocale())
+    // Days that already match start picked, so the dialog shows where these hours already are.
+    var days by rememberSaveable { mutableStateOf((1..7).filter { it != from && schedule.windowsOn(it) == schedule.windowsOn(from) }) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.schedule_copy_title, name)) },
+        text = { DayChips(days, firstDay, enabled = true, taken = listOf(from)) { days = it } },
+        confirmButton = { TextButton(onClick = { onCopy(days) }, enabled = days.isNotEmpty()) { Text(stringResource(R.string.action_ok)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 /** A day's windows, and a button for one more while there's room. */
@@ -211,7 +259,7 @@ private fun WindowList(windows: List<TimeWindow>, enabled: Boolean, onChange: (L
 
 /** A time that looks like a field to fill in, and opens a clock. */
 @Composable
-private fun TimeField(time: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun TimeField(time: String, description: String, enabled: Boolean, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
@@ -229,7 +277,7 @@ private fun nextWindow(windows: List<TimeWindow>): TimeWindow {
 
 /** [onPick] returns false when the time doesn't fit, which keeps the dialog open. */
 @Composable
-private fun TimeDialog(initialMinute: Int, onDismiss: () -> Unit, onPick: (Int) -> Boolean) {
+internal fun TimeDialog(initialMinute: Int, onDismiss: () -> Unit, onPick: (Int) -> Boolean) {
     val context = LocalContext.current
     val state = rememberTimePickerState(initialMinute / 60, initialMinute % 60, DateFormat.is24HourFormat(context))
     var invalid by rememberSaveable { mutableStateOf(false) }

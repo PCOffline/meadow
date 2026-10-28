@@ -4,7 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * A committed limit for one app. A value of 0 means "no limit" for that period; a null
- * [schedule] means the app may be used at any hour.
+ * [schedule] means the app may be used at any hour. A day in [dayMinutes] has its own daily limit
+ * instead of [dailyMinutes], and every one of [caps] applies on top: the app rests once any of
+ * them is used up.
  */
 @Serializable
 data class AppLimit(
@@ -13,6 +15,8 @@ data class AppLimit(
     val dailyMinutes: Int,
     val weeklyMinutes: Int,
     val schedule: Schedule? = null,
+    val dayMinutes: Map<Int, Int> = emptyMap(),
+    val caps: List<TimeCap> = emptyList(),
 )
 
 /** Extra minutes a Bumblebee granted for a single day. */
@@ -174,6 +178,8 @@ data class LimitRequest(
     val dayKey: String,
     val createdAtMillis: Long,
     val schedule: Schedule? = null,
+    val dayMinutes: Map<Int, Int> = emptyMap(),
+    val caps: List<TimeCap> = emptyList(),
     val requesterFlower: String = "🌼",
     /** "yes" or "no" when this Bumblebee answered it themselves. */
     val myDecision: String? = null,

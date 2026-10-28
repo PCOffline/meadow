@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -189,5 +191,37 @@ class EditorsTest : ScreenTest() {
         show { ScheduleEditor(Schedule.everyDay()) {} }
         compose.onNodeWithText(text(R.string.schedule_per_day)).assertIsSelected()
         compose.onAllNodesWithText(text(R.string.schedule_day_off)).assertCountEquals(7)
+    }
+
+    @Test
+    fun `per weekday, a day can be allowed all day in one tap, and back to set hours`() {
+        var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 17 * 60)))
+        show { ScheduleEditor(schedule) { schedule = it } }
+        node(R.string.schedule_per_day).performClick()
+        val allDay = "${text(R.string.schedule_all_day_chip)}, ${dayName(DayOfWeek.WEDNESDAY)}"
+        compose.onNodeWithContentDescription(allDay).assertIsNotSelected().performClick()
+        assertEquals(listOf(TimeWindow.ALL_DAY), schedule.windowsOn(3))
+        assertEquals(listOf(TimeWindow(9 * 60, 17 * 60)), schedule.windowsOn(4))
+        // Back to set hours: the hours the other days have.
+        compose.onNodeWithContentDescription(allDay).assertIsSelected().performClick()
+        assertEquals(listOf(TimeWindow(9 * 60, 17 * 60)), schedule.windowsOn(3))
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `per weekday, one day's hours are copied to several days at once`() {
+        var schedule by mutableStateOf(Schedule((1..7).associateWith { if (it == 1) listOf(TimeWindow(9 * 60, 12 * 60)) else listOf(TimeWindow(8 * 60, 20 * 60)) }))
+        show { ScheduleEditor(schedule) { schedule = it } }
+        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.MONDAY))).performClick()
+        compose.onNodeWithText(text(R.string.schedule_copy_title, dayName(DayOfWeek.MONDAY))).assertExists()
+        // Monday is the one being copied, so it can't be picked.
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.MONDAY)).assertIsNotEnabled()
+        node(R.string.action_ok).assertIsNotEnabled()
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.SATURDAY)).performClick()
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.SUNDAY)).performClick()
+        node(R.string.action_ok).performClick()
+        assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(6))
+        assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(7))
+        assertEquals(listOf(TimeWindow(8 * 60, 20 * 60)), schedule.windowsOn(5))
     }
 }

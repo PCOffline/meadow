@@ -138,6 +138,8 @@ fun DocumentSnapshot.toLimit() = AppLimit(
     dailyMinutes = int("dailyMinutes"),
     weeklyMinutes = int("weeklyMinutes"),
     schedule = Schedule.fromFirestore(get("schedule")),
+    dayMinutes = DayMinutes.fromFirestore(get("dayMinutes")),
+    caps = TimeCap.listFromFirestore(get("caps")),
 )
 
 fun DocumentSnapshot.toGrant() = Grant(
@@ -166,6 +168,8 @@ fun DocumentSnapshot.toRequest() = LimitRequest(
     dayKey = getString("dayKey") ?: "",
     createdAtMillis = millis("createdAt"),
     schedule = Schedule.fromFirestore(get("schedule")),
+    dayMinutes = DayMinutes.fromFirestore(get("dayMinutes")),
+    caps = TimeCap.listFromFirestore(get("caps")),
     requesterFlower = getString("requesterFlower") ?: "🌼",
     myDecision = getString("myDecision"),
     grantedMinutes = int("grantedMinutes"),

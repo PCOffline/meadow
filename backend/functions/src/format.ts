@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { describeSchedule, type Schedule } from "./schedule";
+import { type Cap, type DayMinutes, describeCaps, describeDayMinutes, describeSchedule, type Schedule } from "./schedule";
 
 /** "disable_strict_mode" only appears on old requests: strict mode now turns off without asking. */
 export type RequestType = "extra_time" | "change_limit" | "remove_limit" | "disable_strict_mode";
@@ -12,6 +12,8 @@ export interface RequestSummary {
   dailyMinutes: number;
   weeklyMinutes: number;
   schedule?: Schedule | null;
+  dayMinutes?: DayMinutes | null;
+  caps?: Cap[] | null;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -51,12 +53,14 @@ export function formatMinutes(minutes: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-export function limitText(daily: number, weekly: number, schedule?: Schedule | null): string {
+export function limitText(daily: number, weekly: number, schedule?: Schedule | null, dayMinutes?: DayMinutes | null, caps?: Cap[] | null): string {
   const parts: string[] = [];
   if (daily > 0) parts.push(`${formatMinutes(daily)} a day`);
+  parts.push(...describeDayMinutes(dayMinutes, formatMinutes));
   if (weekly > 0) parts.push(`${formatMinutes(weekly)} a week`);
   const hours = describeSchedule(schedule);
   if (hours) parts.push(hours);
+  parts.push(...describeCaps(caps, formatMinutes));
   return parts.length ? parts.join(", ").replace(/, ([^,]*)$/, " and $1") : "no limit";
 }
 
@@ -76,7 +80,7 @@ export function summarize(r: RequestSummary): string {
     case "extra_time":
       return `${r.minutes} more minutes on ${app}`;
     case "change_limit":
-      return `a new limit for ${app}: ${limitText(r.dailyMinutes, r.weeklyMinutes, r.schedule)}`;
+      return `a new limit for ${app}: ${limitText(r.dailyMinutes, r.weeklyMinutes, r.schedule, r.dayMinutes, r.caps)}`;
     case "remove_limit":
       return `removing the limit on ${app}`;
     case "disable_strict_mode":

@@ -52,6 +52,8 @@ class RequestRepository(
         dailyMinutes: Int = 0,
         weeklyMinutes: Int = 0,
         schedule: Schedule? = null,
+        dayMinutes: Map<Int, Int> = emptyMap(),
+        caps: List<TimeCap> = emptyList(),
         /** Which Bumblebees to ask; null asks all of them. */
         approverIds: List<String>? = null,
     ): String {
@@ -68,6 +70,8 @@ class RequestRepository(
                 "weeklyMinutes" to weeklyMinutes,
                 "dayKey" to Days.todayKey(),
                 "schedule" to schedule?.toFirestore(),
+                "dayMinutes" to dayMinutes.takeIf { it.isNotEmpty() }?.let(DayMinutes::toFirestore),
+                "caps" to caps.map(TimeCap::toFirestore),
                 "approverIds" to approverIds,
                 "usedMinutes" to day?.usedMinutes,
                 "allowedMinutes" to day?.allowedMinutes,

@@ -4,10 +4,13 @@ import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalResources
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
+import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -38,8 +41,17 @@ fun Resources.durationText(millis: Long): String {
 
 private const val MINUTES_PER_DAY = 24 * 60
 
-/** "30m a day and 3h a week", plus the allowed hours when there are any. */
-fun Resources.limitText(dailyMinutes: Int, weeklyMinutes: Int, schedule: Schedule? = null): String {
+/**
+ * "30m a day and 3h a week", plus days with their own limit, the allowed hours and caps within
+ * hours when there are any.
+ */
+fun Resources.limitText(
+    dailyMinutes: Int,
+    weeklyMinutes: Int,
+    schedule: Schedule? = null,
+    dayMinutes: Map<Int, Int> = emptyMap(),
+    caps: List<TimeCap> = emptyList(),
+): String {
     val minutes = when {
         dailyMinutes > 0 && weeklyMinutes > 0 ->
             getString(R.string.limit_daily_and_weekly, minutesText(dailyMinutes), minutesText(weeklyMinutes))
@@ -47,12 +59,31 @@ fun Resources.limitText(dailyMinutes: Int, weeklyMinutes: Int, schedule: Schedul
         weeklyMinutes > 0 -> getString(R.string.limit_weekly, minutesText(weeklyMinutes))
         else -> null
     }
+    val days = dayMinutes.toSortedMap().entries.groupBy({ it.value }, { it.key }).map { (m, d) ->
+        getString(R.string.limit_on_days, if (m > 0) minutesText(m) else getString(R.string.limit_no_limit), daysText(d))
+    }
     val hours = schedule?.let { scheduleText(it) }
-    return when {
-        minutes != null && hours != null -> getString(R.string.limit_and_hours, minutes, hours)
-        else -> minutes ?: hours ?: getString(R.string.limit_none)
+    val capped = caps.map { getString(R.string.limit_cap, minutesText(it.minutes), windowsText(listOf(it.window)), daysText(it.days)) }
+    val parts = listOfNotNull(minutes) + days + listOfNotNull(hours) + capped
+    return parts.reduceOrNull { all, part -> getString(R.string.limit_and_hours, all, part) } ?: getString(R.string.limit_none)
+}
+
+fun Resources.limitText(limit: AppLimit): String =
+    limitText(limit.dailyMinutes, limit.weeklyMinutes, limit.schedule, limit.dayMinutes, limit.caps)
+
+/** "every day", "on weekdays", "at weekends" or "on Mon, Wed". */
+fun Resources.daysText(days: Collection<Int>): String {
+    val sorted = days.distinct().sorted()
+    return when (sorted) {
+        (1..7).toList() -> getString(R.string.days_every)
+        (1..5).toList() -> getString(R.string.days_weekdays)
+        listOf(6, 7) -> getString(R.string.days_weekends)
+        else -> getString(R.string.days_some, sorted.joinToString(", ") { shortDay(it) })
     }
 }
+
+/** "Mon". */
+fun shortDay(day: Int): String = DayOfWeek.of(day).getDisplayName(TextStyle.SHORT, Locale.getDefault())
 
 /** "10:00", in the phone's own clock style. */
 fun clockText(minuteOfDay: Int): String =
@@ -88,7 +119,10 @@ fun Resources.requestSummary(request: LimitRequest): String {
     return when (request.type) {
         RequestType.EXTRA_TIME -> getQuantityString(R.plurals.request_extra_time, request.minutes, request.minutes, app)
         RequestType.CHANGE_LIMIT ->
-            getString(R.string.request_change_limit, app, limitText(request.dailyMinutes, request.weeklyMinutes, request.schedule))
+            getString(
+                R.string.request_change_limit, app,
+                limitText(request.dailyMinutes, request.weeklyMinutes, request.schedule, request.dayMinutes, request.caps),
+            )
         RequestType.REMOVE_LIMIT -> getString(R.string.request_remove_limit, app)
         RequestType.DISABLE_STRICT_MODE -> getString(R.string.request_disable_strict_mode)
     }
@@ -101,8 +135,7 @@ fun minutesText(minutes: Int): String = LocalResources.current.minutesText(minut
 fun durationText(millis: Long): String = LocalResources.current.durationText(millis)
 
 @Composable
-fun limitText(dailyMinutes: Int, weeklyMinutes: Int, schedule: Schedule? = null): String =
-    LocalResources.current.limitText(dailyMinutes, weeklyMinutes, schedule)
+fun limitText(limit: AppLimit): String = LocalResources.current.limitText(limit)
 
 @Composable
 fun requestSummary(request: LimitRequest): String = LocalResources.current.requestSummary(request)

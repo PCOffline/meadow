@@ -254,6 +254,26 @@ describe("limits", () => {
     await assertSucceeds(setDoc(ref, { ...limit(30, 300), schedule: evenings }));
   });
 
+  test("days' own limits and caps can be set on a new limit, but with Bumblebees only change through the backend", async () => {
+    await seed();
+    const weekend = { 6: 120, 7: 120 };
+    const caps = [{ days: [1, 2, 3, 4, 5], from: 600, to: 960, minutes: 30 }];
+    const tok = doc(as("sam"), "users/sam/limits/com.tok");
+    await assertSucceeds(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: weekend }));
+    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.yt"), { ...limit(0), packageName: "com.yt", caps }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", dayMinutes: { 9: 10 } }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: Array(7).fill(caps[0]) }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: "lots" }));
+    // Rules can't compare them: with Bumblebees, any change to them goes through the backend.
+    await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: { 6: 60, 7: 60 } }));
+    await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: weekend, caps }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.insta"), { ...limit(30, 300), caps }));
+    // A tighter everyday limit with them unchanged is fine.
+    await assertSucceeds(setDoc(tok, { ...limit(20), packageName: "com.tok", dayMinutes: weekend }));
+    await seed({ samHasBee: false });
+    await assertSucceeds(setDoc(tok, { ...limit(20), packageName: "com.tok", dayMinutes: { 6: 0 }, caps }));
+  });
+
   test("Bumblebees can see what's shared; strangers can't, and extra time stays private", async () => {
     await seed();
     await assertSucceeds(getDoc(doc(as("bee"), "users/sam/appUsage/today")));

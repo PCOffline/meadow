@@ -274,7 +274,7 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
                     Box {
                         BloomFlower(
                             if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp),
-                            asleep = !state.unlocked && state.budget?.restingByHours == true,
+                            asleep = !state.unlocked && state.budget?.sleeping == true,
                         )
                         if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
                     }
@@ -312,11 +312,11 @@ private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Uni
                 state.unlocked && budget.emergency ->
                     stringResource(R.string.rest_body_emergency, state.appName, durationText(budget.emergencyUntilMillis - System.currentTimeMillis()))
                 state.unlocked -> stringResource(R.string.rest_body_yes, durationText(budget.remainingMs))
-                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                budget.sleeping -> budget.wakesInMs
                     ?.let { stringResource(R.string.rest_body_hours, state.appName, opensAtText(it)) }
                     ?: stringResource(R.string.rest_body_hours_closed, state.appName)
                 budget.weeklyIsTighter -> stringResource(R.string.rest_body_week, minutesText(budget.limit.weeklyMinutes))
-                else -> stringResource(R.string.rest_body_today, minutesText(budget.limit.dailyMinutes))
+                else -> stringResource(R.string.rest_body_today, minutesText(budget.dailyMinutesToday))
             },
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,

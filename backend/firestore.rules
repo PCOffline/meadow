@@ -35,13 +35,16 @@ service cloud.firestore {
     function isString(v, max) { return v is string && v.size() <= max; }
 
     function validLimit(d, pkg) {
-      return d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'createdAt', 'updatedAt'])
+      return d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'dayMinutes', 'caps', 'createdAt', 'updatedAt'])
         && d.packageName == pkg
         && isString(d.appName, 100)
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
         && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
         && (!('schedule' in d) || d.schedule == null || validSchedule(d.schedule))
-        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0 || d.get('schedule', null) != null);
+        && (!('dayMinutes' in d) || d.dayMinutes == null || (d.dayMinutes is map && d.dayMinutes.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7'])))
+        && (!('caps' in d) || d.caps == null || (d.caps is list && d.caps.size() <= 6))
+        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0 || d.get('schedule', null) != null
+            || d.get('dayMinutes', null) != null || d.get('caps', null) != null);
     }
 
     // Allowed hours per weekday ("1" = Monday). The windows themselves are checked when they
@@ -50,8 +53,11 @@ service cloud.firestore {
       return s is map && s.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7']);
     }
 
+    // Hours, days with their own limit and caps within hours: what rules can't compare.
     function sameSchedule(old, next) {
-      return old.get('schedule', null) == next.get('schedule', null);
+      return old.get('schedule', null) == next.get('schedule', null)
+        && old.get('dayMinutes', null) == next.get('dayMinutes', null)
+        && old.get('caps', null) == next.get('caps', null);
     }
 
     // 0 means "no limit" for that period, so going from 0 to anything is stricter.
@@ -115,8 +121,8 @@ service cloud.firestore {
       match /limits/{pkg} {
         allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareLimits')));
         allow create: if signedIn() && me() == uid && validLimit(request.resource.data, pkg);
-        // Allowed hours can't be compared here, so with Bumblebees they change through the
-        // backend's saveLimit, which checks they only got stricter. The app's name stays as it
+        // Allowed hours, days' own limits and caps can't be compared here, so with Bumblebees
+        // they change through the backend's saveLimit, which checks they only got stricter. The app's name stays as it
         // was: Bumblebees read it in requests, and a new one could pass one app off as another.
         allow update: if signedIn() && me() == uid && validLimit(request.resource.data, pkg)
           && (hasNoApprovers(uid)
