@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
+import androidx.annotation.MainThread
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.data.Browsers
@@ -190,7 +191,16 @@ class GuardianAccessibilityService : AccessibilityService() {
         return AddressBar.Shows(bar.text?.toString().orEmpty())
     }
 
-    private fun setSite(site: String?) {
+    /** Measures [site] if it's still the one in front; false once it's been left. */
+    @MainThread
+    internal fun measureSite(site: String): Boolean {
+        if (site != sitePackage) return false
+        AppGraph.sites.seen(site)
+        return true
+    }
+
+    @MainThread
+    internal fun setSite(site: String?) {
         if (site == sitePackage) return
         if (sitePackage != null) AppGraph.sites.left()
         sitePackage = site
@@ -244,8 +254,9 @@ class GuardianAccessibilityService : AccessibilityService() {
                 first = true
                 continue
             }
-            // A website's time is measured as it's watched.
-            if (Sites.isSite(pkg)) AppGraph.sites.seen(pkg)
+            // A website's time is measured as it's watched, on the main thread where the site in
+            // front changes: measured from here, a visit just left could open again and keep counting.
+            if (Sites.isSite(pkg) && !withContext(Dispatchers.Main) { measureSite(pkg) }) return
             val budget = AppGraph.engine.budget(pkg, forceRefresh = first) ?: return
             first = false
             if (budget.exhausted) {
