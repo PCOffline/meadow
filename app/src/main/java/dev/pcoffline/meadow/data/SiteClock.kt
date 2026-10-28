@@ -102,7 +102,8 @@ class SiteClock(context: Context, private val now: () -> Long = System::currentT
         const val GAP_MS = 20_000L
         const val KEEP_DAYS = 8L
         private const val DAY_MS = 24 * 60 * 60_000L
-        private const val SAVE_EVERY_MS = 30_000L
+        /** A visit in progress is saved this often, so stopping Meadow loses at most this much of it. */
+        private const val SAVE_EVERY_MS = 5_000L
         private const val KEY = "sessions"
         private const val KEY_OPEN = "open"
     }

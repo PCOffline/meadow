@@ -97,7 +97,8 @@ class SiteClockTest {
         val restarted = newClock()
         val counted = restarted.usageBetween(start, clock)
         assertEquals(30_000L, counted[yt])
-        assertTrue("the visit in progress was lost: $counted", (counted[reddit] ?: 0L) >= 30_000L)
+        // Saved every few seconds as it went: at most that much of it is lost.
+        assertTrue("the visit in progress was lost: $counted", (counted[reddit] ?: 0L) >= 35_000L)
         assertNull(restarted.current())
     }
 

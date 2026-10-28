@@ -291,11 +291,12 @@ class GuardianAccessibilityService : AccessibilityService() {
             pipPackage = null
         }
         val since = SystemClock.elapsedRealtime()
-        BlockActivity.launch(this, pkg)
+        val browser = if (Sites.isSite(pkg)) browserInFront() else null
+        BlockActivity.launch(this, pkg, browser)
         MeadowNotificationListener.rest(this, pkg)
         // A website's sound plays in its browser, which the rest screen covers along with it.
-        if (Sites.isSite(pkg)) browserInFront()?.let { MeadowNotificationListener.pauseMedia(this, setOf(it)) }
-        scope.launch { makeSureBlocked(pkg, since) }
+        browser?.let { MeadowNotificationListener.pauseMedia(this, setOf(it)) }
+        scope.launch { makeSureBlocked(pkg, since, browser) }
     }
 
     /**
@@ -303,7 +304,7 @@ class GuardianAccessibilityService : AccessibilityService() {
      * on screen beside it (the other split-screen half) is left with Home, once, after which the
      * block screen has to show again.
      */
-    private suspend fun makeSureBlocked(pkg: String, launchedAt: Long) {
+    private suspend fun makeSureBlocked(pkg: String, launchedAt: Long, browser: String?) {
         var since = launchedAt
         var leftHome = false
         repeat(BLOCK_ATTEMPTS) {
@@ -322,7 +323,7 @@ class GuardianAccessibilityService : AccessibilityService() {
                         since = SystemClock.elapsedRealtime()
                         performGlobalAction(GLOBAL_ACTION_HOME)
                     }
-                    !shown -> BlockActivity.launch(this@GuardianAccessibilityService, pkg)
+                    !shown -> BlockActivity.launch(this@GuardianAccessibilityService, pkg, browser)
                     else -> Unit // Shown; the app's own window events haven't caught up yet.
                 }
             }

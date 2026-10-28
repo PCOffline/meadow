@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.enforcement
 
+import android.app.ActivityManager
 import android.app.Application
+import android.content.Intent
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -108,6 +110,40 @@ class SiteMeasureTest {
         service.onForeground("com.example.notes")
 
         assertNull(service.browserInFront())
+    }
+
+    @Test
+    fun `a resting site opens again in the browser it was open in, or any if that's gone`() {
+        service.onForeground("com.android.chrome")
+        service.setSite(SITE)
+        shadowOf(app).clearNextStartedActivities()
+
+        service.block(SITE)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val rest = generateSequence { shadowOf(app).nextStartedActivity }
+            .first { it.component?.className == BlockActivity::class.java.name }
+        assertEquals("com.android.chrome", rest.getStringExtra(BlockActivity.EXTRA_BROWSER))
+        val opens = with(BlockActivity) { app.openIntents(SITE, "com.android.chrome") }
+        assertEquals(listOf("com.android.chrome", null), opens.map { it.`package` })
+        assertEquals(listOf("https://example.org", "https://example.org"), opens.map { it.dataString })
+    }
+
+    @Test
+    fun `an app opens itself again, never a browser`() {
+        val opens = with(BlockActivity) { app.openIntents("com.example.notes", "com.android.chrome") }
+        assertTrue(opens.none { it.action == Intent.ACTION_VIEW })
+    }
+
+    @Test
+    fun `stopping in the background leaves a site's browser alone, and stops an app`() {
+        val manager = shadowOf(app.getSystemService(ActivityManager::class.java))
+
+        MeadowNotificationListener.stopInBackground(app, SITE)
+        assertNull(manager.backgroundPackage)
+
+        MeadowNotificationListener.stopInBackground(app, "com.example.notes")
+        assertEquals("com.example.notes", manager.backgroundPackage)
     }
 
     private companion object {
