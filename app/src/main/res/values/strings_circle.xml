@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="circle_title">Your circle</string>
+    <string name="people_title">People</string>
+    <string name="people_waiting">Waiting for you</string>
+    <string name="people_your_asks">Your asks</string>
+    <string name="people_invite_more">Invite a Bumblebee</string>
 
     <string name="invite_title">Invite a Bumblebee 🐝</string>
     <string name="invite_link_button">Share an invite link</string>
@@ -11,17 +14,17 @@
     <string name="invite_code_placeholder">Their code</string>
     <string name="invite_code_button">Invite</string>
     <string name="invite_code_sent">Invite sent 💌</string>
-
-    <string name="circle_invites_for_you">Waiting for your answer</string>
     <string name="circle_invite_title">%1$s would like you as their Bumblebee</string>
-    <string name="circle_invite_accept">Say yes</string>
-    <string name="circle_invite_decline">Not now</string>
+    <string name="circle_offer_title">%1$s offers to be your Bumblebee</string>
+    <string name="circle_offer_accepted">%1$s is your Bumblebee now 🐝</string>
+    <string name="circle_offer_sent_at">Offered %1$s</string>
+    <string name="circle_invite_accept">Approve</string>
+    <string name="circle_invite_decline">Deny</string>
     <string name="circle_invite_accepted">You\'re %1$s\'s Bumblebee now 🐝</string>
     <string name="circle_invite_sent_at">Invited %1$s</string>
 
     <string name="circle_your_bees">Your Bumblebees</string>
     <string name="circle_bee_role">Looks after your garden</string>
-    <string name="circle_chat_with">Chat with %1$s</string>
     <string name="circle_remove_title">Remove %1$s?</string>
 
     <string name="circle_looking_after">Gardens you look after</string>
@@ -37,11 +40,11 @@
     <string name="accept_invite_title">Be %1$s\'s Bumblebee?</string>
     <string name="accept_invite_body">You\'ll answer when %1$s asks for extra time. You can step down any time.</string>
     <string name="accept_invite_expired">This invite from %1$s has expired. Ask them for a new link.</string>
-    <string name="accept_invite_used">Someone already said yes to this invite from %1$s. Ask them for a new link.</string>
+    <string name="accept_invite_used">Someone already accepted this invite from %1$s. Ask them for a new link.</string>
     <string name="accept_invite_own">This is your own invite link. Send it to a friend instead. 🐝</string>
     <string name="accept_invite_already">You\'re already %1$s\'s Bumblebee. 🐝</string>
     <string name="accept_invite_yes">Yes, I\'ll be their Bumblebee</string>
-    <string name="accept_invite_not_now">Not now</string>
+    <string name="accept_invite_not_now">Deny</string>
     <string name="accept_invite_done">You\'re %1$s\'s Bumblebee now 🐝</string>
     <string name="friend_gone_title">This garden isn\'t here any more</string>
     <string name="friend_today">Today</string>

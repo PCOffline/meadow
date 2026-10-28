@@ -49,15 +49,14 @@ class ChatJourneyTest : EndToEndTest() {
             val chatId = ChatRepository.chatIdFor(me, sam.uid)
             sam.send(chatId, "Thanks for looking after me")
 
-            // The Chats tab lists it with its last message, and opens it.
-            node(R.string.tab_chats).performClick()
+            // People shows Sam with the last message, and opens the chat.
+            tab(R.string.tab_people).performClick()
             waitForText("Thanks for looking after me")
             compose.onNode(hasText("Sam") and hasClickAction()).performClick()
             waitForText(text(R.string.chat_placeholder))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
-            // So does Sam's garden.
-            node(R.string.tab_circle).performClick()
+            // Sam's garden is a tap away from the chat, and leads back to it.
             openGardenOf("Sam")
             node(R.string.action_chat).performScrollTo().performClick()
             waitForText("Thanks for looking after me")

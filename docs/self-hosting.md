@@ -121,8 +121,8 @@ Collections appear on their own as people use the app.
 
 Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which lets
 people change only their own photo, lets their Bumblebees and the people they look after see it,
-and keeps each export file to its owner, and sets the bucket's lifecycle
-rule.
+keeps each chat's photos and GIFs (under `chats/`) to its two people, and keeps each export file
+to its owner, and sets the bucket's lifecycle rule. A chat's pictures are deleted when it closes.
 
 ### 2.6 Cloud Messaging
 
@@ -286,7 +286,7 @@ proposes updates weekly.
 |---|---|---|---|
 | **Build** (`build.yml`) | Every pull request and every push to `main` (run it from the Actions tab for any other branch) | Builds the app, runs unit tests and lint; tests the functions, security rules, hosting pages; runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON` it builds against your backend; without it, it builds the "connect your backend" version |
 | **Deliver** (`deliver.yml`) | After Build passes on `main` (when turned on, see 7.5 and 7.6), when you push a tag like `v0.4.0`, or by hand | Deploys the backend to Firebase, then tests, builds and signs the release APK and publishes it on your fork's Releases page | The five in 7.4 to release; the Google Cloud access in 7.6 to deploy |
-| **Screenshots** (`screenshots.yml`) | Pushes whose commit message contains `[screenshots]` | Re-renders the README images and commits them | None |
+| **Screenshots** (`screenshots.yml`) | Pull requests that change the app's screens (not from forks), or by hand | Re-renders the README images, commits them to the branch, and runs Build on that commit | None |
 
 Until you turn on automatic deploys (7.6), deploy the backend from your computer (step 4)
 whenever `backend/` changes.

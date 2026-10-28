@@ -118,7 +118,15 @@ class BlockActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        packageState.value?.let { markShown(it) }
+        packageState.value?.let {
+            markShown(it)
+            showing = it
+        }
+    }
+
+    override fun onPause() {
+        showing = null
+        super.onPause()
     }
 
     /** Home, fading out the same way however it's asked for, instead of the launcher's zoom. */
@@ -148,6 +156,12 @@ class BlockActivity : ComponentActivity() {
 
         /** The app the screen last showed for, and when (elapsed realtime). */
         @Volatile private var lastShown: Pair<String, Long>? = null
+
+        /** The app the screen is on screen for right now, if it is. */
+        @Volatile internal var showing: String? = null
+
+        /** Whether the screen is on screen for [packageName] right now. */
+        fun isShowingFor(packageName: String): Boolean = showing == packageName
 
         internal fun markShown(packageName: String) {
             lastShown = packageName to SystemClock.elapsedRealtime()
@@ -258,7 +272,10 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
                 ) {
                     AppIcon(pkg, size = 56.dp)
                     Box {
-                        BloomFlower(if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp))
+                        BloomFlower(
+                            if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp),
+                            asleep = !state.unlocked && state.budget?.sleeping == true,
+                        )
                         if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))
                     }
                     MeadowCard(Modifier.fillMaxWidth()) {
@@ -295,11 +312,11 @@ private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Uni
                 state.unlocked && budget.emergency ->
                     stringResource(R.string.rest_body_emergency, state.appName, durationText(budget.emergencyUntilMillis - System.currentTimeMillis()))
                 state.unlocked -> stringResource(R.string.rest_body_yes, durationText(budget.remainingMs))
-                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                budget.sleeping -> budget.wakesInMs
                     ?.let { stringResource(R.string.rest_body_hours, state.appName, opensAtText(it)) }
                     ?: stringResource(R.string.rest_body_hours_closed, state.appName)
                 budget.weeklyIsTighter -> stringResource(R.string.rest_body_week, minutesText(budget.limit.weeklyMinutes))
-                else -> stringResource(R.string.rest_body_today, minutesText(budget.limit.dailyMinutes))
+                else -> stringResource(R.string.rest_body_today, minutesText(budget.dailyMinutesToday))
             },
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,

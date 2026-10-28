@@ -43,17 +43,40 @@ class ChatRepository(private val backend: Backend) {
                 "createdAt" to FieldValue.serverTimestamp(),
             ),
         )
-        batch.update(
-            chatRef,
-            mapOf(
-                "lastMessage" to body.take(140),
-                "lastMessageAt" to FieldValue.serverTimestamp(),
-                "lastSenderId" to uid,
-                "lastRead.$uid" to FieldValue.serverTimestamp(),
-            ),
-        )
+        batch.update(chatRef, summaryOf(uid, body))
         batch.commit().awaitWrite()
     }
+
+    /**
+     * Sends a picture already uploaded to [picture]'s path. [summary] stands for it in the chat
+     * list ("📷 Photo"). Throws if the server refuses it.
+     */
+    suspend fun sendPicture(chatId: String, picture: ChatPicture, summary: String) {
+        val uid = backend.requireUid()
+        val chatRef = chats.document(chatId)
+        val batch = backend.db.batch()
+        batch.set(
+            chatRef.collection("messages").document(),
+            mapOf(
+                "senderId" to uid,
+                "kind" to "image",
+                "path" to picture.path,
+                "width" to picture.width,
+                "height" to picture.height,
+                "gif" to picture.gif,
+                "createdAt" to FieldValue.serverTimestamp(),
+            ),
+        )
+        batch.update(chatRef, summaryOf(uid, summary))
+        batch.commit().awaitWrite()
+    }
+
+    private fun summaryOf(uid: String, text: String) = mapOf(
+        "lastMessage" to text.take(140),
+        "lastMessageAt" to FieldValue.serverTimestamp(),
+        "lastSenderId" to uid,
+        "lastRead.$uid" to FieldValue.serverTimestamp(),
+    )
 
     suspend fun markRead(chatId: String) {
         val uid = backend.uid ?: return

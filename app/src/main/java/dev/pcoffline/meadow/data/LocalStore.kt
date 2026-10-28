@@ -79,6 +79,27 @@ class LocalStore(context: Context) {
         _autoUpdate.value = enabled
     }
 
+    private val _weatherOn = MutableStateFlow(prefs.getBoolean(KEY_WEATHER_ON, false))
+
+    /** Whether the sky shows the weather, from the phone's rough location. Off unless turned on. */
+    val weatherOn: StateFlow<Boolean> = _weatherOn.asStateFlow()
+
+    private val _weather = MutableStateFlow(read<WeatherReading>(KEY_WEATHER))
+
+    /** The last weather read. Where it was read for is never kept. */
+    val weather: StateFlow<WeatherReading?> = _weather.asStateFlow()
+
+    fun setWeatherOn(on: Boolean) {
+        prefs.edit { putBoolean(KEY_WEATHER_ON, on) }
+        _weatherOn.value = on
+        if (!on) setWeather(null)
+    }
+
+    fun setWeather(reading: WeatherReading?) {
+        write(KEY_WEATHER, reading)
+        _weather.value = reading
+    }
+
     private val _weekRule = MutableStateFlow(
         WeekRule(
             first = DayOfWeek.of(prefs.getInt(KEY_WEEK_FIRST, DayOfWeek.MONDAY.value)),
@@ -125,6 +146,16 @@ class LocalStore(context: Context) {
         _privacy.value = privacy
     }
 
+    private val _sharingChosen = MutableStateFlow(prefs.getBoolean(KEY_SHARING_CHOSEN, false))
+
+    /** Whether what to share was looked at and settled during setup, so the step can fold away. */
+    val sharingChosen: StateFlow<Boolean> = _sharingChosen.asStateFlow()
+
+    fun setSharingChosen() {
+        prefs.edit { putBoolean(KEY_SHARING_CHOSEN, true) }
+        _sharingChosen.value = true
+    }
+
     /** The address a sign-in link was last sent to from this phone, to finish signing in with it. */
     var pendingLinkEmail: String?
         get() = prefs.getString(KEY_LINK_EMAIL, null)
@@ -160,6 +191,8 @@ class LocalStore(context: Context) {
         lastReportedProtection = null
         warnedKeys = emptySet()
         lastAskedBees = emptySet()
+        prefs.edit { remove(KEY_SHARING_CHOSEN) }
+        _sharingChosen.value = false
         pendingEmergency?.let { if (it.ownerUid != null && it.ownerUid != uid) pendingEmergency = null }
     }
 
@@ -173,9 +206,12 @@ class LocalStore(context: Context) {
         _emergency.value = null
         _pendingInvite.value = null
         _privacy.value = Privacy()
+        _sharingChosen.value = false
         _theme.value = null
         _darkMode.value = null
         _autoUpdate.value = true
+        _weatherOn.value = false
+        _weather.value = null
         _weekRule.value = WeekRule()
         _acceptedTerms.value = 0
     }
@@ -275,6 +311,8 @@ class LocalStore(context: Context) {
         const val KEY_THEME = "theme"
         const val KEY_DARK_MODE = "dark_mode"
         const val KEY_AUTO_UPDATE = "auto_update"
+        const val KEY_WEATHER_ON = "weather_on"
+        const val KEY_WEATHER = "weather"
         const val KEY_WEEK_FIRST = "week_first"
         const val KEY_WEEK_PREVIOUS = "week_previous"
         const val KEY_WEEK_LIMITS_FROM = "week_limits_from"
@@ -282,5 +320,6 @@ class LocalStore(context: Context) {
         const val KEY_TERMS = "accepted_terms_version"
         const val KEY_NOTIFIED_UPDATE = "notified_update"
         const val KEY_LINK_EMAIL = "link_email"
+        const val KEY_SHARING_CHOSEN = "sharing_chosen"
     }
 }

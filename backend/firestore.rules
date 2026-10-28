@@ -20,9 +20,9 @@ service cloud.firestore {
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
     // Whether the owner shares [part] ("shareLimits", "shareTime", "shareApps", "shareProgress")
-    // with their Bumblebees. Progress sums up earlier days, so it's only shared once chosen.
+    // with their Bumblebees. Nothing is shared until it's chosen.
     function shares(uid, part) {
-      return account(uid).get('privacy', {}).get(part, part != 'shareProgress') == true;
+      return account(uid).get('privacy', {}).get(part, false) == true;
     }
 
     function validPrivacy(p) {
@@ -35,13 +35,43 @@ service cloud.firestore {
     function isString(v, max) { return v is string && v.size() <= max; }
 
     function validLimit(d, pkg) {
-      return d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'createdAt', 'updatedAt'])
+      return d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'dayMinutes', 'caps', 'createdAt', 'updatedAt'])
         && d.packageName == pkg
         && isString(d.appName, 100)
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
         && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
         && (!('schedule' in d) || d.schedule == null || validSchedule(d.schedule))
-        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0 || d.get('schedule', null) != null);
+        && (!('dayMinutes' in d) || d.dayMinutes == null || validDayMinutes(d.dayMinutes))
+        && (!('caps' in d) || d.caps == null || validCaps(d.caps))
+        && (d.dailyMinutes > 0 || d.weeklyMinutes > 0 || d.get('schedule', null) != null
+            || d.get('dayMinutes', null) != null || d.get('caps', null) != null);
+    }
+
+    // A day's own daily limit ("6": 120 is two hours on Saturdays); 0 is none that day.
+    function dayLimitOk(m, day) {
+      return !(day in m) || (m[day] is int && m[day] >= 0 && m[day] <= 1440);
+    }
+
+    function validDayMinutes(m) {
+      return m is map && m.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7'])
+        && dayLimitOk(m, '1') && dayLimitOk(m, '2') && dayLimitOk(m, '3') && dayLimitOk(m, '4')
+        && dayLimitOk(m, '5') && dayLimitOk(m, '6') && dayLimitOk(m, '7');
+    }
+
+    // Up to [minutes] between [from] and [to] on [days] (1 = Monday), as the app's TimeCap.
+    function validCap(c) {
+      return c is map && c.keys().hasOnly(['days', 'from', 'to', 'minutes'])
+        && c.days is list && c.days.size() >= 1 && c.days.size() <= 7 && c.days.hasOnly([1, 2, 3, 4, 5, 6, 7])
+        && c.from is int && c.to is int && c.minutes is int
+        && c.from >= 0 && c.from < c.to && c.to <= 1440
+        && c.minutes >= 1 && c.minutes < c.to - c.from;
+    }
+
+    // At most six, each a cap (rules can't loop, so each place is checked on its own).
+    function validCaps(l) {
+      return l is list && l.size() <= 6
+        && (l.size() < 1 || validCap(l[0])) && (l.size() < 2 || validCap(l[1])) && (l.size() < 3 || validCap(l[2]))
+        && (l.size() < 4 || validCap(l[3])) && (l.size() < 5 || validCap(l[4])) && (l.size() < 6 || validCap(l[5]));
     }
 
     // Allowed hours per weekday ("1" = Monday). The windows themselves are checked when they
@@ -50,8 +80,11 @@ service cloud.firestore {
       return s is map && s.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7']);
     }
 
+    // Hours, days with their own limit and caps within hours: what rules can't compare.
     function sameSchedule(old, next) {
-      return old.get('schedule', null) == next.get('schedule', null);
+      return old.get('schedule', null) == next.get('schedule', null)
+        && old.get('dayMinutes', null) == next.get('dayMinutes', null)
+        && old.get('caps', null) == next.get('caps', null);
     }
 
     // 0 means "no limit" for that period, so going from 0 to anything is stricter.
@@ -115,8 +148,8 @@ service cloud.firestore {
       match /limits/{pkg} {
         allow read: if signedIn() && (me() == uid || (isApproverOf(uid) && shares(uid, 'shareLimits')));
         allow create: if signedIn() && me() == uid && validLimit(request.resource.data, pkg);
-        // Allowed hours can't be compared here, so with Bumblebees they change through the
-        // backend's saveLimit, which checks they only got stricter. The app's name stays as it
+        // Allowed hours, days' own limits and caps can't be compared here, so with Bumblebees
+        // they change through the backend's saveLimit, which checks they only got stricter. The app's name stays as it
         // was: Bumblebees read it in requests, and a new one could pass one app off as another.
         allow update: if signedIn() && me() == uid && validLimit(request.resource.data, pkg)
           && (hasNoApprovers(uid)
@@ -249,14 +282,27 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if participant();
+        function textMessage() {
+          return request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
+            && request.resource.data.kind == 'text'
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000;
+        }
+        // A photo or GIF the sender uploaded to this chat's own folder in Storage.
+        function imageMessage() {
+          return request.resource.data.keys().hasOnly(['senderId', 'kind', 'createdAt', 'path', 'width', 'height', 'gif'])
+            && request.resource.data.kind == 'image'
+            && request.resource.data.path is string
+            && request.resource.data.path.matches('chats/' + chatId + '/' + me() + '/[A-Za-z0-9_-]{8,64}[.](jpg|gif)')
+            && request.resource.data.width is int && request.resource.data.width > 0 && request.resource.data.width <= 8192
+            && request.resource.data.height is int && request.resource.data.height > 0 && request.resource.data.height <= 8192
+            && request.resource.data.gif is bool;
+        }
         allow create: if participant() && isOpen()
-          && request.resource.data.keys().hasOnly(['senderId', 'text', 'kind', 'createdAt'])
           && request.resource.data.senderId == me()
-          && request.resource.data.kind == 'text'
           && request.resource.data.createdAt == request.time
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
+          && (textMessage() || imageMessage());
         allow update, delete: if false;
       }
     }

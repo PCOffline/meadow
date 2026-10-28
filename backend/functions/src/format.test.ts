@@ -17,12 +17,15 @@ test("describes limits", () => {
   const evenings = Object.fromEntries(["1", "2", "3", "4", "5", "6", "7"].map((d) => [d, [{ from: 600, to: 1320 }]]));
   assert.equal(limitText(60, 0, evenings), "1h a day and only 10:00–22:00");
   assert.equal(limitText(30, 300, { "6": [] }), "30m a day, 5h a week and only at set hours");
+  const caps = [{ days: [1, 2, 3, 4, 5], from: 600, to: 960, minutes: 30 }];
+  assert.equal(limitText(30, 0, null, { "6": 120, "7": 120 }, caps), "30m a day, 2h at weekends and up to 30m 10:00–16:00 on weekdays");
 });
 
 test("summarizes each kind of request", () => {
   const base = { appName: "Instagram", minutes: 15, dailyMinutes: 20, weeklyMinutes: 0 };
   assert.equal(summarize({ ...base, type: "extra_time" }), "15 more minutes on Instagram");
   assert.equal(summarize({ ...base, type: "change_limit" }), "a new limit for Instagram: 20m a day");
+  assert.equal(summarize({ ...base, type: "change_limit", dayMinutes: { "7": 0 } }), "a new limit for Instagram: 20m a day and no limit on Sun");
   assert.equal(summarize({ ...base, type: "remove_limit" }), "removing the limit on Instagram");
   assert.equal(summarize({ ...base, type: "disable_strict_mode" }), "turning off strict mode");
 });

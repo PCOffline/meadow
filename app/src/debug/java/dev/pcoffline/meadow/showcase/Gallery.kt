@@ -58,8 +58,8 @@ import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
-import dev.pcoffline.meadow.ui.chat.ChatListContent
-import dev.pcoffline.meadow.ui.circle.CircleContent
+import dev.pcoffline.meadow.ui.circle.People
+import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.circle.FriendPage
 import dev.pcoffline.meadow.ui.components.OfflineBar
 import dev.pcoffline.meadow.ui.components.SectionTitle
@@ -72,7 +72,6 @@ import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.BeeStatsContent
 import dev.pcoffline.meadow.ui.requests.RequestCard
-import dev.pcoffline.meadow.ui.requests.RequestsContent
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
@@ -87,10 +86,13 @@ import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import java.time.LocalDate
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.pcoffline.meadow.data.Weather
+import dev.pcoffline.meadow.ui.components.LocalSkyWeather
 
 /**
  * Debug builds only: every screen in each of its states, drawn from [DemoGarden], with the theme,
- * day or night and being offline switched from the list. Opened from its own launcher icon,
+ * day or night, the weather in the sky and being offline switched from the list. Opened from its own launcher icon,
  * "Meadow screens". The data is made up; what a screen does when tapped (saving a limit, say)
  * still acts on whoever is signed in to this build.
  */
@@ -111,6 +113,8 @@ internal fun Gallery(scenarios: List<Scenario> = Scenarios.all) {
     var theme by rememberSaveable { mutableStateOf(GardenTheme.MEADOW) }
     var mode by rememberSaveable { mutableStateOf(DarkMode.LIGHT) }
     var offline by rememberSaveable { mutableStateOf(false) }
+    // Null follows the phone's own weather setting.
+    var weather by rememberSaveable { mutableStateOf<Weather?>(null) }
     // Offline here is pretend: the real state comes back on leaving the gallery.
     val wasOnline = remember { Connectivity.online.value }
     DisposableEffect(offline) {
@@ -118,19 +122,21 @@ internal fun Gallery(scenarios: List<Scenario> = Scenarios.all) {
         onDispose { Connectivity.set(wasOnline) }
     }
     MeadowTheme(theme, mode) {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            val index = open
-            if (index == null) {
-                ScenarioList(
-                    scenarios, theme, mode, offline,
-                    onTheme = { theme = it }, onMode = { mode = it }, onOffline = { offline = it }, onOpen = { open = it },
-                )
-            } else {
-                BackHandler { open = null }
-                // As in the app: below the status bar, with the offline strip on top.
-                Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                    OfflineBar()
-                    Box(Modifier.weight(1f)) { SnackbarScope { scenarios[index].content() } }
+        CompositionLocalProvider(LocalSkyWeather provides weather) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                val index = open
+                if (index == null) {
+                    ScenarioList(
+                        scenarios, theme, mode, offline, weather,
+                        onTheme = { theme = it }, onMode = { mode = it }, onOffline = { offline = it }, onWeather = { weather = it }, onOpen = { open = it },
+                    )
+                } else {
+                    BackHandler { open = null }
+                    // As in the app: below the status bar, with the offline strip on top.
+                    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                        OfflineBar()
+                        Box(Modifier.weight(1f)) { SnackbarScope { scenarios[index].content() } }
+                    }
                 }
             }
         }
@@ -143,9 +149,11 @@ private fun ScenarioList(
     theme: GardenTheme,
     mode: DarkMode,
     offline: Boolean,
+    weather: Weather?,
     onTheme: (GardenTheme) -> Unit,
     onMode: (DarkMode) -> Unit,
     onOffline: (Boolean) -> Unit,
+    onWeather: (Weather?) -> Unit,
     onOpen: (Int) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -161,6 +169,14 @@ private fun ScenarioList(
             Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DarkMode.entries.forEach { m ->
                     FilterChip(selected = m == mode, onClick = { onMode(m) }, label = { Text(stringResource(m.label)) })
+                }
+            }
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (listOf(null) + Weather.entries).forEach { w ->
+                    val label = w?.name?.lowercase()?.replace('_', ' ')?.replaceFirstChar { it.uppercase() } ?: "Phone's weather"
+                    FilterChip(selected = w == weather, onClick = { onWeather(w) }, label = { Text(label) })
                 }
             }
         }
@@ -283,28 +299,19 @@ internal object Scenarios {
         Scenario("Growth", "No usage access") { WithTabs(Tab.STATS) { StatsContent(StatsUiState(hasPermission = false)) } },
         Scenario("Growth", "Loading") { WithTabs(Tab.STATS) { StatsContent(StatsUiState()) } },
 
-        Scenario("Requests", "A friend asking, and your own") {
-            WithTabs(Tab.REQUESTS) { RequestsContent(d.robin, listOf(d.askFromAna), listOf(d.waitingAsk, d.request)) }
+        Scenario("People", "Everyone, with what's waiting") { WithTabs(Tab.PEOPLE) { PeopleContent(d.robin, d.people) } },
+        Scenario("People", "Invites, to you and from you") {
+            WithTabs(Tab.PEOPLE) {
+                PeopleContent(d.robin, People(listOf(d.maya), listOf(d.ana), listOf(d.inviteToRobin), listOf(d.inviteFromRobin)))
+            }
         },
-        Scenario("Requests", "Nothing yet") { WithTabs(Tab.REQUESTS) { RequestsContent(d.robin, emptyList(), emptyList()) } },
-        Scenario("Requests", "No Bumblebees yet") { WithTabs(Tab.REQUESTS) { RequestsContent(nobody, emptyList(), emptyList()) } },
-        Scenario("Requests", "Loading") { WithTabs(Tab.REQUESTS) { RequestsContent(d.robin, null, null) } },
-        Scenario("Requests", "Your answers as a Bumblebee") { Page { BeeStatsContent(d.beeStats) } },
-        Scenario("Requests", "Your answers, none yet") { Page { BeeStatsContent(Demo.noAnswers) } },
+        Scenario("People", "Nobody yet") { WithTabs(Tab.PEOPLE) { PeopleContent(nobody, People()) } },
+        Scenario("People", "Your answers as a Bumblebee") { Page { BeeStatsContent(d.beeStats) } },
+        Scenario("People", "Your answers, none yet") { Page { BeeStatsContent(Demo.noAnswers) } },
+        Scenario("People", "A friend's garden, all shared") { FriendDemo(d.anaPage) },
+        Scenario("People", "A friend's garden, nothing shared") { FriendDemo(SharedPage(d.ana, null, null, null, null)) },
+        Scenario("People", "A friend's garden, loading") { FriendDemo(d.anaPage, waiting = true) },
 
-        Scenario("Circle", "Bumblebees and a garden you look after") {
-            WithTabs(Tab.CIRCLE) { CircleContent(d.robin, listOf(d.maya, d.theo), listOf(d.ana), emptyList(), emptyList()) }
-        },
-        Scenario("Circle", "Invites, to you and from you") {
-            WithTabs(Tab.CIRCLE) { CircleContent(d.robin, listOf(d.maya), listOf(d.ana), listOf(d.inviteToRobin), listOf(d.inviteFromRobin)) }
-        },
-        Scenario("Circle", "Nobody yet") { WithTabs(Tab.CIRCLE) { CircleContent(nobody, emptyList(), emptyList(), emptyList(), emptyList()) } },
-        Scenario("Circle", "A friend's garden, all shared") { FriendDemo(d.anaPage) },
-        Scenario("Circle", "A friend's garden, nothing shared") { FriendDemo(SharedPage(d.ana, null, null, null, null)) },
-        Scenario("Circle", "A friend's garden, loading") { FriendDemo(d.anaPage, waiting = true) },
-
-        Scenario("Chats", "Your chats") { WithTabs(Tab.CHATS) { ChatListContent(d.robin, listOf(d.chat)) } },
-        Scenario("Chats", "No chats yet") { WithTabs(Tab.CHATS) { ChatListContent(nobody, emptyList()) } },
         Scenario("Chats", "A conversation") { Page { ChatDemo() } },
         Scenario("Chats", "A message that didn't send") { Page { ChatDemo(error = "Something went wrong. Please try again.") } },
         Scenario("Chats", "A closed chat") { Page { ChatContent(d.robin, null, emptyList()) } },
@@ -321,7 +328,7 @@ internal object Scenarios {
         Scenario("Resting app", "Asked, waiting") { RestContent("demo.tiktok", Demo.restAsked) },
         Scenario("Resting app", "No Bumblebees") { RestContent("demo.tiktok", d.rest.copy(hasBumblebees = false)) },
         Scenario("Resting app", "Signed out") { RestContent("demo.tiktok", d.rest.copy(signedIn = false)) },
-        Scenario("Resting app", "A Bumblebee said yes") { RestContent("demo.tiktok", Demo.restYes) },
+        Scenario("Resting app", "A Bumblebee approved") { RestContent("demo.tiktok", Demo.restYes) },
         Scenario("Resting app", "Emergency unlock") { RestContent("demo.tiktok", Demo.restEmergency) },
 
         Scenario("Protections", "Nothing on yet") { Page { SetupScreen(onDone = {}, read = { Demo.protection(essentials = false, rest = false) }) } },

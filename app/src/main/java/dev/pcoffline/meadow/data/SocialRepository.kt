@@ -72,6 +72,11 @@ class SocialRepository(
         backend.call("sendInvite", mapOf("friendCode" to friendCode.trim().uppercase()))
     }
 
+    /** From your chat with [uid]: asks them to be your Bumblebee, or ([offer]) offers to be theirs. */
+    suspend fun inviteFromChat(uid: String, offer: Boolean) {
+        backend.call("inviteFromChat", mapOf("uid" to uid, "offer" to offer))
+    }
+
     suspend fun respond(inviteId: String, accept: Boolean) {
         backend.call("respondInvite", mapOf("inviteId" to inviteId, "accept" to accept))
     }

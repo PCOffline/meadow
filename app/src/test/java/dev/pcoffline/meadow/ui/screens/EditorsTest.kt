@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -116,7 +118,7 @@ class EditorsTest : ScreenTest() {
     @Test
     fun `the same hours every day - presets, adding and removing hours`() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow.ALL_DAY))
-        show { ScheduleEditor(schedule) { schedule = it } }
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
         compose.onNodeWithText(text(R.string.schedule_every_day)).assertIsSelected()
 
         // "10:00–16:00" every day, shown as a start and an end to change.
@@ -141,7 +143,7 @@ class EditorsTest : ScreenTest() {
     @Test
     fun `per weekday, a day is switched off and on, leaving the others as they were`() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 21 * 60)))
-        show { ScheduleEditor(schedule) { schedule = it } }
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
         node(R.string.schedule_per_day).performClick()
 
         daySwitch(DayOfWeek.WEDNESDAY).assertIsOn().performClick()
@@ -158,7 +160,7 @@ class EditorsTest : ScreenTest() {
 
     @Test
     fun `per weekday, the days start on the chosen first day of the week`() {
-        show { ScheduleEditor(Schedule.everyDay(TimeWindow.ALL_DAY), firstDay = DayOfWeek.SATURDAY) {} }
+        showScrolling { ScheduleEditor(Schedule.everyDay(TimeWindow.ALL_DAY), firstDay = DayOfWeek.SATURDAY) {} }
         node(R.string.schedule_per_day).performClick()
         val tops = listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY)
             .map { daySwitch(it).fetchSemanticsNode().boundsInRoot.top }
@@ -170,7 +172,7 @@ class EditorsTest : ScreenTest() {
         var schedule by mutableStateOf(
             Schedule((1..7).associateWith { if (it == 1) emptyList() else listOf(TimeWindow(8 * 60, 20 * 60)) }),
         )
-        show { ScheduleEditor(schedule) { schedule = it } }
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
         compose.onNodeWithText(text(R.string.schedule_per_day)).assertIsSelected()
         node(R.string.schedule_every_day).performClick()
         assertEquals(Schedule.everyDay(TimeWindow(8 * 60, 20 * 60)), schedule)
@@ -178,7 +180,7 @@ class EditorsTest : ScreenTest() {
 
     @Test
     fun `while saving, nothing in the hours can be changed`() {
-        show { ScheduleEditor(Schedule.everyDay(TimeWindow(9 * 60, 17 * 60)), enabled = false) {} }
+        showScrolling { ScheduleEditor(Schedule.everyDay(TimeWindow(9 * 60, 17 * 60)), enabled = false) {} }
         val actionable = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes()
         assertTrue(actionable.isNotEmpty())
         actionable.forEach { assertTrue(SemanticsProperties.Disabled in it.config) }
@@ -186,8 +188,40 @@ class EditorsTest : ScreenTest() {
 
     @Test
     fun `a schedule with no hours at all opens day by day, every day not allowed`() {
-        show { ScheduleEditor(Schedule.everyDay()) {} }
+        showScrolling { ScheduleEditor(Schedule.everyDay()) {} }
         compose.onNodeWithText(text(R.string.schedule_per_day)).assertIsSelected()
         compose.onAllNodesWithText(text(R.string.schedule_day_off)).assertCountEquals(7)
+    }
+
+    @Test
+    fun `per weekday, a day can be allowed all day in one tap, and back to set hours`() {
+        var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 17 * 60)))
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
+        node(R.string.schedule_per_day).performClick()
+        val allDay = "${text(R.string.schedule_all_day_chip)}, ${dayName(DayOfWeek.WEDNESDAY)}"
+        compose.onNodeWithContentDescription(allDay).assertIsNotSelected().performClick()
+        assertEquals(listOf(TimeWindow.ALL_DAY), schedule.windowsOn(3))
+        assertEquals(listOf(TimeWindow(9 * 60, 17 * 60)), schedule.windowsOn(4))
+        // Back to set hours: the hours the other days have.
+        compose.onNodeWithContentDescription(allDay).assertIsSelected().performClick()
+        assertEquals(listOf(TimeWindow(9 * 60, 17 * 60)), schedule.windowsOn(3))
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `per weekday, one day's hours are copied to several days at once`() {
+        var schedule by mutableStateOf(Schedule((1..7).associateWith { if (it == 1) listOf(TimeWindow(9 * 60, 12 * 60)) else listOf(TimeWindow(8 * 60, 20 * 60)) }))
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
+        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.MONDAY))).performClick()
+        compose.onNodeWithText(text(R.string.schedule_copy_title, dayName(DayOfWeek.MONDAY))).assertExists()
+        // Monday is the one being copied, so it can't be picked.
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.MONDAY)).assertIsNotEnabled()
+        node(R.string.action_ok).assertIsNotEnabled()
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.SATURDAY)).performClick()
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.SUNDAY)).performClick()
+        node(R.string.action_ok).performClick()
+        assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(6))
+        assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(7))
+        assertEquals(listOf(TimeWindow(8 * 60, 20 * 60)), schedule.windowsOn(5))
     }
 }

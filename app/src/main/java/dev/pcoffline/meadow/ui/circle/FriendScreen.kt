@@ -39,6 +39,7 @@ import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.SharedAppUsage
 import dev.pcoffline.meadow.data.SharedPage
 import dev.pcoffline.meadow.data.UserProfile
+import dev.pcoffline.meadow.data.dailyMinutesOn
 import dev.pcoffline.meadow.ui.components.AppIcon
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.Hint
@@ -187,7 +188,8 @@ fun FriendPage(page: SharedPage, waiting: Boolean = false, offline: Boolean = fa
 
 @Composable
 private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>, limits: List<AppLimit>) {
-    val daily = limits.associate { it.packageName to it.dailyMinutes }
+    val today = Days.today().dayOfWeek.value
+    val daily = limits.associate { it.packageName to it.dailyMinutesOn(today) }
     MeadowCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.friend_today), style = MaterialTheme.typography.titleMedium)
         if (minutes != null) {
@@ -229,7 +231,7 @@ private fun LimitsCard(limits: List<AppLimit>) {
                 AppIcon(limit.packageName, size = 28.dp)
                 Spacer(Modifier.width(10.dp))
                 Text(limit.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Text(limitText(limit.dailyMinutes, limit.weeklyMinutes, limit.schedule), style = MaterialTheme.typography.labelMedium)
+                Text(limitText(limit), style = MaterialTheme.typography.labelMedium)
             }
         }
     }

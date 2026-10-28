@@ -7,9 +7,11 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -46,6 +48,24 @@ fun <T> Flow<T>.retryWithBackoff(onFailure: suspend (cause: Throwable, waitMs: L
         delay(waitMs)
         true
     }
+
+/**
+ * Holds back what [fromCache] says came from this phone's cache while [online], for up to
+ * [waitMs], so a screen opened after a change made elsewhere (a Bumblebee answering) doesn't act
+ * on the old copy first. The server's copy, arriving meanwhile, replaces it; offline, or with a
+ * server slow to answer, the cached copy is what there is.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+fun <T> Flow<T>.preferServer(
+    fromCache: (T) -> Boolean,
+    online: () -> Boolean = { Connectivity.online.value },
+    waitMs: Long = SERVER_WAIT_MS,
+): Flow<T> = transformLatest {
+    if (fromCache(it) && online()) delay(waitMs)
+    emit(it)
+}
+
+const val SERVER_WAIT_MS = 2_000L
 
 /** The pause before listening again after failure number [attempt] (counted from 0). */
 fun backoffMs(attempt: Long): Long = minOf(MAX_BACKOFF_MS, 1_000L shl attempt.coerceIn(0L, 6L).toInt())
@@ -138,6 +158,8 @@ fun DocumentSnapshot.toLimit() = AppLimit(
     dailyMinutes = int("dailyMinutes"),
     weeklyMinutes = int("weeklyMinutes"),
     schedule = Schedule.fromFirestore(get("schedule")),
+    dayMinutes = DayMinutes.fromFirestore(get("dayMinutes")),
+    caps = TimeCap.listFromFirestore(get("caps")),
 )
 
 fun DocumentSnapshot.toGrant() = Grant(
@@ -166,6 +188,8 @@ fun DocumentSnapshot.toRequest() = LimitRequest(
     dayKey = getString("dayKey") ?: "",
     createdAtMillis = millis("createdAt"),
     schedule = Schedule.fromFirestore(get("schedule")),
+    dayMinutes = DayMinutes.fromFirestore(get("dayMinutes")),
+    caps = TimeCap.listFromFirestore(get("caps")),
     requesterFlower = getString("requesterFlower") ?: "🌼",
     myDecision = getString("myDecision"),
     grantedMinutes = int("grantedMinutes"),
@@ -188,6 +212,7 @@ fun DocumentSnapshot.toInvite() = Invite(
         else -> InviteStatus.PENDING
     },
     createdAtMillis = millis("createdAt"),
+    offer = getBoolean("offer") == true,
 )
 
 fun DocumentSnapshot.toChat() = Chat(
@@ -216,11 +241,20 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
     kind = when (getString("kind")) {
         "request" -> MessageKind.REQUEST
         "system" -> MessageKind.SYSTEM
+        "image" -> MessageKind.IMAGE
         else -> MessageKind.TEXT
     },
     requestId = getString("requestId"),
     createdAtMillis = millis("createdAt"),
     pending = metadata.hasPendingWrites(),
+    picture = getString("path")?.let { path ->
+        ChatPicture(
+            path = path,
+            width = (getLong("width") ?: 1L).toInt().coerceAtLeast(1),
+            height = (getLong("height") ?: 1L).toInt().coerceAtLeast(1),
+            gif = getBoolean("gif") == true,
+        )
+    },
 )
 
 fun DocumentSnapshot.toSharedApps(): List<SharedAppUsage> =

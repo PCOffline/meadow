@@ -128,12 +128,12 @@ class AskJourneyTest : EndToEndTest() {
             lee.call("decideRequest", mapOf("requestId" to requestId, "approve" to true, "minutes" to 10))
             waitForText(text(R.string.garden_tile_extra, app.resources.minutesText(10)))
 
-            // The Requests tab's button asks about the same limited apps.
-            node(R.string.tab_requests).performClick()
+            // People's button asks about the same limited apps.
+            tab(R.string.tab_people).performClick()
             waitForSnackbarToGo(R.string.ask_sent)
             compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).performClick()
             try {
-                eventually("the ask dialog from the Requests button") { showing(text(R.string.ask_title)) }
+                eventually("the ask dialog from People's button") { showing(text(R.string.ask_title)) }
             } catch (e: AssertionError) {
                 // What the system shows, and what went wrong on the way, beyond Compose's view.
                 val windows = shell("dumpsys window windows").lines().filter { "Window #" in it || "mCurrentFocus" in it }

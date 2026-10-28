@@ -192,7 +192,7 @@ describe("profiles", () => {
     assert.deepEqual(account.approverIds, []);
     assert.equal(account.acceptedTerms.version, 1);
     assert.equal(account.strictMode, false);
-    assert.deepEqual(account.privacy, { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false });
+    assert.deepEqual(account.privacy, { shareLimits: false, shareTime: false, shareApps: false, shareProgress: false });
     assert.deepEqual(await read(`friendCodes/${account.friendCode}`), { uid: sam.uid });
     assert.equal((await read(`heartbeats/${sam.uid}`)).staleNotified, false);
   });
@@ -231,6 +231,21 @@ describe("profiles", () => {
       assert.equal(chat.names[sam.uid], "Sammy");
       assert.equal(chat.avatars[sam.uid].flower, "🦔");
       assert.equal(chat.avatars[sam.uid].color, "honey");
+    });
+  });
+
+  test("profile edits reach invites still waiting for an answer", async () => {
+    const sam = await person("Sam");
+    const ana = await person("Ana");
+    await sam.call("sendInvite", { friendCode: await friendCodeOf(ana) });
+    const [{ inviteId }] = await outbox(ana.uid, "invite");
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}`), { displayName: "Sammy", flower: "🦔" }));
+    await admin((db) => updateDoc(doc(db, `users/${ana.uid}`), { displayName: "Anna" }));
+    await eventually(async () => {
+      const invite = await read(`invites/${inviteId}`);
+      assert.equal(invite.fromName, "Sammy");
+      assert.equal(invite.fromFlower, "🦔");
+      assert.equal(invite.toName, "Anna");
     });
   });
 });
@@ -350,6 +365,59 @@ describe("friend codes", () => {
     // Even a real code isn't looked up any more today, so nobody learns whether it exists.
     await rejects(sam.call("sendInvite", { friendCode: await friendCodeOf(bee) }), "resource-exhausted", /friend codes today/);
     assert.equal((await outbox(bee.uid, "invite")).length, 0);
+  });
+});
+
+describe("asking from a chat", () => {
+  test("you can ask someone you chat with to be your Bumblebee too", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Bee looks after Sam's garden; now Bee asks Sam to look after theirs.
+    await bee.call("inviteFromChat", { uid: sam.uid, offer: false });
+    await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: false }), "already-exists");
+    const [invite] = await outbox(sam.uid, "invite");
+    assert.match(invite.title, /would like you as their Bumblebee/);
+    await sam.call("respondInvite", { inviteId: invite.inviteId, accept: true });
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approverIds, [sam.uid]);
+    assert.equal((await outbox(bee.uid, "invite_accepted")).length, 1);
+    await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: false }), "already-exists", /already your Bumblebee/);
+  });
+
+  test("you can offer to be the Bumblebee of someone you chat with", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // Sam is looked after by Bee, and offers to look after Bee's garden in return.
+    await sam.call("inviteFromChat", { uid: bee.uid, offer: true });
+    const [offer] = await outbox(bee.uid, "invite");
+    assert.match(offer.title, /offers to be your Bumblebee/);
+    assert.equal((await read(`invites/${offer.inviteId}`)).offer, true);
+    await bee.call("respondInvite", { inviteId: offer.inviteId, accept: true });
+    // Accepting an offer makes whoever offered the Bumblebee, and tells them.
+    assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approverIds, [sam.uid]);
+    assert.deepEqual((await read(`users/${sam.uid}/private/account`)).approveeIds, [bee.uid]);
+    // Sam already heard that Bee became theirs when they were linked; this one is the other way round.
+    const told = await outbox(sam.uid, "invite_accepted");
+    assert.ok(told.some((push) => /You're Bee's Bumblebee now/.test(push.title)), JSON.stringify(told));
+    await rejects(sam.call("inviteFromChat", { uid: bee.uid, offer: true }), "already-exists", /already Bee's Bumblebee/);
+  });
+
+  test("nobody you don't already chat with can be reached this way", async () => {
+    const sam = await person("Sam");
+    const stranger = await person("Stranger");
+    await rejects(sam.call("inviteFromChat", { uid: stranger.uid, offer: false }), "failed-precondition");
+    await rejects(sam.call("inviteFromChat", { uid: stranger.uid, offer: true }), "failed-precondition");
+    await rejects(sam.call("inviteFromChat", { uid: sam.uid, offer: true }), "invalid-argument");
+    assert.equal((await outbox(stranger.uid)).length, 0);
+  });
+
+  test("a closed chat can't be used to ask either", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: true }), "failed-precondition");
   });
 });
 
@@ -637,6 +705,32 @@ describe("requests", () => {
     assert.equal(limit.dailyMinutes, 20);
   });
 
+  test("days' own limits and caps: tightening goes through saveLimit, loosening needs a yes, and a yes applies them", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    const path = `users/${sam.uid}/limits/com.insta`;
+    const cap = { days: [5, 1, 2, 3, 4], from: 600, to: 960, minutes: 20 };
+    const save = (extra) => sam.call("saveLimit", { packageName: "com.insta", dailyMinutes: 30, weeklyMinutes: 0, ...extra });
+    await save({ dayMinutes: { "6": 15 }, caps: [cap] });
+    let limit = await read(path);
+    assert.deepEqual(limit.dayMinutes, { "6": 15 });
+    assert.deepEqual(limit.caps, [{ ...cap, days: [1, 2, 3, 4, 5] }], "days come back in order");
+    await save({ dayMinutes: { "6": 10 }, caps: [{ ...cap, minutes: 15 }] });
+    await rejects(save({ dayMinutes: { "6": 60 }, caps: [{ ...cap, minutes: 15 }] }), "failed-precondition");
+    await rejects(save({ dayMinutes: { "6": 10 }, caps: [] }), "failed-precondition");
+    await rejects(save({ dayMinutes: { "6": 10 }, caps: [{ ...cap, minutes: 15, days: [1] }] }), "failed-precondition");
+
+    const { requestId } = await sam.call("createRequest", {
+      type: "change_limit", packageName: "com.insta", dailyMinutes: 30, weeklyMinutes: 0, dayMinutes: { "6": 120, "7": 120 }, caps: [], dayKey: today(),
+    });
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.title + push.body, /2h at weekends/);
+    assert.deepEqual((await read(`users/${bee.uid}/inbox/${requestId}`)).dayMinutes, { "6": 120, "7": 120 });
+    await bee.call("decideRequest", { requestId, approve: true });
+    limit = await read(path);
+    assert.deepEqual(limit.dayMinutes, { "6": 120, "7": 120 });
+    assert.equal(limit.caps, undefined);
+  });
+
   test("Bumblebees are told the app the request is really about, whatever name the phone gives", async () => {
     const { sam, bee } = await gardenWithLimit();
     const { requestId } = await sam.call("createRequest", {
@@ -836,6 +930,33 @@ describe("chat and alerts", () => {
     assert.equal((await outbox(sam.uid, "chat")).length, 0);
   });
 
+  test("a photo is pushed as a photo, and the chat's pictures go when the chat closes", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
+    const path = `chats/${chatId}/${sam.uid}/photo1234.jpg`;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      for (const bucket of BUCKETS) await uploadBytes(storageRef(ctx.storage(`gs://${bucket}`), path), new Uint8Array([255, 216, 255]), { contentType: "image/jpeg" });
+    });
+    await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
+      senderId: sam.uid, kind: "image", path, width: 640, height: 480, gif: false, createdAt: serverTimestamp(),
+    }));
+    const [push] = await eventually(async () => {
+      const sent = await outbox(bee.uid, "chat");
+      assert.equal(sent.length, 1);
+      return sent;
+    });
+    assert.equal(push.body, "📷 Photo");
+    // Uploaded to both possible default buckets (see readFile): the backend's own copy goes.
+    const copies = async () => (await Promise.all(BUCKETS.map(async (bucket) =>
+      (await fetch(`http://127.0.0.1:9199/v0/b/${bucket}/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } })).ok))).filter(Boolean).length;
+    assert.equal(await copies(), 2);
+
+    await bee.call("stepDown", { approveeUid: sam.uid });
+    assert.equal(await copies(), 1);
+  });
+
   test("a protection alert reaches every Bumblebee, without saying which setting changed", async () => {
     const sam = await person("Sam");
     const bee = await person("Bee");
@@ -847,6 +968,22 @@ describe("chat and alerts", () => {
       return pushes;
     });
     assert.doesNotMatch(alert.title + alert.body, /strict|battery|keeper|usage access|uninstall/i);
+  });
+});
+
+describe("test notifications", () => {
+  test("go only to your own phones, one per channel, and can't be sent all day", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    // No phone registered: nothing to deliver, and the app can say so.
+    assert.deepEqual(await sam.call("sendTestPush"), { phones: 0, delivered: 0, errors: [] });
+    const sent = await outbox(sam.uid, "test");
+    assert.deepEqual(sent.map((p) => p.channel).sort(), ["chat", "requests"]);
+    assert.ok(sent.every((p) => p.title && p.body));
+    assert.equal((await outbox(bee.uid, "test")).length, 0);
+    for (let i = 1; i < 5; i++) await sam.call("sendTestPush");
+    await rejects(sam.call("sendTestPush"), "resource-exhausted");
   });
 });
 
@@ -1081,9 +1218,9 @@ describe("invites by code can be withdrawn", () => {
 
 describe("every callable is safe to call wrongly", () => {
   const CALLABLES = [
-    "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "respondInvite", "cancelInvite",
+    "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "inviteFromChat", "respondInvite", "cancelInvite",
     "removeApprover", "cancelRemoval", "stepDown", "createRequest", "decideRequest", "cancelRequest", "saveLimit",
-    "emergencyUnlock", "exportMyData", "deleteAccount",
+    "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush",
   ];
 
   test("nothing works without signing in", async () => {

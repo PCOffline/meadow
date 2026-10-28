@@ -45,11 +45,14 @@ class GuardianAccessibilityService : AccessibilityService() {
     /** Limited apps on screen besides the main one: the other split-screen half, a floating window. */
     @Volatile private var sidePackages: Set<String> = emptySet()
 
-    /** The app shown in picture-in-picture, taken to be the limited app left just before it appeared. */
+    /** The limited app shown in picture-in-picture, if any. */
     @Volatile private var pipPackage: String? = null
     private var lastLimitedLeft: String? = null
+    private var lastLimitedLeftAt = 0L
     private val watchers = HashMap<String, Job>()
     private val windowPackages = WindowPackages()
+    private val pipWindows = WindowPackages()
+    private val homeGuard = HomeGuard()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -97,7 +100,10 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     private fun onForeground(pkg: String) {
         if (pkg == currentPackage) return
-        currentPackage?.takeIf { AppGraph.engine.limitFor(it) != null }?.let { lastLimitedLeft = it }
+        currentPackage?.takeIf { AppGraph.engine.limitFor(it) != null }?.let {
+            lastLimitedLeft = it
+            lastLimitedLeftAt = SystemClock.elapsedRealtime()
+        }
         currentPackage = pkg
         AppGraph.engine.setForeground(pkg)
         // Picture-in-picture often starts just as its app is left.
@@ -109,22 +115,25 @@ class GuardianAccessibilityService : AccessibilityService() {
     /** Finds limited apps in other windows: split screen and picture-in-picture. */
     private fun scanWindows() {
         val all = runCatching { windows }.getOrNull() ?: return
-        var pip = false
+        val pip = ArrayList<AccessibilityWindowInfo>()
         val apps = ArrayList<AccessibilityWindowInfo>()
         for (w in all) {
             if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
-            if (w.isInPictureInPictureMode) {
-                pip = true
-                continue
-            }
-            apps += w
+            if (w.isInPictureInPictureMode) pip += w else apps += w
         }
         // Reading a window's root asks its app, so each window is only asked once.
         val side = HashSet<String>()
         for (pkg in windowPackages.of(apps, { it.id }) { w -> runCatching { w.root?.packageName?.toString() }.getOrNull() }) {
             if (pkg != currentPackage && pkg != packageName && AppGraph.engine.limitFor(pkg) != null) side += pkg
         }
-        pipPackage = if (!pip) null else pipPackage ?: lastLimitedLeft?.takeIf { it != currentPackage }
+        // Each floating window is attributed once, when it appears.
+        pipPackage = pipWindows.of(pip, { it.id }) { w ->
+            PipOwner.of(
+                windowPackage = runCatching { w.root?.packageName?.toString() }.getOrNull(),
+                lastLimitedLeft = lastLimitedLeft,
+                leftAgoMs = SystemClock.elapsedRealtime() - lastLimitedLeftAt,
+            )
+        }.firstOrNull { it != packageName && AppGraph.engine.limitFor(it) != null }
         sidePackages = side
         updateWatchers()
     }
@@ -172,6 +181,8 @@ class GuardianAccessibilityService : AccessibilityService() {
      * background open for a few seconds, so going Home first would leave nothing shown.
      */
     internal fun block(pkg: String) {
+        // Already covered: opening the screen again, or going Home, would only make it flicker.
+        if (BlockActivity.isShowingFor(pkg) && pkg !in sidePackages && pkg != pipPackage) return
         if (pkg == pipPackage) {
             dismissPictureInPicture()
             pipPackage = null
@@ -201,7 +212,7 @@ class GuardianAccessibilityService : AccessibilityService() {
             val beside = pkg in sidePackages || pkg == pipPackage
             withContext(Dispatchers.Main) {
                 when {
-                    beside && !leftHome -> {
+                    beside && !leftHome && homeGuard.allow(pkg, SystemClock.elapsedRealtime()) -> {
                         leftHome = true
                         since = SystemClock.elapsedRealtime()
                         performGlobalAction(GLOBAL_ACTION_HOME)
@@ -216,7 +227,7 @@ class GuardianAccessibilityService : AccessibilityService() {
     private fun dismissPictureInPicture() {
         val window = runCatching { windows }.getOrNull()?.firstOrNull { it.isInPictureInPictureMode } ?: return
         val dismissed = runCatching { window.root?.performAction(AccessibilityNodeInfo.ACTION_DISMISS) == true }.getOrDefault(false)
-        if (!dismissed) performGlobalAction(GLOBAL_ACTION_HOME)
+        if (!dismissed && homeGuard.allow(pipPackage ?: return, SystemClock.elapsedRealtime())) performGlobalAction(GLOBAL_ACTION_HOME)
     }
 
     private fun checkStrict(pkg: String, force: Boolean) {
@@ -345,5 +356,40 @@ internal class WindowPackages {
         }
         known = next
         return packages
+    }
+}
+
+/**
+ * Which app a picture-in-picture window belongs to. Its own [windowPackage] when Android tells;
+ * otherwise the limited app left a moment before it appeared ([leftAgoMs]), since picture-in-picture
+ * starts as its app is left. Any other floating window, such as another app's video, isn't
+ * blamed on a resting app, or the block screen would keep sending the phone Home.
+ */
+internal object PipOwner {
+    const val JUST_LEFT_MS = 3_000L
+
+    fun of(windowPackage: String?, lastLimitedLeft: String?, leftAgoMs: Long): String? =
+        windowPackage ?: lastLimitedLeft?.takeIf { leftAgoMs in 0..JUST_LEFT_MS }
+}
+
+/**
+ * Lets the phone be sent Home for an app at most once in a while. Home is the last resort for an
+ * app left beside the block screen; repeating it would trap the phone between Home and the block
+ * screen if Android kept reporting the app as shown.
+ */
+internal class HomeGuard(private val intervalMs: Long = INTERVAL_MS) {
+    private val last = HashMap<String, Long>()
+
+    /** Whether Home may be used for [pkg] at [now] (elapsed realtime); if so, counts it. */
+    @Synchronized
+    fun allow(pkg: String, now: Long): Boolean {
+        val previous = last[pkg]
+        if (previous != null && now - previous < intervalMs) return false
+        last[pkg] = now
+        return true
+    }
+
+    companion object {
+        const val INTERVAL_MS = 30_000L
     }
 }

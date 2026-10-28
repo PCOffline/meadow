@@ -25,12 +25,13 @@ import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.WeekRule
 import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.legal.LegalDoc
+import dev.pcoffline.meadow.ui.profile.ProfileEdit
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.SetupScreen
@@ -146,6 +147,74 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `each step not done yet says exactly where to tap, and done ones don't`() {
+        val hows = listOf(
+            R.string.setup_usage_how, R.string.setup_keeper_how, R.string.setup_listener_how, R.string.setup_overlay_how, R.string.setup_admin_how,
+        )
+        var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
+        show { key(state) { SetupScreen(onDone = {}, read = { state }, anonymous = false) } }
+        hows.forEach { node(it).assertExists() }
+        assertAccessible()
+
+        state = ProtectionState(true, true, true, true, true, true, notificationListener = true)
+        compose.waitForIdle()
+        hows.forEach { node(it).assertDoesNotExist() }
+    }
+
+    @Test
+    fun `setup offers to save a garden started without an email, in place`() {
+        show { SetupScreen(onDone = {}, anonymous = true) }
+        node(R.string.setup_account_title).performScrollTo().assertExists()
+        node(R.string.auth_email_link).assertDoesNotExist()
+        node(R.string.setup_account_action).performScrollTo().performClick()
+        node(R.string.setup_account_action).assertDoesNotExist()
+        node(R.string.auth_email_link).performScrollTo().assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `a garden with an email shows as saved in setup`() {
+        val all = ProtectionState(true, true, true, true, true, true, notificationListener = true)
+        show { SetupScreen(onDone = {}, read = { all }, anonymous = false) }
+        node(R.string.setup_account_action).assertDoesNotExist()
+        // Seven protections and the account.
+        assertEquals(8, compose.onAllNodesWithText(text(R.string.setup_step_done)).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun `setup asks what to share, with nothing shared to start and an example of the page it makes`() {
+        val saves = mutableListOf<Privacy>()
+        var chosen by mutableStateOf(false)
+        val robin = DemoGarden.robin.copy(privacy = Privacy())
+        show {
+            SetupScreen(
+                onDone = {}, anonymous = false, profile = robin,
+                sharingChosen = chosen, onSharingChosen = { chosen = true }, savePrivacy = { saves += it },
+            )
+        }
+        node(R.string.setup_sharing_title).performScrollTo().assertExists()
+        for (part in listOf(R.string.settings_share_limits, R.string.settings_share_time, R.string.settings_share_apps, R.string.settings_share_progress)) {
+            compose.onNode(isToggleable() and hasText(text(part))).performScrollTo().assertIsOff()
+        }
+        node(R.string.friend_nothing_shared, robin.displayName).performScrollTo().assertExists()
+        assertAccessible()
+
+        // The example follows each switch as it moves, and the choice is saved as in Settings.
+        compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time))).performScrollTo().performClick()
+        val time = text(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 8))
+        compose.onNodeWithText(time).performScrollTo().assertExists()
+        node(R.string.friend_nothing_shared, robin.displayName).assertDoesNotExist()
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals(listOf(Privacy(shareTime = true)), saves)
+
+        // Settled, the step folds away.
+        node(R.string.setup_sharing_done).performScrollTo().performClick()
+        assertTrue(chosen)
+        node(R.string.setup_sharing_example).assertDoesNotExist()
+        node(R.string.setup_sharing_done).assertDoesNotExist()
+    }
+
+    @Test
     fun `setup has one way out, into the garden only once the essentials are on`() {
         var state by mutableStateOf(ProtectionState(false, false, false, false, false, false, notificationListener = false))
         var left = 0
@@ -166,7 +235,7 @@ class OtherScreensTest : ScreenTest() {
     @Test
     fun `settings show privacy choices, legal documents and a careful delete`() {
         val opened = mutableListOf<LegalDoc>()
-        val shy = DemoGarden.robin.copy(privacy = Privacy(shareTime = false))
+        val shy = DemoGarden.robin.copy(privacy = DemoGarden.sharesEverything.copy(shareTime = false))
         show { SettingsScreen(shy, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = { opened += it }) }
         compose.onNode(isToggleable() and hasText(text(R.string.settings_share_time))).performScrollTo().assertIsOff()
         node(R.string.legal_privacy).performScrollTo().performClick()
@@ -207,5 +276,44 @@ class OtherScreensTest : ScreenTest() {
     fun `colour choices are named, not just shown`() {
         show { ProfileScreen(DemoGarden.robin, onBack = {}) }
         compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.avatar_color_honey))).performScrollTo().assertExists()
+    }
+
+    private val withPhoto = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = "https://example.invalid/robin.jpg"))
+
+    @Test
+    fun `a photo can be changed or removed, right under it`() {
+        var removed = 0
+        show { ProfileScreen(withPhoto, onBack = {}, onRemovePhoto = { removed++ }) }
+        node(R.string.profile_photo_change).assertExists()
+        node(R.string.profile_photo_remove).performClick()
+        compose.waitUntil(5_000) { removed == 1 }
+        // Gone at once: the flower is back and it's a photo to add again.
+        node(R.string.profile_photo_remove).assertDoesNotExist()
+        node(R.string.profile_photo_choose).assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `picking a flower instead of the photo is saved, and the photo goes`() {
+        val saves = mutableListOf<ProfileEdit>()
+        show { ProfileScreen(withPhoto, onBack = {}, onSave = { saves += it }) }
+        val flower = compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.flower_picker_item, "🌻")))
+        flower.performScrollTo().performClick()
+        flower.assertIsSelected()
+        node(R.string.profile_photo_remove).assertDoesNotExist()
+        node(R.string.action_save).performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals("🌻", saves.single().emoji)
+        assertTrue(saves.single().removePhoto)
+    }
+
+    @Test
+    fun `without a photo, saving never removes one`() {
+        val saves = mutableListOf<ProfileEdit>()
+        show { ProfileScreen(DemoGarden.robin, onBack = {}, onSave = { saves += it }) }
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.flower_picker_item, "🌻"))).performScrollTo().performClick()
+        node(R.string.action_save).performScrollTo().performClick()
+        compose.waitUntil(5_000) { saves.isNotEmpty() }
+        assertEquals(false, saves.single().removePhoto)
     }
 }

@@ -2,170 +2,57 @@
 
 package dev.pcoffline.meadow.ui.requests
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
-import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.LocalCelebrate
-import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.AppIcon
-import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
-import dev.pcoffline.meadow.ui.components.TabTitle
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.requestSummary
-import dev.pcoffline.meadow.ui.stateWhileVisible
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
-
-class RequestsViewModel(uid: String) : ViewModel() {
-    /** Requests friends sent me as one of their Bumblebees; null while loading. */
-    val incoming: StateFlow<List<LimitRequest>?> = AppGraph.requests.incoming(uid).stateWhileVisible(this, null)
-
-    /** Requests I sent to my Bumblebees; null while loading. */
-    val outgoing: StateFlow<List<LimitRequest>?> = AppGraph.requests.outgoing(uid).stateWhileVisible(this, null)
-}
-
-@Composable
-fun RequestsScreen(
-    profile: UserProfile,
-    onOpenCircle: () -> Unit,
-    onOpenBeeStats: () -> Unit = {},
-    viewModel: RequestsViewModel = viewModel(key = "requests-${profile.uid}") { RequestsViewModel(profile.uid) },
-) {
-    val incoming by viewModel.incoming.collectAsStateWithLifecycle()
-    val outgoing by viewModel.outgoing.collectAsStateWithLifecycle()
-    RequestsContent(profile, incoming, outgoing, onOpenCircle, onOpenBeeStats)
-}
-
-/** The requests, drawn from plain state (also used for tests). */
-@Composable
-fun RequestsContent(
-    profile: UserProfile,
-    incoming: List<LimitRequest>?,
-    outgoing: List<LimitRequest>?,
-    onOpenCircle: () -> Unit = {},
-    onOpenBeeStats: () -> Unit = {},
-) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    var asking by rememberSaveable { mutableStateOf(false) }
-    val hasBees = profile.approverIds.isNotEmpty()
-
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            TabTitle(stringResource(R.string.requests_title))
-            val waiting = incoming?.count { it.status == RequestStatus.PENDING } ?: 0
-            PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 8.dp)) {
-                Tab(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    text = { Text(if (waiting > 0) stringResource(R.string.requests_tab_for_you_count, waiting) else stringResource(R.string.requests_tab_for_you)) },
-                )
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.requests_tab_yours)) })
-            }
-            val list = if (tab == 0) incoming else outgoing
-            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { Spacer(Modifier.height(4.dp)) }
-                if (tab == 0 && profile.approveeIds.isNotEmpty()) {
-                    item {
-                        TextButton(onClick = onOpenBeeStats, modifier = Modifier.padding(horizontal = 12.dp)) {
-                            Text(stringResource(R.string.bee_stats_open))
-                        }
-                    }
-                }
-                if (list?.isEmpty() == true) {
-                    item {
-                        if (tab == 0) EmptyState("🌤️", stringResource(R.string.requests_empty_for_you_title))
-                        else EmptyState("🌱", stringResource(R.string.requests_empty_yours_title))
-                    }
-                }
-                items(list.orEmpty(), key = { it.id }) { request ->
-                    RequestCard(request, myUid = profile.uid, modifier = Modifier.animateItem().padding(horizontal = 20.dp))
-                }
-                item { Spacer(Modifier.height(88.dp)) }
-            }
-        }
-        val label = stringResource(if (hasBees) R.string.requests_ask_button else R.string.requests_invite_button)
-        // Snackbars sit above the button rather than over it (they'd take its taps), only while it's here.
-        val clearance = LocalSnackbarClearance.current
-        val density = LocalDensity.current
-        DisposableEffect(clearance) { onDispose { clearance.height = 0.dp } }
-        ExtendedFloatingActionButton(
-            onClick = { if (hasBees) asking = true else onOpenCircle() },
-            icon = { Icon(Icons.Outlined.MoreTime, contentDescription = null) },
-            text = { Text(label) },
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            // Material keeps the label's text from screen readers, so the button names itself.
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-                .onSizeChanged { clearance.height = with(density) { it.height.toDp() } + 20.dp }
-                .semantics { contentDescription = label },
-        )
-    }
-    if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })
-}
 
 @Composable
 fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modifier, compact: Boolean = false) {

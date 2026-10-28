@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,5 +54,14 @@ class GalleryTest : ScreenTest() {
         compose.onNode(hasText("Nothing planted yet")).performScrollTo().performClick()
         node(R.string.garden_empty_title).assertExists()
         node(R.string.offline_bar).assertExists()
+    }
+
+    @Test
+    fun `the sky's weather can be picked, and the screens draw under it`() {
+        show { Gallery() }
+        compose.onNode(hasText("Storm") and hasClickAction()).performScrollTo().performClick()
+        compose.onNode(hasText("Storm") and hasClickAction()).assertIsSelected()
+        compose.onNode(hasText("Nothing planted yet")).performScrollTo().performClick()
+        node(R.string.garden_empty_title).assertExists()
     }
 }

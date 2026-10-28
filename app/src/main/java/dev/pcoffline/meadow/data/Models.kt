@@ -4,7 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * A committed limit for one app. A value of 0 means "no limit" for that period; a null
- * [schedule] means the app may be used at any hour.
+ * [schedule] means the app may be used at any hour. A day in [dayMinutes] has its own daily limit
+ * instead of [dailyMinutes], and every one of [caps] applies on top: the app rests once any of
+ * them is used up.
  */
 @Serializable
 data class AppLimit(
@@ -13,6 +15,8 @@ data class AppLimit(
     val dailyMinutes: Int,
     val weeklyMinutes: Int,
     val schedule: Schedule? = null,
+    val dayMinutes: Map<Int, Int> = emptyMap(),
+    val caps: List<TimeCap> = emptyList(),
 )
 
 /** Extra minutes a Bumblebee granted for a single day. */
@@ -32,20 +36,17 @@ data class Avatar(val emoji: String, val color: String, val photoUrl: String?) {
 }
 
 /**
- * What someone shares with their Bumblebees, each part on its own. Protections, strict mode,
- * extra time and earlier days' screen time are never shared.
+ * What someone shares with their Bumblebees, each part on its own. Nothing is shared until it's
+ * chosen. Protections, strict mode, extra time and earlier days' screen time are never shared.
  */
 data class Privacy(
     /** Which apps have limits, and what they are. */
-    val shareLimits: Boolean = true,
+    val shareLimits: Boolean = false,
     /** Today's total screen time. */
-    val shareTime: Boolean = true,
+    val shareTime: Boolean = false,
     /** The apps used most today, and for how long. */
-    val shareApps: Boolean = true,
-    /**
-     * How the weeks compare, and how often limits were kept: see [Progress]. It sums up earlier
-     * days, which otherwise never leave the phone, so it's only shared when chosen.
-     */
+    val shareApps: Boolean = false,
+    /** How the weeks compare, and how often limits were kept: see [Progress]. */
     val shareProgress: Boolean = false,
 ) {
     /** As stored on the account, under "privacy". */
@@ -55,9 +56,9 @@ data class Privacy(
     companion object {
         /** Reads the choices through [field] ("shareTime" and so on); one never made is the default. */
         fun read(field: (String) -> Boolean?): Privacy = Privacy(
-            shareLimits = field("shareLimits") ?: true,
-            shareTime = field("shareTime") ?: true,
-            shareApps = field("shareApps") ?: true,
+            shareLimits = field("shareLimits") ?: false,
+            shareTime = field("shareTime") ?: false,
+            shareApps = field("shareApps") ?: false,
             shareProgress = field("shareProgress") ?: false,
         )
     }
@@ -177,6 +178,8 @@ data class LimitRequest(
     val dayKey: String,
     val createdAtMillis: Long,
     val schedule: Schedule? = null,
+    val dayMinutes: Map<Int, Int> = emptyMap(),
+    val caps: List<TimeCap> = emptyList(),
     val requesterFlower: String = "🌼",
     /** "yes" or "no" when this Bumblebee answered it themselves. */
     val myDecision: String? = null,
@@ -199,6 +202,8 @@ data class Invite(
     val toName: String,
     val status: InviteStatus,
     val createdAtMillis: Long,
+    /** The sender offers to be the Bumblebee, rather than asking the receiver to be theirs. */
+    val offer: Boolean = false,
 )
 
 /** A one-time link that makes whoever accepts it the creator's Bumblebee. */
@@ -227,7 +232,10 @@ data class Chat(
         lastMessageAtMillis > (lastReadMillis[me] ?: 0L)
 }
 
-enum class MessageKind { TEXT, REQUEST, SYSTEM }
+enum class MessageKind { TEXT, IMAGE, REQUEST, SYSTEM }
+
+/** A photo or GIF sent in a chat: where it is in Storage, and its size to lay it out before it loads. */
+data class ChatPicture(val path: String, val width: Int, val height: Int, val gif: Boolean)
 
 data class ChatMessage(
     val id: String,
@@ -237,6 +245,8 @@ data class ChatMessage(
     val requestId: String?,
     val createdAtMillis: Long,
     val pending: Boolean,
+    /** Set for [MessageKind.IMAGE]. */
+    val picture: ChatPicture? = null,
 )
 
 /** Today's usage of a person, as uploaded for their Bumblebees. */

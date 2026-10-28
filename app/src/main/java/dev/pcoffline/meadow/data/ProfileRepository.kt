@@ -2,10 +2,7 @@ package dev.pcoffline.meadow.data
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
 import androidx.core.graphics.scale
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.storage.FirebaseStorage
@@ -20,8 +17,14 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.usage.UsageHistory
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import java.io.ByteArrayOutputStream
+import java.io.OutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** Your own profile, appearance, privacy choices and data rights. */
 class ProfileRepository(
@@ -29,6 +32,8 @@ class ProfileRepository(
     private val backend: Backend,
     private val store: LocalStore,
     private val share: UsageShareRepository,
+    /** Fetches a chat picture for the export. */
+    private val chatPicture: suspend (path: String) -> ByteArray = { AppGraph.chatMedia.download(it) },
     private val sync: () -> SyncManager,
 ) {
     private val storage by lazy { FirebaseStorage.getInstance() }
@@ -103,6 +108,27 @@ class ProfileRepository(
         return PrettyJson.encodeToString(JsonElement.serializer(), data)
     }
 
+    /**
+     * [exportData] as a zip: the JSON, then each chat photo and GIF it mentions, at the same path
+     * as in the JSON. Pictures that are already gone are left out.
+     */
+    suspend fun exportTo(out: OutputStream) {
+        val json = exportData()
+        withContext(Dispatchers.IO) {
+            ZipOutputStream(out).use { zip ->
+                zip.putNextEntry(ZipEntry(EXPORT_JSON))
+                zip.write(json.toByteArray())
+                zip.closeEntry()
+                for (path in picturePaths(json)) {
+                    val bytes = runCatchingCancellable { chatPicture(path) }.getOrNull() ?: continue
+                    zip.putNextEntry(ZipEntry(path))
+                    zip.write(bytes)
+                    zip.closeEntry()
+                }
+            }
+        }
+    }
+
     /** Deletes the account and everything tied to it, then forgets it on this phone too. */
     suspend fun deleteAccount() {
         // The profile disappears mid-call; keep the app from offering to create a new one.
@@ -116,10 +142,11 @@ class ProfileRepository(
         runCatchingCancellable { backend.auth.signOut() }
         store.clearAll()
         listOf(UsageHistory.FILE, UsageHistory.LEGACY_FILE).forEach { context.filesDir.resolve(it).delete() }
+        ChatMedia.clearCache(context)
     }
 
     private fun squareJpeg(uri: Uri): ByteArray {
-        val source = decode(uri)
+        val source = Pictures.decode(context, uri, MAX_DECODE)
         val side = minOf(source.width, source.height)
         val cropped = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
         val scaled = cropped.scale(PHOTO_SIZE, PHOTO_SIZE)
@@ -129,30 +156,25 @@ class ProfileRepository(
         }
     }
 
-    private fun decode(uri: Uri): Bitmap {
-        val resolver = context.contentResolver
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            return ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                val longest = maxOf(info.size.width, info.size.height)
-                if (longest > MAX_DECODE) decoder.setTargetSampleSize(longest / MAX_DECODE)
-            }
-        }
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = (maxOf(bounds.outWidth, bounds.outHeight) / MAX_DECODE).coerceAtLeast(1)
-        }
-        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw FriendlyException(dev.pcoffline.meadow.R.string.error_photo)
-    }
-
     companion object {
         const val BIO_MAX = 80
         private const val PHOTO_SIZE = 384
         private const val MAX_DECODE = 1600
         private const val MAX_EXPORT_BYTES = 32L * 1024 * 1024
         private val PrettyJson = Json { prettyPrint = true }
+        const val EXPORT_JSON = "meadow-data.json"
+
+        /** The chat pictures an export mentions, each once. */
+        fun picturePaths(json: String): List<String> {
+            val conversations = runCatching { Json.parseToJsonElement(json).jsonObject["conversations"]?.jsonArray }.getOrNull()
+            return conversations.orEmpty().flatMap { chat ->
+                (chat as? JsonObject)?.get("messages")?.let { it as? JsonArray }.orEmpty().mapNotNull { message ->
+                    val fields = message as? JsonObject ?: return@mapNotNull null
+                    if ((fields["kind"] as? JsonPrimitive)?.content != "image") return@mapNotNull null
+                    (fields["path"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                }
+            }.distinct()
+        }
 
         /** Converts a callable result (maps, lists, primitives) into JSON. */
         fun toJson(value: Any?): JsonElement = when (value) {

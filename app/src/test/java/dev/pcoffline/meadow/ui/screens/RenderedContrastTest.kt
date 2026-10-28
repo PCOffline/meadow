@@ -15,11 +15,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.a11y.contrastProblems
 import dev.pcoffline.meadow.data.BeeStats
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.Weather
 import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.showcase.DemoGarden
@@ -29,8 +36,9 @@ import dev.pcoffline.meadow.ui.MeadowTabBar
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
-import dev.pcoffline.meadow.ui.circle.CircleContent
+import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
+import dev.pcoffline.meadow.ui.components.LocalSkyWeather
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.BeeStatsContent
@@ -80,10 +88,34 @@ class RenderedContrastTest : ScreenTest() {
     private fun sweep(content: @Composable () -> Unit) = sweep(listOf(Unit)) { content() }
 
     @Test
+    fun `faint text is caught, unless a floating button is drawn over it`() {
+        var covered by mutableStateOf(false)
+        compose.setContent {
+            Box(Modifier.fillMaxSize().background(Color.White)) {
+                Text("Barely there", color = Color(0xFFEEEEEE), modifier = Modifier.align(Alignment.Center))
+                if (covered) Button(onClick = {}, modifier = Modifier.align(Alignment.Center).size(240.dp, 80.dp)) { Text("Plant") }
+            }
+        }
+        assertTrue(compose.contrastProblems().any { "Barely there" in it })
+        covered = true
+        compose.waitForIdle()
+        assertTrue(compose.contrastProblems().none { "Barely there" in it })
+    }
+
+    @Test
     fun `the garden, under every sky`() =
         // Morning, afternoon, evening and night skies each put their own colours behind the header.
         sweep(listOf(8, 13, 19, 23)) { hour ->
             CompositionLocalProvider(LocalSkyHour provides hour) { GardenContent(DemoGarden.robin, DemoGarden.garden) }
+        }
+
+    @Test
+    fun `the garden, in every weather, by day and by night`() =
+        // Clouds, fog, rain, snow and a storm each veil the sky and draw over it.
+        sweep(Weather.entries.flatMap { w -> listOf(13, 23).map { w to it } }) { (weather, hour) ->
+            CompositionLocalProvider(LocalSkyHour provides hour, LocalSkyWeather provides weather) {
+                GardenContent(DemoGarden.robin, DemoGarden.garden)
+            }
         }
 
     @Test
@@ -117,8 +149,8 @@ class RenderedContrastTest : ScreenTest() {
     fun `stats without usage access`() = sweep { StatsContent(DemoGarden.stats.copy(hasPermission = false)) }
 
     @Test
-    fun `the circle`() = sweep {
-        CircleContent(DemoGarden.robin, listOf(DemoGarden.maya, DemoGarden.theo), listOf(DemoGarden.ana), emptyList(), emptyList())
+    fun `people`() = sweep {
+        PeopleContent(DemoGarden.robin, DemoGarden.people)
     }
 
     @Test
@@ -149,7 +181,7 @@ class RenderedContrastTest : ScreenTest() {
 
     @Test
     fun `what Bumblebees see, shared and not`() = sweep(listOf(true, false)) { shared ->
-        val privacy = if (shared) Privacy(shareProgress = true) else Privacy(shareLimits = false, shareTime = false, shareApps = false, shareProgress = false)
+        val privacy = if (shared) DemoGarden.sharesEverything else Privacy()
         PrivacyPreviewContent(DemoGarden.robin.copy(privacy = privacy), DemoGarden.today, DemoGarden.progress, DemoGarden.myLimits, save = {})
     }
 
@@ -157,7 +189,7 @@ class RenderedContrastTest : ScreenTest() {
     fun `profile`() = sweep { ProfileScreen(DemoGarden.robin, onBack = {}) }
 
     @Test
-    fun `setup`() = sweep { SetupScreen(onDone = {}) }
+    fun `setup`() = sweep { SetupScreen(onDone = {}, profile = DemoGarden.robin.copy(privacy = Privacy()), sharingChosen = false, savePrivacy = {}) }
 
     @Test
     fun `strict mode needs more permissions`() = sweep {

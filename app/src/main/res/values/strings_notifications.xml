@@ -7,7 +7,7 @@
     <string name="channel_requests">Requests from friends</string>
     <string name="channel_requests_description">Friends asking you for extra time or a change to their limits.</string>
     <string name="channel_decisions">Answers from your Bumblebees</string>
-    <string name="channel_decisions_description">When a Bumblebee says yes or not today.</string>
+    <string name="channel_decisions_description">When a Bumblebee approves or denies a request.</string>
     <string name="channel_chat">Messages</string>
     <string name="channel_social">Invites and Bumblebees</string>
     <string name="channel_social_description">New Bumblebees, invites, and Bumblebees stepping down.</string>
@@ -41,4 +41,5 @@
 
     <string name="notify_warning_ask">Ask for more</string>
     <string name="notify_warning_body_hours">%1$s\'s allowed hours end soon.</string>
+    <string name="notify_warning_body_cap">Your %1$s time for these hours is almost up. It opens again once they end.</string>
 </resources>

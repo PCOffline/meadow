@@ -17,7 +17,7 @@ class LimitsRepository(
     /** [approverIds] picks which Bumblebees to ask if it needs a yes; null asks all of them. */
     suspend fun save(limit: AppLimit, message: String = "", approverIds: List<String>? = null): ChangeOutcome {
         val uid = backend.requireUid()
-        if (limit.dailyMinutes <= 0 && limit.weeklyMinutes <= 0 && limit.schedule == null) {
+        if (!limit.holdsBack) {
             throw FriendlyException(R.string.error_set_a_limit)
         }
         val current = store.limits.value.firstOrNull { it.packageName == limit.packageName }
@@ -31,13 +31,15 @@ class LimitsRepository(
                 dailyMinutes = limit.dailyMinutes,
                 weeklyMinutes = limit.weeklyMinutes,
                 schedule = limit.schedule,
+                dayMinutes = limit.dayMinutes,
+                caps = limit.caps,
                 approverIds = approverIds,
             )
             return ChangeOutcome.REQUESTED
         }
-        // Rules can't compare hours, so with Bumblebees a new schedule goes through the backend,
-        // which only accepts stricter ones.
-        if (current != null && hasBumblebees && current.schedule != limit.schedule) {
+        // Rules can't compare hours, days' own limits or caps, so with Bumblebees a change to them
+        // goes through the backend, which only accepts stricter ones.
+        if (current != null && hasBumblebees && !current.sameUncomparable(limit)) {
             backend.call(
                 "saveLimit",
                 mapOf(
@@ -46,6 +48,8 @@ class LimitsRepository(
                     "dailyMinutes" to limit.dailyMinutes,
                     "weeklyMinutes" to limit.weeklyMinutes,
                     "schedule" to limit.schedule?.toFirestore(),
+                    "dayMinutes" to limit.dayMinutes.takeIf { it.isNotEmpty() }?.let(DayMinutes::toFirestore),
+                    "caps" to limit.caps.map(TimeCap::toFirestore),
                 ),
             )
             return ChangeOutcome.APPLIED
@@ -58,6 +62,8 @@ class LimitsRepository(
             "updatedAt" to FieldValue.serverTimestamp(),
         )
         limit.schedule?.let { data["schedule"] = it.toFirestore() }
+        if (limit.dayMinutes.isNotEmpty()) data["dayMinutes"] = DayMinutes.toFirestore(limit.dayMinutes)
+        if (limit.caps.isNotEmpty()) data["caps"] = limit.caps.map(TimeCap::toFirestore)
         if (current == null) data["createdAt"] = FieldValue.serverTimestamp()
         // The local snapshot updates right away; offline writes are queued by Firestore.
         backend.user(uid).collection("limits").document(limit.packageName).set(data).awaitWrite()
@@ -81,10 +87,6 @@ class LimitsRepository(
     }
 
     companion object {
-        fun isLooser(old: AppLimit, new: AppLimit): Boolean {
-            val dailyLooser = old.dailyMinutes > 0 && (new.dailyMinutes == 0 || new.dailyMinutes > old.dailyMinutes)
-            val weeklyLooser = old.weeklyMinutes > 0 && (new.weeklyMinutes == 0 || new.weeklyMinutes > old.weeklyMinutes)
-            return dailyLooser || weeklyLooser || !Schedule.isStricter(old.schedule, new.schedule)
-        }
+        fun isLooser(old: AppLimit, new: AppLimit): Boolean = LimitRules.isLooser(old, new)
     }
 }

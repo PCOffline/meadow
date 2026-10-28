@@ -8,9 +8,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
+import dev.pcoffline.meadow.data.WeatherRepository
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.Connectivity
+import dev.pcoffline.meadow.data.ChatMedia
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.DayUsage
 import dev.pcoffline.meadow.data.EmergencyRepository
@@ -67,6 +69,7 @@ object AppGraph {
     val limits by lazy { LimitsRepository(backend, store, requests) }
     val social by lazy { SocialRepository(backend) { protection.current().strictReady } }
     val chats by lazy { ChatRepository(backend) }
+    val chatMedia by lazy { ChatMedia(app) }
     val share by lazy { UsageShareRepository(backend) }
     val tracker by lazy { UsageTracker(app) }
     val catalog by lazy { AppCatalog(app) }
@@ -77,6 +80,7 @@ object AppGraph {
     val profiles by lazy { ProfileRepository(app, backend, store, share) { sync } }
     val notifier by lazy { Notifier(app, store) }
     val updater by lazy { Updater(app) }
+    val weather by lazy { WeatherRepository(app, store) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }
 
     fun init(application: Application) {

@@ -12,7 +12,7 @@
     <string name="disclosure_usage">Meadow will read your phone\'s app usage log to measure how long each app is open. Your detailed history stays on this phone. If you choose to share it, only today\'s total and top apps go to your Bumblebees.</string>
     <string name="disclosure_keeper">The garden keeper is an accessibility service. It notices which app is on screen so it can gently close apps whose time is up, and in strict mode it reads the words on a few settings screens so Meadow can\'t be switched off. Everything happens on this phone: Meadow never reads what you type, and never stores or sends what\'s on your screen.</string>
     <string name="disclosure_agree">Agree and continue</string>
-    <string name="disclosure_not_now">Not now</string>
+    <string name="disclosure_not_now">Deny</string>
 
     <string name="disclosure_listener">Notification access lets the garden keeper see which app each notification comes from, so it can hide notifications from resting apps and pause their videos and music. Everything happens on this phone: Meadow never stores or sends your notifications or what\'s in them.</string>
 </resources>

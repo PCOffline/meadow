@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -123,6 +125,14 @@ class ActionState(private val context: Context, private val snackbar: SnackbarHo
 
     fun toast(message: String) {
         AppGraph.scope.launch(Dispatchers.Main.immediate) { snackbar.showSnackbar(message) }
+    }
+
+    /** A message with one thing to do about it (e.g. share what was just saved), for a little longer. */
+    fun toast(message: String, actionLabel: String, onAction: () -> Unit) {
+        AppGraph.scope.launch(Dispatchers.Main.immediate) {
+            val result = snackbar.showSnackbar(message, actionLabel = actionLabel, withDismissAction = true, duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) onAction()
+        }
     }
 }
 

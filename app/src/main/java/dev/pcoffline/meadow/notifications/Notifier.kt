@@ -42,6 +42,17 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         ).forEach(nm::createNotificationChannel)
     }
 
+    /**
+     * The names of the channels for chats and requests that are turned off, or all of them when
+     * Meadow's notifications are off altogether (null then).
+     */
+    fun silentMessageChannels(): List<String>? {
+        if (!manager.areNotificationsEnabled()) return null
+        return listOf(CH_CHAT, CH_REQUESTS, CH_DECISIONS).mapNotNull { id ->
+            manager.getNotificationChannel(id)?.takeIf { it.importance == NotificationManager.IMPORTANCE_NONE }?.name?.toString()
+        }
+    }
+
     fun guardianNotification(text: String): Notification =
         NotificationCompat.Builder(context, CH_GUARDIAN)
             .setSmallIcon(R.drawable.ic_flower)
@@ -73,13 +84,15 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         }
         val today = Days.todayKey()
         // Extra time from a Bumblebee changes the allowance, and earns its own reminders.
-        val key = "${budget.limit.packageName}|$today|$threshold|${budget.dailyAllowedMs}/${budget.weeklyAllowedMs}"
+        // Each cap's hours earn their own reminders, too.
+        val key = "${budget.limit.packageName}|$today|$threshold|${budget.dailyAllowedMs}/${budget.weeklyAllowedMs}|${budget.cap?.from}"
         val warned = store.warnedKeys
         if (key in warned) return
         store.warnedKeys = warned.filter { it.contains("|$today|") }.toSet() + key
         val app = budget.limit.appName
         val body = when {
             budget.untilScheduleChangeMs != null && budget.untilScheduleChangeMs <= remaining -> R.string.notify_warning_body_hours
+            budget.capRemainingMs != null && budget.capRemainingMs <= remaining -> R.string.notify_warning_body_cap
             budget.weeklyIsTighter -> R.string.notify_warning_body_week
             else -> R.string.notify_warning_body_today
         }
@@ -141,6 +154,8 @@ class Notifier(private val context: Context, private val store: LocalStore) {
             "chat" -> CH_CHAT to data["chatId"]?.let(DeepLinks::chat)
             "invite", "invite_accepted", "approver_left", "approver_leaving", "approver_kept" -> CH_SOCIAL to DeepLinks.circle()
             "alert", "emergency" -> CH_ALERTS to (friend ?: DeepLinks.circle())
+            // Shows on the channel it tests, so that channel's own setting decides whether it's seen.
+            "test" -> (if (data["channel"] == CH_REQUESTS) CH_REQUESTS else CH_CHAT) to DeepLinks.troubleshoot()
             else -> CH_SOCIAL to null
         }
         val builder = NotificationCompat.Builder(context, channel)

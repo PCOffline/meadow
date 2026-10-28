@@ -94,16 +94,18 @@ import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.limitText
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeWindow
-import dev.pcoffline.meadow.ui.components.shareText
+import dev.pcoffline.meadow.ui.components.ShareCommitment
 import dev.pcoffline.meadow.ui.requests.BeePicks
 import dev.pcoffline.meadow.ui.requests.BumblebeePicker
 import dev.pcoffline.meadow.ui.requests.pendingRequestFor
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
 import dev.pcoffline.meadow.ui.requestSummary
 import dev.pcoffline.meadow.ui.ActionState
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import dev.pcoffline.meadow.data.TimeCap
+import dev.pcoffline.meadow.data.sameUncomparable
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
@@ -115,6 +117,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 @Composable
 fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable () -> Unit = {}) {
@@ -202,22 +206,29 @@ data class LimitEditorState(
     val bumblebeeCount: Int = 0,
     /** My unanswered question about this app; only one can be open at a time. */
     val pending: LimitRequest? = null,
+    /** Whether [pending] is known yet: the server is asked, since the phone's copy may be out of date. */
+    val pendingKnown: Boolean = true,
     val loaded: Boolean = false,
 )
+
+/** What's known of my open question about an app: [request] is null when there's none. */
+private class Known(val request: LimitRequest?)
 
 class LimitEditorViewModel(private val packageName: String) : ViewModel() {
     val state: StateFlow<LimitEditorState> = combine(
         AppGraph.store.limits,
         AppGraph.store.approverCount,
-        pendingRequestFor(packageName),
-    ) { limits, bees, pending ->
+        // The editor shows at once; only asking waits until it's known whether a question is open.
+        pendingRequestFor(packageName).map<LimitRequest?, Known?> { Known(it) }.onStart { emit(null) },
+    ) { limits, bees, known ->
         val existing = limits.firstOrNull { it.packageName == packageName }
         LimitEditorState(
             existing = existing,
             appName = existing?.appName ?: AppGraph.catalog.label(packageName),
             budget = AppGraph.engine.budget(packageName),
             bumblebeeCount = bees,
-            pending = pending,
+            pending = known?.request,
+            pendingKnown = known != null,
             loaded = true,
         )
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, LimitEditorState())
@@ -252,6 +263,11 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         mutableStateOf(ScheduleJson.encodeToString(Schedule.serializer(), existing?.schedule ?: Schedule.everyDay(TimeWindow(0, 22 * 60))))
     }
     val schedule = ScheduleJson.decodeFromString(Schedule.serializer(), scheduleJson)
+    var groupsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(GroupsSerializer, dayGroups(existing?.dayMinutes.orEmpty()))) }
+    val groups = ScheduleJson.decodeFromString(GroupsSerializer, groupsJson)
+    var capsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(CapsSerializer, existing?.caps.orEmpty())) }
+    val caps = ScheduleJson.decodeFromString(CapsSerializer, capsJson)
+    val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
     var message by rememberSaveable { mutableStateOf("") }
     var removeNote by rememberSaveable { mutableStateOf("") }
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
@@ -263,18 +279,24 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
     val proposed = AppLimit(
         packageName, state.appName, if (dailyOn) daily else 0, if (weeklyOn) weekly else 0,
         schedule = if (hoursOn) schedule else null,
+        dayMinutes = if (dailyOn) groups.toDayMinutes() else emptyMap(),
+        caps = caps,
     )
     val needsApproval = existing != null && hasBees && LimitsRepository.isLooser(existing, proposed)
     val online by Connectivity.online.collectAsStateWithLifecycle()
-    // Asking, and hours with Bumblebees, go through the backend; the rest is saved offline too.
-    val needsConnection = needsApproval || (existing != null && hasBees && existing.schedule != proposed.schedule)
+    // Asking, and hours, days and caps with Bumblebees, go through the backend; the rest is saved offline too.
+    val needsConnection = needsApproval || (existing != null && hasBees && !existing.sameUncomparable(proposed))
     val editable = !action.busy
-    // The backend takes one open question per app, so another has to wait for its answer.
+    // The backend takes one open question per app, so another has to wait for its answer (or
+    // until it's known whether there is one).
     val waiting = state.pending
-    val anyLimitOn = dailyOn || weeklyOn || hoursOn
+    val askBlocked = waiting != null || !state.pendingKnown
+    val anyLimitOn = dailyOn || weeklyOn || hoursOn || caps.isNotEmpty()
     val planted = stringResource(R.string.limit_editor_planted)
     val updated = stringResource(R.string.limit_editor_updated)
     val requested = stringResource(R.string.limit_editor_requested)
+    val shareLabel = stringResource(R.string.share_title)
+    val res = LocalResources.current
     val removed = stringResource(R.string.limit_editor_removed)
 
     Column(
@@ -294,14 +316,20 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                     )
                 }
             }
-            BloomFlower(1f - (state.budget?.usedFraction ?: 0f), Garden.colors.petalPink, Modifier.size(48.dp, 72.dp))
+            BloomFlower(
+                1f - (state.budget?.usedFraction ?: 0f), Garden.colors.petalPink, Modifier.size(48.dp, 72.dp),
+                asleep = state.budget?.sleeping == true,
+            )
         }
 
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn, editable) { dailyOn = it }
             if (dailyOn) {
-                MinutesStepper(daily, step = 5, min = 5, max = 16 * 60, editable) { daily = it }
+                val label = stringResource(R.string.limit_editor_daily)
+                MinutesStepper(daily, step = 5, min = 5, max = 16 * 60, editable, label = label) { daily = it }
                 PresetChips(listOf(15, 30, 45, 60, 90, 120), daily, editable) { daily = it }
+                Spacer(Modifier.height(4.dp))
+                DayLimitsEditor(groups, week.first, editable) { groupsJson = ScheduleJson.encodeToString(GroupsSerializer, it) }
             }
         }
         MeadowCard(Modifier.fillMaxWidth()) {
@@ -314,10 +342,13 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn, editable) { hoursOn = it }
             if (hoursOn) {
-                val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
                 Spacer(Modifier.height(8.dp))
                 ScheduleEditor(schedule, firstDay = week.first, enabled = editable) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
             }
+        }
+        MeadowCard(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.limit_editor_caps), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 12.dp))
+            CapsEditor(caps, week.first, editable) { capsJson = ScheduleJson.encodeToString(CapsSerializer, it) }
         }
 
         if (waiting != null) {
@@ -347,17 +378,17 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             onClick = {
                 action.run(onSuccess = onDone) {
                     val outcome = AppGraph.limits.save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
-                    if (outcome == ChangeOutcome.APPLIED) celebrate()
-                    action.toast(
-                        when {
-                            outcome == ChangeOutcome.REQUESTED -> requested
-                            existing == null -> planted
-                            else -> updated
-                        },
-                    )
+                    if (outcome == ChangeOutcome.APPLIED) {
+                        celebrate()
+                        // A commitment just made is the one most worth telling someone about.
+                        val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed))
+                        action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared) }
+                    } else {
+                        action.toast(requested)
+                    }
                 }
             },
-            enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && waiting != null) && (online || !needsConnection),
+            enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && askBlocked) && (online || !needsConnection),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text(
@@ -373,18 +404,14 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         if (existing != null) {
             OutlinedButton(
                 onClick = { confirmRemove = true },
-                enabled = !action.busy && !(hasBees && waiting != null),
+                enabled = !action.busy && !(hasBees && askBlocked),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
-            val context = LocalContext.current
-            val res = LocalResources.current
             // Straight to Android's share sheet: picking where it goes is the only choice to make.
             TextButton(
-                onClick = {
-                    context.shareText(res.getString(R.string.share_limit, existing.appName, res.limitText(existing.dailyMinutes, existing.weeklyMinutes, existing.schedule)))
-                },
+                onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             ) {
                 Text(stringResource(R.string.limit_editor_share))
@@ -427,6 +454,8 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
 }
 
 private val ScheduleJson = Json { ignoreUnknownKeys = true }
+private val GroupsSerializer = ListSerializer(DayGroup.serializer())
+private val CapsSerializer = ListSerializer(TimeCap.serializer())
 
 /** The question already waiting about this app, and a way to take it back. */
 @Composable
@@ -462,8 +491,15 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChang
     }
 }
 
+/**
+ * A length of time with − and + either side. With a [label], tapping the time opens a clock to
+ * pick it straight away, for any length under a day.
+ */
 @Composable
-private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: Boolean, onChange: (Int) -> Unit) {
+internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: Boolean, label: String? = null, onChange: (Int) -> Unit) {
+    var picking by rememberSaveable { mutableStateOf(false) }
+    val clock = label != null && max < 24 * 60
+    val pick = stringResource(R.string.limit_editor_pick_time)
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -483,10 +519,19 @@ private fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: B
             style = style,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.padding(horizontal = 16.dp).widthIn(min = widest),
+            color = if (clock && enabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            modifier = Modifier.padding(horizontal = 8.dp)
+                .then(if (clock) Modifier.clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true } else Modifier)
+                .padding(horizontal = 8.dp, vertical = 4.dp).widthIn(min = widest),
         )
         RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = enabled && value < max) {
             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))
+        }
+    }
+    if (picking && label != null) {
+        DurationDialog(label, value, min, max, onDismiss = { picking = false }) {
+            picking = false
+            onChange(it)
         }
     }
 }

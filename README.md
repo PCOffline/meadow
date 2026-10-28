@@ -12,12 +12,12 @@
 **Meadow is a cozy way to spend less time on the apps that pull you in.** Give each app a little
 patch of time. When it's used up, the app rests until tomorrow. Want more? Ask one of your
 **Bumblebees**, the friends you've chosen to look after your garden. Willpower is hard; a kind
-friend who has to say yes is much harder to argue with.
+friend who has to approve is much harder to argue with.
 
 <p align="center">
   <img src="docs/images/screen-garden.png" alt="The garden: a flower for each app, blooming while there's time left, resting when it's used up" width="250">
   &nbsp;
-  <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who said yes to 15 more minutes" width="250">
+  <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who approved 15 more minutes" width="250">
   &nbsp;
   <img src="docs/images/screen-stats.png" alt="A week of screen time, down 20% on the week before" width="250">
 </p>
@@ -28,32 +28,42 @@ friend who has to say yes is much harder to argue with.
   <tr>
     <td align="center" width="33%"><img src="docs/images/step-plant.svg" alt="" width="150"><br><b>Plant a limit</b><br>Choose how long an app may bloom each day or week.</td>
     <td align="center" width="33%"><img src="docs/images/step-rest.svg" alt="" width="150"><br><b>It rests</b><br>When the time is used up, the app closes gently until tomorrow.</td>
-    <td align="center" width="33%"><img src="docs/images/step-ask.svg" alt="" width="150"><br><b>Ask a Bumblebee</b><br>Need more? A friend can say yes, right from their notification.</td>
+    <td align="center" width="33%"><img src="docs/images/step-ask.svg" alt="" width="150"><br><b>Ask a Bumblebee</b><br>Need more? A friend can approve it, right from their notification.</td>
   </tr>
 </table>
 
 ## Features
 
 ### A garden that grows with your time
-Every app you limit is a flower that blooms while there's time left and wilts as it runs out. The
-sky follows your day, from a peach sunrise to a starry night with fireflies. Gentle reminders
+Every app you limit is a flower that blooms while there's time left, wilts as it runs out and
+sleeps outside the hours you allow it. The sky follows your day, from a peach sunrise to a starry night with fireflies, and,
+if you like, the weather outside: clouds, fog, rain, snow or a storm. Gentle reminders
 arrive at five minutes and one minute left.
+
+### Limits that fit your week
+Set a daily limit, then give some days their own: 30 minutes on weekdays, two hours at weekends.
+Add a weekly limit, the hours an app may be used (or all day, in one tap), and caps within hours,
+like up to 30 minutes between 10:00 and 16:00. Every one of them applies, and the app rests as
+soon as any is used up. Pick times on a clock, and set several days at once.
 
 ### Friends who have your back
 Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee
 gets a chat with you, and your requests appear in it as cards they can answer with one tap.
-When someone stops being your Bumblebee, your chat with them closes.
+Send photos and GIFs (straight from your keyboard too), and long-press a message to copy it.
+When you plant or change a limit, share it with them in their chat, or through any other app.
+From a chat you can ask them to be your Bumblebee too, or offer to be theirs. When someone stops
+being your Bumblebee, your chat with them closes.
 
 <p align="center">
-  <img src="docs/images/screen-circle.png" alt="Your circle: two Bumblebees, and a friend whose garden you look after" width="250">
+  <img src="docs/images/screen-people.png" alt="People: two Bumblebees and a friend whose garden you look after, each with their latest message" width="250">
   &nbsp;
   <img src="docs/images/screen-resting.png" alt="A resting app under a night sky, with a button to ask a Bumblebee" width="250">
 </p>
 
 ### Hard to wriggle out of
 Strict mode keeps Meadow's own settings, uninstalling and the phone's clock out of reach, and
-turning it off needs a Bumblebee's yes too. If something gets switched off anyway, or your phone
+turning it off needs a Bumblebee's approval too. If something gets switched off anyway, or your phone
 goes quiet, your Bumblebees are told. Your limits keep working offline.
 
 ### For real emergencies
@@ -75,11 +85,11 @@ words about yourself.
 
 ### Private by default
 No email needed to start; later you can keep your garden safe with a sign-in link emailed to
-you, or a password. You choose what your Bumblebees see, part by part (your limits, today's
-screen time, top apps and your progress over the weeks), and Settings shows your page exactly as
-they see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
+you, or a password. Nothing is shared until you choose what your Bumblebees see, part by part (your limits, today's
+screen time, top apps and your progress over the weeks); setup asks, and shows your page exactly
+as they'll see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
 person affected is told when you add or remove a Bumblebee. Download everything Meadow holds about
-you, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
+you, with the photos from your chats, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
 
 ### Kind to everyone
 Built for TalkBack, large text and switch access: every control is labelled, touch targets are

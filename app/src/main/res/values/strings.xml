@@ -7,7 +7,7 @@
       limit                   time allowed for one app, per day and/or week
       resting                 an app whose time is up for now
       extra time              what you ask a Bumblebee for
-      say yes / not today     a Bumblebee's answers
+      approve / deny          a Bumblebee's answers
       emergency unlock        lifting limits without a Bumblebee
     The backend's functions/src/copy.ts uses the same terms for notifications.
 -->
@@ -44,9 +44,7 @@
     <!-- Tabs -->
     <string name="tab_garden">Garden</string>
     <string name="tab_growth">Growth</string>
-    <string name="tab_requests">Requests</string>
-    <string name="tab_circle">Circle</string>
-    <string name="tab_chats">Chats</string>
+    <string name="tab_people">People</string>
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong. Please try again.</string>

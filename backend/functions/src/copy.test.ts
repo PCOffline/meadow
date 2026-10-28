@@ -19,13 +19,22 @@ test("emergency notes say what happened", () => {
 
 test("notifications use the Bumblebee wording", () => {
   const all = [
-    pushes.invite(sam), pushes.inviteAccepted(sam), pushes.steppedDown(sam, 0), pushes.removedBumblebee(sam),
+    pushes.invite(sam), pushes.inviteAccepted(sam), pushes.offer(sam), pushes.offerAccepted(sam), pushes.steppedDown(sam, 0), pushes.removedBumblebee(sam),
     pushes.gardenClosed(sam), pushes.bumblebeeLeftMeadow(sam), pushes.removalScheduled(sam), pushes.removalCancelled(sam),
   ];
   for (const push of all) {
     assert.match(push.title + push.body, /Bumblebee|Meadow/);
     assert.doesNotMatch(push.title + push.body, /approver|Petal Pal/i);
   }
+});
+
+test("someone with a photo goes by it, without their flower in front of their name", () => {
+  const withPhoto = { ...sam, photoUrl: "https://example.test/sam.jpg" };
+  assert.equal(pushes.chat(sam, "Hi").title, "🌻 Sam");
+  assert.equal(pushes.chat(withPhoto, "Hi").title, "Sam");
+  assert.equal(pushes.inviteAccepted(withPhoto).title, "Sam is your Bumblebee now");
+  assert.equal(chatNotes.newBumblebee(withPhoto, { displayName: "Maya", flower: "🌼" }), "Sam is now Maya's Bumblebee");
+  assert.equal(pushes.chat({ ...sam, photoUrl: null }, "Hi").title, "🌻 Sam");
 });
 
 test("a removed Bumblebee isn't told about anyone else", () => {
@@ -55,6 +64,8 @@ function everything() {
     "chatNotes.emergency": () => chatNotes.emergency(emergencyHeadline(sam, false, false), emergencyScope("Maps", 30), "Lost"),
     "pushes.invite": () => pushes.invite(sam),
     "pushes.inviteAccepted": () => pushes.inviteAccepted(maya),
+    "pushes.offer": () => pushes.offer(maya),
+    "pushes.offerAccepted": () => pushes.offerAccepted(sam),
     "pushes.removedBumblebee": () => pushes.removedBumblebee(sam),
     "pushes.removalScheduled": () => pushes.removalScheduled(sam),
     "pushes.removalCancelled": () => pushes.removalCancelled(sam),
@@ -67,6 +78,7 @@ function everything() {
     "pushes.bumblebeeLeftMeadow": () => pushes.bumblebeeLeftMeadow(maya),
     "pushes.quietPhone": () => pushes.quietPhone(sam),
     "pushes.emergency": () => pushes.emergency(emergencyHeadline(sam, true, false), emergencyScope(null, 60), "Lost"),
+    "pushes.test": () => [pushes.test("chat"), pushes.test("requests")],
   };
   return fns;
 }

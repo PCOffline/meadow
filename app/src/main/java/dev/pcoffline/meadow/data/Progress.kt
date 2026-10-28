@@ -56,11 +56,15 @@ data class Progress(
             limits: List<AppLimit>,
             bonus: (packageName: String, day: LocalDate) -> Int,
         ): Pair<Int, Int> {
-            val daily = limits.filter { it.dailyMinutes > 0 }
+            val daily = limits.filter { it.dailyMinutes > 0 || it.dayMinutes.values.any { m -> m > 0 } }
             if (daily.isEmpty()) return 0 to 0
             val recorded = days.mapNotNull { (day, apps) -> apps?.let { day to it } }
             val kept = recorded.count { (day, apps) ->
-                daily.all { limit -> (apps[limit.packageName] ?: 0L) <= (limit.dailyMinutes + bonus(limit.packageName, day)) * 60_000L }
+                daily.all { limit ->
+                    // Each day by its own limit, if it has one.
+                    val minutes = limit.dailyMinutesOn(day.dayOfWeek.value)
+                    minutes == 0 || (apps[limit.packageName] ?: 0L) <= (minutes + bonus(limit.packageName, day)) * 60_000L
+                }
             }
             return kept to recorded.size
         }

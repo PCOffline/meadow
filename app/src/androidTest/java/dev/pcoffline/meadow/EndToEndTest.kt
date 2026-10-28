@@ -1,16 +1,21 @@
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.semantics.Role
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
 import android.app.Application
 import android.app.UiAutomation
 import android.content.Intent
+import android.graphics.Rect
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -24,10 +29,12 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -63,6 +70,14 @@ abstract class EndToEndTest {
 
     protected fun text(@StringRes id: Int, vararg args: Any) = app.getString(id, *args)
     protected fun node(@StringRes id: Int): SemanticsNodeInteraction = compose.onNodeWithText(text(id))
+
+    /** A tab in the bar at the bottom: a screen's title can read the same ("People"). */
+    /** The tab named [id], once the tab bar shows it (saying what showed instead if it never does). */
+    protected fun tab(@StringRes id: Int): SemanticsNodeInteraction {
+        val matcher = hasText(text(id)) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
+        eventually("the ${text(id)} tab") { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        return compose.onNode(matcher)
+    }
     protected fun inDialog(value: String, substring: Boolean = false): SemanticsNodeInteraction =
         compose.onNode(hasText(value, substring) and hasAnyAncestor(isDialog()))
 
@@ -118,7 +133,10 @@ abstract class EndToEndTest {
                     node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() + node.children.flatMap(::words)
             fun walk(node: SemanticsNode): List<String> =
                 listOfNotNull(
-                    node.takeIf { SemanticsActions.OnClick in it.config }?.let { "${words(it).joinToString("/")}@${it.boundsInRoot}" },
+                    node.takeIf { SemanticsActions.OnClick in it.config }?.let {
+                        val off = if (SemanticsProperties.Disabled in it.config) " (off)" else ""
+                        "${words(it).joinToString("/")}$off@${it.boundsInRoot}"
+                    },
                 ) + node.children.flatMap(::walk)
             walk(root)
         }.joinToString(" | ").take(3000)
@@ -135,7 +153,13 @@ abstract class EndToEndTest {
      * which [hideKeyboard] doesn't watch, and test taps reach the dialog's buttons regardless.
      */
     protected fun typeIntoDialog(field: SemanticsMatcher, value: String) {
-        compose.onNode(field and hasAnyAncestor(isDialog())).performTextInput(value)
+        val inDialog = field and hasAnyAncestor(isDialog())
+        try {
+            eventually("the dialog's field") { compose.onAllNodes(inDialog).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: AssertionError) {
+            throw AssertionError("${e.message} Tappable: ${tappables()}", e)
+        }
+        compose.onNode(inDialog).performTextInput(value)
         compose.waitForIdle()
     }
 
@@ -278,14 +302,14 @@ abstract class EndToEndTest {
     }
 
     /**
-     * Becomes [friend]'s Bumblebee by pasting their invite link into the circle's friend code
+     * Becomes [friend]'s Bumblebee by pasting their invite link into People's friend code
      * field (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
      */
     protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
         val token = friend.call("createInviteLink")!!["token"] as String
         val me = FirebaseAuth.getInstance().currentUser!!.uid
-        node(R.string.tab_circle).performClick()
-        waitFor(R.string.circle_title)
+        tab(R.string.tab_people).performClick()
+        waitFor(R.string.people_title)
         val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
         typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
@@ -300,9 +324,89 @@ abstract class EndToEndTest {
     }
 
     /** From the circle screen, opens the garden of the person called [name]. */
+    /** Opens the chat with [name] from People, where everyone opens their chat. */
+    protected fun openChatWith(name: String) {
+        tab(R.string.tab_people).performClick()
+        val person = hasText(name) and hasClickAction()
+        eventually("$name in People") { runCatching { compose.onNode(hasScrollToNodeAction()).performScrollToNode(person) }.isSuccess }
+        compose.onNode(person).performClick()
+        waitForText(text(R.string.chat_placeholder))
+    }
+
+    /** Opens the garden of [name], whom this phone looks after: from People, through their chat. */
     protected fun openGardenOf(name: String) {
-        val garden = hasText(name, substring = true) and hasClickAction()
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(garden)
-        compose.onNode(garden).performClick()
+        openChatWith(name)
+        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
+    }
+
+    /** Taps the button [id] once it takes taps: asking, for one, waits to know no other question is open. */
+    protected fun tapWhenEnabled(@StringRes id: Int) {
+        eventually("${text(id)} enabled") { runCatching { node(id).assertIsEnabled() }.isSuccess }
+        node(id).performScrollTo().performClick()
+    }
+
+    /**
+     * Taps [id] for the dialog it opens, the way a finger does: through Android's input, as from
+     * adb. Compose's own tap on the editor's last button never arrived (not even at the window),
+     * while a real tap there always worked.
+     */
+    protected fun tapForDialog(@StringRes id: Int) {
+        eventually("${text(id)} enabled") { runCatching { node(id).assertIsEnabled() }.isSuccess }
+        node(id).performScrollTo()
+        // Scrolling there is animated, and a touch while the page still moves only stops it, as a
+        // finger's would: the tap waits until the button has come to rest.
+        val button = hasText(text(id)) and hasClickAction()
+        var last = compose.onNode(button).fetchSemanticsNode().boundsInWindow
+        poll("${text(id)} at rest") {
+            Thread.sleep(300)
+            val now = compose.onNode(button).fetchSemanticsNode().boundsInWindow
+            (now == last).also { last = now }
+        }
+        // Meadow's window fills the screen, so where it is in the window is where it is on screen.
+        val center = last.center
+        shell("input tap ${center.x.toInt()} ${center.y.toInt()}")
+        fun opens() = runCatching {
+            compose.waitUntil(10_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty() }
+        }.isSuccess
+        if (opens()) return
+        val tappable = tappables()
+        val windows = windowsOnScreen()
+        node(id).performSemanticsAction(SemanticsActions.OnClick)
+        throw AssertionError(
+            if (opens()) "A tap on ${text(id)} never reached it, but its click opened the dialog. Tappable: $tappable Windows: $windows"
+            else "${text(id)} opened no dialog, tapped or clicked. Tappable: $tappable Windows: $windows",
+        )
+    }
+
+    /**
+     * The windows on screen, top first: what each is, where, and which takes keys; then whether
+     * the keyboard is up. For when a tap seems to land on something else.
+     */
+    protected fun windowsOnScreen(): String {
+        val listed = runCatching {
+            val automation = InstrumentationRegistry.getInstrumentation().getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+            automation.serviceInfo = automation.serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS }
+            automation.windows.sortedByDescending { it.layer }.joinToString(" | ") { window ->
+                val kind = when (window.type) {
+                    AccessibilityWindowInfo.TYPE_APPLICATION -> "app"
+                    AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "keyboard"
+                    AccessibilityWindowInfo.TYPE_SYSTEM -> "system"
+                    AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY -> "overlay"
+                    else -> "type ${window.type}"
+                }
+                val bounds = Rect().also { window.getBoundsInScreen(it) }
+                "$kind ${window.title}@${bounds.toShortString()}${if (window.isFocused) " (focused)" else ""}"
+            }
+        }.getOrElse { "(couldn't list them: $it)" }
+        val keyboard = shell("dumpsys input_method").lines()
+            .filter { "mInputShown" in it || "mImeWindowVis" in it }.joinToString(" ") { it.trim() }
+        return "$listed. Keyboard: $keyboard"
+    }
+
+    /** From [name]'s garden, back to their chat (where the garden opened from) and into the garden again. */
+    protected fun reopenGardenOf(name: String) {
+        compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+        waitForText(text(R.string.chat_placeholder))
+        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
     }
 }

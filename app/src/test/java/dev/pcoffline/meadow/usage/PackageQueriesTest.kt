@@ -79,6 +79,17 @@ class PackageQueriesTest {
         assertEquals(listOf(InstalledApp(PKG, "Example")), AppCatalog(app).launchableApps().filter { it.packageName == PKG })
     }
 
+    @Test
+    fun `the catalog keeps its list until apps change`() {
+        val catalog = AppCatalog(app)
+        val first = catalog.launchableApps()
+        // Read once: opening the picker again doesn't go through every app's name again.
+        assertTrue(first === catalog.launchableApps())
+        catalog.invalidate()
+        assertTrue(first !== catalog.launchableApps())
+        assertEquals(first, catalog.launchableApps())
+    }
+
     private companion object {
         const val PKG = "com.example.reader"
     }

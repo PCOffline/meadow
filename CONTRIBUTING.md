@@ -15,7 +15,7 @@ Warm, calm and plain; sentence case; at most one emoji, at the end. Use these te
 | limit | Time allowed for one app, per day and/or week |
 | resting | An app whose time is up for now |
 | extra time | What you ask a Bumblebee for |
-| say yes / not today | A Bumblebee's answers |
+| approve / deny | A Bumblebee's answers |
 | emergency unlock | Lifting limits without a Bumblebee |
 
 ## Accessibility
@@ -27,5 +27,6 @@ WCAG AA contrast. New screens should get a screen test that calls it.
 ## README images
 
 Screenshots and animations come from `ShowcaseTest`, rendered on an emulator by the Screenshots
-workflow. Put `[screenshots]` in a commit message to refresh them. The banner and illustrations
-are drawn by `docs/art/build.py`.
+workflow whenever a pull request changes the app's screens, and committed to the pull request.
+Run it from the Actions tab for any other branch. The banner and illustrations are drawn by
+`docs/art/build.py`.

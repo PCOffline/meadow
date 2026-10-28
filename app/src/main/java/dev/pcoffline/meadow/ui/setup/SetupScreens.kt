@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,11 +55,15 @@ import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.GuardianService
 import dev.pcoffline.meadow.enforcement.MeadowNotificationListener
 import dev.pcoffline.meadow.enforcement.ProtectionState
+import dev.pcoffline.meadow.ui.auth.SecureAccountForm
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.GrowthBar
 import dev.pcoffline.meadow.ui.components.MeadowCard
@@ -71,6 +76,11 @@ fun SetupScreen(
     onDone: () -> Unit,
     onTroubleshoot: () -> Unit = {},
     read: () -> ProtectionState = { AppGraph.protection.current() },
+    anonymous: Boolean = AppGraph.auth.anonymous.collectAsStateWithLifecycle().value,
+    profile: UserProfile? = null,
+    sharingChosen: Boolean = AppGraph.store.sharingChosen.collectAsStateWithLifecycle().value,
+    onSharingChosen: () -> Unit = { AppGraph.store.setSharingChosen() },
+    savePrivacy: suspend (Privacy) -> Unit = { AppGraph.profiles.setPrivacy(it) },
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -113,6 +123,7 @@ fun SetupScreen(
             emoji = "📊",
             title = R.string.setup_usage_title,
             body = R.string.setup_usage_body,
+            how = R.string.setup_usage_how,
             done = state.usageAccess,
             required = true,
         ) { disclosure = Disclosure.USAGE }
@@ -120,6 +131,7 @@ fun SetupScreen(
             emoji = "🌿",
             title = R.string.setup_keeper_title,
             body = R.string.setup_keeper_body,
+            how = R.string.setup_keeper_how,
             done = state.accessibility,
             required = true,
             restricted = true,
@@ -128,6 +140,7 @@ fun SetupScreen(
             emoji = "🔕",
             title = R.string.setup_listener_title,
             body = R.string.setup_listener_body,
+            how = R.string.setup_listener_how,
             done = state.notificationListener,
             required = true,
             restricted = true,
@@ -148,12 +161,14 @@ fun SetupScreen(
             emoji = "🪟",
             title = R.string.setup_overlay_title,
             body = R.string.setup_overlay_body,
+            how = R.string.setup_overlay_how,
             done = state.overlay,
         ) { context.openSettings(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, withPackageUri = true) }
         SetupStep(
             emoji = "🛡️",
             title = R.string.setup_admin_title,
             body = R.string.setup_admin_body,
+            how = R.string.setup_admin_how,
             done = state.deviceAdmin,
         ) {
             context.startActivity(
@@ -174,6 +189,30 @@ fun SetupScreen(
             @Suppress("BatteryLife")
             context.openSettings(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, withPackageUri = true)
         }
+        // Not permissions either, so not counted above.
+        if (profile != null) {
+            SetupStep(
+                emoji = "🐝",
+                title = R.string.setup_sharing_title,
+                body = R.string.setup_sharing_body,
+                done = sharingChosen,
+                expanded = { SharingChoice(profile, onDone = onSharingChosen, save = savePrivacy) },
+            ) {}
+        }
+        // A garden without an email is lost with the phone.
+        var addingEmail by rememberSaveable { mutableStateOf(false) }
+        SetupStep(
+            emoji = "🔐",
+            title = R.string.setup_account_title,
+            body = R.string.setup_account_body,
+            done = !anonymous,
+            action = R.string.setup_account_action,
+            expanded = if (addingEmail) {
+                { SecureAccountForm() }
+            } else {
+                null
+            },
+        ) { addingEmail = true }
         TextButton(onClick = onTroubleshoot, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text(stringResource(R.string.trouble_button))
         }
@@ -235,9 +274,9 @@ internal enum class Disclosure(@StringRes val body: Int) {
 }
 
 /**
- * [required] steps are the ones limits can't work without. [restricted] steps are ones Android
- * greys out for apps installed outside an app store until "Allow restricted settings" is chosen in
- * the app's info (Android 13 and later).
+ * [required] steps are the ones limits can't work without. [how] says where to tap in Android's
+ * settings. [restricted] steps are ones Android greys out for apps installed outside an app store
+ * until "Allow restricted settings" is chosen in the app's info (Android 13 and later).
  */
 @Composable
 private fun SetupStep(
@@ -245,8 +284,11 @@ private fun SetupStep(
     @StringRes title: Int,
     @StringRes body: Int,
     done: Boolean,
+    @StringRes how: Int? = null,
     required: Boolean = false,
     restricted: Boolean = false,
+    @StringRes action: Int = R.string.setup_step_allow,
+    expanded: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -263,8 +305,13 @@ private fun SetupStep(
                     }
                 }
                 Text(stringResource(body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (!done) {
-                    FilledTonalButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text(stringResource(R.string.setup_step_allow)) }
+                if (!done && expanded != null) {
+                    Spacer(Modifier.height(4.dp))
+                    expanded()
+                } else if (!done) {
+                    // Exactly where to tap on the screen the button opens, which differs between phones.
+                    how?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
+                    FilledTonalButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text(stringResource(action)) }
                     if (restricted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         Text(
                             stringResource(R.string.setup_restricted_hint),

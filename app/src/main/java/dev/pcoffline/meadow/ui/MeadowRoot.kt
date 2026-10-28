@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -16,8 +18,6 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.LocalFlorist
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material3.Badge
@@ -34,13 +34,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -68,11 +66,11 @@ import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.auth.EmailLinkDialog
 import dev.pcoffline.meadow.ui.auth.ProfileSetupScreen
-import dev.pcoffline.meadow.ui.chat.ChatListScreen
 import dev.pcoffline.meadow.ui.chat.ChatScreen
 import dev.pcoffline.meadow.ui.circle.AcceptInviteDialog
-import dev.pcoffline.meadow.ui.circle.CircleScreen
+import dev.pcoffline.meadow.ui.circle.PeopleScreen
 import dev.pcoffline.meadow.ui.circle.FriendScreen
+import dev.pcoffline.meadow.ui.components.ShareCommitmentHost
 import dev.pcoffline.meadow.ui.components.AccountEntry
 import dev.pcoffline.meadow.ui.components.LocalAccount
 import dev.pcoffline.meadow.ui.components.OfflineBar
@@ -85,8 +83,6 @@ import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.limits.LimitEditorScreen
 import dev.pcoffline.meadow.ui.navigation.ChatRoute
-import dev.pcoffline.meadow.ui.navigation.ChatsRoute
-import dev.pcoffline.meadow.ui.navigation.CircleRoute
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.navigation.FriendRoute
 import dev.pcoffline.meadow.ui.navigation.GardenRoute
@@ -95,13 +91,12 @@ import dev.pcoffline.meadow.ui.navigation.LimitRoute
 import dev.pcoffline.meadow.ui.navigation.ProfileRoute
 import dev.pcoffline.meadow.ui.navigation.PickAppRoute
 import dev.pcoffline.meadow.ui.navigation.PrivacyPreviewRoute
-import dev.pcoffline.meadow.ui.navigation.RequestsRoute
+import dev.pcoffline.meadow.ui.navigation.PeopleRoute
 import dev.pcoffline.meadow.ui.navigation.SettingsRoute
 import dev.pcoffline.meadow.ui.navigation.SetupRoute
 import dev.pcoffline.meadow.ui.navigation.StatsRoute
 import dev.pcoffline.meadow.ui.navigation.TroubleshootRoute
 import dev.pcoffline.meadow.ui.navigation.BeeStatsRoute
-import dev.pcoffline.meadow.ui.requests.RequestsScreen
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.setup.BackendMissingScreen
@@ -159,14 +154,14 @@ internal enum class Tab(
     val icon: ImageVector,
 ) {
     GARDEN(GardenRoute, { it.hasRoute<GardenRoute>() }, R.string.tab_garden, Icons.Outlined.LocalFlorist),
+    PEOPLE(PeopleRoute, { it.hasRoute<PeopleRoute>() }, R.string.tab_people, Icons.Outlined.People),
     STATS(StatsRoute, { it.hasRoute<StatsRoute>() }, R.string.tab_growth, Icons.Outlined.BarChart),
-    REQUESTS(RequestsRoute, { it.hasRoute<RequestsRoute>() }, R.string.tab_requests, Icons.Outlined.Inbox),
-    CIRCLE(CircleRoute, { it.hasRoute<CircleRoute>() }, R.string.tab_circle, Icons.Outlined.People),
-    CHATS(ChatsRoute, { it.hasRoute<ChatsRoute>() }, R.string.tab_chats, Icons.Outlined.ChatBubbleOutline),
 }
 
-/** Counts shown on the tab bar. */
-data class Badges(val requests: Int = 0, val invites: Int = 0, val chats: Int = 0)
+/** What's waiting on the People tab: requests to answer, invites, and unread chats. */
+data class Badges(val requests: Int = 0, val invites: Int = 0, val chats: Int = 0) {
+    val people: Int get() = requests + invites + chats
+}
 
 class MainViewModel(uid: String) : ViewModel() {
     val badges: StateFlow<Badges> = combine(
@@ -254,7 +249,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                         popExitTransition = { fadeOut(tween(200)) + slideOutVertically(tween(260)) { it / 28 } },
                     ) {
                         composable<SetupRoute> {
-                            SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
+                            SetupScreen(onDone = { nav.popBackStack() }, onTroubleshoot = { nav.navigate(TroubleshootRoute) }, profile = profile)
                         }
                         composable<TroubleshootRoute> {
                             TroubleshootScreen(onBack = { nav.popBackStack() }, onOpenSetup = { nav.navigate(SetupRoute) })
@@ -272,17 +267,9 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             )
                         }
                         composable<StatsRoute> { StatsScreen(onOpenSetup = { nav.navigate(SetupRoute) }, onOpenApp = { nav.navigate(LimitRoute(it)) }) }
-                        composable<RequestsRoute> {
-                            RequestsScreen(profile, onOpenCircle = { nav.switchTab(CircleRoute) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
+                        composable<PeopleRoute> {
+                            PeopleScreen(profile, onOpenChat = { nav.navigate(ChatRoute(it)) }, onOpenBeeStats = { nav.navigate(BeeStatsRoute) })
                         }
-                        composable<CircleRoute> {
-                            CircleScreen(
-                                profile = profile,
-                                onOpenChat = { nav.navigate(ChatRoute(it)) },
-                                onOpenFriend = { nav.navigate(FriendRoute(it)) },
-                            )
-                        }
-                        composable<ChatsRoute> { ChatListScreen(profile, onOpenChat = { nav.navigate(ChatRoute(it)) }) }
                         composable<SettingsRoute> {
                             SettingsScreen(
                                 profile = profile,
@@ -309,7 +296,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                             LimitEditorScreen(entry.toRoute<LimitRoute>().packageName, onDone = { nav.popBackStack() })
                         }
                         composable<ChatRoute> { entry ->
-                            ChatScreen(profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() })
+                            ChatScreen(profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() }, onOpenGarden = { nav.navigate(FriendRoute(it)) })
                         }
                         composable<FriendRoute> { entry ->
                             FriendScreen(
@@ -325,6 +312,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
             }
         }
         askFor?.let { AskForTimeDialog(packageName = it, onDismiss = { askFor = null }) }
+        ShareCommitmentHost()
         if (strictGateCovers(destination)) StrictGate(profile.strictMode, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
         if (accountConfirmed && acceptedTerms < LegalDoc.CURRENT_VERSION) {
             TermsUpdateDialog(onAccept = { scope.launch { AppGraph.profiles.acceptTerms(LegalDoc.CURRENT_VERSION) } })
@@ -346,12 +334,7 @@ internal fun strictGateCovers(destination: NavDestination?): Boolean = destinati
 internal fun MeadowTabBar(current: Tab, badges: Badges, onSelect: (Tab) -> Unit) {
     NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Tab.entries.forEach { tab ->
-            val count = when (tab) {
-                Tab.REQUESTS -> badges.requests
-                Tab.CIRCLE -> badges.invites
-                Tab.CHATS -> badges.chats
-                else -> 0
-            }
+            val count = if (tab == Tab.PEOPLE) badges.people else 0
             TabItem(tab, selected = tab == current, count = count) { onSelect(tab) }
         }
     }

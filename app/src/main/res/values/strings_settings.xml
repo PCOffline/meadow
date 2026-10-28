@@ -19,6 +19,10 @@
     <string name="settings_protections_title">Protections</string>
     <string name="settings_protections_button">Review protections</string>
     <string name="settings_appearance_title">Appearance</string>
+    <string name="settings_weather">Weather in the sky</string>
+    <string name="settings_weather_body">Rain, snow or sun over your garden, from your rough location. Only Open-Meteo sees it, rounded to about 10 km.</string>
+    <string name="settings_weather_denied">Meadow needs your approximate location for this.</string>
+    <string name="settings_weather_allow">Allow in Android settings</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_share_limits">Limits</string>
     <string name="settings_share_time">Today\'s screen time</string>
@@ -58,5 +62,11 @@
     <string name="settings_sign_out_stay">Stay</string>
 
     <string name="share_title">Share</string>
+    <string name="share_commitment_title">Share this commitment</string>
+    <string name="share_commitment_in_meadow">Send in Meadow</string>
+    <string name="share_commitment_loading">Finding your circle…</string>
+    <string name="share_commitment_send_to">Send to %1$s</string>
+    <string name="share_commitment_sent">Sent to %1$s 💌</string>
+    <string name="share_commitment_other_apps">Other apps</string>
     <string name="share_limit">I\'ve committed to %2$s on %1$s with Meadow 🌼</string>
 </resources>

@@ -37,7 +37,7 @@ const account = (overrides = {}) => ({
   pushIds: ["phone"],
   friendCode: "ABC234",
   strictMode: false,
-  privacy: { shareLimits: true, shareTime: true, shareApps: true, shareProgress: false },
+  privacy: { shareLimits: false, shareTime: false, shareApps: false, shareProgress: false },
   pendingRemovals: {},
   ...overrides,
 });
@@ -254,6 +254,39 @@ describe("limits", () => {
     await assertSucceeds(setDoc(ref, { ...limit(30, 300), schedule: evenings }));
   });
 
+  test("days' own limits and caps can be set on a new limit, but with Bumblebees only change through the backend", async () => {
+    await seed();
+    const weekend = { 6: 120, 7: 120 };
+    const caps = [{ days: [1, 2, 3, 4, 5], from: 600, to: 960, minutes: 30 }];
+    const tok = doc(as("sam"), "users/sam/limits/com.tok");
+    await assertSucceeds(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: weekend }));
+    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.yt"), { ...limit(0), packageName: "com.yt", caps }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", dayMinutes: { 9: 10 } }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: Array(7).fill(caps[0]) }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: "lots" }));
+    // What Bumblebees' phones read is only ever well formed: no odd minutes, no stray caps.
+    for (const dayMinutes of [{ 6: -5 }, { 6: 1441 }, { 6: "two hours" }, { 6: 1.5 }, { 6: { nested: true } }]) {
+      await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", dayMinutes }));
+    }
+    for (const cap of [
+      { ...caps[0], days: [] }, { ...caps[0], days: [0] }, { ...caps[0], days: [8] }, { ...caps[0], days: ["mon"] },
+      { ...caps[0], from: 960, to: 600 }, { ...caps[0], to: 1441 }, { ...caps[0], from: -1 },
+      { ...caps[0], minutes: 0 }, { ...caps[0], minutes: 360 }, { ...caps[0], minutes: "30" },
+      { ...caps[0], note: "x".repeat(100_000) }, "a cap", null,
+    ]) {
+      await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: [caps[0], cap] }));
+    }
+    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: Array(6).fill(caps[0]) }));
+    // Rules can't compare them: with Bumblebees, any change to them goes through the backend.
+    await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: { 6: 60, 7: 60 } }));
+    await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: weekend, caps }));
+    await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.insta"), { ...limit(30, 300), caps }));
+    // A tighter everyday limit with them unchanged is fine.
+    await assertSucceeds(setDoc(tok, { ...limit(20), packageName: "com.tok", dayMinutes: weekend }));
+    await seed({ samHasBee: false });
+    await assertSucceeds(setDoc(tok, { ...limit(20), packageName: "com.tok", dayMinutes: { 6: 0 }, caps }));
+  });
+
   test("Bumblebees can see what's shared; strangers can't, and extra time stays private", async () => {
     await seed();
     await assertSucceeds(getDoc(doc(as("bee"), "users/sam/appUsage/today")));
@@ -288,13 +321,12 @@ describe("limits", () => {
     }
   });
 
-  test("a choice never made shares today's time and apps, and progress waits to be chosen", async () => {
+  test("a choice never made shares nothing", async () => {
     await seed({ privacy: {} });
-    for (const path of ["users/sam/limits/com.insta", "users/sam/usage/today", "users/sam/appUsage/today"]) {
-      await assertSucceeds(getDoc(doc(as("bee"), path)));
+    for (const path of ["users/sam/limits/com.insta", "users/sam/usage/today", "users/sam/appUsage/today", "users/sam/progress/current"]) {
+      await assertFails(getDoc(doc(as("bee"), path)));
+      await assertSucceeds(getDoc(doc(as("sam"), path)));
     }
-    await assertFails(getDoc(doc(as("bee"), "users/sam/progress/current")));
-    await assertSucceeds(getDoc(doc(as("sam"), "users/sam/progress/current")));
   });
 
   test("only today's copy of time and top apps is kept; earlier days never leave the phone", async () => {
@@ -406,6 +438,21 @@ describe("chats", () => {
     await assertFails(addDoc(messages, { senderId: "bee", text: "Yes!", kind: "text", createdAt: serverTimestamp() }));
     await assertFails(addDoc(messages, { senderId: "sam", text: "🌸 Bee said yes", kind: "system", createdAt: serverTimestamp() }));
     await assertFails(addDoc(messages, { senderId: "sam", text: "", kind: "text", createdAt: serverTimestamp() }));
+  });
+
+  test("a photo message points at the sender's own file in this chat, and nothing else", async () => {
+    const messages = collection(as("sam"), "chats/bee_sam/messages");
+    const photo = { senderId: "sam", kind: "image", path: "chats/bee_sam/sam/abc12345.jpg", width: 800, height: 600, gif: false, createdAt: serverTimestamp() };
+    await assertSucceeds(addDoc(messages, photo));
+    await assertSucceeds(addDoc(messages, { ...photo, path: "chats/bee_sam/sam/abc12345.gif", gif: true }));
+    // Someone else's file, another chat's, or anywhere else in Storage.
+    for (const path of ["chats/bee_sam/bee/abc12345.jpg", "chats/other_sam/sam/abc12345.jpg", "avatars/bee", "chats/bee_sam/sam/../bee/x.jpg", "chats/bee_sam/sam/abc12345.html"]) {
+      await assertFails(addDoc(messages, { ...photo, path }));
+    }
+    await assertFails(addDoc(messages, { ...photo, width: 0 }));
+    await assertFails(addDoc(messages, { ...photo, height: 9000 }));
+    await assertFails(addDoc(messages, { ...photo, text: "caption" }));
+    await assertFails(addDoc(messages, { ...photo, senderId: "bee", path: "chats/bee_sam/bee/abc12345.jpg" }));
   });
 
   test("chat summaries only change in the allowed ways", async () => {

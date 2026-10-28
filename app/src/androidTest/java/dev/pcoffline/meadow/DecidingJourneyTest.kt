@@ -2,6 +2,7 @@ package dev.pcoffline.meadow
 
 import android.app.NotificationManager
 import android.os.ParcelFileDescriptor
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -67,7 +68,7 @@ class DecidingJourneyTest : EndToEndTest() {
 
             // 30 minutes asked; Bee gives 10, with a note.
             val first = sam.ask("Instagram", "com.instagram.android", 30, "Homework research")
-            node(R.string.tab_requests).performClick()
+            tab(R.string.tab_people).performClick()
             waitForText("Homework research", substring = true)
             compose.onAllNodesWithText(text(R.string.request_say_yes)).onFirst().performScrollTo().performClick()
             waitForText(text(R.string.request_decide_yes_title, "Sam"))
@@ -78,7 +79,10 @@ class DecidingJourneyTest : EndToEndTest() {
             waitForBackend("requests/$first") { it.string("status") == "approved" && it.int("minutes") == 10 }
             assertEquals("Ten is plenty", backendDoc("requests/$first")!!.string("decisionNote"))
             assertEquals(10, backendDoc("users/${sam.uid}/grants/$first")!!.int("minutes"))
+            // Answered, it lives on in the chat with Sam.
+            openChatWith("Sam")
             waitFor(R.string.request_you_said_yes)
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
             // Not today, with a kind word; no time is given.
             val second = sam.ask("YouTube", "com.google.android.youtube", 15, "One more video")
@@ -91,10 +95,10 @@ class DecidingJourneyTest : EndToEndTest() {
             waitForBackend("requests/$second") { it.string("status") == "denied" && it.string("decisionNote") == "Bedtime" }
             assertEquals(null, backendDoc("users/${sam.uid}/grants/$second"))
 
-            // The third arrives as a notification: tapping it opens the requests, and its
+            // The third arrives as a notification: tapping it opens People, and its
             // "Say yes" answers without opening Meadow at all.
             val third = sam.ask("WhatsApp", "com.whatsapp", 5, "Replying to my coach")
-            node(R.string.tab_circle).performClick()
+            tab(R.string.tab_garden).performClick()
             MeadowMessagingService().onMessageReceived(
                 RemoteMessage.Builder("meadow@fcm.googleapis.com")
                     .setData(mapOf("type" to "request_new", "to" to me, "requestId" to third, "title" to "Sam", "body" to "Replying to my coach"))
@@ -106,7 +110,7 @@ class DecidingJourneyTest : EndToEndTest() {
                 posted != null
             }
             posted!!.contentIntent.send()
-            waitFor(R.string.requests_tab_yours)
+            waitFor(R.string.people_waiting)
             posted!!.actions.single { it.title.toString() == text(R.string.request_say_yes) }.actionIntent.send()
             waitForBackend("requests/$third") { it.string("status") == "approved" }
             assertEquals(5, backendDoc("users/${sam.uid}/grants/$third")!!.int("minutes"))

@@ -5,7 +5,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -76,7 +75,8 @@ class BumblebeeJourneyTest : EndToEndTest() {
                     "message" to "Finishing a message to my sister", "dayKey" to today, "usedMinutes" to 29, "allowedMinutes" to 30,
                 ),
             )!!["requestId"] as String
-            node(R.string.tab_requests).performClick()
+            tab(R.string.tab_people).performClick()
+            waitFor(R.string.people_waiting)
             waitForText(text(R.string.request_they_ask, "Sam"))
             waitForText("Finishing a message to my sister", substring = true)
             compose.onAllNodesWithText(text(R.string.request_say_yes)).onFirst().performScrollTo().performClick()
@@ -86,10 +86,11 @@ class BumblebeeJourneyTest : EndToEndTest() {
             val grant = backendDoc("users/${sam.uid}/grants/$requestId")!!
             assertEquals("15", grant.getJSONObject("minutes").getString("integerValue"))
             assertEquals(me, grant.getJSONObject("grantedBy").getString("stringValue"))
-            waitFor(R.string.request_status_yes)
+            waitFor(R.string.request_sent_yes)
+            // Answered, it leaves what's waiting.
+            eventually("the answered request gone from People") { !showing(text(R.string.people_waiting)) }
 
             // Sam's garden: each part Sam shares.
-            node(R.string.tab_circle).performClick()
             openGardenOf("Sam")
             waitForText(text(R.string.friend_screen_time, app.resources.minutesText(42)))
             waitForText(text(R.string.progress_kept, 6, 7))
@@ -99,15 +100,13 @@ class BumblebeeJourneyTest : EndToEndTest() {
             // only what's still shared is shown: not even this phone's cached copy of the rest.
             val privacy = "users/${sam.uid}/private/account"
             await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to true, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
-            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
-            openGardenOf("Sam")
+            reopenGardenOf("Sam")
             waitForText(text(R.string.friend_limits))
             eventually("today's time and progress gone") {
                 !showing(text(R.string.friend_screen_time, app.resources.minutesText(42))) && !showing(text(R.string.progress_title))
             }
             await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to false, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
-            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
-            openGardenOf("Sam")
+            reopenGardenOf("Sam")
             waitForText(text(R.string.friend_step_down, "Sam"))
             eventually("Sam's page read") { !showing(text(R.string.loading_garden)) }
             waitForText(text(R.string.friend_nothing_shared, "Sam"))

@@ -4,6 +4,16 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.ui.geometry.Offset
+import dev.pcoffline.meadow.ui.LocalSnackbarClearance
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -138,67 +148,82 @@ fun GardenContent(
     onAsk: (String) -> Unit = {},
 ) {
     val canAsk = profile.approverIds.isNotEmpty()
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            // One item, so no gap is left when there's no emergency unlock to show.
-            Column {
-                GardenHeader(profile, state, onOpenSettings, onOpenProfile)
-                EmergencyBanner(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
-            }
-        }
-
-        if (!state.essentialsReady) {
+    Box(Modifier.fillMaxSize()) {
+        // Room at the bottom so the last flowers can scroll clear of the Plant button.
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                Notice(
-                    emoji = "🍂",
-                    text = stringResource(R.string.garden_notice_setup),
-                    action = stringResource(R.string.garden_notice_setup_action),
-                    onClick = onOpenSetup,
-                )
+                // One item, so no gap is left when there's no emergency unlock to show.
+                Column {
+                    GardenHeader(profile, state, onOpenSettings, onOpenProfile)
+                    EmergencyBanner(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
+                }
             }
-        }
-        if (state.essentialsReady && state.batteryRestricted) {
-            item {
-                Notice(
-                    emoji = "🔋",
-                    text = stringResource(R.string.garden_notice_battery),
-                    action = stringResource(R.string.trouble_button),
-                    onClick = onOpenTroubleshoot,
-                )
-            }
-        }
 
-        item {
-            SectionTitle(stringResource(R.string.garden_title), Modifier.padding(horizontal = 20.dp)) {
-                TextButton(onClick = onPlantLimit) { Text(stringResource(R.string.garden_plant)) }
+            if (!state.essentialsReady) {
+                item {
+                    Notice(
+                        emoji = "🍂",
+                        text = stringResource(R.string.garden_notice_setup),
+                        action = stringResource(R.string.garden_notice_setup_action),
+                        onClick = onOpenSetup,
+                    )
+                }
             }
-        }
+            if (state.essentialsReady && state.batteryRestricted) {
+                item {
+                    Notice(
+                        emoji = "🔋",
+                        text = stringResource(R.string.garden_notice_battery),
+                        action = stringResource(R.string.trouble_button),
+                        onClick = onOpenTroubleshoot,
+                    )
+                }
+            }
 
-        if (state.loaded && state.budgets.isEmpty()) {
-            item {
-                MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onPlantLimit) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BloomFlower(0.2f, Garden.colors.petalPink, Modifier.size(56.dp, 84.dp), sway = false)
-                        Spacer(Modifier.width(12.dp))
-                        Text(stringResource(R.string.garden_empty_title), style = MaterialTheme.typography.titleMedium)
+            item { SectionTitle(stringResource(R.string.garden_title), Modifier.padding(horizontal = 20.dp)) }
+
+            if (state.loaded && state.budgets.isEmpty()) {
+                item {
+                    MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onPlantLimit) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            BloomFlower(0.2f, Garden.colors.petalPink, Modifier.size(56.dp, 84.dp), sway = false)
+                            Spacer(Modifier.width(12.dp))
+                            Text(stringResource(R.string.garden_empty_title), style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
-        }
 
-        items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
-            Row(Modifier.animateItem().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { budget ->
-                    FlowerTile(
-                        budget,
-                        Modifier.weight(1f),
-                        onAsk = if (canAsk && !budget.emergency) ({ onAsk(budget.limit.packageName) }) else null,
-                    ) { onOpenLimit(budget.limit.packageName) }
+            items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
+                Row(Modifier.animateItem().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { budget ->
+                        FlowerTile(
+                            budget,
+                            Modifier.weight(1f),
+                            onAsk = if (canAsk && !budget.emergency) ({ onAsk(budget.limit.packageName) }) else null,
+                        ) { onOpenLimit(budget.limit.packageName) }
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        item { Spacer(Modifier.height(24.dp)) }
+        // Planting a limit is what the garden is for, so it's the one big button, always in reach.
+        val plant = stringResource(R.string.garden_plant)
+        // Snackbars sit above the button rather than over it (they'd take its taps), only while it's here.
+        val clearance = LocalSnackbarClearance.current
+        val density = LocalDensity.current
+        DisposableEffect(clearance) { onDispose { clearance.height = 0.dp } }
+        ExtendedFloatingActionButton(
+            onClick = onPlantLimit,
+            icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+            text = { Text(plant) },
+            // Material keeps the label's text from screen readers, so the button names itself.
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .onSizeChanged { clearance.height = with(density) { it.height.toDp() } + 16.dp }
+                .semantics { contentDescription = plant },
+        )
     }
 }
 
@@ -210,13 +235,20 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
     val locale = currentLocale()
     val today = remember(now.toLocalDate(), locale) { now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)) }
     Box(Modifier.fillMaxWidth().height(250.dp)) {
-        SkyScene(mood, Modifier.fillMaxSize())
+        // The sun or moon sits low on the right, beside today's total, so it never crowds your
+        // picture and Settings up top.
+        SkyScene(mood, Modifier.fillMaxSize(), celestial = Offset(0.8f, 0.56f))
         Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky)
                     Text(
-                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.avatar.emoji),
+                        // Someone who uses a photo goes by it, not by a flower next to their name.
+                        if (profile.avatar.photoUrl != null) {
+                            stringResource(R.string.garden_greeting_plain, stringResource(mood.greeting), profile.displayName)
+                        } else {
+                            stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.avatar.emoji)
+                        },
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.asHeading(),
                         color = mood.onSky,
@@ -254,7 +286,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
     }
     MeadowCard(modifier, onClick = onClick) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp))
+            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
             AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
             if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
         }
@@ -269,7 +301,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
         Text(
             when {
                 budget.emergency -> stringResource(R.string.garden_tile_emergency)
-                budget.restingByHours -> budget.untilScheduleChangeMs?.takeIf { it < Long.MAX_VALUE / 4 }
+                budget.sleeping -> budget.wakesInMs
                     ?.let { stringResource(R.string.garden_tile_resting_until, opensAtText(it)) }
                     ?: stringResource(R.string.garden_tile_resting_hours)
                 budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)

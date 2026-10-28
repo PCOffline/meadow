@@ -22,7 +22,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.Manifest
 import dev.pcoffline.meadow.AppGraph
+import org.robolectric.Shadows.shadowOf
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
@@ -31,7 +33,8 @@ import dev.pcoffline.meadow.data.Privacy
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.AccountEntry
 import dev.pcoffline.meadow.ui.components.LocalAccount
-import dev.pcoffline.meadow.ui.requests.RequestsContent
+import dev.pcoffline.meadow.ui.circle.People
+import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
@@ -40,6 +43,7 @@ import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,7 +67,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
             CompositionLocalProvider(LocalAccount provides AccountEntry(robin.avatar) { opened++ }) {
                 when (tab) {
                     0 -> StatsContent(DemoGarden.stats)
-                    else -> RequestsContent(robin, incoming = emptyList(), outgoing = emptyList())
+                    else -> PeopleContent(robin, People())
                 }
             }
         }
@@ -87,6 +91,32 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.onNode(hasText(text(GardenTheme.LAVENDER.label), substring = true) and hasClickAction()).performScrollTo().assertExists()
         node(R.string.dark_mode_dark).performScrollTo().assertExists()
         assertAccessible()
+    }
+
+    @Test
+    fun `the weather in the sky is off until turned on, and shows off again without the location permission`() {
+        AppGraph.store.setWeatherOn(false)
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        showScrolling { AppearanceCard() }
+        val weather = compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true))
+        weather.performScrollTo().assertIsOff()
+        weather.performClick().assertIsOn()
+        assertTrue(AppGraph.store.weatherOn.value)
+        weather.performClick().assertIsOff()
+        assertFalse(AppGraph.store.weatherOn.value)
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `turned on but with the location permission taken away, the weather reads as off`() {
+        shadowOf(app).denyPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        AppGraph.store.setWeatherOn(true)
+        try {
+            showScrolling { AppearanceCard() }
+            compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true)).performScrollTo().assertIsOff()
+        } finally {
+            AppGraph.store.setWeatherOn(false)
+        }
     }
 
     @Test
@@ -139,7 +169,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         assertEquals(1, previews)
     }
 
-    private fun preview(privacy: Privacy = Privacy(shareProgress = true), save: suspend (Privacy) -> Unit = {}) = show {
+    private fun preview(privacy: Privacy = DemoGarden.sharesEverything, save: suspend (Privacy) -> Unit = {}) = show {
         PrivacyPreviewContent(robin.copy(privacy = privacy), DemoGarden.today, DemoGarden.progress, DemoGarden.myLimits, save = save)
     }
 
@@ -168,7 +198,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     @Test
     fun `each part comes off the page on its own`() {
-        preview(Privacy(shareTime = false, shareLimits = false, shareProgress = true))
+        preview(DemoGarden.sharesEverything.copy(shareTime = false, shareLimits = false))
         node(R.string.friend_screen_time, app.resources.getString(R.string.duration_hours_minutes, 2, 14)).assertDoesNotExist()
         node(R.string.friend_limits).assertDoesNotExist()
         // Top apps stay, without the limits that are now private.
@@ -179,7 +209,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     @Test
     fun `with nothing shared, the preview says so`() {
-        preview(Privacy(shareLimits = false, shareTime = false, shareApps = false, shareProgress = false))
+        preview(Privacy())
         node(R.string.friend_nothing_shared, robin.displayName).performScrollTo().assertExists()
         node(R.string.friend_limits).assertDoesNotExist()
         compose.onAllNodesWithText("Maps").assertCountEquals(0)
@@ -202,7 +232,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.mainClock.advanceTimeBy(PRIVACY_SETTLE_MS)
         compose.mainClock.autoAdvance = true
         compose.waitUntil(5_000) { saves.isNotEmpty() }
-        assertEquals(listOf(Privacy(shareTime = false, shareApps = false, shareProgress = true)), saves)
+        assertEquals(listOf(DemoGarden.sharesEverything.copy(shareTime = false, shareApps = false)), saves)
     }
 
     @Test
