@@ -1,32 +1,64 @@
 # Contributing to Meadow
 
-Thank you for helping Meadow grow. Before opening a pull request, run the checks in the
-README's *Tests* section that cover what you changed; CI runs all of them.
+Thank you for your help. Read [AGENTS.md](AGENTS.md) for the rules on commits, branches, tests
+and writing.
 
-## Voice and words
+## Set up
 
-Copy lives in `app/src/main/res/values/strings*.xml` and `backend/functions/src/copy.ts`.
-Warm, calm and plain; sentence case; at most one emoji, at the end. Use these terms exactly:
+1. Install Java 21 or newer and Node 24. `mise install` installs both. CI uses Java 25.
+2. Run `just` to see the shortcuts for build, install, test and deploy.
+
+## Checks
+
+CI runs all checks on each pull request and on each push to `main`. Before you push, run the
+checks for the parts you changed. `just check` runs most of them.
+
+| Part | Command |
+|---|---|
+| App unit, screen and accessibility tests | `./gradlew testDebugUnitTest` |
+| Lint | `./gradlew lintDebug`, `.github/scripts/detekt.sh`, and `npm run lint` in `backend/` and `backend/functions/` |
+| Cloud Functions unit tests | `cd backend/functions && npm test` |
+| Security rules (Firestore and Storage) | `cd backend && npm ci && npm run test:rules` |
+| Cloud Functions on the emulators | `cd backend && npm ci && npm --prefix functions ci && npm run test:integration` |
+| Hosted pages (legal, invite and sign-in) | `cd backend && npm run test:hosting` |
+| Deploy scripts | `cd backend && npm run test:deploy` |
+| End to end, on an Android emulator | Start the Firebase emulators (`npm run emulators` in `backend/`). Then run `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2` |
+| CI scripts and workflows | `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`, `actionlint`, `shellcheck` and `ruff check` |
+
+Run the end-to-end tests on an emulator only. Some of these tests turn Meadow's permissions on
+and off.
+
+## Every screen by hand
+
+Install a debug build with `./gradlew installDebug`, or get the `meadow-debug-apk` artifact from
+CI. Open **Meadow screens**, the second icon. It shows each screen in each state, with made-up
+data, in each theme. Read [Debugging Meadow](docs/debugging.md) for more.
+
+## Words
+
+App text is in `app/src/main/res/values/strings*.xml` and `backend/functions/src/copy.ts`. Use
+these terms, and use each term for one meaning only:
 
 | Term | Meaning |
 |---|---|
-| Bumblebee | A friend who looks after your garden (code calls them *approvers*) |
-| garden | Your limits, together |
-| limit | Time allowed for one app, per day and/or week |
-| resting | An app whose time is up for now |
-| extra time | What you ask a Bumblebee for |
-| approve / deny | A Bumblebee's answers |
-| emergency unlock | Lifting limits without a Bumblebee |
+| Bumblebee | A friend who looks after your garden. The code calls them *approvers*. |
+| garden | All your limits |
+| limit | The time one app can open, each day, each week or both |
+| resting | An app whose time is used, for now |
+| more time | What you ask a Bumblebee for |
+| approve / deny | The two answers a Bumblebee gives |
+| emergency unlock | All apps open without a Bumblebee, for a short time |
 
 ## Accessibility
 
-Every screen is checked by `assertAccessible` (in `app/src/sharedTest`): controls are labelled,
-touch targets are at least 48dp, and each screen has headings. Theme colours are checked against
-WCAG AA contrast. New screens should get a screen test that calls it.
+`assertAccessible` (in `app/src/sharedTest`) checks each screen. It checks that each control has
+a label, each touch target is 48dp or more, and each screen has headings. The theme tests check
+each colour pair against WCAG AA contrast. Give each new screen a screen test that calls
+`assertAccessible`.
 
 ## README images
 
-Screenshots and animations come from `ShowcaseTest`, rendered on an emulator by the Screenshots
-workflow whenever a pull request changes the app's screens, and committed to the pull request.
-Run it from the Actions tab for any other branch. The banner and illustrations are drawn by
-`docs/art/build.py`.
+`ShowcaseTest` makes the screenshots and animations. The Screenshots workflow runs it on an
+emulator when a push to `main` changes the app's screens. Then it commits the images to `main`.
+To run it on a different branch, start it from the Actions tab. `docs/art/build.py` draws
+the banner and the illustrations.

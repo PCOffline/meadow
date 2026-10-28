@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** Reminders are gentle: one at five minutes left and one at one minute, once each per day. */
+/** Reminders are gentle: at 15, 10, 5, 2 and 1 minutes left, then 30 seconds, once each per day. */
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class)
 class NotifierTest {
@@ -54,19 +54,28 @@ class NotifierTest {
     }
 
     @Test
-    fun `five minutes and one minute left are each mentioned once`() {
+    fun `reminders come at 15, 10, 5, 2 and 1 minutes left, then 30 seconds, once each`() {
         // Every reminder for an app shares one notification, so each is cleared before the next check.
-        notifier.maybeWarn(budget(usedMinutes = 25.5)) // 4.5 minutes left
-        assertEquals(1, posted())
-        manager.cancelAll()
-        notifier.maybeWarn(budget(usedMinutes = 26.0))
-        assertEquals(0, posted())
-        notifier.maybeWarn(budget(usedMinutes = 29.5)) // Under a minute left: a new reminder.
-        assertEquals(1, posted())
-        assertEquals(true, shadowOf(manager).allNotifications.single().extras.getCharSequence("android.title")!!.contains("Demo"))
-        manager.cancelAll()
-        notifier.maybeWarn(budget(usedMinutes = 29.8))
-        assertEquals(0, posted())
+        val titles = mutableListOf<String>()
+        for (used in listOf(15.2, 15.5, 20.0, 25.0, 28.0, 28.5, 29.0, 29.2, 29.5, 29.7)) {
+            notifier.maybeWarn(budget(usedMinutes = used))
+            shadowOf(manager).allNotifications.forEach { titles += it.extras.getCharSequence("android.title").toString() }
+            manager.cancelAll()
+        }
+        assertEquals(
+            listOf("15m left on Demo 🌷", "10m left on Demo 🌷", "5m left on Demo 🌷", "2m left on Demo 🌷", "1m left on Demo 🌷", "30s left on Demo 🌷"),
+            titles,
+        )
+    }
+
+    @Test
+    fun `the reminder due is the nearest point at or above the time left`() {
+        assertEquals(null, Notifier.warningPoint(16 * 60_000L))
+        assertEquals(15 * 60_000L, Notifier.warningPoint(15 * 60_000L))
+        assertEquals(5 * 60_000L, Notifier.warningPoint(4 * 60_000L + 30_000L))
+        assertEquals(60_000L, Notifier.warningPoint(45_000L))
+        assertEquals(30_000L, Notifier.warningPoint(30_000L))
+        assertEquals(30_000L, Notifier.warningPoint(5_000L))
     }
 
     @Test

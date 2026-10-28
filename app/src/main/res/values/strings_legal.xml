@@ -4,15 +4,15 @@
     <string name="legal_terms">Terms of use</string>
     <string name="legal_licenses">Open-source licences</string>
     <string name="legal_agree">I\'ve read and agree to the terms of use and privacy notice.</string>
-    <string name="legal_update_title">We\'ve updated our terms</string>
-    <string name="legal_update_body">Please take a moment to read the updated terms of use and privacy notice. Continuing means you agree to them.</string>
+    <string name="legal_update_title">We updated our terms</string>
+    <string name="legal_update_body">Read the new terms of use and privacy notice. If you continue, you agree to them.</string>
     <string name="legal_update_accept">I agree</string>
 
     <string name="disclosure_title">Before you turn this on</string>
-    <string name="disclosure_usage">Meadow will read your phone\'s app usage log to measure how long each app is open. Your detailed history stays on this phone. If you choose to share it, only today\'s total and top apps go to your Bumblebees.</string>
-    <string name="disclosure_keeper">The garden keeper is an accessibility service. It notices which app is on screen so it can gently close apps whose time is up, and in strict mode it reads the words on a few settings screens so Meadow can\'t be switched off. Everything happens on this phone: Meadow never reads what you type, and never stores or sends what\'s on your screen.</string>
+    <string name="disclosure_usage">Meadow reads your phone\'s app usage log to measure how long each app is open. Your full history stays on this phone. If you choose to share, only today\'s total and your top apps go to your Bumblebees.</string>
+    <string name="disclosure_keeper">The garden keeper is an accessibility service. It sees which app is on screen and closes apps whose time is used. In strict mode, it also reads the words on some settings screens, so nobody can turn Meadow off. All of this happens on this phone. Meadow never reads what you type. It never stores or sends what is on your screen.</string>
     <string name="disclosure_agree">Agree and continue</string>
     <string name="disclosure_not_now">Deny</string>
 
-    <string name="disclosure_listener">Notification access lets the garden keeper see which app each notification comes from, so it can hide notifications from resting apps and pause their videos and music. Everything happens on this phone: Meadow never stores or sends your notifications or what\'s in them.</string>
+    <string name="disclosure_listener">Notification access lets the garden keeper see which app sends each notification. Then it can hide notifications from resting apps and pause their videos and music. All of this happens on this phone. Meadow never stores or sends your notifications or their content.</string>
 </resources>

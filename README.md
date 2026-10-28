@@ -9,168 +9,114 @@
   <img src="https://img.shields.io/badge/Android-8.0%2B-5B7F55" alt="Android 8.0 or newer">
 </p>
 
-**Meadow is a cozy way to spend less time on the apps that pull you in.** Give each app a little
-patch of time. When it's used up, the app rests until tomorrow. Want more? Ask one of your
-**Bumblebees**, the friends you've chosen to look after your garden. Willpower is hard; a kind
-friend who has to approve is much harder to argue with.
+Meadow helps you spend less time on the apps that pull you in. Each app gets a set amount of
+time. When the time is used, the app rests. To get more time, ask a Bumblebee: a friend you
+chose to look after your garden.
 
 <p align="center">
-  <img src="docs/images/screen-garden.png" alt="The garden: a flower for each app, blooming while there's time left, resting when it's used up" width="250">
+  <img src="docs/images/screen-garden.png" alt="The garden: a flower for each app, open while time is left and closed when it is used" width="250">
   &nbsp;
-  <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who approved 15 more minutes" width="250">
+  <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who gave 15 more minutes" width="250">
   &nbsp;
-  <img src="docs/images/screen-stats.png" alt="A week of screen time, down 20% on the week before" width="250">
+  <img src="docs/images/screen-stats.png" alt="A week of screen time, 20% less than the week before" width="250">
 </p>
 
 ## How it works
 
 <table>
   <tr>
-    <td align="center" width="33%"><img src="docs/images/step-plant.svg" alt="" width="150"><br><b>Plant a limit</b><br>Choose how long an app may bloom each day or week.</td>
-    <td align="center" width="33%"><img src="docs/images/step-rest.svg" alt="" width="150"><br><b>It rests</b><br>When the time is used up, the app closes gently until tomorrow.</td>
-    <td align="center" width="33%"><img src="docs/images/step-ask.svg" alt="" width="150"><br><b>Ask a Bumblebee</b><br>Need more? A friend can approve it, right from their notification.</td>
+    <td align="center" width="33%"><img src="docs/images/step-plant.svg" alt="" width="150"><br><b>Plant a limit</b><br>Choose how long an app can open each day or week.</td>
+    <td align="center" width="33%"><img src="docs/images/step-rest.svg" alt="" width="150"><br><b>It rests</b><br>When the time is used, the app closes until tomorrow.</td>
+    <td align="center" width="33%"><img src="docs/images/step-ask.svg" alt="" width="150"><br><b>Ask a Bumblebee</b><br>A friend can give you more time with one tap.</td>
   </tr>
 </table>
 
-## Features
+## Your garden
 
-### A garden that grows with your time
-Every app you limit is a flower that blooms while there's time left, wilts as it runs out and
-sleeps outside the hours you allow it (in the Mushroom forest, a mushroom that opens and droops
-the same way). The sky follows your day, from a peach sunrise to a starry night with fireflies:
-the sun crosses it from morning to evening, and the moon by night. By day two butterflies drift
-and glide over the hills, and, if you like, the sky shows the weather
-outside: clouds, fog, rain, snow or a storm. Gentle reminders arrive at five minutes and one
-minute left.
+Each app you limit is a flower. The flower is open while time is left and closes as the time
+goes. The sky follows your day, from sunrise to a night with fireflies. It can also show the
+weather outside.
 
-### Limits that fit your week
-Set a daily limit, then give some days their own: 30 minutes on weekdays, two hours at weekends.
-Add a weekly limit, the hours an app may be used (or all day, in one tap), and caps within hours,
-like up to 30 minutes between 10:00 and 16:00. Every one of them applies, and the app rests as
-soon as any is used up. Pick times on a clock, and set several days at once.
+## Limits for your week
 
-### Websites too
-Type a website's address to limit it like an app: youtube.com covers every part of it, in Chrome,
-Firefox, Edge, Samsung Internet, Brave, Opera, Vivaldi, Kiwi and DuckDuckGo. Only the sites you add are
-looked for, and no history is kept.
-
-### Friends who have your back
-Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
-time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee
-gets a chat with you, and your requests appear in it as cards they can answer with one tap.
-Send photos and GIFs (straight from your keyboard too), and long-press a message to copy it.
-When you plant or change a limit, share it with them in their chat, or through any other app.
-From a chat you can ask them to be your Bumblebee too, or offer to be theirs. When someone stops
-being your Bumblebee, your chat with them closes.
+Give each app a daily limit, a weekly limit, or both. Give some days more time, for example
+the weekend. Choose the hours an app can open. Limit websites the same way.
 
 <p align="center">
-  <img src="docs/images/screen-people.png" alt="People: two Bumblebees and a friend whose garden you look after, each with their latest message" width="250">
+  <img src="docs/images/screen-limit.png" alt="The limit for YouTube: one hour each day, with the time used today" width="250">
+</p>
+
+## When time is up
+
+You get a reminder at 15, 10, 5, 2 and 1 minutes, and at 30 seconds. Then the app rests until
+tomorrow. Go do something else, or ask a Bumblebee for more time.
+
+In a real emergency, unlock all your apps for up to one hour. You can do this three times in
+30 days. Calls and emergency apps never rest.
+
+<p align="center">
+  <img src="docs/images/screen-resting.png" alt="A resting app under a night sky, with a button to go home and a button to ask a Bumblebee" width="250">
   &nbsp;
-  <img src="docs/images/screen-resting.png" alt="A resting app under a night sky, with a button to ask a Bumblebee" width="250">
+  <img src="docs/images/screen-emergency.png" alt="An app open during an emergency unlock, with the time left" width="250">
 </p>
 
-### Hard to wriggle out of
-Strict mode keeps Meadow's own settings, uninstalling and the phone's clock out of reach, and
-turning it off needs a Bumblebee's approval too. If something gets switched off anyway, or your phone
-goes quiet, your Bumblebees are told. Your limits keep working offline.
+## Friends who help
 
-### For real emergencies
-Lost and need maps? Unlock everything for up to an hour, three times in 30 days, with a short note
-for your Bumblebees. Calls and emergency apps are never limited.
-
-### See your days take shape
-Daily, weekly and monthly views show where your time went, how it compares with the week before,
-and which days were the calmest.
-
-### Make it yours
-Six themes, each by day or by night: Meadow, Cherry blossom, Lavender field, Sunflower, Lily pond
-and Mushroom forest. Each colours the page, the sky, its flowers and its butterflies, while the sun
-and grass only lean a little towards it. The picker shows each theme as a little sky of its own.
-Pick a critter or flower for your picture, or use a photo, and add a few words about yourself.
+Invite a friend to be your Bumblebee. Only a Bumblebee can give you more time or make a limit
+easier. You can always make a limit stricter yourself. Your requests go to your chat with them,
+and they answer with one tap. Send messages, photos and GIFs. Look after a friend's garden too.
 
 <p align="center">
-  <img src="docs/images/themes.png" alt="The garden in all six themes through a day, the sun climbing and setting across them: Cherry blossom at dawn, Meadow, Lily pond at midday, Sunflower, Mushroom forest with its mushrooms in the evening, and Lavender field by night" width="100%">
-</p>
-<p align="center">
-  <img src="docs/images/screen-appearance.png" alt="The theme picker: each of the six themes as a small sky with its sun, hills and flower, or mushroom" width="250">
+  <img src="docs/images/screen-people.png" alt="People: two Bumblebees and a friend whose garden you look after" width="250">
+  &nbsp;
+  <img src="docs/images/screen-friend.png" alt="A friend's garden: their limits, their time today and their progress" width="250">
 </p>
 
-### Private by default
-No email needed to start; later you can keep your garden safe with a sign-in link emailed to
-you, or a password. Nothing is shared until you choose what your Bumblebees see, part by part (your limits, today's
-screen time, top apps and your progress over the weeks); setup asks, and shows your page exactly
-as they'll see it. Your detailed history never leaves your phone. Who looks after whom is your own business: only the
-person affected is told when you add or remove a Bumblebee. Download everything Meadow holds about
-you, with the photos from your chats, or delete your account, any time. Read the [privacy notice](legal/privacy_notice.md).
+## Strict mode
 
-### Kind to everyone
-Built for TalkBack, large text and switch access: every control is labelled, touch targets are
-large, and every theme meets WCAG AA contrast. All motion stops when you turn animations off.
+Strict mode stops changes to Meadow's settings and the phone's clock. It also stops anyone
+from removing Meadow. To turn strict mode off, a Bumblebee must agree. If Meadow stops working,
+your Bumblebees get a message.
+
+## Private by default
+
+You choose what your Bumblebees see. Your full history stays on your phone. Download all your
+data, or delete your account, at any time. Read the [privacy notice](legal/privacy_notice.md).
 
 <p align="center">
+  <img src="docs/images/screen-privacy.png" alt="What your Bumblebees see: switches for your limits, your time today, your top apps and your progress" width="250">
+</p>
+
+## Make it yours
+
+Choose from six themes, by day or by night. Pick a critter, a flower or a photo for your
+picture.
+
+<p align="center">
+  <img src="docs/images/themes.png" alt="The garden in all six themes through one day: Cherry blossom at dawn, Meadow, Lily pond at midday, Sunflower, Mushroom forest in the evening, and Lavender field at night" width="100%">
+</p>
+<p align="center">
+  <img src="docs/images/screen-appearance.png" alt="The theme picker: each theme as a small sky with its sun, hills and flower" width="250">
+  &nbsp;
+  <img src="docs/images/screen-profile.png" alt="Your profile: your picture, your name and a few words about you" width="250">
+  &nbsp;
   <img src="docs/images/welcome.webp" alt="Meadow's welcome screens" width="250">
 </p>
 
----
-
 ## Get Meadow
 
-Download the latest APK from [Releases](https://github.com/PCOffline/meadow/releases) and
-open it on your phone (you may need to allow installing from your browser or files app). Meadow
-checks for new releases once a day on Wi-Fi and asks before updating; you can turn this off in
-Settings.
+Download the latest APK from [Releases](https://github.com/PCOffline/meadow/releases). Open it
+on your phone.
 
-On first launch, Meadow asks for **usage access** (to measure time) and for its **garden keeper**
-accessibility service (to rest apps whose time is up). On Android 13 and newer, sideloaded apps
-need *App info → ⋮ → Allow restricted settings* before the garden keeper can be turned on.
-
-Meadow needs a backend to run. The releases here are built for this project's own Firebase
-project. To run your own copy, see [Running your own Meadow](docs/self-hosting.md).
-
-## How Meadow keeps its promises
-
-- Limits are enforced on the phone, from a copy that works offline and signed out.
-- An accessibility service notices which app is on screen and closes it when its time is up; a
-  background service double-checks the usage log.
-- Loosening a limit, extra time and Bumblebee changes go through the backend, whose security
-  rules only let a phone make things stricter on its own.
-- Nothing on Android can stop a phone's owner who is determined (safe mode, a factory reset,
-  developer tools). Meadow makes getting around it deliberate and visible, because your
-  Bumblebees are told.
-
-## Tests
-
-The `justfile` has a shortcut for each of these and for building, installing and deploying: run
-`just` to list them (for example `just check`, `just install-trace` or `just deploy`).
-
-| What | Command |
-|---|---|
-| App unit, screen and accessibility tests | `./gradlew testDebugUnitTest` |
-| Lint | `./gradlew lintDebug`, `.github/scripts/detekt.sh`, and `npm run lint` in `backend/` and `backend/functions/` |
-| Cloud Functions unit tests | `cd backend/functions && npm test` |
-| Security rules (Firestore and Storage) | `cd backend && npm ci && npm run test:rules` |
-| Cloud Functions on the emulators | `cd backend && npm ci && npm --prefix functions ci && npm run test:integration` |
-| Hosted pages (legal, invite and sign-in) | `cd backend && npm run test:hosting` |
-| Deploy scripts | `cd backend && npm run test:deploy` |
-| End to end, on an Android emulator | Start the Firebase emulators (`npm run emulators` in `backend/`), then `./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2`. Use an emulator, not your own phone: some tests switch Meadow's accessibility service, notification access and usage access on and off |
-| CI scripts and workflows | `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`, plus `actionlint`, `shellcheck` and `ruff check` |
-
-To try every screen by hand, install a debug build (`./gradlew installDebug`, or the
-`meadow-debug-apk` artifact from CI) and open **Meadow screens**, its second icon: each screen in
-each of its states, from made-up data, in any theme, by day or night, and offline. See
-[Debugging Meadow](docs/debugging.md#every-screen-by-hand).
-
-Building and testing need Java 21 or newer (CI uses 25) and Node 24; `mise install` sets both up.
-CI runs everything on every pull request and every push to `main`. To see every request the app
-makes and what comes back, see [Debugging Meadow](docs/debugging.md).
+To run your own copy of Meadow, read [Running your own Meadow](docs/self-hosting.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the voice guide,
-accessibility checks and how the README images are made.
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence and credits
 
-Meadow is free software under the [GNU GPL v3](LICENSE). See the [terms of use](legal/terms_of_use.md)
-and [open-source licences](legal/licenses.md). Fonts: [Fraunces](https://github.com/undercasetype/Fraunces)
-and [Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License).
+Meadow is free software under the [GNU GPL v3](LICENSE). Read the
+[terms of use](legal/terms_of_use.md) and the [open-source licences](legal/licenses.md). Fonts:
+[Fraunces](https://github.com/undercasetype/Fraunces) and
+[Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License).

@@ -27,7 +27,7 @@
 
     <!-- Limit editor -->
     <string name="limit_editor_new">Plant a limit</string>
-    <string name="limit_editor_existing">Tend this limit</string>
+    <string name="limit_editor_existing">Change this limit</string>
     <string name="limit_editor_usage">%1$s today · %2$s this week</string>
     <string name="limit_editor_daily">Daily limit</string>
     <string name="limit_editor_weekly">Weekly limit</string>
@@ -35,8 +35,8 @@
     <string name="limit_editor_pending_body">%1$s is still waiting for an answer.</string>
     <string name="limit_editor_less">Less time</string>
     <string name="limit_editor_more">More time</string>
-    <string name="limit_editor_loosens_title">This loosens your limit 💌</string>
-    <string name="limit_editor_locked_hint">Loosening it later needs a Bumblebee\'s approval.</string>
+    <string name="limit_editor_loosens_title">This makes your limit easier 💌</string>
+    <string name="limit_editor_locked_hint">To make it easier later, you need a Bumblebee\'s approval.</string>
     <string name="limit_editor_pick_one">Turn on at least one.</string>
     <string name="limit_editor_note">A note for them (optional)</string>
     <string name="limit_editor_plant">Plant this limit</string>
@@ -48,8 +48,8 @@
     <string name="limit_editor_removed">Limit removed</string>
     <string name="limit_editor_requested">Asked your Bumblebees 💌</string>
     <string name="limit_remove_title">Remove the limit on %1$s?</string>
-    <string name="limit_remove_body_ask">Your Bumblebees will be asked first. The limit stays until one of them says yes.</string>
-    <string name="limit_remove_body_now">The limit will be removed straight away.</string>
+    <string name="limit_remove_body_ask">Meadow asks your Bumblebees first. The limit stays until one of them approves.</string>
+    <string name="limit_remove_body_now">Meadow removes the limit now.</string>
     <string name="limit_remove_ask">Ask</string>
 
     <string name="limit_and_hours">%1$s, %2$s</string>
@@ -79,7 +79,7 @@
     <string name="schedule_preset_from">From %1$s</string>
     <string name="schedule_add_window">Add hours</string>
     <string name="schedule_remove_window">Remove these hours</string>
-    <string name="schedule_bad_window">The end has to be after the start.</string>
+    <string name="schedule_bad_window">The end must be after the start.</string>
     <string name="schedule_all_day_chip">All day</string>
     <string name="schedule_copy">Copy</string>
     <string name="schedule_copy_description">Copy %1$s\'s hours to other days</string>
@@ -96,6 +96,6 @@
     <string name="limit_editor_cap_remove">Remove this cap</string>
     <string name="limit_editor_cap_title">Cap within hours</string>
     <string name="limit_editor_cap_minutes">Up to</string>
-    <string name="limit_editor_cap_pick_days">Pick at least one day.</string>
-    <string name="limit_editor_cap_too_long">A cap has to be shorter than its hours.</string>
+    <string name="limit_editor_cap_pick_days">Choose one or more days.</string>
+    <string name="limit_editor_cap_too_long">A cap must be shorter than its hours.</string>
 </resources>

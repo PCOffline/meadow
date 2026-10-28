@@ -1,8 +1,8 @@
 # Dependency and runtime migration (October 2026)
 
-Branch: `claude/dependency-upgrades`. Each step below is one commit, verified by CI before the
-next. Google Maven isn't reachable from the machine this was prepared on, so Android builds are
-verified on CI only.
+Branch: `claude/dependency-upgrades`. Each step below is one commit. CI checked each commit
+before the next one. The machine that prepared this can't reach Google Maven, so only CI
+checked the Android builds.
 
 ## Inventory
 
@@ -57,52 +57,62 @@ Latest stable versions as of 12 October 2026.
 | firebase, @firebase/rules-unit-testing, firebase-tools | 13.0.0, 6.0.0, 15.33.0 | unchanged | Already latest. The first two need Node ≥ 24.12; firebase-tools' emulators need Java ≥ 21 |
 | @grpc/grpc-js (inside `firebase`, tests only) | 1.9.16 | 1.14.6 via `overrides` | 1.9 has two published advisories |
 
-Sources, in the order they were used: migration guides (AGP 9 and built-in Kotlin migration,
-Gradle 9 upgrading guides, markdown renderer `MIGRATION.md`, TypeScript 6.0 release notes),
-then changelogs and release notes (AndroidX, Kotlin, Coil, Robolectric, kotlinx, Firebase
-Android and JS SDK, firebase-admin, firebase-functions, marked, zod), then commit history where
-neither existed (Firebase JS SDK's Node 24 requirement, Robolectric's SDK and JDK table).
+Sources, in the order of use:
+
+1. Migration guides: AGP 9 and built-in Kotlin, Gradle 9 upgrading guides, the markdown
+   renderer's `MIGRATION.md`, TypeScript 6.0 release notes.
+2. Changelogs and release notes: AndroidX, Kotlin, Coil, Robolectric, kotlinx, Firebase Android
+   and JS SDK, firebase-admin, firebase-functions, marked, zod.
+3. Commit history, where no guide or changelog had the data: the Node 24 requirement of the
+   Firebase JS SDK, and the SDK and JDK table of Robolectric.
 
 ## Steps
 
-All five are done; CI (Android build, unit tests, lint, R8 release, rules, functions, emulator
-integration and end-to-end tests) is green after each.
+All five steps are done. After each step, all of CI passed: Android build, unit tests, lint, R8
+release, rules, functions, emulator integration and end-to-end tests.
 
-1. **Backend.** TypeScript 7, firebase-admin 14, firebase-functions 7, zod, marked; functions
-   runtime Node 24; build hook and `tsconfig` fixes; grpc override.
-2. **Build toolchain and runtimes.** Gradle 9.8.1, AGP 9.4.0, Kotlin 2.4.21 (remove the
-   `kotlin-android` plugin, `sharedTest` as Kotlin source dirs, drop `jvmTarget`, release
-   workflow runs `testDebugUnitTest`). CI on Node 24 and Java 21 everywhere; `mise.toml`
-   updated; docs updated.
-3. **Libraries.** compileSdk 37 with the AndroidX set, Compose BOM, kotlinx, Coil, markdown
-   renderer, konfetti, Robolectric and androidx.test. Follow-ups CI asked for: konfetti's
-   `CoreImage` shapes, and Compose lint's observable locale and resource reads.
-4. **Java 25.** CI and `mise.toml` on Temurin 25: Gradle, AGP, R8, Robolectric and the Firebase
+1. **Backend.** TypeScript 7, firebase-admin 14, firebase-functions 7, zod and marked. The
+   functions run on Node 24. Fixes to the build hook and `tsconfig`. A grpc override.
+2. **Build toolchain and runtimes.** Gradle 9.8.1, AGP 9.4.0 and Kotlin 2.4.21. The
+   `kotlin-android` plugin and `jvmTarget` are removed. `sharedTest` is a Kotlin source
+   directory. The release workflow runs `testDebugUnitTest`. All of CI uses Node 24 and Java 21.
+   `mise.toml` and the docs have the new versions.
+3. **Libraries.** compileSdk 37 with the AndroidX set, the Compose BOM, kotlinx, Coil, the
+   markdown renderer, konfetti, Robolectric and androidx.test. CI then asked for two more
+   changes: `CoreImage` shapes for konfetti, and locale and resource reads that Compose lint can
+   observe.
+4. **Java 25.** CI and `mise.toml` use Temurin 25. Gradle, AGP, R8, Robolectric and the Firebase
    emulators all pass on it. The docs keep 21 as the minimum.
-5. **Screenshots.** Re-rendered for Material 3 1.4 by the `[screenshots]` workflow.
+5. **Screenshots.** The Screenshots workflow made them again for Material 3 1.4.
 
 ## Risks
 
-- KGP 2.4.21 is tested up to Gradle 9.7 and AGP 9.3.1. Newer versions are allowed but may warn.
-- AGP and Robolectric on Java 25 aren't officially confirmed; CI covers both, so a regression
-  would show there first.
-- Material 3 1.4 and Compose 1.9+ semantics changes can affect screenshot and accessibility
-  tests.
+- KGP 2.4.21 has tests up to Gradle 9.7 and AGP 9.3.1. Newer versions work, but can show
+  warnings.
+- AGP and Robolectric don't officially support Java 25. CI runs both on it, so CI shows a
+  regression first.
+- Semantics changes in Material 3 1.4 and Compose 1.9+ can change the results of screenshot and
+  accessibility tests.
 
 ## Done since
 
-- **Installation IDs instead of FCM tokens:** the app registers with `FirebaseMessaging.register()`
-  and the backend sends with `sendEachForMulticast({ fids })`.
-- **targetSdk 36 (Android 16):** nothing in the app depends on what Android 16 changes for apps
-  that target it: it's already edge-to-edge without an opt-out, handles back only through
-  `OnBackPressedCallback` and `BackHandler` (no `onBackPressed` or `KEYCODE_BACK`), locks no
-  orientation, aspect ratio or resizability, and uses neither `elegantTextHeight` nor
-  `scheduleAtFixedRate`. The changes for all apps (JobScheduler quotas, intent redirection
-  hardening) apply whatever the target.
+- **Installation IDs, not FCM tokens.** The app registers with `FirebaseMessaging.register()`.
+  The backend sends with `sendEachForMulticast({ fids })`.
+- **targetSdk 36 (Android 16).** The Android 16 changes for apps that target it have no effect
+  on Meadow:
+  - The app is already edge-to-edge, with no opt-out.
+  - It handles back only with `OnBackPressedCallback` and `BackHandler`. It doesn't use
+    `onBackPressed` or `KEYCODE_BACK`.
+  - It doesn't lock the orientation, the aspect ratio or the resizability.
+  - It doesn't use `elegantTextHeight` or `scheduleAtFixedRate`.
+
+  The changes for all apps (JobScheduler quotas, safer intent redirection) apply for all
+  targets.
 
 ## Later
 
-- **Node 26:** once firebase-tools lists `nodejs26` and Cloud Functions makes it GA.
-- **Material icons:** the extended set is frozen; switch to Material Symbols drawables when
-  convenient.
-- **firebase-tools' transitive advisories** (11, development only): wait for an upstream release.
+- **Node 26:** move when firebase-tools lists `nodejs26` and Cloud Functions makes it GA.
+- **Material icons:** the extended set gets no more updates. Move to Material Symbols drawables
+  at a good time.
+- **Advisories in the dependencies of firebase-tools** (11, development only): wait for a new
+  release of firebase-tools.

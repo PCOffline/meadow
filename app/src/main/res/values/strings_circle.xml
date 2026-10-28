@@ -9,12 +9,12 @@
     <string name="invite_link_button">Share an invite link</string>
     <string name="invite_link_busy">Making a link…</string>
     <string name="invite_share_title">Invite a Bumblebee</string>
-    <string name="invite_share_text">Will you be my Bumblebee? 🐝 I\'m keeping my screen time in check with Meadow, and I\'d love you to look after my garden: %1$s</string>
-    <string name="invite_code_title">Got a friend code?</string>
+    <string name="invite_share_text">Will you be my Bumblebee? I use Meadow to spend less time on my phone, and I want you to look after my garden: %1$s</string>
+    <string name="invite_code_title">Do you have a friend code?</string>
     <string name="invite_code_placeholder">Their code</string>
     <string name="invite_code_button">Invite</string>
     <string name="invite_code_sent">Invite sent 💌</string>
-    <string name="circle_invite_title">%1$s would like you as their Bumblebee</string>
+    <string name="circle_invite_title">%1$s wants you as their Bumblebee</string>
     <string name="circle_offer_title">%1$s offers to be your Bumblebee</string>
     <string name="circle_offer_accepted">%1$s is your Bumblebee now 🐝</string>
     <string name="circle_offer_sent_at">Offered %1$s</string>
@@ -38,10 +38,10 @@
 
     <string name="accept_invite_loading_title">Opening your invite…</string>
     <string name="accept_invite_title">Be %1$s\'s Bumblebee?</string>
-    <string name="accept_invite_body">You\'ll answer when %1$s asks for extra time. You can step down any time.</string>
-    <string name="accept_invite_expired">This invite from %1$s has expired. Ask them for a new link.</string>
+    <string name="accept_invite_body">You answer when %1$s asks for more time. You can stop at any time.</string>
+    <string name="accept_invite_expired">This invite from %1$s expired. Ask them for a new link.</string>
     <string name="accept_invite_used">Someone already accepted this invite from %1$s. Ask them for a new link.</string>
-    <string name="accept_invite_own">This is your own invite link. Send it to a friend instead. 🐝</string>
+    <string name="accept_invite_own">This is your own invite link. Send it to a friend. 🐝</string>
     <string name="accept_invite_already">You\'re already %1$s\'s Bumblebee. 🐝</string>
     <string name="accept_invite_yes">Yes, I\'ll be their Bumblebee</string>
     <string name="accept_invite_not_now">Deny</string>
@@ -54,15 +54,15 @@
     <string name="friend_limits">Their limits</string>
     <string name="friend_step_down">Stop being %1$s\'s Bumblebee</string>
     <string name="friend_step_down_title">Step down?</string>
-    <string name="friend_step_down_body">%1$s will be told, and their requests won\'t come to you anymore.</string>
+    <string name="friend_step_down_body">%1$s gets a message. Their requests stop coming to you.</string>
     <string name="friend_step_down_confirm">Step down</string>
     <string name="friend_step_down_stay">Stay</string>
-    <string name="friend_stepped_down">You\'ve stepped down</string>
+    <string name="friend_stepped_down">You stepped down</string>
 
     <string name="circle_bee_leaving">Leaving in %1$s</string>
     <string name="circle_bee_keep">Keep</string>
     <string name="circle_bee_kept">%1$s stays your Bumblebee 🐝</string>
-    <string name="circle_bee_removing">%1$s will stop being your Bumblebee in 24 hours</string>
-    <string name="circle_remove_body_delayed">%1$s stops being your Bumblebee in 24 hours. You can change your mind until then.</string>
+    <string name="circle_bee_removing">%1$s stops being your Bumblebee in 24 hours</string>
+    <string name="circle_remove_body_delayed">%1$s stops being your Bumblebee in 24 hours. You can cancel this until then.</string>
     <string name="circle_garden_role">You\'re their Bumblebee</string>
 </resources>

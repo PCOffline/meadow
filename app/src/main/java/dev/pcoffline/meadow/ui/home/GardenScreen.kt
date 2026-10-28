@@ -281,12 +281,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                 Column(Modifier.weight(1f)) {
                     Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky)
                     Text(
-                        // Someone who uses a photo goes by it, not by a flower next to their name.
-                        if (profile.avatar.photoUrl != null) {
-                            stringResource(R.string.garden_greeting_plain, stringResource(mood.greeting), profile.displayName)
-                        } else {
-                            stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName, profile.avatar.emoji)
-                        },
+                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName),
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.asHeading(),
                         color = mood.onSky,

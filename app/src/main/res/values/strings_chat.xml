@@ -4,7 +4,7 @@
     <string name="chat_remove_bee">Remove as Bumblebee</string>
     <string name="chat_keep_bee">Keep as Bumblebee</string>
     <string name="chats_unread">Unread</string>
-    <string name="chat_closed_title">This chat isn\'t open</string>
+    <string name="chat_closed_title">This chat is closed</string>
     <string name="chat_placeholder">Write something kind…</string>
     <string name="chat_sending">sending…</string>
     <plurals name="chat_sending_pictures">
@@ -19,10 +19,10 @@
     <string name="chat_ask_bee">Ask %1$s to be your Bumblebee</string>
     <string name="chat_offer_bee">Offer to be %1$s\'s Bumblebee</string>
     <string name="chat_ask_title">Ask %1$s to be your Bumblebee?</string>
-    <string name="chat_ask_body">%1$s would answer when you ask for extra time. Only your Bumblebees can loosen your limits.</string>
+    <string name="chat_ask_body">%1$s answers when you ask for more time. Only your Bumblebees can make your limits easier.</string>
     <string name="chat_ask_confirm">Ask</string>
     <string name="chat_offer_title">Offer to be %1$s\'s Bumblebee?</string>
-    <string name="chat_offer_body">If %1$s approves, you\'ll answer when they ask for extra time.</string>
+    <string name="chat_offer_body">If %1$s approves, you answer when they ask for more time.</string>
     <string name="chat_offer_confirm">Offer</string>
     <string name="chat_ask_sent">Asked %1$s 💌</string>
     <string name="chat_offer_sent">Offer sent to %1$s 💌</string>
@@ -34,6 +34,6 @@
     <string name="chat_picture_photo">Photo</string>
     <string name="chat_picture_open">Open picture</string>
     <string name="chat_picture_gone">This picture isn\'t available anymore</string>
-    <string name="chat_picture_failed">This picture couldn\'t load</string>
-    <string name="chat_gif_too_big">That GIF is too big to send. Try one under 4 MB.</string>
+    <string name="chat_picture_failed">This picture can\'t load</string>
+    <string name="chat_gif_too_big">This GIF is too big. Send one under 4 MB.</string>
 </resources>

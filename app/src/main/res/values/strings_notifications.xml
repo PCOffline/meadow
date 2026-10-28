@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="channel_guardian">Garden keeper</string>
-    <string name="channel_guardian_description">The quiet notification that keeps your limits working.</string>
+    <string name="channel_guardian_description">The silent notification that keeps your limits on.</string>
     <string name="channel_warnings">Time reminders</string>
-    <string name="channel_warnings_description">A heads-up before an app\'s time runs out.</string>
+    <string name="channel_warnings_description">A reminder before an app\'s time is used.</string>
     <string name="channel_requests">Requests from friends</string>
-    <string name="channel_requests_description">Friends asking you for extra time or a change to their limits.</string>
+    <string name="channel_requests_description">Friends who ask you for more time or a change to their limits.</string>
     <string name="channel_decisions">Answers from your Bumblebees</string>
     <string name="channel_decisions_description">When a Bumblebee approves or denies a request.</string>
     <string name="channel_chat">Messages</string>
@@ -22,10 +22,10 @@
     <string name="notify_update_confirm_body">Tap to let Android finish installing it.</string>
 
     <string name="notify_warning_title">%1$s left on %2$s 🌷</string>
-    <string name="notify_warning_body_today">Your %1$s time for today is almost up. Time to wind down.</string>
-    <string name="notify_warning_body_week">Your %1$s time for this week is almost up. Time to wind down.</string>
+    <string name="notify_warning_body_today">Your %1$s time for today is almost used.</string>
+    <string name="notify_warning_body_week">Your %1$s time for this week is almost used.</string>
     <string name="notify_time_up_title">%1$s is resting now 🌙</string>
-    <string name="notify_time_up_body">You\'ve used the time you set aside. Tap to ask a Bumblebee for extra time.</string>
+    <string name="notify_time_up_body">You used the time you set. Tap to ask a Bumblebee for more time.</string>
 
     <string name="guardian_starting">Looking after your garden 🌱</string>
     <string name="guardian_no_limits">No limits yet. Plant one in Meadow. 🌱</string>
@@ -37,9 +37,9 @@
     <string name="guardian_joined">%1$s · %2$s</string>
     <string name="guardian_emergency">🚨 Emergency unlock: limits paused for %1$s</string>
     <string name="strict_mode_blocked">Strict mode is on. Ask a Bumblebee to turn it off first. 🌿</string>
-    <string name="device_admin_disable_warning">Turning this off lets Meadow be uninstalled. Your Bumblebees will be told.</string>
+    <string name="device_admin_disable_warning">If you turn this off, Meadow can be removed. Your Bumblebees get a message.</string>
 
     <string name="notify_warning_ask">Ask for more</string>
-    <string name="notify_warning_body_hours">%1$s\'s allowed hours end soon.</string>
-    <string name="notify_warning_body_cap">Your %1$s time for these hours is almost up. It opens again once they end.</string>
+    <string name="notify_warning_body_hours">%1$s\'s hours end soon.</string>
+    <string name="notify_warning_body_cap">Your %1$s time for these hours is almost used. It opens again when they end.</string>
 </resources>

@@ -1,10 +1,11 @@
 name: Screenshots
 
 # Renders the README's screenshots and animations on an Android emulator and commits them to the
-# pull request, so they're current when it merges. Runs when a pull request changes anything the
-# screens are drawn from, or by hand for any branch.
+# branch. Runs when a push to main changes anything the screens are drawn from, or by hand for
+# any branch.
 on:
-  pull_request:
+  push:
+    branches: [main]
     paths:
       - 'app/src/**'
       - '!app/src/test/**'
@@ -22,11 +23,9 @@ permissions: {}
 
 jobs:
   screenshots:
-    # A fork's pull request can't be committed to from here, so it's left alone.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     # A newer push to the same branch makes an older rendering pointless.
     concurrency:
-      group: screenshots-${{ github.head_ref || github.ref_name }}
+      group: screenshots-${{ github.ref_name }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
@@ -36,8 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The branch itself, not the merge preview: the new images are committed to it.
-          ref: ${{ github.head_ref || github.ref_name }}
+          # The branch itself, not the commit that started the run: the new images go on its tip.
+          ref: ${{ github.ref_name }}
           persist-credentials: true
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -75,7 +74,7 @@ jobs:
       - name: Commit images
         id: commit
         env:
-          BRANCH: ${{ github.head_ref || github.ref_name }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -85,13 +84,13 @@ jobs:
           git pull --rebase origin "$BRANCH"
           git push origin "HEAD:$BRANCH"
           echo "pushed=true" >> "$GITHUB_OUTPUT"
-      # A commit pushed with this job's token starts no workflows, so the pull request's new head
-      # would have no checks; Build is started on it by hand instead.
+      # A commit pushed with this job's token starts no workflows, so the new commit would have no
+      # checks. Build is started on it by hand instead.
       - name: Build the new commit
         if: steps.commit.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ github.head_ref || github.ref_name }}
+          BRANCH: ${{ github.ref_name }}
         run: gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()

@@ -63,7 +63,7 @@ class MainScreensTest : ScreenTest() {
         show { GardenContent(DemoGarden.robin, DemoGarden.garden, onOpenLimit = { opened += it }) }
         compose.onNodeWithText("Robin", substring = true).assertExists()
         node(R.string.garden_tile_resting_today).assertExists()
-        compose.onNodeWithText("extra today", substring = true).assertExists()
+        compose.onNodeWithText("more today", substring = true).assertExists()
         compose.onNodeWithText("Instagram").performScrollTo().performClick()
         assertEquals(listOf("demo.instagram"), opened)
         // Within their hours, no flower sleeps.
@@ -104,11 +104,10 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `someone with a photo is greeted without a flower next to their name`() {
-        val withPhoto = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = "https://example.invalid/robin.jpg"))
-        show { GardenContent(withPhoto, DemoGarden.garden) }
+    fun `the greeting names you without an emoji`() {
+        show { GardenContent(DemoGarden.robin, DemoGarden.garden) }
         compose.onNodeWithText("Robin", substring = true).assertExists()
-        compose.onNodeWithText("Robin ${DemoGarden.robin.avatar.emoji}", substring = true).assertDoesNotExist()
+        compose.onNodeWithText(DemoGarden.robin.avatar.emoji, substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -351,11 +350,12 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `a resting app offers to ask a Bumblebee, go home, or an emergency unlock`() {
+    fun `a resting app offers to go home first, then to ask a Bumblebee or an emergency unlock`() {
         var home = 0
         show { RestContent("demo.tiktok", DemoGarden.rest, onHome = { home++ }) }
         node(R.string.rest_title, "TikTok").assertExists()
-        node(R.string.rest_ask).assertExists()
+        // Going home is the filled button, above asking for more.
+        assertTrue(node(R.string.rest_home).fetchSemanticsNode().boundsInRoot.top < node(R.string.rest_ask).fetchSemanticsNode().boundsInRoot.top)
         node(R.string.rest_emergency).assertExists()
         node(R.string.rest_home).performClick()
         assertEquals(1, home)

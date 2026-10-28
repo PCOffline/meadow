@@ -2,12 +2,12 @@
 <resources>
     <string name="settings_secure_reason">Add an email to sign in on another phone.</string>
     <string name="settings_week_start">Week starts on</string>
-    <string name="settings_week_start_pending">Weekly limits switch over on %1$s, when this week ends.</string>
+    <string name="settings_week_start_pending">Weekly limits change on %1$s, at the end of this week.</string>
     <string name="settings_strict_title">Strict mode</string>
-    <string name="settings_strict_body">Keeps Meadow\'s settings, uninstalling and the clock out of reach.</string>
+    <string name="settings_strict_body">Locks Meadow\'s settings, its removal and the clock.</string>
     <string name="settings_strict_on">Strict mode on 🌿</string>
     <string name="settings_strict_off_title">Turn off strict mode?</string>
-    <string name="settings_strict_off_now">Strict mode turns off straight away. Nobody is told.</string>
+    <string name="settings_strict_off_now">Strict mode turns off now. Nobody gets a message.</string>
     <string name="settings_strict_off_button">Turn off</string>
     <string name="settings_strict_keep">Keep it on</string>
     <string name="settings_strict_off_done">Strict mode off</string>
@@ -44,12 +44,12 @@
     <string name="settings_updates_allow">Allow Meadow to install updates.</string>
     <string name="settings_updates_allow_button">Allow updates</string>
 
-    <string name="settings_legal_title">Your data and the small print</string>
+    <string name="settings_legal_title">Your data and legal</string>
     <string name="settings_export">Download my data</string>
     <string name="settings_export_done">Your data is saved 📦</string>
     <string name="settings_delete">Delete my account</string>
     <string name="settings_delete_title">Delete your account?</string>
-    <string name="settings_delete_body">Your profile, limits, requests, chats and photo are deleted for good. Your circle will see you\'ve left.</string>
+    <string name="settings_delete_body">This deletes your profile, limits, requests, chats and photo for good. Your circle sees that you left.</string>
     <string name="settings_delete_confirm_hint">Type DELETE to confirm</string>
     <string name="settings_delete_confirm_word">DELETE</string>
     <string name="settings_delete_button">Delete for good</string>
@@ -57,7 +57,7 @@
 
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_sign_out_title">Sign out?</string>
-    <string name="settings_sign_out_body">Limits keep working, but you can\'t ask for extra time until you sign in again.</string>
+    <string name="settings_sign_out_body">Limits stay on. To ask for more time, sign in again.</string>
     <string name="settings_sign_out_stay">Stay</string>
 
     <string name="share_title">Share</string>
@@ -67,5 +67,5 @@
     <string name="share_commitment_send_to">Send to %1$s</string>
     <string name="share_commitment_sent">Sent to %1$s 💌</string>
     <string name="share_commitment_other_apps">Other apps</string>
-    <string name="share_limit">I\'ve committed to %2$s on %1$s with Meadow 🌼</string>
+    <string name="share_limit">I committed to %2$s on %1$s with Meadow 🌼</string>
 </resources>

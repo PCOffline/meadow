@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="requests_ask_button">Ask for extra time</string>
+    <string name="requests_ask_button">Ask for more time</string>
 
     <string name="request_you_asked">You asked for</string>
     <string name="request_they_ask">%1$s asks for</string>
@@ -22,12 +22,12 @@
     <string name="request_status_expired">Expired</string>
     <string name="request_decide_yes_title">Approve %1$s?</string>
     <string name="request_decide_no_title">Deny this request?</string>
-    <string name="request_decide_less">You can give a little less if you like:</string>
+    <string name="request_decide_less">You can give less time:</string>
     <string name="request_decide_note">A kind word (optional)</string>
 
-    <string name="ask_title">Ask for a little extra time</string>
-    <string name="ask_no_limits">You haven\'t planted any limits yet.</string>
-    <string name="ask_pending">You\'ve already asked about %1$s.</string>
+    <string name="ask_title">Ask for more time</string>
+    <string name="ask_no_limits">You have no limits yet.</string>
+    <string name="ask_pending">You already asked about %1$s.</string>
     <string name="ask_how_much">How much?</string>
     <string name="ask_why">Why?</string>
     <string name="ask_sending">Sending…</string>
@@ -44,8 +44,8 @@
     <string name="bee_stats_title">Your answers</string>
     <string name="bee_stats_leniency">How you answer</string>
     <plurals name="bee_stats_leniency_unknown">
-        <item quantity="one">Answer at least %1$d request to see how you lean.</item>
-        <item quantity="other">Answer at least %1$d requests to see how you lean.</item>
+        <item quantity="one">Answer %1$d request to see how you answer.</item>
+        <item quantity="other">Answer %1$d or more requests to see how you answer.</item>
     </plurals>
     <string name="bee_stats_leniency_score">Leniency %1$d of 100</string>
     <string name="bee_leaning_very_strict">Very strict 🌵</string>
@@ -58,7 +58,7 @@
     <string name="bee_stats_yes">You approved</string>
     <string name="bee_stats_no">You denied</string>
     <string name="bee_stats_rate">Approval rate</string>
-    <string name="bee_stats_minutes">Extra time you gave</string>
+    <string name="bee_stats_minutes">More time you gave</string>
     <string name="bee_stats_missed">Answered by someone else, withdrawn or expired</string>
     <string name="bee_stats_waiting">Waiting for you</string>
     <string name="bee_stats_by_person">By person</string>
