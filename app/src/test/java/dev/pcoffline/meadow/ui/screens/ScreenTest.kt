@@ -2,7 +2,10 @@ package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -49,6 +52,10 @@ abstract class ScreenTest {
 
     protected fun show(theme: GardenTheme = GardenTheme.MEADOW, mode: DarkMode = DarkMode.LIGHT, content: @Composable () -> Unit) =
         compose.setContent { MeadowTheme(theme, mode) { AppBackground(content) } }
+
+    /** [content] in a scrolling column, as screens that hold it in the app have it: taller than the phone, it isn't squeezed. */
+    protected fun showScrolling(content: @Composable () -> Unit) =
+        show { Column(Modifier.verticalScroll(rememberScrollState())) { content() } }
 
     protected fun assertAccessible(requireHeading: Boolean = true) = compose.assertAccessible(compose.density, requireHeading)
 }
