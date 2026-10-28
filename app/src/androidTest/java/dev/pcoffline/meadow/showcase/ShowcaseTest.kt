@@ -175,10 +175,13 @@ class ShowcaseTest {
 
     @Test
     fun themes() {
+        // Every theme, through a day: the sun climbs and sets across them, then night falls.
         val looks = listOf(
-            Triple(GardenTheme.BLOSSOM, DarkMode.LIGHT, 8),
-            Triple(GardenTheme.SUNFLOWER, DarkMode.LIGHT, 14),
-            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 18),
+            Triple(GardenTheme.BLOSSOM, DarkMode.LIGHT, 7),
+            Triple(GardenTheme.MEADOW, DarkMode.LIGHT, 10),
+            Triple(GardenTheme.POND, DarkMode.LIGHT, 13),
+            Triple(GardenTheme.SUNFLOWER, DarkMode.LIGHT, 16),
+            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 19),
             Triple(GardenTheme.LAVENDER, DarkMode.DARK, 22),
         )
         var look by mutableStateOf(looks.first())
@@ -194,9 +197,10 @@ class ShowcaseTest {
                 }
             }
         }
-        looks.forEach {
+        // Numbered, so the strip keeps the day's order.
+        looks.forEachIndexed { i, it ->
             look = it
-            capture("theme-${it.first.key}")
+            capture("theme-${i + 1}-${it.first.key}")
         }
     }
 

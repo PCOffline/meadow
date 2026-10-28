@@ -89,7 +89,7 @@ and grass only lean a little towards it. The picker shows each theme as a little
 Pick a critter or flower for your picture, or use a photo, and add a few words about yourself.
 
 <p align="center">
-  <img src="docs/images/themes.png" alt="The garden in four themes: Cherry blossom, Sunflower, Mushroom forest with its mushrooms, and Lavender field by night" width="100%">
+  <img src="docs/images/themes.png" alt="The garden in all six themes through a day, the sun climbing and setting across them: Cherry blossom at dawn, Meadow, Lily pond at midday, Sunflower, Mushroom forest with its mushrooms in the evening, and Lavender field by night" width="100%">
 </p>
 <p align="center">
   <img src="docs/images/screen-appearance.png" alt="The theme picker: each of the six themes as a small sky with its sun, hills and flower, or mushroom" width="250">
