@@ -397,13 +397,32 @@ describe("requests, invites and links", () => {
     await assertFails(updateDoc(doc(as("sam"), "requests/r1"), { status: "approved" }));
   });
 
-  test("removals, rate limits and unsent pictures are the backend's alone", async () => {
+  test("removals and rate limits are the backend's alone", async () => {
     await assertFails(getDoc(doc(as("sam"), "removals/sam_bee")));
     await assertFails(setDoc(doc(as("sam"), "removals/sam_bee"), { ownerUid: "sam", beeUid: "bee" }));
     await assertFails(getDoc(doc(as("sam"), "rateLimits/sam")));
     await assertFails(setDoc(doc(as("sam"), "rateLimits/sam"), {}));
-    await assertFails(getDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|abc12345.jpg")));
-    await assertFails(deleteDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|abc12345.jpg")));
+  });
+
+  test("a chat picture is noted by its sender before it's uploaded, and only the backend reads the note", async () => {
+    const path = "chats/bee_sam/sam/abc12345.jpg";
+    const note = (uid, at = serverTimestamp(), p = path) => setDoc(doc(as(uid), `chatUploads/${p.replaceAll("/", "|")}`), { path: p, at });
+    await assertSucceeds(note("sam"));
+    await assertSucceeds(note("sam", serverTimestamp(), "chats/bee_sam/sam/funny123.gif"));
+    // Never read, changed or removed by anyone but the backend.
+    await assertFails(getDoc(doc(as("sam"), `chatUploads/${path.replaceAll("/", "|")}`)));
+    await assertFails(note("sam"));
+    await assertFails(deleteDoc(doc(as("sam"), `chatUploads/${path.replaceAll("/", "|")}`)));
+    // Only your own folder of a chat you're in, under its own name, at the server's time.
+    await assertFails(note("bee", serverTimestamp(), "chats/bee_sam/sam/other123.jpg"));
+    await assertFails(note("stranger", serverTimestamp(), "chats/bee_sam/stranger/abc12345.jpg"));
+    await assertFails(note("sam", Timestamp.fromMillis(Date.now() - 2 * 60 * 60_000), "chats/bee_sam/sam/early123.jpg"));
+    await assertFails(note("sam", serverTimestamp(), "chats/bee_sam/sam/page1234.html"));
+    await assertFails(setDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|wrong123.jpg"), { path: "chats/bee_sam/sam/named123.jpg", at: serverTimestamp() }));
+    await assertFails(setDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|extra123.jpg"), { path: "chats/bee_sam/sam/extra123.jpg", at: serverTimestamp(), sent: true }));
+    // Nor a chat that's closed.
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "chats/lee_sam"), { participants: ["lee", "sam"], closed: true }));
+    await assertFails(note("sam", serverTimestamp(), "chats/lee_sam/sam/abc12345.jpg"));
   });
 
   test("invite links, friend codes and the test outbox are hidden", async () => {

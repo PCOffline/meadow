@@ -21,6 +21,11 @@ class ChatMediaTest {
     }
 
     @Test
+    fun `a picture's note is named after its path, as the rules require`() {
+        assertEquals("chats|chat1|robin|0123456789abcdef.jpg", ChatMedia.noteIdFor("chats/chat1/robin/0123456789abcdef.jpg"))
+    }
+
+    @Test
     fun `a GIF is known by its type or by its first bytes`() {
         val gif = "GIF89a".toByteArray()
         val png = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte())

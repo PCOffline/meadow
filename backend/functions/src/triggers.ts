@@ -3,10 +3,9 @@ import { getStorage } from "firebase-admin/storage";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
-import { chatOfPicture, isChatPicture, uploadId } from "./format";
+import { chatOfPicture, uploadId } from "./format";
 import { chatMedia, pushes } from "./copy";
 import { accountOf, accountRef, chats, chatUploads, db, heartbeats, invites, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
@@ -18,20 +17,11 @@ const STALE_HEARTBEAT_MS = 6 * 60 * 60_000;
 const STALE_UPLOAD_MS = 60 * 60_000;
 
 /**
- * Notes each chat picture as it's uploaded. A picture is sent by a message naming it, which the
- * app writes once the upload is done; one never sent (the message was refused, the app was
- * stopped, or the uploads weren't the app's) is deleted by [sweepUnsentPictures], so nobody can
- * fill Storage with pictures nobody sees.
- */
-export const onChatUpload = onObjectFinalized(async (event) => {
-  const path = event.data.name;
-  if (!isChatPicture(path)) return;
-  await chatUploads().doc(uploadId(path)).set({ path, at: FieldValue.serverTimestamp() });
-});
-
-/**
- * Deletes chat pictures uploaded over an hour before [now] that no message sent; sent ones are
- * only crossed off. Pictures of chats that closed meanwhile are gone already.
+ * Deletes chat pictures noted over an hour before [now] that no message sent; sent ones are only
+ * crossed off. Each is noted in chatUploads by its sender before its upload (storage.rules lets
+ * none in otherwise), so one never sent (the message was refused, the app was stopped, or the
+ * upload wasn't the app's) can't fill Storage with pictures nobody sees. Pictures of chats that
+ * closed meanwhile are gone already.
  */
 export async function sweepUnsentPictures(now: number): Promise<number> {
   const due = await chatUploads().where("at", "<", Timestamp.fromMillis(now - STALE_UPLOAD_MS)).limit(400).get();
@@ -57,7 +47,7 @@ export async function sweepUnsentPictures(now: number): Promise<number> {
 export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data?.data();
   if (message?.kind !== "text" && message?.kind !== "image") return;
-  // Sent: the picture stays. (The record may only be written after this; the sweep checks again.)
+  // Sent: the picture stays.
   if (message.kind === "image" && typeof message.path === "string") {
     await chatUploads().doc(uploadId(message.path)).delete().catch(() => undefined);
   }

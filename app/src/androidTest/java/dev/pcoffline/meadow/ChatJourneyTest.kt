@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow
 
+import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,18 +19,21 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import dev.pcoffline.meadow.EmulatorFriend.Companion.await
+import dev.pcoffline.meadow.data.ChatMedia
+import dev.pcoffline.meadow.data.ChatPicture
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.WRITE_TIMEOUT_MS
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 /**
  * End to end, with two people: the person on this phone becomes Sam's Bumblebee and chats with
  * Sam. A message written offline stays on the phone, counts as sent and reaches Sam once back
- * online. When they part ways the chat closes: nothing more can be written, but what was said
- * stays readable.
+ * online. A photo goes up under the rules and is sent. When they part ways the chat closes:
+ * nothing more can be written, but what was said stays readable.
  */
 @RunWith(AndroidJUnit4::class)
 class ChatJourneyTest : EndToEndTest() {
@@ -78,6 +83,21 @@ class ChatJourneyTest : EndToEndTest() {
                 messages.any { it.string("text") == "Written in a tunnel" && it.string("senderId") == me }
             }
             waitShowing("it sent", db, chatId) { compose.onAllNodesWithText(text(R.string.chat_sending)).fetchSemanticsNodes().isEmpty() }
+
+            // A photo goes the way the chat sends one picked (Android's own picker aside): noted,
+            // uploaded under the rules, then sent, which crosses its note off.
+            val photo = File(app.cacheDir, "e2e-photo.jpg").apply {
+                outputStream().use { Bitmap.createBitmap(64, 48, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            }
+            val path = runBlocking {
+                val media = AppGraph.chatMedia
+                val picture = media.prepare(Uri.fromFile(photo))
+                media.upload(me, chatId, picture).also {
+                    AppGraph.chats.sendPicture(chatId, ChatPicture(it, picture.width, picture.height, picture.gif), text(R.string.chat_photo))
+                }
+            }
+            waitForBackendDocs("chats/$chatId/messages") { messages -> messages.any { it.string("kind") == "image" && it.string("path") == path } }
+            poll("the photo's note crossed off") { backendDoc("chatUploads/${Uri.encode(ChatMedia.noteIdFor(path))}") == null }
 
             // Stepping down (as from another of this person's phones) closes the open chat.
             runBlocking { AppGraph.backend.call("stepDown", mapOf("approveeUid" to sam.uid)) }

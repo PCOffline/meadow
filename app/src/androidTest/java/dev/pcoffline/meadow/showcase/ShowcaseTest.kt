@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.stats.StatsContent
+import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
@@ -87,8 +89,32 @@ class ShowcaseTest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
+        // A screen can be captured before its window is in front, or before it's drawn: then it's
+        // one flat colour. Wait for it, and never save a blank page.
+        val until = System.currentTimeMillis() + 15_000
+        while ((!focused() || blank()) && System.currentTimeMillis() < until) Thread.sleep(250)
+        check(!blank()) { "$name stayed blank" }
         Thread.sleep(800) // Let images and entrance animations settle.
         shell("screencap -p $DIR/$name.png")
+    }
+
+    /** Whether the screen below the status bar is all one colour. */
+    private fun blank(): Boolean {
+        val shot = automation.takeScreenshot() ?: return true
+        try {
+            val first = shot.getPixel(shot.width / 2, shot.height / 3)
+            return (1 until 20).all { i ->
+                shot.getPixel(shot.width * (i % 5 + 1) / 6, shot.height * (i / 5 + 2) / 7) == first
+            }
+        } finally {
+            shot.recycle()
+        }
+    }
+
+    private fun focused(): Boolean {
+        var focused = false
+        compose.runOnUiThread { focused = compose.activity.hasWindowFocus() }
+        return focused
     }
 
     /** Records the screen while [drive] plays animations frame by frame on the test clock. */
@@ -149,10 +175,13 @@ class ShowcaseTest {
 
     @Test
     fun themes() {
+        // Every theme, through a day: the sun climbs and sets across them, then night falls.
         val looks = listOf(
-            Triple(GardenTheme.BLOSSOM, DarkMode.LIGHT, 8),
-            Triple(GardenTheme.SUNFLOWER, DarkMode.LIGHT, 14),
-            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 18),
+            Triple(GardenTheme.BLOSSOM, DarkMode.LIGHT, 7),
+            Triple(GardenTheme.MEADOW, DarkMode.LIGHT, 10),
+            Triple(GardenTheme.POND, DarkMode.LIGHT, 13),
+            Triple(GardenTheme.SUNFLOWER, DarkMode.LIGHT, 16),
+            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 19),
             Triple(GardenTheme.LAVENDER, DarkMode.DARK, 22),
         )
         var look by mutableStateOf(looks.first())
@@ -168,10 +197,17 @@ class ShowcaseTest {
                 }
             }
         }
-        looks.forEach {
+        // Numbered, so the strip keeps the day's order.
+        looks.forEachIndexed { i, it ->
             look = it
-            capture("theme-${it.first.key}")
+            capture("theme-${i + 1}-${it.first.key}")
         }
+    }
+
+    @Test
+    fun appearance() {
+        show { Box(Modifier.statusBarsPadding().padding(16.dp)) { AppearanceCard() } }
+        capture("appearance")
     }
 
     @Test

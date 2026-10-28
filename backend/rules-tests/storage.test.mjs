@@ -2,7 +2,7 @@
 import { after, before, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, setDoc, setLogLevel } from "firebase/firestore";
+import { doc, serverTimestamp, setDoc, setLogLevel } from "firebase/firestore";
 
 // Denied writes are what these tests expect; the SDK would log each one as a warning.
 setLogLevel("error");
@@ -28,6 +28,8 @@ after(async () => {
 });
 
 const storageOf = (uid) => (uid ? env.authenticatedContext(uid) : env.unauthenticatedContext()).storage();
+/** Notes a chat picture before it's uploaded, as the app does. */
+const note = (path) => env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `chatUploads/${path.replaceAll("/", "|")}`), { path, at: serverTimestamp() }));
 
 test("you can set and remove your own photo", async () => {
   await assertSucceeds(uploadBytes(ref(storageOf("sam"), "avatars/sam"), jpeg(), image));
@@ -62,6 +64,9 @@ test("your circle can see your photo; strangers and signed-out visitors can't", 
 test("chat photos are seen only by the two in the chat, and added only by each to their own folder", async () => {
   await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "chats/bee_sam"), { participants: ["bee", "sam"] }));
   const gif = { contentType: "image/gif" };
+  for (const path of ["chats/bee_sam/sam/photo1234.jpg", "chats/bee_sam/bee/funny123.gif", "chats/bee_sam/bee/fake1234.jpg", "chats/bee_sam/stranger/x1234567.jpg", "chats/bee_sam/sam/big12345.jpg", "chats/bee_sam/sam/page1234.jpg"]) {
+    await note(path);
+  }
   await assertSucceeds(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/photo1234.jpg"), jpeg(), image));
   await assertSucceeds(uploadBytes(ref(storageOf("bee"), "chats/bee_sam/bee/funny123.gif"), jpeg(), gif));
   await assertSucceeds(getBytes(ref(storageOf("bee"), "chats/bee_sam/sam/photo1234.jpg")));
@@ -78,8 +83,16 @@ test("chat photos are seen only by the two in the chat, and added only by each t
   await assertFails(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/page1234.jpg"), jpeg(), { contentType: "text/html" }));
 });
 
+test("a chat photo not noted first is refused, so none escapes the sweep of unsent ones", async () => {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "chats/bee_sam"), { participants: ["bee", "sam"] }));
+  await assertFails(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/unnoted1.jpg"), jpeg(), image));
+  await note("chats/bee_sam/sam/unnoted1.jpg");
+  await assertSucceeds(uploadBytes(ref(storageOf("sam"), "chats/bee_sam/sam/unnoted1.jpg"), jpeg(), image));
+});
+
 test("a closed chat takes no new photos", async () => {
   await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "chats/lee_sam"), { participants: ["lee", "sam"], closed: true }));
+  await note("chats/lee_sam/sam/photo1234.jpg");
   await assertFails(uploadBytes(ref(storageOf("sam"), "chats/lee_sam/sam/photo1234.jpg"), jpeg(), image));
 });
 

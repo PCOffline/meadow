@@ -22,4 +22,4 @@ export { createRequest, decideRequest, cancelRequest, saveLimit } from "./reques
 export { emergencyUnlock } from "./emergency";
 export { exportMyData, deleteAccount } from "./account";
 export { sendTestPush } from "./diagnostics";
-export { onChatMessage, onChatUpload, onProtectionAlert, onProfileUpdated, hourlyCare, expireRequests, runSchedulesForTests } from "./triggers";
+export { onChatMessage, onProtectionAlert, onProfileUpdated, hourlyCare, expireRequests, runSchedulesForTests } from "./triggers";

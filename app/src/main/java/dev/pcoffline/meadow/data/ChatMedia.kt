@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.core.graphics.scale
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
@@ -28,6 +30,7 @@ import java.util.UUID
  */
 class ChatMedia(private val context: Context) {
     private val storage by lazy { FirebaseStorage.getInstance() }
+    private val db by lazy { FirebaseFirestore.getInstance() }
     /** One lock per picture: each is fetched once, and a slow one doesn't hold up the rest. */
     private val downloads = HashMap<String, Mutex>()
 
@@ -60,9 +63,14 @@ class ChatMedia(private val context: Context) {
         Prepared(bytes, width, height, gif = false)
     }
 
-    /** Uploads [picture] to my folder in [chatId], returning where it went. */
+    /**
+     * Uploads [picture] to my folder in [chatId], returning where it went. It's noted first, as
+     * storage.rules requires, so the backend deletes it if no message ever sends it.
+     */
     suspend fun upload(uid: String, chatId: String, picture: Prepared): String {
         val path = pathFor(chatId, uid, UUID.randomUUID().toString().replace("-", ""), picture.gif)
+        db.collection("chatUploads").document(noteIdFor(path))
+            .set(mapOf("path" to path, "at" to FieldValue.serverTimestamp())).await()
         val ref = storage.reference.child(path)
         val type = if (picture.gif) "image/gif" else "image/jpeg"
         Trace.request<UploadTask.TaskSnapshot>("upload ${ref.path} (${picture.bytes.size} bytes)", describe = { "${it.bytesTransferred} bytes sent" }) {
@@ -106,6 +114,9 @@ class ChatMedia(private val context: Context) {
 
         /** Where a picture goes: the chat's folder, then the sender's, as storage.rules requires. */
         fun pathFor(chatId: String, uid: String, id: String, gif: Boolean) = "chats/$chatId/$uid/$id.${if (gif) "gif" else "jpg"}"
+
+        /** The id of the note of a picture at [path]: its path, with "|" for "/" (see firestore.rules). */
+        fun noteIdFor(path: String) = path.replace('/', '|')
 
         /** Whether a picture is a GIF, by its type or else by its first bytes ("GIF8"). */
         fun isGif(mimeType: String?, head: ByteArray): Boolean =

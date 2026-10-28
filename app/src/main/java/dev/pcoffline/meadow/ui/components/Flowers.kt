@@ -33,7 +33,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.readable
 import kotlin.math.cos
 import kotlin.math.sin
@@ -45,7 +47,9 @@ private var SemanticsPropertyReceiver.flowerAsleep by FlowerAsleep
 /**
  * A flower whose bloom mirrors how much time is left: wide open with plenty left,
  * closing and drooping as the limit approaches, wilted once it is used up. [asleep] folds it into
- * a closed bud nodding off, keeping its colour: resting outside its hours, not used up.
+ * a closed bud nodding off, keeping its colour: resting outside its hours, not used up. In the
+ * mushroom forest it's a mushroom instead, its cap [petalColor]: spread wide with plenty left,
+ * closing and drooping the same way.
  */
 @Composable
 fun BloomFlower(
@@ -58,6 +62,7 @@ fun BloomFlower(
     asleep: Boolean = false,
 ) {
     val garden = Garden.colors
+    val mushroom = Garden.theme == GardenTheme.MUSHROOM
     val reduced = rememberReducedMotion()
     val animatedBloom by animateFloatAsState(bloom.coerceIn(0f, 1f), tween(900), label = "bloom")
     val sleep by animateFloatAsState(if (asleep) 1f else 0f, tween(900), label = "sleep")
@@ -99,6 +104,13 @@ fun BloomFlower(
 
         scale(grow.value, grow.value, pivot = base) {
         rotate(angle * (0.4f + shown), pivot = base) {
+            if (mushroom) {
+                // A shorter stalk than a flower's stem, so the cap sits low like a mushroom's.
+                val top = Offset(head.x, head.y + h * 0.16f)
+                mushroom(base, top, w, lerp(petalColor, garden.wilted, wilt * 0.85f), lerp(MushroomStalk, garden.wilted, wilt * 0.6f),
+                    lerp(garden.leaf, garden.wilted, wilt * 0.6f), open = shown, droop = wilt * (1f - sleep), path = stem, leafPath = leafPath)
+                return@rotate
+            }
             stem.reset()
             stem.moveTo(base.x, base.y)
             stem.quadraticTo(w / 2f - w * 0.06f, h * 0.62f, head.x, head.y)
@@ -108,7 +120,7 @@ fun BloomFlower(
             flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, garden.petalHoney, droops = 1f - sleep)
         }
         }
-        if (animatedBloom < 0.15f && sleep < 0.5f) {
+        if (!mushroom && animatedBloom < 0.15f && sleep < 0.5f) {
             // A couple of fallen petals.
             val fallen = lerp(petalColor, garden.wilted, 0.6f)
             drawOval(fallen, topLeft = Offset(w * 0.62f, h * 0.88f), size = Size(w * 0.10f, h * 0.035f))
@@ -116,6 +128,36 @@ fun BloomFlower(
         }
     }
 }
+
+private val MushroomStalk = Color(0xFFF1E6D2)
+
+/**
+ * A mushroom from [base] up to its cap at [top]: a pale stalk with a tuft of moss, and a [cap]
+ * that's a tall closed dome at [open] 0 and a wide, flatter cap at 1, tipping over as it [droop]s.
+ */
+private fun DrawScope.mushroom(
+    base: Offset, top: Offset, w: Float, cap: Color, stalk: Color, moss: Color, open: Float, droop: Float, path: Path, leafPath: Path,
+) {
+    path.reset()
+    path.moveTo(base.x, base.y)
+    path.quadraticTo(base.x - w * 0.03f, (base.y + top.y) / 2f, top.x, top.y)
+    drawPath(path, stalk, style = Stroke(width = w * 0.11f, cap = StrokeCap.Round))
+    leaf(Offset(base.x - w * 0.04f, base.y - w * 0.02f), w * 0.15f, -150f, moss, leafPath)
+    leaf(Offset(base.x + w * 0.04f, base.y - w * 0.02f), w * 0.13f, -28f, moss, leafPath)
+    val width = w * (0.32f + 0.3f * open)
+    val height = width * (0.9f - 0.42f * open)
+    rotate(droop * droop * 32f, pivot = top) {
+        // The gills under the cap, then the cap over them, then its pale spots.
+        drawOval(lerp(cap, stalk, 0.55f), topLeft = Offset(top.x - width * 0.45f, top.y - height * 0.1f), size = Size(width * 0.9f, height * 0.22f))
+        drawArc(cap, startAngle = 180f, sweepAngle = 180f, useCenter = true, topLeft = Offset(top.x - width / 2f, top.y - height), size = Size(width, height * 2f))
+        for ((dx, dy, r) in MUSHROOM_SPOTS) {
+            drawCircle(Color.White.copy(alpha = 0.82f), radius = width * r, center = Offset(top.x + dx * width, top.y - dy * height))
+        }
+    }
+}
+
+/** Where a cap's spots go, across its width and up its height, and their sizes. */
+private val MUSHROOM_SPOTS = listOf(Triple(-0.24f, 0.45f, 0.06f), Triple(0.16f, 0.62f, 0.07f), Triple(0.02f, 0.25f, 0.045f), Triple(0.3f, 0.28f, 0.04f))
 
 private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Color, path: Path = Path()) {
     rotate(degrees, pivot = at) {
@@ -163,16 +205,18 @@ fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Colo
 }
 
 /**
- * Rolling hills with a scatter of tiny flowers, drawn behind screen headers. Given the [sky]
- * behind them and the [text] drawn over them, the hills are shaded just enough to keep that text
- * readable (4.5:1).
+ * Rolling hills with a scatter of tiny flowers (toadstools in the mushroom forest), drawn behind
+ * screen headers. Given the [sky] behind them and the [text] drawn over them, the hills are shaded
+ * just enough to keep that text readable (4.5:1). [rise] below 1 keeps them lower, that share of
+ * their full height above the bottom.
  */
 @Composable
-fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? = null) {
+fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? = null, rise: Float = 1f) {
     val garden = Garden.colors
+    val mushrooms = Garden.theme == GardenTheme.MUSHROOM
     val (backColor, frontColor) = remember(garden, sky, text) {
-        val back = garden.leaf.copy(alpha = 0.35f)
-        val front = garden.leaf.copy(alpha = 0.55f)
+        val back = garden.grass.copy(alpha = 0.35f)
+        val front = garden.grass.copy(alpha = 0.55f)
         if (sky == null || text == null) {
             back to front
         } else {
@@ -185,30 +229,47 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
     Canvas(modifier) {
         val w = size.width
         val h = size.height
+        // From a share of the way down to a height, squeezed towards the bottom by [rise].
+        fun y(share: Float) = h * (1f - (1f - share) * rise)
         val back = Path().apply {
-            moveTo(0f, h * 0.55f)
-            cubicTo(w * 0.25f, h * 0.30f, w * 0.55f, h * 0.70f, w, h * 0.38f)
+            moveTo(0f, y(0.55f))
+            cubicTo(w * 0.25f, y(0.30f), w * 0.55f, y(0.70f), w, y(0.38f))
             lineTo(w, h); lineTo(0f, h); close()
         }
         drawPath(back, backColor)
         val front = Path().apply {
-            moveTo(0f, h * 0.78f)
-            cubicTo(w * 0.3f, h * 0.55f, w * 0.7f, h * 0.95f, w, h * 0.68f)
+            moveTo(0f, y(0.78f))
+            cubicTo(w * 0.3f, y(0.55f), w * 0.7f, y(0.95f), w, y(0.68f))
             lineTo(w, h); lineTo(0f, h); close()
         }
         drawPath(front, frontColor)
         val dots = listOf(0.08f to 0.82f, 0.21f to 0.72f, 0.37f to 0.80f, 0.63f to 0.86f, 0.78f to 0.74f, 0.91f to 0.80f)
-        dots.forEachIndexed { i, (x, y) ->
+        val unit = 1.dp.toPx()
+        dots.forEachIndexed { i, (x, down) ->
             val color = garden.petals[i % garden.petals.size]
-            translate(w * x, h * y) {
-                for (k in 0 until 5) {
-                    val a = Math.toRadians(72.0 * k).toFloat()
-                    drawCircle(color, radius = 3.2f, center = Offset(cos(a) * 3.6f, sin(a) * 3.6f))
+            translate(w * x, y(down)) {
+                if (mushrooms) {
+                    tinyToadstool(color, unit)
+                } else {
+                    for (k in 0 until 5) {
+                        val a = Math.toRadians(72.0 * k).toFloat()
+                        drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
+                    }
+                    drawCircle(garden.petalHoney, radius = 1.05f * unit, center = Offset.Zero)
                 }
-                drawCircle(garden.petalHoney, radius = 2.2f, center = Offset.Zero)
             }
         }
     }
+}
+
+/** A toadstool a few dp tall, its cap [cap] with pale spots, standing on the origin's ground. */
+private fun DrawScope.tinyToadstool(cap: Color, unit: Float) {
+    val stalk = Color(0xFFF3E9D8)
+    drawRoundRect(stalk, topLeft = Offset(-1f * unit, -3.2f * unit), size = Size(2f * unit, 4f * unit),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(unit))
+    drawArc(cap, startAngle = 180f, sweepAngle = 180f, useCenter = true, topLeft = Offset(-3.6f * unit, -5.6f * unit), size = Size(7.2f * unit, 5.4f * unit))
+    drawCircle(Color.White.copy(alpha = 0.85f), radius = 0.6f * unit, center = Offset(-1.3f * unit, -4.2f * unit))
+    drawCircle(Color.White.copy(alpha = 0.85f), radius = 0.5f * unit, center = Offset(1.2f * unit, -3.7f * unit))
 }
 
 /** A thin vine with leaves, used as a section divider. */
