@@ -85,7 +85,8 @@ For agent instructions such as this file, follow
 
 ### App text
 
-App text tells people what they need to know to act.
+App text tells people what they need to know to act. It is warm, calm and plain. Use sentence
+case, and one emoji at most, at the end.
 
 - Describe what people see and do. Services, providers, error codes, browsers and how a feature
   works go in the README, `docs/` and the legal documents.

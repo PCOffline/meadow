@@ -57,7 +57,7 @@ test("an invite link opens in Meadow, and a mangled one doesn't", () => {
 });
 
 test("the invite page points to where Meadow takes a pasted link", () => {
-  assert.match(open("invite.html", "https://x.web.app/i/AbCdEfGh12345678").body.textContent, /Circle → Got a friend code\?/);
+  assert.match(open("invite.html", "https://x.web.app/i/AbCdEfGh12345678").body.textContent, /People → Invite a Bumblebee/);
 });
 
 test("no page runs inline script or handlers, so the content security policy can forbid them", () => {

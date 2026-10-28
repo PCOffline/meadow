@@ -63,7 +63,7 @@ class MainScreensTest : ScreenTest() {
         show { GardenContent(DemoGarden.robin, DemoGarden.garden, onOpenLimit = { opened += it }) }
         compose.onNodeWithText("Robin", substring = true).assertExists()
         node(R.string.garden_tile_resting_today).assertExists()
-        compose.onNodeWithText("extra today", substring = true).assertExists()
+        compose.onNodeWithText("more today", substring = true).assertExists()
         compose.onNodeWithText("Instagram").performScrollTo().performClick()
         assertEquals(listOf("demo.instagram"), opened)
         // Within their hours, no flower sleeps.

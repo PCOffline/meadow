@@ -100,7 +100,7 @@ class FormatTest {
         assertEquals("No record for 4 days", res.getQuantityString(R.plurals.stats_missing_days, 4, 4))
         assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 1, 1).contains("your 1 emergency unlock for"))
         assertEquals(true, res.getQuantityString(R.plurals.emergency_dialog_used_up, 3, 3).contains("all 3 emergency unlocks"))
-        assertEquals("Answer at least 1 request to see how you lean.", res.getQuantityString(R.plurals.bee_stats_leniency_unknown, 1, 1))
+        assertEquals("Answer 1 request to see how you answer.", res.getQuantityString(R.plurals.bee_stats_leniency_unknown, 1, 1))
         assertEquals("2 of 3 left", res.getQuantityString(R.plurals.settings_emergency_left, 2, 2, 3))
         assertEquals("1 of 4 ready", res.getQuantityString(R.plurals.setup_progress, 1, 1, 4))
     }

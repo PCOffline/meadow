@@ -2,20 +2,20 @@
 <resources>
     <string name="rest_title">%1$s is resting 🌙</string>
     <string name="rest_title_yes">Your Bumblebee approved 🌸</string>
-    <string name="rest_title_emergency">Emergency unlock on 🚨</string>
-    <string name="rest_body_today">You\'ve used the %1$s you set aside today. It blooms again tomorrow.</string>
-    <string name="rest_body_week">You\'ve used the %1$s you set aside for this week. It blooms again next week.</string>
-    <string name="rest_body_generic">You\'ve used the time you set aside.</string>
-    <string name="rest_body_yes">You have %1$s of extra time. Enjoy it mindfully.</string>
-    <string name="rest_body_emergency">%1$s is open for %2$s. Take care of what you need to.</string>
+    <string name="rest_title_emergency">Emergency unlock is on 🚨</string>
+    <string name="rest_body_today">You used the %1$s you set for today. It opens again tomorrow.</string>
+    <string name="rest_body_week">You used the %1$s you set for this week. It opens again next week.</string>
+    <string name="rest_body_generic">You used the time you set.</string>
+    <string name="rest_body_yes">You have %1$s more.</string>
+    <string name="rest_body_emergency">%1$s is open for %2$s.</string>
     <string name="rest_open">Open %1$s</string>
-    <string name="rest_pending">💌 You asked for %1$s of extra time.</string>
-    <string name="rest_signed_out">Sign in to ask for extra time.</string>
-    <string name="rest_no_bees">Invite a Bumblebee to ask for extra time.</string>
-    <string name="rest_ask">Ask a Bumblebee for extra time</string>
+    <string name="rest_pending">💌 You asked for %1$s more.</string>
+    <string name="rest_signed_out">Sign in to ask for more time.</string>
+    <string name="rest_no_bees">Invite a Bumblebee to ask for more time.</string>
+    <string name="rest_ask">Ask a Bumblebee for more time</string>
     <string name="rest_home">Go do something lovely</string>
     <string name="rest_emergency">Emergency? Unlock now</string>
 
     <string name="rest_body_hours">%1$s rests until %2$s.</string>
-    <string name="rest_body_hours_closed">%1$s is resting outside its allowed hours.</string>
+    <string name="rest_body_hours_closed">%1$s rests outside its hours.</string>
 </resources>

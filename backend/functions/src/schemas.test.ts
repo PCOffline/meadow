@@ -10,7 +10,7 @@ const firstError = (r: { success: boolean; error?: { issues: { message: string }
 test("profiles trim names and fall back to a daisy", () => {
   const ok = ProfileInput.parse({ displayName: "  Sam  ", flower: "🦖" });
   assert.deepEqual(ok, { displayName: "Sam", flower: "🌼" });
-  assert.equal(firstError(ProfileInput.safeParse({ displayName: "   " })), "Please choose a name.");
+  assert.equal(firstError(ProfileInput.safeParse({ displayName: "   " })), "Choose a name.");
 });
 
 test("friend codes are normalised", () => {
@@ -25,7 +25,7 @@ test("nothing a caller sends can become a different document path", () => {
     assert.ok(!InviteByCodeInput.safeParse({ friendCode: `AB/${bad}CD` }).success, bad);
   }
   for (const bad of ["a/b", "../x", ".", "a..b", ".a", "a.", "com.app/../../x"]) {
-    assert.equal(firstError(SaveLimitInput.safeParse({ packageName: bad, dailyMinutes: 30, weeklyMinutes: 0 })), "Which app is this about?", bad);
+    assert.equal(firstError(SaveLimitInput.safeParse({ packageName: bad, dailyMinutes: 30, weeklyMinutes: 0 })), "Which app is this for?", bad);
   }
   assert.ok(RequestIdInput.safeParse({ requestId: "Xy3_k-9AbCdEfGh12345" }).success);
   assert.ok(SaveLimitInput.safeParse({ packageName: "com.example.app_2", dailyMinutes: 30, weeklyMinutes: 0 }).success);
@@ -45,8 +45,8 @@ test("requests are checked per type", () => {
     firstError(CreateRequestInput.safeParse({ type: "change_limit", packageName: "a.b", dailyMinutes: 0, weeklyMinutes: 0, dayKey })),
     "Set a daily or weekly limit.",
   );
-  assert.equal(firstError(CreateRequestInput.safeParse({ type: "add_approver", dayKey })), "That kind of request isn't supported.");
-  assert.equal(firstError(CreateRequestInput.safeParse({ type: "remove_limit", packageName: "a.b", dayKey: "today" })), "That date doesn't look right.");
+  assert.equal(firstError(CreateRequestInput.safeParse({ type: "add_approver", dayKey })), "Meadow can't send this type of request.");
+  assert.equal(firstError(CreateRequestInput.safeParse({ type: "remove_limit", packageName: "a.b", dayKey: "today" })), "Check the date.");
   // Extra fields from older clients are ignored rather than rejected.
   assert.ok(CreateRequestInput.safeParse({ type: "remove_limit", dayKey, packageName: "a.b", minutes: 0 }).success);
   // Strict mode turns off without asking now.
@@ -58,7 +58,7 @@ test("a request can name the Bumblebees to ask, and a new limit can be only hour
   assert.ok(CreateRequestInput.safeParse({ type: "extra_time", packageName: "a.b", minutes: 5, dayKey, approverIds: ["bee"] }).success);
   assert.equal(
     firstError(CreateRequestInput.safeParse({ type: "extra_time", packageName: "a.b", minutes: 5, dayKey, approverIds: [] })),
-    "Pick at least one Bumblebee to ask.",
+    "Choose one or more Bumblebees to ask.",
   );
   const evenings = { "1": [{ from: 600, to: 1320 }] };
   assert.ok(CreateRequestInput.safeParse({ type: "change_limit", packageName: "a.b", dailyMinutes: 0, weeklyMinutes: 0, schedule: evenings, dayKey }).success);
@@ -99,8 +99,8 @@ test("emergency unlocks need a real reason and a set length", () => {
   assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "site:maps.example.com" }).success);
   assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: null }).success);
   assert.equal(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "anything at all" }).success, false);
-  assert.equal(firstError(EmergencyInput.safeParse({ minutes: 45, reason: "Need maps to get home" })), "Pick 15, 30 or 60 minutes.");
-  assert.equal(firstError(EmergencyInput.safeParse({ minutes: 15, reason: "pls" })), "Please say briefly what the emergency is.");
+  assert.equal(firstError(EmergencyInput.safeParse({ minutes: 45, reason: "Need maps to get home" })), "Choose 15, 30 or 60 minutes.");
+  assert.equal(firstError(EmergencyInput.safeParse({ minutes: 15, reason: "pls" })), "Write a short reason for the emergency.");
 });
 
 test("only package names are looked up as limits", () => {

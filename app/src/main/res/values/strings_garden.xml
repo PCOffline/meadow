@@ -6,7 +6,7 @@
         <item quantity="one">across %1$d app</item>
         <item quantity="other">across %1$d apps</item>
     </plurals>
-    <string name="garden_notice_setup">Limits are off until setup is finished.</string>
+    <string name="garden_notice_setup">Limits are off until you finish setup.</string>
     <string name="garden_notice_setup_action">Finish setup</string>
     <string name="garden_title">Your garden</string>
     <string name="garden_plant">Plant a limit</string>
@@ -16,9 +16,9 @@
     <string name="garden_tile_resting_today">Resting until tomorrow 🌙</string>
     <string name="garden_tile_resting_week">Resting until next week 🌙</string>
     <string name="garden_tile_emergency">Paused for an emergency 🚨</string>
-    <string name="garden_tile_extra">+%1$s extra today 🌸</string>
+    <string name="garden_tile_extra">+%1$s more today 🌸</string>
 
-    <string name="garden_notice_battery">Android may stop Meadow in the background.</string>
+    <string name="garden_notice_battery">Android can stop Meadow in the background.</string>
     <string name="garden_tile_ask">Ask for more</string>
     <string name="garden_tile_resting_until">Resting until %1$s</string>
     <string name="garden_tile_resting_hours">Resting outside its hours</string>

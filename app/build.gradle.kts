@@ -8,7 +8,7 @@ plugins {
 }
 
 // The Firebase config is per-developer and never committed. Without it the app
-// still builds and shows a "connect your backend" screen at launch.
+// still builds and shows a "Meadow can't start" screen at launch.
 val firebaseConfig = file("google-services.json")
 val hasFirebaseConfig = firebaseConfig.exists()
 if (hasFirebaseConfig) {

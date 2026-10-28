@@ -344,7 +344,7 @@ describe("friend codes", () => {
     const code = await friendCodeOf(bee);
     for (let i = 0; i < 10; i++) await (await person(`Guest ${i}`, { anonymous: true })).call("sendInvite", { friendCode: code });
     const late = await person("Late", { anonymous: true });
-    await rejects(late.call("sendInvite", { friendCode: code }), "resource-exhausted", /lots of invites waiting/);
+    await rejects(late.call("sendInvite", { friendCode: code }), "resource-exhausted", /many invites to answer/);
     assert.equal((await outbox(bee.uid, "invite")).length, 10);
     // Answering one makes room.
     const [first] = await outbox(bee.uid, "invite");
@@ -377,7 +377,7 @@ describe("asking from a chat", () => {
     await bee.call("inviteFromChat", { uid: sam.uid, offer: false });
     await rejects(bee.call("inviteFromChat", { uid: sam.uid, offer: false }), "already-exists");
     const [invite] = await outbox(sam.uid, "invite");
-    assert.match(invite.title, /would like you as their Bumblebee/);
+    assert.match(invite.title, /wants you as their Bumblebee/);
     await sam.call("respondInvite", { inviteId: invite.inviteId, accept: true });
     assert.deepEqual((await read(`users/${bee.uid}/private/account`)).approverIds, [sam.uid]);
     assert.equal((await outbox(bee.uid, "invite_accepted")).length, 1);

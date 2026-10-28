@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="intro_plant_title">Plant gentle limits</string>
-    <string name="intro_plant_body">Choose how long each app may bloom every day. When its time is up, it rests until tomorrow.</string>
+    <string name="intro_plant_body">Choose how long each app can open each day. When its time is used, the app rests until tomorrow.</string>
     <string name="intro_bees_title">Friends keep the garden</string>
-    <string name="intro_bees_body">Your Bumblebees are the friends you choose. Only they can give you extra time or loosen a limit.</string>
+    <string name="intro_bees_body">Your Bumblebees are friends you choose. Only they can give you more time or make a limit easier.</string>
     <string name="intro_growth_title">Watch your days grow</string>
-    <string name="intro_growth_body">See your days, weeks and months take shape, and celebrate the calmer ones.</string>
+    <string name="intro_growth_body">See how you use your time each day, week and month.</string>
     <string name="intro_next">Next</string>
     <string name="intro_begin">Let\'s begin 🌱</string>
     <string name="intro_have_garden">I already have a garden · Sign in</string>
 
-    <string name="onboarding_name_title">Who\'s tending this garden?</string>
+    <string name="onboarding_name_title">Who looks after this garden?</string>
     <string name="onboarding_name_label">Your name</string>
     <string name="onboarding_plant">Plant my garden 🌱</string>
     <string name="onboarding_planting">Planting…</string>
@@ -25,7 +25,7 @@
     <string name="auth_password_instead">Use a password instead</string>
     <string name="auth_link_instead">Use a sign-in link instead</string>
     <string name="link_title">Signing you in</string>
-    <string name="link_ask_email">Which email address did you ask for this link with?</string>
+    <string name="link_ask_email">Enter the email address that got this link.</string>
     <string name="link_continue">Sign in</string>
     <string name="link_busy">Signing you in…</string>
     <string name="link_done">You\'re signed in 🌼</string>
@@ -38,5 +38,5 @@
 
     <string name="profile_setup_title">Almost there</string>
     <string name="profile_setup_continue">Continue</string>
-    <string name="profile_setup_other_account">Use another account</string>
+    <string name="profile_setup_other_account">Use a different account</string>
 </resources>

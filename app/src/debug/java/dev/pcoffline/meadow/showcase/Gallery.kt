@@ -313,7 +313,7 @@ internal object Scenarios {
         Scenario("People", "A friend's garden, loading") { FriendDemo(d.anaPage, waiting = true) },
 
         Scenario("Chats", "A conversation") { Page { ChatDemo() } },
-        Scenario("Chats", "A message that didn't send") { Page { ChatDemo(error = "Something went wrong. Please try again.") } },
+        Scenario("Chats", "A message that didn't send") { Page { ChatDemo(error = "Something went wrong. Try again.") } },
         Scenario("Chats", "A closed chat") { Page { ChatContent(d.robin, null, emptyList()) } },
         Scenario("Chats", "Loading") { Page { ChatContent(d.robin, null, emptyList(), loading = true) } },
 
@@ -336,7 +336,7 @@ internal object Scenarios {
         Scenario("Protections", "Everything on") { Page { SetupScreen(onDone = {}, read = { Demo.protection(essentials = true, rest = true) }) } },
         Scenario("Protections", "Troubleshoot, essentials off") { TroubleshootDemo(Demo.protection(essentials = false, rest = false)) },
         Scenario("Protections", "Troubleshoot") { TroubleshootDemo(Demo.protection(essentials = true, rest = false)) },
-        Scenario("Protections", "Strict mode needs a hand") { Page { StrictGateContent(Demo.protection(essentials = true, rest = false)) } },
+        Scenario("Protections", "Strict mode needs two settings") { Page { StrictGateContent(Demo.protection(essentials = true, rest = false)) } },
 
         Scenario("Settings", "Settings") { Page { SettingsScreen(d.robin, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) } },
         Scenario("Settings", "What your Bumblebees see") { Page { PrivacyPreviewContent(d.robin, d.today, d.progress, d.myLimits, save = {}) } },
