@@ -89,7 +89,11 @@ class WebsiteJourneyTest : EndToEndTest() {
             waitForText(text(R.string.rest_title, "example.org"))
             eventually("example.org covered") { "BlockActivity" in onTop() }
             node(R.string.rest_home).performScrollTo().performClick()
-            eventually("home") { onTop().let { "BlockActivity" !in it && "StandInBrowserActivity" !in it && it.isNotEmpty() } }
+            try {
+                eventually("home") { onTop().let { "BlockActivity" !in it && "StandInBrowserActivity" !in it && it.isNotEmpty() } }
+            } catch (e: AssertionError) {
+                throw AssertionError("${e.message} On top: ${onTop().trim()} Tappable: ${tappables()} Windows: ${windowsOnScreen()}", e)
+            }
             assertEquals(null, AppGraph.sites.current())
         }
     }
