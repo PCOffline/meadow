@@ -387,11 +387,13 @@ describe("requests, invites and links", () => {
     await assertFails(updateDoc(doc(as("sam"), "requests/r1"), { status: "approved" }));
   });
 
-  test("removals and rate limits are the backend's alone", async () => {
+  test("removals, rate limits and unsent pictures are the backend's alone", async () => {
     await assertFails(getDoc(doc(as("sam"), "removals/sam_bee")));
     await assertFails(setDoc(doc(as("sam"), "removals/sam_bee"), { ownerUid: "sam", beeUid: "bee" }));
     await assertFails(getDoc(doc(as("sam"), "rateLimits/sam")));
     await assertFails(setDoc(doc(as("sam"), "rateLimits/sam"), {}));
+    await assertFails(getDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|abc12345.jpg")));
+    await assertFails(deleteDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|abc12345.jpg")));
   });
 
   test("invite links, friend codes and the test outbox are hidden", async () => {
@@ -461,6 +463,9 @@ describe("chats", () => {
     await assertFails(updateDoc(chat, { lastSenderId: "bee" }));
     await assertFails(updateDoc(chat, { participants: ["sam", "stranger"] }));
     await assertSucceeds(updateDoc(chat, { "lastRead.sam": serverTimestamp() }));
+    // When I last read it is now, never a time or anything else made up.
+    await assertFails(updateDoc(chat, { "lastRead.sam": Timestamp.fromMillis(Date.now() + 86_400_000) }));
+    await assertFails(updateDoc(chat, { "lastRead.sam": "x".repeat(10_000) }));
   });
 
   test("once the two part ways, the chat is closed: read-only for them, still shut to everyone else", async () => {

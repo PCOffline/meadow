@@ -240,6 +240,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Chat pictures uploaded and not yet known to be sent, swept by the backend.
+    match /chatUploads/{id} {
+      allow read, write: if false;
+    }
+
     // Invite links are created, previewed and redeemed only through Cloud Functions.
     match /inviteLinks/{token} {
       allow read, write: if false;
@@ -278,7 +283,8 @@ service cloud.firestore {
                 && request.resource.data.lastMessageAt == request.time
                 && isString(request.resource.data.lastMessage, 140)))
         && (!('lastRead' in changed())
-            || request.resource.data.lastRead.diff(resource.data.get('lastRead', {})).affectedKeys().hasOnly([me()]));
+            || (request.resource.data.lastRead.diff(resource.data.get('lastRead', {})).affectedKeys().hasOnly([me()])
+                && request.resource.data.lastRead[me()] == request.time));
 
       match /messages/{messageId} {
         allow read: if participant();

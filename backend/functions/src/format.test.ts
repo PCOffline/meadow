@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatIdFor, formatMinutes, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, storedAppName, summarize, withPhotoToken } from "./format";
+import { chatIdFor, chatOfPicture, formatMinutes, isChatPicture, uploadId, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, storedAppName, summarize, withPhotoToken } from "./format";
 
 test("formats minutes like the app does", () => {
   assert.equal(formatMinutes(0), "0m");
@@ -60,4 +60,16 @@ test("a photo link gets a new token, keeping everything else", () => {
   assert.equal(withPhotoToken(`${base}&token=old-123#v=5`, "new-456"), `${base}&token=new-456#v=5`);
   assert.equal(withPhotoToken(`${base}&token=old-123`, "new-456"), `${base}&token=new-456`);
   assert.equal(withPhotoToken(base, "new-456"), base);
+});
+
+test("tells chat pictures from other uploads, and where each was sent", () => {
+  assert.equal(isChatPicture("chats/a_b/a/photo1234.jpg"), true);
+  assert.equal(isChatPicture("avatars/a"), false);
+  assert.equal(isChatPicture("exports/a/meadow-1.json"), false);
+  assert.equal(isChatPicture("chats/a_b/photo.jpg"), false);
+  assert.equal(isChatPicture("chats/a_b/a/b/photo.jpg"), false);
+  assert.equal(isChatPicture(undefined), false);
+  assert.equal(chatOfPicture("chats/a_b/a/photo1234.jpg"), "a_b");
+  assert.equal(chatOfPicture("photo.jpg"), "");
+  assert.equal(uploadId("chats/a_b/a/photo1234.jpg"), "chats|a_b|a|photo1234.jpg");
 });

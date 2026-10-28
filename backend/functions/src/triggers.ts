@@ -1,21 +1,66 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
+import { chatOfPicture, isChatPicture, uploadId } from "./format";
 import { chatMedia, pushes } from "./copy";
-import { accountOf, accountRef, chats, db, heartbeats, invites, isEmulator, loadPerson, notify, profileOf, users } from "./db";
+import { accountOf, accountRef, chats, chatUploads, db, heartbeats, invites, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
 import { finishDueRemovals } from "./social";
 
 const ALERT_COOLDOWN_MS = 2 * 60_000;
 const STALE_HEARTBEAT_MS = 6 * 60 * 60_000;
 
+const STALE_UPLOAD_MS = 60 * 60_000;
+
+/**
+ * Notes each chat picture as it's uploaded. A picture is sent by a message naming it, which the
+ * app writes once the upload is done; one never sent (the message was refused, the app was
+ * stopped, or the uploads weren't the app's) is deleted by [sweepUnsentPictures], so nobody can
+ * fill Storage with pictures nobody sees.
+ */
+export const onChatUpload = onObjectFinalized(async (event) => {
+  const path = event.data.name;
+  if (!isChatPicture(path)) return;
+  await chatUploads().doc(uploadId(path)).set({ path, at: FieldValue.serverTimestamp() });
+});
+
+/**
+ * Deletes chat pictures uploaded over an hour before [now] that no message sent; sent ones are
+ * only crossed off. Pictures of chats that closed meanwhile are gone already.
+ */
+export async function sweepUnsentPictures(now: number): Promise<number> {
+  const due = await chatUploads().where("at", "<", Timestamp.fromMillis(now - STALE_UPLOAD_MS)).limit(400).get();
+  let deleted = 0;
+  await inChunks(due.docs, async (record) => {
+    const path = record.get("path") as string;
+    try {
+      const sent = await chats().doc(chatOfPicture(path)).collection("messages").where("path", "==", path).limit(1).get();
+      if (sent.empty) {
+        await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+        deleted++;
+      }
+      await record.ref.delete();
+    } catch (e) {
+      // Left for the next run.
+      logger.warn("Unsent picture not swept", { path, error: String(e) });
+    }
+  });
+  return deleted;
+}
+
 /** Pushes new chat messages, words or pictures, to the other person, while the chat is open. */
 export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data?.data();
   if (message?.kind !== "text" && message?.kind !== "image") return;
+  // Sent: the picture stays. (The record may only be written after this; the sweep checks again.)
+  if (message.kind === "image" && typeof message.path === "string") {
+    await chatUploads().doc(uploadId(message.path)).delete().catch(() => undefined);
+  }
   const text = message.kind === "image" ? (message.gif === true ? chatMedia.gif : chatMedia.photo) : String(message.text ?? "");
   const chat = await chats().doc(event.params.chatId).get();
   if (!chat.exists || chat.get("closed") === true) return;
@@ -124,11 +169,12 @@ export const expireRequests = onSchedule("every 5 minutes", async () => {
   if (expired > 0) logger.info("Expired requests", { expired });
 });
 
-/** Hourly housekeeping: finish Bumblebee removals, notice quiet phones. */
+/** Hourly housekeeping: finish Bumblebee removals, delete unsent chat pictures, notice quiet phones. */
 export async function housekeeping(now: number) {
   const migrated = await migrateProfiles();
 
   const removed = await finishDueRemovals(now);
+  const unsentPictures = await sweepUnsentPictures(now);
 
   // Only phones not yet looked at, oldest first. Every one looked at is marked, even a garden
   // nobody looks after, so quiet phones that are never reported don't crowd out new ones. The
@@ -153,7 +199,7 @@ export async function housekeeping(now: number) {
     for (const d of back.docs) batch.update(d.ref, { staleNotified: false });
     await batch.commit();
   }
-  const done = { migrated, removed, quiet: quiet.size, recovered: back.size };
+  const done = { migrated, removed, unsentPictures, quiet: quiet.size, recovered: back.size };
   logger.info("Hourly care done", done);
   return done;
 }

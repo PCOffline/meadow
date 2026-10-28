@@ -1,9 +1,10 @@
 rules_version = '2';
 
 // Profile photos: you, your Bumblebees and the people you look after may see yours; only you
-// may set or remove it. Small images only.
+// may set or remove it. Small JPEGs only, as the app makes them: nothing a browser would run.
 // Chat photos and GIFs: only the two in the chat may see them, and each may add their own while
-// the chat is open. The backend deletes them when the chat closes or an account is deleted.
+// the chat is open. The backend deletes them when the chat closes or an account is deleted, and
+// any never sent in a message after an hour.
 service firebase.storage {
   match /b/{bucket}/o {
     function account(uid) {
@@ -38,7 +39,7 @@ service firebase.storage {
           || request.auth.uid in account(uid).approveeIds);
       allow write: if request.auth != null && request.auth.uid == uid
         && (request.resource == null
-          || (request.resource.size < 2 * 1024 * 1024 && request.resource.contentType.matches('image/.*')));
+          || (request.resource.size < 2 * 1024 * 1024 && request.resource.contentType == 'image/jpeg'));
     }
   }
 }

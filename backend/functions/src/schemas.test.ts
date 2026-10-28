@@ -94,6 +94,10 @@ test("decisions accept an optional smaller amount", () => {
 
 test("emergency unlocks need a real reason and a set length", () => {
   assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home" }).success);
+  // For one app or website, or every limit; never anything that isn't one.
+  assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "com.maps" }).success);
+  assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: null }).success);
+  assert.equal(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "anything at all" }).success, false);
   assert.equal(firstError(EmergencyInput.safeParse({ minutes: 45, reason: "Need maps to get home" })), "Pick 15, 30 or 60 minutes.");
   assert.equal(firstError(EmergencyInput.safeParse({ minutes: 15, reason: "pls" })), "Please say briefly what the emergency is.");
 });

@@ -83,7 +83,8 @@ export const RequestIdInput = z.object({ requestId: id });
 export const EmergencyInput = z.object({
   minutes: z.number().int().refine((m) => EMERGENCY_MINUTES.includes(m), errors.emergencyMinutes),
   reason: z.string().trim().min(10, errors.emergencyReason).max(280),
-  packageName: z.string().trim().max(200).nullish(),
+  // An app or website the unlock is for, or none for every limit.
+  packageName: packageName.nullish(),
   // Ignored: Bumblebees are told the name the limit was planted under (see emergencyUnlock).
   appName: z.string().trim().max(100).nullish(),
   // Set only when reporting an unlock the phone already took while offline.

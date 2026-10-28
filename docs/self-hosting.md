@@ -122,7 +122,9 @@ Collections appear on their own as people use the app.
 Nothing else to set up: the deploy (section 4) uploads `backend/storage.rules`, which lets
 people change only their own photo, lets their Bumblebees and the people they look after see it,
 keeps each chat's photos and GIFs (under `chats/`) to its two people, and keeps each export file
-to its owner, and sets the bucket's lifecycle rule. A chat's pictures are deleted when it closes.
+to its owner, and sets the bucket's lifecycle rule. A chat's pictures are deleted when it closes,
+and any picture never sent in a message is deleted after an hour (`onChatUpload` notes each
+upload, `hourlyCare` sweeps).
 
 ### 2.6 Cloud Messaging
 
@@ -182,7 +184,9 @@ The deploy:
   Meadow's own rule (a delete rule for `exports/`) and keeps any other rules on the bucket;
 - compiles the functions (`backend/build-functions.cjs`) and deploys them to the region in
   `backend/functions/.env` (see below),
-  along with two scheduled jobs: `expireRequests` every 5 minutes and `hourlyCare` every hour;
+  along with two scheduled jobs (`expireRequests` every 5 minutes and `hourlyCare` every hour)
+  and one Storage trigger (`onChatUpload`; on the first deploy the CLI grants Cloud Storage's
+  service account the right to publish to Pub/Sub, which Storage triggers need);
 - renders the legal pages and app links (`backend/predeploy.cjs`) and publishes
   `backend/hosting/` to `https://<project-id>.web.app`.
 
