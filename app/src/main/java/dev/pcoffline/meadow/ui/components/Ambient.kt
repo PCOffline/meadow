@@ -245,7 +245,7 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = O
                 }
                 if (clouds.celestialShows) moon(Offset(size.width * celestial.x, size.height * celestial.y), 22.dp.toPx(), mood.top)
             } else if (clouds.celestialShows) {
-                sun(Offset(size.width * (celestial.x + 0.02f), size.height * (celestial.y - 0.02f)), 20.dp.toPx(), t, garden.petalHoney)
+                sun(Offset(size.width * (celestial.x + 0.02f), size.height * (celestial.y - 0.02f)), 20.dp.toPx(), t, garden.sun)
             }
             CLOUD_PATHS.take(clouds.count).forEach { (speed, offset, height, scale) ->
                 cloud(Offset(((t * speed + size.width * offset) % (size.width + 240f)) - 120f, size.height * height), scale, clouds.alpha, clouds.color)
@@ -268,11 +268,37 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = O
                 }
                 else -> {
                     // The theme's two butterflies, the smaller one further off and higher up.
-                    flutter(butterflies[1], t, seed = 2.1f, lane = 0.38f, length = 9.5.dp.toPx(), speed = 0.19f)
-                    flutter(butterflies[0], t, seed = 0f, lane = 0.52f, length = 13.dp.toPx(), speed = 0.25f)
+                    flutter(butterflies[1], t, seed = 2.1f, lane = 0.38f, length = 9.5.dp.toPx(), speed = 0.11f)
+                    flutter(butterflies[0], t, seed = 0.4f, lane = 0.52f, length = 13.dp.toPx(), speed = 0.14f)
                 }
             }
         }
+    }
+}
+
+/**
+ * A still, small sky for a theme's preview: the afternoon sky as the garden shows it (or the night,
+ * in dark mode), with its sun or moon and hills, in the theme it's drawn under.
+ */
+@Composable
+fun SkyPreview(modifier: Modifier = Modifier) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalSkyHour provides 14, LocalSkyWeather provides Weather.CLEAR) {
+        StillSky(modifier)
+    }
+}
+
+@Composable
+private fun StillSky(modifier: Modifier) {
+    val garden = Garden.colors
+    val mood = rememberSkyMood()
+    val sky = remember(mood.top, mood.bottom) { Brush.verticalGradient(listOf(mood.top, mood.bottom)) }
+    Box(modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(sky)
+            val at = Offset(size.width * 0.76f, size.height * 0.3f)
+            if (mood.night) moon(at, 9.dp.toPx(), mood.top) else sun(at, 8.dp.toPx(), 0f, garden.sun)
+        }
+        MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky)
     }
 }
 

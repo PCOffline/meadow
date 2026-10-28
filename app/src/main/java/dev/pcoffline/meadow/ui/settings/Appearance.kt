@@ -15,13 +15,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +55,7 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.components.SkyPreview
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.Garden
 import dev.pcoffline.meadow.ui.theme.GardenTheme
@@ -170,12 +171,12 @@ private fun ThemeCard(theme: GardenTheme, selected: Boolean, modifier: Modifier,
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary, Garden.colors.petalPink).forEach {
-                Box(Modifier.size(12.dp).clip(CircleShape).background(it))
-            }
+        // The theme itself, small: its sky, sun, hills and a flower (a toadstool in the mushroom forest).
+        Box(Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(12.dp))) {
+            SkyPreview(Modifier.matchParentSize())
+            BloomFlower(1f, Garden.colors.petalPink, Modifier.align(Alignment.BottomCenter).size(38.dp, 54.dp), sway = false, growIn = false)
         }
-        BloomFlower(1f, Garden.colors.petalPink, Modifier.size(44.dp, 60.dp), sway = false, growIn = false)
+        Spacer(Modifier.height(6.dp))
         // Room for two lines on every card, so a long name doesn't make its card taller than the rest.
         val style = MaterialTheme.typography.labelMedium
         Box(Modifier.heightIn(min = with(LocalDensity.current) { (style.lineHeight * 2).toDp() }), contentAlignment = Alignment.Center) {

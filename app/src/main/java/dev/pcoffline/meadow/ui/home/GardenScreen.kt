@@ -10,6 +10,9 @@ import androidx.compose.ui.geometry.Offset
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -234,12 +237,21 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
     val now = rememberResumedNow()
     val locale = currentLocale()
     val today = remember(now.toLocalDate(), locale) { now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)) }
-    Box(Modifier.fillMaxWidth().height(250.dp)) {
-        // The sun or moon sits low on the right, beside today's total, so it never crowds your
-        // picture and Settings up top.
-        SkyScene(mood, Modifier.fillMaxSize(), celestial = Offset(0.8f, 0.56f))
-        Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    val density = LocalDensity.current
+    var boxHeight by remember { mutableIntStateOf(0) }
+    var rowHeight by remember { mutableIntStateOf(0) }
+    // The sun or moon sits on the right just below your picture and Settings, never behind them,
+    // and beside today's total.
+    val rowBottom = WindowInsets.statusBars.getTop(density) + with(density) { HEADER_TOP.toPx() } + rowHeight
+    val celestialY = if (boxHeight == 0) 0.5f else (rowBottom + with(density) { CELESTIAL_GAP.toPx() }) / boxHeight
+    Box(Modifier.fillMaxWidth().onSizeChanged { boxHeight = it.height }) {
+        SkyScene(mood, Modifier.matchParentSize(), celestial = Offset(0.82f, celestialY))
+        // Room around the words, and at the bottom for the hills to show.
+        Column(Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = HEADER_TOP, bottom = 52.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.onSizeChanged { rowHeight = it.height },
+            ) {
                 Column(Modifier.weight(1f)) {
                     Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky)
                     Text(
@@ -261,14 +273,16 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                     Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.action_settings), tint = mood.onSky)
                 }
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(32.dp))
             Text(stringResource(R.string.garden_screen_time_today), style = MaterialTheme.typography.labelLarge, color = mood.onSky)
+            Spacer(Modifier.height(4.dp))
             Text(
                 minutesText(minutes),
                 style = MaterialTheme.typography.displaySmall.copy(fontSize = 46.sp),
                 fontWeight = FontWeight.SemiBold,
                 color = mood.onSky,
             )
+            Spacer(Modifier.height(2.dp))
             Text(
                 pluralStringResource(R.plurals.garden_across_apps, state.appsUsed, state.appsUsed),
                 style = MaterialTheme.typography.bodyMedium,
@@ -277,6 +291,11 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
         }
     }
 }
+
+private val HEADER_TOP = 12.dp
+
+/** How far below the header's top row the sun or moon's middle sits: clear of its glow. */
+private val CELESTIAL_GAP = 48.dp
 
 @Composable
 private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {

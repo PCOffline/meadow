@@ -56,6 +56,10 @@ data class GardenColors(
      */
     val better: Color,
     val onBetter: Color,
+    /** The sun: the same warm gold in every theme, its hue only leaning a little towards the theme's. */
+    val sun: Color,
+    /** The hills' grass: one fresh green everywhere, leaning a little towards the theme's hue the same way. */
+    val grass: Color,
 ) {
     val petals: List<Color> get() = listOf(petalPink, petalLavender, petalHoney, petalPeach, petalSky)
 }
@@ -95,11 +99,13 @@ private data class Seed(
     val leaf: Color,
 )
 
+// Each page is lightly tinted with its theme's own colour, as cherry blossom's is pink, and its
+// flowers are picked to sit together.
 private val Seeds = mapOf(
     GardenTheme.MEADOW to Seed(
-        Color(0xFF5B7F55), Color(0xFFB4646C), Color(0xFF7A6CA8), Color(0xFFFBF6EC),
-        listOf(Color(0xFFE8A0A6), Color(0xFFB4A7D6), Color(0xFFE9B949), Color(0xFFF2B48C), Color(0xFF9CC3D5)),
-        Color(0xFF8FB283),
+        Color(0xFF4F7F4C), Color(0xFFB4646C), Color(0xFF6B7FB8), Color(0xFFF3F6EA),
+        listOf(Color(0xFFEFA3B0), Color(0xFFB9A9E0), Color(0xFFF2C24F), Color(0xFFF5B48A), Color(0xFF93C1E6)),
+        Color(0xFF86B56F),
     ),
     GardenTheme.BLOSSOM to Seed(
         Color(0xFFB5577A), Color(0xFF7F8F5A), Color(0xFF8E6FB0), Color(0xFFFCEBEE),
@@ -107,26 +113,59 @@ private val Seeds = mapOf(
         Color(0xFF9DB57E),
     ),
     GardenTheme.LAVENDER to Seed(
-        Color(0xFF7461A8), Color(0xFFB26B8A), Color(0xFF5E8C7A), Color(0xFFF2EEFA),
-        listOf(Color(0xFFB4A7D6), Color(0xFFCFC2EC), Color(0xFF9C8AC9), Color(0xFFE8A0A6), Color(0xFFF2D58C)),
-        Color(0xFF95AE8C),
+        Color(0xFF6B57A8), Color(0xFFA0607E), Color(0xFF5E8C7A), Color(0xFFF5F2FB),
+        listOf(Color(0xFFB7A6E4), Color(0xFFD5C8F2), Color(0xFF9C88D2), Color(0xFFF1B5C8), Color(0xFFF3D98F)),
+        Color(0xFF97B39A),
     ),
     GardenTheme.SUNFLOWER to Seed(
-        Color(0xFFA8741A), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFDF3D8),
-        listOf(Color(0xFFF2C14E), Color(0xFFF6D77F), Color(0xFFE9A23B), Color(0xFFF2B48C), Color(0xFFE8A0A6)),
-        Color(0xFF94B061),
+        Color(0xFF9A6412), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFFF8E8),
+        listOf(Color(0xFFF4C13E), Color(0xFFF7D774), Color(0xFFEC9F35), Color(0xFFF0B184), Color(0xFFD98E5F)),
+        Color(0xFF92B45E),
     ),
     GardenTheme.POND to Seed(
-        Color(0xFF3F7F86), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFE7F3F1),
-        listOf(Color(0xFFF2B8C6), Color(0xFF9CC3D5), Color(0xFFB7DCD3), Color(0xFFE9D27A), Color(0xFFC7B6E6)),
-        Color(0xFF7FB39E),
+        Color(0xFF2E7A80), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFECF6F4),
+        listOf(Color(0xFFF2B2C4), Color(0xFF98CBE0), Color(0xFFB5E0D3), Color(0xFFF0D98A), Color(0xFFC8B8EA)),
+        Color(0xFF72B39A),
     ),
     GardenTheme.MUSHROOM to Seed(
-        Color(0xFFA4553F), Color(0xFF7A6A4F), Color(0xFF6F8B5E), Color(0xFFF6EBE0),
-        listOf(Color(0xFFD9735B), Color(0xFFF0C9A0), Color(0xFFE9B949), Color(0xFFC9A98B), Color(0xFFB4A7D6)),
-        Color(0xFF8DA36F),
+        // A woodland floor: toadstool red, chanterelle, tan and brown caps, and moss.
+        Color(0xFF9B3F2E), Color(0xFF5E7A45), Color(0xFF8A6D4E), Color(0xFFF5F1E8),
+        listOf(Color(0xFFD4573F), Color(0xFFE59B52), Color(0xFFBF9670), Color(0xFF9E6B4A), Color(0xFFC7A2D8)),
+        Color(0xFF7FA05F),
     ),
 )
+
+/** The sun and the grass before each theme's lean (see [leanTowards]). */
+private val Sun = Color(0xFFF4C04E)
+private val Grass = Color(0xFF8DB57A)
+
+/** The hue of [color], in degrees (0 until 360); grey has hue 0. */
+internal fun hueOf(color: Color): Float {
+    val max = maxOf(color.red, color.green, color.blue)
+    val min = minOf(color.red, color.green, color.blue)
+    val d = max - min
+    if (d == 0f) return 0f
+    val h = when (max) {
+        color.red -> ((color.green - color.blue) / d).mod(6f)
+        color.green -> (color.blue - color.red) / d + 2f
+        else -> (color.red - color.green) / d + 4f
+    }
+    return (h * 60f).mod(360f)
+}
+
+/**
+ * [color] with its hue turned [share] of the way towards [toward]'s, the short way round, but by
+ * no more than [maxDegrees]; its lightness and saturation stay as they are.
+ */
+internal fun leanTowards(color: Color, toward: Color, share: Float, maxDegrees: Float): Color {
+    val from = hueOf(color)
+    val turn = ((hueOf(toward) - from + 540f).mod(360f) - 180f) * share
+    val max = maxOf(color.red, color.green, color.blue)
+    val min = minOf(color.red, color.green, color.blue)
+    val lightness = (max + min) / 2f
+    val saturation = if (max == min) 0f else (max - min) / (1f - kotlin.math.abs(2f * lightness - 1f))
+    return Color.hsl((from + turn.coerceIn(-maxDegrees, maxDegrees)).mod(360f), saturation.coerceIn(0f, 1f), lightness, color.alpha)
+}
 
 private val Ink = Color(0xFF3E3A32)
 private val NightInk = Color(0xFFE9E3D6)
@@ -315,6 +354,8 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         better = better,
         onBetter = readable(if (dark) lerp(s.leaf, Color.White, 0.85f) else lerp(s.leaf, Color.Black, 0.7f), listOf(better),
             toward = if (dark) Color.White else Color.Black),
+        sun = leanTowards(Sun, s.primary, share = 0.2f, maxDegrees = 8f),
+        grass = leanTowards(Grass, s.primary, share = 0.2f, maxDegrees = 12f).let { if (dark) lerp(it, Color.Black, 0.08f) else it },
     )
 }
 

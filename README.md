@@ -36,9 +36,11 @@ friend who has to approve is much harder to argue with.
 
 ### A garden that grows with your time
 Every app you limit is a flower that blooms while there's time left, wilts as it runs out and
-sleeps outside the hours you allow it. The sky follows your day, from a peach sunrise to a starry night with fireflies, and,
-if you like, the weather outside: clouds, fog, rain, snow or a storm. Gentle reminders
-arrive at five minutes and one minute left.
+sleeps outside the hours you allow it (in the Mushroom forest, a mushroom that opens and droops
+the same way). The sky follows your day, from a peach sunrise to a starry night with fireflies,
+with two butterflies drifting and gliding over the hills by day, and, if you like, the weather
+outside: clouds, fog, rain, snow or a storm. Gentle reminders arrive at five minutes and one
+minute left.
 
 ### Limits that fit your week
 Set a daily limit, then give some days their own: 30 minutes on weekdays, two hours at weekends.
@@ -81,11 +83,15 @@ and which days were the calmest.
 
 ### Make it yours
 Six themes, each by day or by night: Meadow, Cherry blossom, Lavender field, Sunflower, Lily pond
-and Mushroom forest. Pick a critter or flower for your picture, or use a photo, and add a few
-words about yourself.
+and Mushroom forest. Each colours the page, the sky, its flowers and its butterflies, while the sun
+and grass only lean a little towards it. The picker shows each theme as a little sky of its own.
+Pick a critter or flower for your picture, or use a photo, and add a few words about yourself.
 
 <p align="center">
-  <img src="docs/images/themes.png" alt="The garden in four themes: Cherry blossom, Sunflower, Mushroom forest and Lavender field by night" width="100%">
+  <img src="docs/images/themes.png" alt="The garden in four themes: Cherry blossom, Sunflower, Mushroom forest with its mushrooms, and Lavender field by night" width="100%">
+</p>
+<p align="center">
+  <img src="docs/images/screen-appearance.png" alt="The theme picker: each of the six themes as a small sky with its sun, hills and flower, or mushroom" width="250">
 </p>
 
 ### Private by default

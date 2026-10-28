@@ -27,8 +27,11 @@ import kotlin.math.sin
 private const val MAX_FOLD = 1.4f
 private const val TAU = (2 * PI).toFloat()
 
-/** Wingbeats a second while flapping. */
-private const val WINGBEATS_PER_SECOND = 2.8f
+/** Wingbeats a second while flapping, at the slowest; each butterfly beats a little faster (see [wingbeatsPerSecond]). */
+private const val WINGBEATS_PER_SECOND = 1.5f
+
+/** How fast a butterfly started with [seed] beats its wings: 1.5 to 2 a second, so no two keep time. */
+internal fun wingbeatsPerSecond(seed: Float): Float = WINGBEATS_PER_SECOND + 0.5f * hash(seed * 7.1f)
 
 /**
  * How far folded the wings are, 0 (spread flat) to 1 (up over the back), [beat] wingbeats in:
@@ -49,21 +52,54 @@ private fun smoothstep(from: Float, to: Float, x: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
+/** A steady pseudo-random number in 0..1 for [x]. */
+private fun hash(x: Float): Float {
+    val v = sin(x * 127.1f + 311.7f) * 43758.547f
+    return v - floor(v)
+}
+
 /**
- * One butterfly crossing the sky [t] seconds in: bursts of wingbeats, then a glide on open
- * wings. [seed] sets it apart from the others; [lane] is its height as a fraction of the sky.
+ * Smooth noise, -1..1: a random value at each whole [x], eased from one to the next. Unlike a
+ * sum of waves it never quite repeats, so a butterfly wanders instead of tracing a loop.
  */
+internal fun wander(x: Float): Float {
+    val i = floor(x)
+    val f = x - i
+    val e = f * f * (3f - 2f * f)
+    return (hash(i) * (1f - e) + hash(i + 1f) * e) * 2f - 1f
+}
+
+/** Where a butterfly is (fractions of the sky) and how its wings are held, at a moment. */
+internal class FlightPose(val x: Float, val y: Float, val fold: Float, val hindFold: Float, val gliding: Float, val heading: Float)
+
+/**
+ * A butterfly [t] seconds into its flight. It drifts slowly and unevenly across, wandering up and
+ * down around its [lane], and flaps in short bursts between long glides on open wings; [seed]
+ * gives each its own path, pace and timing, so two never move together.
+ */
+internal fun flightAt(t: Float, seed: Float, lane: Float, speed: Float): FlightPose {
+    val o = seed * 13.7f
+    // Across the sky and back, the pace itself wandering.
+    val along = t * speed + 0.6f * wander(t * 0.11f + o)
+    val x = 0.5f + 0.38f * sin(along + seed) + 0.06f * wander(t * 0.37f + o + 5f)
+    val y = lane + 0.09f * wander(t * 0.23f + o + 11f) + 0.03f * wander(t * 0.9f + o + 17f)
+    // Glides come and go at no fixed beat, and take up more than half the time.
+    val gliding = smoothstep(-0.35f, 0.05f, wander(t * 0.3f + o + 23f))
+    val beat = wingbeatsPerSecond(seed) * t + seed
+    val held = 0.1f + 0.05f * wander(t * 0.8f + o + 29f)
+    val fold = (1f - gliding) * wingbeat(beat) + gliding * held
+    val hindFold = (1f - gliding) * wingbeat(beat - 0.07f) + gliding * held
+    return FlightPose(x, y, fold, hindFold, gliding, heading = cos(along + seed))
+}
+
+/** One butterfly crossing the sky [t] seconds in (see [flightAt]); [length] is a forewing's, in px. */
 internal fun DrawScope.flutter(look: ButterflyLook, t: Float, seed: Float, lane: Float, length: Float, speed: Float) {
-    val path = t * speed + seed
-    val glide = smoothstep(0.55f, 0.85f, 0.5f + 0.5f * sin(t * 0.45f + seed * 3f))
-    val beat = WINGBEATS_PER_SECOND * t + seed
-    val held = 0.12f + 0.06f * sin(t * 2f + seed)
-    val fold = (1f - glide) * wingbeat(beat) + glide * held
-    val hindFold = (1f - glide) * wingbeat(beat - 0.07f) + glide * held
-    val x = size.width * (0.5f + 0.4f * sin(path))
+    val pose = flightAt(t, seed, lane, speed)
     // Each downstroke lifts it a little; gliding, it sinks.
-    val y = size.height * (lane + 0.1f * sin(path * 2.3f + seed)) - (1f - glide) * (1f - fold) * 2.5.dp.toPx() + glide * 2.dp.toPx()
-    butterfly(look, Offset(x, y), length, fold, hindFold, tilt = 22f * cos(path), sway = 0.04f * sin(beat * TAU))
+    val lift = -(1f - pose.gliding) * (1f - pose.fold) * 1.5.dp.toPx() + pose.gliding * 1.5.dp.toPx()
+    val beat = wingbeatsPerSecond(seed) * t + seed
+    butterfly(look, Offset(size.width * pose.x, size.height * pose.y + lift), length, pose.fold, pose.hindFold,
+        tilt = 18f * pose.heading, sway = 0.03f * sin(beat * TAU))
 }
 
 /** One side's wing outline, in forewing lengths with the body at the origin, and where its veins and edge dots go. */

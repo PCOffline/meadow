@@ -12,7 +12,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.ui.components.butterfly
+import dev.pcoffline.meadow.ui.components.flightAt
 import dev.pcoffline.meadow.ui.components.wingbeat
+import dev.pcoffline.meadow.ui.components.wingbeatsPerSecond
 import dev.pcoffline.meadow.ui.theme.ButterflyLook
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.butterfliesFor
@@ -76,5 +78,58 @@ class ButterflyDrawingTest {
         // Raised past halfway through the beat: the downstroke is the shorter half.
         assertTrue("top at $top", top > 50)
         assertEquals(1f, samples.max(), 0.01f)
+    }
+
+    /** Ten minutes of the sky's two butterflies, sampled 30 times a second. */
+    private val flight = (0 until 30 * 600).map { it / 30f }.let { times ->
+        times.map { flightAt(it, seed = 2.1f, lane = 0.38f, speed = 0.11f) } to times.map { flightAt(it, seed = 0.4f, lane = 0.52f, speed = 0.14f) }
+    }
+
+    private fun correlation(a: List<Float>, b: List<Float>): Float {
+        val ma = a.average()
+        val mb = b.average()
+        val cov = a.indices.sumOf { (a[it] - ma) * (b[it] - mb) }
+        val va = a.sumOf { (it - ma) * (it - ma) }
+        val vb = b.sumOf { (it - mb) * (it - mb) }
+        return (cov / kotlin.math.sqrt(va * vb)).toFloat()
+    }
+
+    @Test
+    fun `butterflies beat their wings calmly, under twice a second, each at its own pace`() {
+        val paces = listOf(0f, 0.4f, 2.1f, 5f).map(::wingbeatsPerSecond)
+        assertTrue("$paces", paces.all { it in 1.4f..2f })
+        assertEquals(paces.size, paces.distinct().size)
+        flight.toList().forEach { poses ->
+            // Each time the wings come up past halfway is one beat.
+            val beats = poses.zipWithNext().count { (a, b) -> a.fold < 0.6f && b.fold >= 0.6f }
+            assertTrue("$beats beats in ten minutes", beats < 2 * 600)
+        }
+    }
+
+    @Test
+    fun `butterflies glide on open wings for much of the time`() {
+        flight.toList().forEach { poses ->
+            val gliding = poses.count { it.gliding > 0.5f } / poses.size.toFloat()
+            assertTrue("gliding $gliding of the time", gliding in 0.4f..0.85f)
+        }
+    }
+
+    @Test
+    fun `the two butterflies never keep step`() {
+        val (one, two) = flight
+        assertTrue(kotlin.math.abs(correlation(one.map { it.x }, two.map { it.x })) < 0.4f)
+        assertTrue(kotlin.math.abs(correlation(one.map { it.y }, two.map { it.y })) < 0.4f)
+        assertTrue(kotlin.math.abs(correlation(one.map { it.fold }, two.map { it.fold })) < 0.4f)
+        assertTrue(kotlin.math.abs(correlation(one.map { it.gliding }, two.map { it.gliding })) < 0.4f)
+    }
+
+    @Test
+    fun `a butterfly wanders instead of tracing the same loop`() {
+        val (one, _) = flight
+        // Its height a minute apart, over and over, isn't the same path again.
+        val minute = 30 * 60
+        val ys = one.map { it.y }
+        assertTrue(kotlin.math.abs(correlation(ys.dropLast(minute), ys.drop(minute))) < 0.5f)
+        assertTrue(one.all { it.x in 0f..1f && it.y in 0.2f..0.7f })
     }
 }

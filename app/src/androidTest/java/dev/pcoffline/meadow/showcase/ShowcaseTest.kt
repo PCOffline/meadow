@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.stats.StatsContent
+import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
@@ -172,6 +174,12 @@ class ShowcaseTest {
             look = it
             capture("theme-${it.first.key}")
         }
+    }
+
+    @Test
+    fun appearance() {
+        show { Box(Modifier.statusBarsPadding().padding(16.dp)) { AppearanceCard() } }
+        capture("appearance")
     }
 
     @Test
