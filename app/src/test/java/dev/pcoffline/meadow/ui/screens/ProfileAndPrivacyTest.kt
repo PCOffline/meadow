@@ -97,7 +97,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
     fun `the weather in the sky is off until turned on, and shows off again without the location permission`() {
         AppGraph.store.setWeatherOn(false)
         shadowOf(app).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
-        show { AppearanceCard() }
+        showScrolling { AppearanceCard() }
         val weather = compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true))
         weather.performScrollTo().assertIsOff()
         weather.performClick().assertIsOn()
@@ -112,7 +112,7 @@ class ProfileAndPrivacyTest : ScreenTest() {
         shadowOf(app).denyPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
         AppGraph.store.setWeatherOn(true)
         try {
-            show { AppearanceCard() }
+            showScrolling { AppearanceCard() }
             compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true)).performScrollTo().assertIsOff()
         } finally {
             AppGraph.store.setWeatherOn(false)
