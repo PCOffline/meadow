@@ -1,12 +1,15 @@
 package dev.pcoffline.meadow
 
 import androidx.compose.ui.semantics.Role
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
 import android.app.Application
 import android.app.UiAutomation
 import android.content.Intent
+import android.graphics.Rect
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
@@ -354,12 +357,36 @@ abstract class EndToEndTest {
         if (opens()) return
         val tappable = tappables()
         node(id).performSemanticsAction(SemanticsActions.OnClick)
-        val windows = shell("dumpsys window windows").lines()
-            .filter { "Window #" in it || "mCurrentFocus" in it }.joinToString(" ") { it.trim() }
+        val windows = windowsOnScreen()
         throw AssertionError(
             if (opens()) "A tap on ${text(id)} never reached it, but its click opened the dialog. Tappable: $tappable Windows: $windows"
             else "${text(id)} opened no dialog, tapped or clicked. Tappable: $tappable Windows: $windows",
         )
+    }
+
+    /**
+     * The windows on screen, top first: what each is, where, and which takes keys; then whether
+     * the keyboard is up. For when a tap seems to land on something else.
+     */
+    protected fun windowsOnScreen(): String {
+        val listed = runCatching {
+            val automation = InstrumentationRegistry.getInstrumentation().getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+            automation.serviceInfo = automation.serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS }
+            automation.windows.sortedByDescending { it.layer }.joinToString(" | ") { window ->
+                val kind = when (window.type) {
+                    AccessibilityWindowInfo.TYPE_APPLICATION -> "app"
+                    AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "keyboard"
+                    AccessibilityWindowInfo.TYPE_SYSTEM -> "system"
+                    AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY -> "overlay"
+                    else -> "type ${window.type}"
+                }
+                val bounds = Rect().also { window.getBoundsInScreen(it) }
+                "$kind ${window.title}@${bounds.toShortString()}${if (window.isFocused) " (focused)" else ""}"
+            }
+        }.getOrElse { "(couldn't list them: $it)" }
+        val keyboard = shell("dumpsys input_method").lines()
+            .filter { "mInputShown" in it || "mImeWindowVis" in it }.joinToString(" ") { it.trim() }
+        return "$listed. Keyboard: $keyboard"
     }
 
     /** From [name]'s garden, back to their chat (where the garden opened from) and into the garden again. */
