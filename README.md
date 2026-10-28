@@ -48,7 +48,7 @@ soon as any is used up. Pick times on a clock, and set several days at once.
 
 ### Websites too
 Type a website's address to limit it like an app: youtube.com covers every part of it, in Chrome,
-Firefox, Edge, Samsung Internet, Brave, Opera, Vivaldi and DuckDuckGo. Only the sites you add are
+Firefox, Edge, Samsung Internet, Brave, Opera, Vivaldi, Kiwi and DuckDuckGo. Only the sites you add are
 looked for, and no history is kept.
 
 ### Friends who have your back

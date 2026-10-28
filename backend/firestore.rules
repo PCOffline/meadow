@@ -34,8 +34,15 @@ service cloud.firestore {
     }
     function isString(v, max) { return v is string && v.size() <= max; }
 
+    // An app's package name, or "site:" and a website's domain in lower case ASCII, as the
+    // backend's schemas take them: what Bumblebees' phones read is never anything else.
+    function validLimitId(pkg) {
+      return pkg.size() <= 200
+        && pkg.matches('^([A-Za-z0-9_]+([.][A-Za-z0-9_]+)*|site:[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+)$');
+    }
+
     function validLimit(d, pkg) {
-      return d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'dayMinutes', 'caps', 'createdAt', 'updatedAt'])
+      return validLimitId(pkg) && d.keys().hasOnly(['packageName', 'appName', 'dailyMinutes', 'weeklyMinutes', 'schedule', 'dayMinutes', 'caps', 'createdAt', 'updatedAt'])
         && d.packageName == pkg
         && isString(d.appName, 100)
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440

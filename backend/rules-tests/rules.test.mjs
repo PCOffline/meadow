@@ -242,6 +242,16 @@ describe("limits", () => {
     await assertFails(setDoc(doc(as("bee"), "users/sam/limits/com.tok"), { ...limit(15), packageName: "com.tok" }));
   });
 
+  test("a limit is filed under an app's package or a website's domain, nothing else", async () => {
+    await seed();
+    for (const ok of ["site:youtube.com", "site:m.youtube.com", "site:xn--bcher-kva.de"]) {
+      await assertSucceeds(setDoc(doc(as("sam"), `users/sam/limits/${ok}`), { ...limit(15), packageName: ok }));
+    }
+    for (const bad of ["site:YouTube.com", "site:youtube", "site:-x.com", "site:you tube.com", "site:a..com", "web:youtube.com", "Maps app", `com.${"a".repeat(200)}`]) {
+      await assertFails(setDoc(doc(as("sam"), `users/sam/limits/${bad}`), { ...limit(15), packageName: bad }));
+    }
+  });
+
   test("allowed hours can be set on a new limit, but with Bumblebees only change through the backend", async () => {
     await seed();
     const evenings = { 1: [{ from: 600, to: 1320 }] };
