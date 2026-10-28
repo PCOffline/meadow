@@ -19,6 +19,8 @@ Every commit follows [Conventional Commits](https://www.conventionalcommits.org/
 
 One branch, one task. A branch changes only what its task needs, plus the tests for it.
 
+- Open its pull request as soon as the branch is pushed, so CI and review follow it from the start.
+
 - No drive-by refactors, renames, formatting or dependency bumps. Put them on their own branch.
 - Something unrelated that needs fixing gets its own branch and pull request.
 - Keep the diff as small as the task allows.
