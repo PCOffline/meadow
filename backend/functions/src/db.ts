@@ -20,6 +20,8 @@ export const heartbeats = () => db().collection("heartbeats");
 export const removals = () => db().collection("removals");
 /** Server-only: per-person counters behind the rate limits. */
 export const rateLimits = () => db().collection("rateLimits");
+/** Server-only: chat pictures uploaded but not yet known to be sent, for [sweepUnsentPictures]. */
+export const chatUploads = () => db().collection("chatUploads");
 /**
  * Owner-only document: who looks after whom, the phones to push to, strict mode, emergency state and
  * other settings. Nothing in it is ever shown to anyone else.

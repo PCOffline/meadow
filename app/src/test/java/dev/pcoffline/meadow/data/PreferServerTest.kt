@@ -54,6 +54,18 @@ class PreferServerTest {
     }
 
     @Test
+    fun `a server that only confirms the cached copy lets it show as soon as it answers`() = runTest {
+        // What a listener with metadata changes hears when nothing changed meanwhile.
+        val shown = mutableListOf<Long>()
+        val got = listener(0L to Snap("waiting", cached = true), 150L to Snap("waiting", cached = false))
+            .preferServer({ it.cached }, online = { true }, waitMs = 2_000L)
+            .onEach { shown += currentTime }
+            .toList()
+        assertEquals(listOf("waiting"), got.map { it.value })
+        assertEquals(listOf(150L), shown)
+    }
+
+    @Test
     fun `the server's copies show as they come`() = runTest {
         val got = listener(0L to Snap("one", cached = false), 10L to Snap("two", cached = false))
             .preferServer({ it.cached }, online = { true })
