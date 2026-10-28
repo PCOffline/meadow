@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.map
 fun pendingRequestFor(packageName: String): Flow<LimitRequest?> =
     AppGraph.sync.profile.flatMapLatest { state ->
         val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
-        AppGraph.requests.outgoing(uid).map { requests -> requests.firstOrNull { it.waitsAbout(packageName) } }
+        AppGraph.requests.outgoing(uid, fresh = true).map { requests -> requests.firstOrNull { it.waitsAbout(packageName) } }
     }
 
 /** Still waiting for an answer about [packageName]; past its time it has expired, settled or not. */

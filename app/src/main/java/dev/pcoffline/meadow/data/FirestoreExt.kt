@@ -7,9 +7,11 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -46,6 +48,24 @@ fun <T> Flow<T>.retryWithBackoff(onFailure: suspend (cause: Throwable, waitMs: L
         delay(waitMs)
         true
     }
+
+/**
+ * Holds back what [fromCache] says came from this phone's cache while [online], for up to
+ * [waitMs], so a screen opened after a change made elsewhere (a Bumblebee answering) doesn't act
+ * on the old copy first. The server's copy, arriving meanwhile, replaces it; offline, or with a
+ * server slow to answer, the cached copy is what there is.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+fun <T> Flow<T>.preferServer(
+    fromCache: (T) -> Boolean,
+    online: () -> Boolean = { Connectivity.online.value },
+    waitMs: Long = SERVER_WAIT_MS,
+): Flow<T> = transformLatest {
+    if (fromCache(it) && online()) delay(waitMs)
+    emit(it)
+}
+
+const val SERVER_WAIT_MS = 2_000L
 
 /** The pause before listening again after failure number [attempt] (counted from 0). */
 fun backoffMs(attempt: Long): Long = minOf(MAX_BACKOFF_MS, 1_000L shl attempt.coerceIn(0L, 6L).toInt())
