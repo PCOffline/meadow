@@ -89,7 +89,7 @@ class WeekLimitsJourneyTest : EndToEndTest() {
             day("Sunday").performScrollTo().performClick()
             compose.onNode(hasText(text(R.string.limit_editor_days_no_limit))).performScrollTo().performClick()
             waitFor(R.string.limit_editor_loosens_title)
-            node(R.string.limit_editor_ask).performScrollTo().performClick()
+            tapWhenEnabled(R.string.limit_editor_ask)
             waitFor(R.string.limit_editor_requested)
             var request = ""
             eventually("a request in Sam's inbox") { samsInbox(sam).firstOrNull()?.also { request = it } != null }

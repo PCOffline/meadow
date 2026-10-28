@@ -45,7 +45,7 @@ class EnforcementJourneyTest : EndToEndTest() {
         shell("dumpsys activity activities").lines().firstOrNull { "topResumedActivity" in it || "mResumedActivity" in it }.orEmpty()
 
     /** The window keys go to, as the system lists it. */
-    private fun focused(): String = shell("dumpsys window windows").lines().firstOrNull { "mCurrentFocus" in it }.orEmpty()
+    private fun focused(): String = shell("dumpsys window displays").lines().filter { "mCurrentFocus" in it || "mFocusedApp" in it }.joinToString(" ").trim()
 
     private fun openMeadowsAppInfo() = app.startActivity(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -73,7 +73,7 @@ class EnforcementJourneyTest : EndToEndTest() {
             // A key goes to the window with focus, which the cover only takes once it's drawn.
             val end = System.currentTimeMillis() + 20_000
             var focus = focused()
-            while ("BlockActivity" !in focus) {
+            while ("mCurrentFocus" !in focus || "BlockActivity" !in focus.substringAfter("mCurrentFocus")) {
                 if (System.currentTimeMillis() > end) throw AssertionError("The cover never took keys; focused: $focus")
                 Thread.sleep(250)
                 focus = focused()

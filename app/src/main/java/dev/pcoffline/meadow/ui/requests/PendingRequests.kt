@@ -8,6 +8,7 @@ import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -17,8 +18,9 @@ import kotlinx.coroutines.flow.map
  * app at a time, so screens that ask say so up front instead of failing after sending.
  */
 fun pendingRequestFor(packageName: String): Flow<LimitRequest?> =
-    AppGraph.sync.profile.flatMapLatest { state ->
-        val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
+    // Listened to again only when the account changes, not on every change to the profile.
+    AppGraph.sync.profile.map { (it as? ProfileState.Ready)?.profile?.uid }.distinctUntilChanged().flatMapLatest { uid ->
+        if (uid == null) return@flatMapLatest flowOf(null)
         AppGraph.requests.outgoing(uid, fresh = true).map { requests -> requests.firstOrNull { it.waitsAbout(packageName) } }
     }
 

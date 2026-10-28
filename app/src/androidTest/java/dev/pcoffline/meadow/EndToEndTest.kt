@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -128,7 +129,10 @@ abstract class EndToEndTest {
                     node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() + node.children.flatMap(::words)
             fun walk(node: SemanticsNode): List<String> =
                 listOfNotNull(
-                    node.takeIf { SemanticsActions.OnClick in it.config }?.let { "${words(it).joinToString("/")}@${it.boundsInRoot}" },
+                    node.takeIf { SemanticsActions.OnClick in it.config }?.let {
+                        val off = if (SemanticsProperties.Disabled in it.config) " (off)" else ""
+                        "${words(it).joinToString("/")}$off@${it.boundsInRoot}"
+                    },
                 ) + node.children.flatMap(::walk)
             walk(root)
         }.joinToString(" | ").take(3000)
@@ -146,7 +150,11 @@ abstract class EndToEndTest {
      */
     protected fun typeIntoDialog(field: SemanticsMatcher, value: String) {
         val inDialog = field and hasAnyAncestor(isDialog())
-        eventually("the dialog's field") { compose.onAllNodes(inDialog).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            eventually("the dialog's field") { compose.onAllNodes(inDialog).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: AssertionError) {
+            throw AssertionError("${e.message} Tappable: ${tappables()}", e)
+        }
         compose.onNode(inDialog).performTextInput(value)
         compose.waitForIdle()
     }
@@ -325,6 +333,12 @@ abstract class EndToEndTest {
     protected fun openGardenOf(name: String) {
         openChatWith(name)
         compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
+    }
+
+    /** Taps the button [id] once it takes taps: asking, for one, waits to know no other question is open. */
+    protected fun tapWhenEnabled(@StringRes id: Int) {
+        eventually("${text(id)} enabled") { runCatching { node(id).assertIsEnabled() }.isSuccess }
+        node(id).performScrollTo().performClick()
     }
 
     /** From [name]'s garden, back to their chat (where the garden opened from) and into the garden again. */
