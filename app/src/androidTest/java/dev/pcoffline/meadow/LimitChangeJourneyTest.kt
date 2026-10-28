@@ -1,6 +1,5 @@
 package dev.pcoffline.meadow
 
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -72,7 +71,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             compose.onNode(hasText(app.resources.minutesText(60)) and hasClickAction()).performScrollTo().performClick()
             waitFor(R.string.limit_editor_loosens_title)
             typeInto(hasSetTextAction() and hasText(text(R.string.limit_editor_note)), "Visiting Grandma")
-            node(R.string.limit_editor_ask).performScrollTo().performClick()
+            tapWhenEnabled(R.string.limit_editor_ask)
             waitFor(R.string.limit_editor_requested)
             val first = nextRequest(sam, emptySet())
             val asked = backendDoc("requests/$first")!!
@@ -92,7 +91,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
 
             // Asked again, Sam says yes: the new limit reaches the backend and this phone.
             compose.onNode(hasText(app.resources.minutesText(60)) and hasClickAction()).performScrollTo().performClick()
-            node(R.string.limit_editor_ask).performScrollTo().performClick()
+            tapWhenEnabled(R.string.limit_editor_ask)
             waitFor(R.string.limit_editor_requested)
             val second = nextRequest(sam, setOf(first))
             sam.call("decideRequest", mapOf("requestId" to second, "approve" to true))
@@ -106,9 +105,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             // Asking to remove it: Sam says not today, with a word why, and it stays.
             tab(R.string.tab_garden).performClick()
             openTheLimit()
-            // Answered, the question no longer holds asking again back.
-            eventually("asking to remove allowed") { runCatching { node(R.string.limit_editor_ask_remove).assertIsEnabled() }.isSuccess }
-            node(R.string.limit_editor_ask_remove).performScrollTo().performClick()
+            tapWhenEnabled(R.string.limit_editor_ask_remove)
             typeIntoDialog(hasSetTextAction(), "I've got it under control")
             inDialog(text(R.string.limit_remove_ask)).performClick()
             waitFor(R.string.limit_editor_requested)
