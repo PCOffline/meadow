@@ -44,6 +44,9 @@ class EnforcementJourneyTest : EndToEndTest() {
     private fun onTop(): String =
         shell("dumpsys activity activities").lines().firstOrNull { "topResumedActivity" in it || "mResumedActivity" in it }.orEmpty()
 
+    /** The window keys go to, as the system lists it. */
+    private fun focused(): String = shell("dumpsys window").lines().firstOrNull { "mCurrentFocus" in it }.orEmpty()
+
     private fun openMeadowsAppInfo() = app.startActivity(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )
@@ -67,6 +70,8 @@ class EnforcementJourneyTest : EndToEndTest() {
             // Back does the same: home, not back into the app it covers.
             openPebbles()
             eventually("Pebbles covered again") { "BlockActivity" in onTop() }
+            // A key goes to the window with focus, which the cover only takes once it's drawn.
+            eventually("the cover taking keys") { "BlockActivity" in focused() }
             shell("input keyevent KEYCODE_BACK")
             eventually("home after back") { onTop().let { "BlockActivity" !in it && "PebblesActivity" !in it && it.isNotEmpty() } }
         }

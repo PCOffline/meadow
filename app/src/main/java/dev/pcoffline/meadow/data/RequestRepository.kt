@@ -27,12 +27,17 @@ class RequestRepository(
             .observe()
             .map { snapshot -> snapshot.documents.map { it.toRequest() } }
 
-    /** Requests I sent. */
-    fun outgoing(uid: String): Flow<List<LimitRequest>> =
+    /**
+     * Requests I sent. [fresh] waits a moment for the server's copy rather than show the cached
+     * one first, for screens that decide from whether one is still waiting: it may well have been
+     * answered while nothing here was listening.
+     */
+    fun outgoing(uid: String, fresh: Boolean = false): Flow<List<LimitRequest>> =
         requests.whereEqualTo("requesterId", uid)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(100)
             .observe()
+            .let { if (fresh) it.preferServer({ snapshot -> snapshot.metadata.isFromCache }) else it }
             .map { snapshot -> snapshot.documents.map { it.toRequest() } }
 
     /** One of my own requests. */

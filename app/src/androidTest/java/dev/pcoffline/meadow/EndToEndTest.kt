@@ -67,8 +67,12 @@ abstract class EndToEndTest {
     protected fun node(@StringRes id: Int): SemanticsNodeInteraction = compose.onNodeWithText(text(id))
 
     /** A tab in the bar at the bottom: a screen's title can read the same ("People"). */
-    protected fun tab(@StringRes id: Int): SemanticsNodeInteraction =
-        compose.onNode(hasText(text(id)) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
+    /** The tab named [id], once the tab bar shows it (saying what showed instead if it never does). */
+    protected fun tab(@StringRes id: Int): SemanticsNodeInteraction {
+        val matcher = hasText(text(id)) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
+        eventually("the ${text(id)} tab") { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        return compose.onNode(matcher)
+    }
     protected fun inDialog(value: String, substring: Boolean = false): SemanticsNodeInteraction =
         compose.onNode(hasText(value, substring) and hasAnyAncestor(isDialog()))
 
