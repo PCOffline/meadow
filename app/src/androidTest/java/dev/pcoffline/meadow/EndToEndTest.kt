@@ -31,6 +31,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -339,6 +340,26 @@ abstract class EndToEndTest {
     protected fun tapWhenEnabled(@StringRes id: Int) {
         eventually("${text(id)} enabled") { runCatching { node(id).assertIsEnabled() }.isSuccess }
         node(id).performScrollTo().performClick()
+    }
+
+    /**
+     * Taps [id] for the dialog it opens. If none opens, its click is run without a touch, to tell
+     * a tap that never reached the button from a click that opened nothing.
+     */
+    protected fun tapForDialog(@StringRes id: Int) {
+        tapWhenEnabled(id)
+        fun opens() = runCatching {
+            compose.waitUntil(10_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty() }
+        }.isSuccess
+        if (opens()) return
+        val tappable = tappables()
+        node(id).performSemanticsAction(SemanticsActions.OnClick)
+        val windows = shell("dumpsys window windows").lines()
+            .filter { "Window #" in it || "mCurrentFocus" in it }.joinToString(" ") { it.trim() }
+        throw AssertionError(
+            if (opens()) "A tap on ${text(id)} never reached it, but its click opened the dialog. Tappable: $tappable Windows: $windows"
+            else "${text(id)} opened no dialog, tapped or clicked. Tappable: $tappable Windows: $windows",
+        )
     }
 
     /** From [name]'s garden, back to their chat (where the garden opened from) and into the garden again. */

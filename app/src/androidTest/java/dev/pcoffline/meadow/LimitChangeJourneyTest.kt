@@ -105,7 +105,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             // Asking to remove it: Sam says not today, with a word why, and it stays.
             tab(R.string.tab_garden).performClick()
             openTheLimit()
-            tapWhenEnabled(R.string.limit_editor_ask_remove)
+            tapForDialog(R.string.limit_editor_ask_remove)
             typeIntoDialog(hasSetTextAction(), "I've got it under control")
             inDialog(text(R.string.limit_remove_ask)).performClick()
             waitFor(R.string.limit_editor_requested)
