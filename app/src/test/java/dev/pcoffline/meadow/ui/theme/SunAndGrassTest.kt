@@ -42,8 +42,9 @@ class SunAndGrassTest {
         GardenTheme.entries.forEach { theme ->
             listOf(false, true).forEach { dark ->
                 val garden = gardenColorsFor(theme, dark)
-                assertTrue("$theme sun", apart(hueOf(garden.sun), gold) <= 8.5f)
-                assertTrue("$theme grass", apart(hueOf(garden.grass), green) <= 12.5f)
+                // At most 8 and 12 degrees, give or take a degree of rounding to 8-bit colour.
+                assertTrue("$theme sun: ${hueOf(garden.sun)}", apart(hueOf(garden.sun), gold) <= 9f)
+                assertTrue("$theme grass: ${hueOf(garden.grass)}", apart(hueOf(garden.grass), green) <= 13f)
             }
         }
     }

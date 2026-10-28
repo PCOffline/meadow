@@ -365,7 +365,10 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         onBetter = readable(if (dark) lerp(s.leaf, Color.White, 0.85f) else lerp(s.leaf, Color.Black, 0.7f), listOf(better),
             toward = if (dark) Color.White else Color.Black),
         sun = leanTowards(Sun, s.primary, share = 0.2f, maxDegrees = 8f),
-        grass = leanTowards(Grass, s.primary, share = 0.2f, maxDegrees = 12f).let { if (dark) lerp(it, Color.Black, 0.08f) else it },
+        // By night, a little darker: scaled, not mixed with black, so its hue holds.
+        grass = leanTowards(Grass, s.primary, share = 0.2f, maxDegrees = 12f).let {
+            if (dark) Color(it.red * 0.92f, it.green * 0.92f, it.blue * 0.92f, it.alpha) else it
+        },
         skyTint = s.sky,
     )
 }
