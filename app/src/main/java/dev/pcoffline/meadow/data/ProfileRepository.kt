@@ -2,10 +2,7 @@ package dev.pcoffline.meadow.data
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
 import androidx.core.graphics.scale
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.storage.FirebaseStorage
@@ -150,7 +147,7 @@ class ProfileRepository(
     }
 
     private fun squareJpeg(uri: Uri): ByteArray {
-        val source = decode(uri)
+        val source = Pictures.decode(context, uri, MAX_DECODE)
         val side = minOf(source.width, source.height)
         val cropped = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
         val scaled = cropped.scale(PHOTO_SIZE, PHOTO_SIZE)
@@ -158,24 +155,6 @@ class ProfileRepository(
             scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
             out.toByteArray()
         }
-    }
-
-    private fun decode(uri: Uri): Bitmap {
-        val resolver = context.contentResolver
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            return ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                val longest = maxOf(info.size.width, info.size.height)
-                if (longest > MAX_DECODE) decoder.setTargetSampleSize(longest / MAX_DECODE)
-            }
-        }
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = (maxOf(bounds.outWidth, bounds.outHeight) / MAX_DECODE).coerceAtLeast(1)
-        }
-        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw FriendlyException(dev.pcoffline.meadow.R.string.error_photo)
     }
 
     companion object {

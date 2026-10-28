@@ -33,6 +33,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -102,10 +103,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,7 +129,10 @@ import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import dev.pcoffline.meadow.ui.theme.Garden
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** A chat once loaded; [chat] is null when it's closed (the friendship ended). */
@@ -145,8 +151,26 @@ class ChatViewModel(private val chatId: String, private val myUid: String) : Vie
 
     suspend fun send(text: String) = AppGraph.chats.send(chatId, text)
 
+    private val _uploading = MutableStateFlow(0)
+
+    /** How many pictures are still on their way, so the chat can say so. */
+    val uploading: StateFlow<Int> = _uploading.asStateFlow()
+
+    /** Sends [uris] one after another, in the order they came. */
+    suspend fun sendPictures(uris: List<Uri>) {
+        _uploading.value = uris.size
+        try {
+            for (uri in uris) {
+                sendPicture(uri)
+                _uploading.update { it - 1 }
+            }
+        } finally {
+            _uploading.value = 0
+        }
+    }
+
     /** Shrinks [uri] (a GIF goes as it is), uploads it to this chat's folder, then sends it. */
-    suspend fun sendPicture(uri: Uri) {
+    private suspend fun sendPicture(uri: Uri) {
         val media = AppGraph.chatMedia
         val picture = media.prepare(uri)
         val path = media.upload(myUid, chatId, picture)
@@ -170,13 +194,15 @@ fun ChatScreen(
     val loaded by viewModel.chat.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val invited by viewModel.invited.collectAsStateWithLifecycle()
+    val uploading by viewModel.uploading.collectAsStateWithLifecycle()
     val sending = rememberAction()
     ChatContent(
         profile, loaded?.chat, messages, loading = loaded == null,
         sending = sending.busy,
         error = sending.error,
         onSend = { text, sent -> sending.run(onSuccess = sent) { viewModel.send(text) } },
-        onSendPicture = { uri -> sending.run { viewModel.sendPicture(uri) } },
+        onSendPicture = { uris -> sending.run { viewModel.sendPictures(uris) } },
+        uploading = uploading,
         onSeen = viewModel::markRead,
         onBack = onBack,
         invited = loaded?.chat?.otherId(profile.uid) in invited,
@@ -192,7 +218,8 @@ fun ChatScreen(
  * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
  * message (with whether you asked it); by default it follows the live request. Whichever way
  * round the two aren't yet each other's Bumblebee, [onAskBee] asks (or offers, when true) unless
- * that's already [invited]. [onSendPicture] gets a photo or GIF, picked or from the keyboard;
+ * that's already [invited]. [onSendPicture] gets photos or GIFs, picked or from the keyboard, and
+ * [uploading] says how many are still on their way;
  * [pictureFile] fetches one to show (null once it's gone). Up top, [onOpenGarden] opens the garden
  * of someone I look after, and a Bumblebee of mine can be removed (or kept, while leaving).
  */
@@ -210,14 +237,15 @@ fun ChatContent(
     onBack: () -> Unit = {},
     invited: Boolean = false,
     onAskBee: suspend (offer: Boolean) -> Unit = {},
-    onSendPicture: (Uri) -> Unit = {},
+    onSendPicture: (List<Uri>) -> Unit = {},
+    uploading: Int = 0,
     onOpenGarden: (uid: String) -> Unit = {},
     pictureFile: suspend (path: String) -> File? = { AppGraph.chatMedia.file(it) },
     requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
     val draft = rememberTextFieldState()
     val canSend = chat != null && !sending
-    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(onSendPicture) }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { onSendPicture(listOf(it)) } }
     var viewing by remember { mutableStateOf<ViewedPicture?>(null) }
     val listState = rememberLazyListState()
 
@@ -262,6 +290,17 @@ fun ChatContent(
                 }
             }
         }
+        if (uploading > 0) {
+            Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    pluralStringResource(R.plurals.chat_sending_pictures, uploading, uploading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         ErrorNote(error, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp))
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = canSend) {
@@ -273,7 +312,11 @@ fun ChatContent(
                 // GIFs and stickers from the keyboard, and pasted pictures, are sent as pictures.
                 modifier = Modifier.weight(1f).contentReceiver { content ->
                     if (!canSend || !content.hasMediaType(MediaType.Image)) return@contentReceiver content
-                    content.consume { item -> item.uri?.also(onSendPicture) != null }
+                    // Several at once (pasted together) all go, in order.
+                    val uris = ArrayList<Uri>()
+                    val rest = content.consume { item -> item.uri?.also { uris += it } != null }
+                    if (uris.isNotEmpty()) onSendPicture(uris)
+                    rest
                 },
                 shape = RoundedCornerShape(24.dp),
                 lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 4),
@@ -386,9 +429,13 @@ private fun PictureViewer(picture: ViewedPicture, onDismiss: () -> Unit) {
     val reduced = rememberReducedMotion()
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var size by remember { mutableStateOf(IntSize.Zero) }
     val zoom = rememberTransformableState { change, pan, _ ->
         scale = (scale * change).coerceIn(1f, 5f)
-        offset = if (scale == 1f) Offset.Zero else offset + pan
+        // Panned only as far as the zoomed picture reaches, so it can't be lost off screen.
+        val reach = Offset(size.width * (scale - 1f) / 2f, size.height * (scale - 1f) / 2f)
+        val moved = offset + pan
+        offset = Offset(moved.x.coerceIn(-reach.x, reach.x), moved.y.coerceIn(-reach.y, reach.y))
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -397,6 +444,7 @@ private fun PictureViewer(picture: ViewedPicture, onDismiss: () -> Unit) {
                 contentDescription = picture.description,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
+                    .onSizeChanged { size = it }
                     .pointerInput(Unit) {
                         detectTapGestures(onDoubleTap = {
                             scale = 1f

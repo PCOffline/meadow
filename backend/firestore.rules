@@ -41,10 +41,37 @@ service cloud.firestore {
         && d.dailyMinutes is int && d.dailyMinutes >= 0 && d.dailyMinutes <= 1440
         && d.weeklyMinutes is int && d.weeklyMinutes >= 0 && d.weeklyMinutes <= 10080
         && (!('schedule' in d) || d.schedule == null || validSchedule(d.schedule))
-        && (!('dayMinutes' in d) || d.dayMinutes == null || (d.dayMinutes is map && d.dayMinutes.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7'])))
-        && (!('caps' in d) || d.caps == null || (d.caps is list && d.caps.size() <= 6))
+        && (!('dayMinutes' in d) || d.dayMinutes == null || validDayMinutes(d.dayMinutes))
+        && (!('caps' in d) || d.caps == null || validCaps(d.caps))
         && (d.dailyMinutes > 0 || d.weeklyMinutes > 0 || d.get('schedule', null) != null
             || d.get('dayMinutes', null) != null || d.get('caps', null) != null);
+    }
+
+    // A day's own daily limit ("6": 120 is two hours on Saturdays); 0 is none that day.
+    function dayLimitOk(m, day) {
+      return !(day in m) || (m[day] is int && m[day] >= 0 && m[day] <= 1440);
+    }
+
+    function validDayMinutes(m) {
+      return m is map && m.keys().hasOnly(['1', '2', '3', '4', '5', '6', '7'])
+        && dayLimitOk(m, '1') && dayLimitOk(m, '2') && dayLimitOk(m, '3') && dayLimitOk(m, '4')
+        && dayLimitOk(m, '5') && dayLimitOk(m, '6') && dayLimitOk(m, '7');
+    }
+
+    // Up to [minutes] between [from] and [to] on [days] (1 = Monday), as the app's TimeCap.
+    function validCap(c) {
+      return c is map && c.keys().hasOnly(['days', 'from', 'to', 'minutes'])
+        && c.days is list && c.days.size() >= 1 && c.days.size() <= 7 && c.days.hasOnly([1, 2, 3, 4, 5, 6, 7])
+        && c.from is int && c.to is int && c.minutes is int
+        && c.from >= 0 && c.from < c.to && c.to <= 1440
+        && c.minutes >= 1 && c.minutes < c.to - c.from;
+    }
+
+    // At most six, each a cap (rules can't loop, so each place is checked on its own).
+    function validCaps(l) {
+      return l is list && l.size() <= 6
+        && (l.size() < 1 || validCap(l[0])) && (l.size() < 2 || validCap(l[1])) && (l.size() < 3 || validCap(l[2]))
+        && (l.size() < 4 || validCap(l[3])) && (l.size() < 5 || validCap(l[4])) && (l.size() < 6 || validCap(l[5]));
     }
 
     // Allowed hours per weekday ("1" = Monday). The windows themselves are checked when they

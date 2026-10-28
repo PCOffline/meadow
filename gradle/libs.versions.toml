@@ -18,6 +18,7 @@ junit = "4.13.2"
 coil = "3.6.3"
 # The bundled Noto emoji font, so emoji look the same on every phone.
 emoji2 = "1.5.0"
+exifinterface = "1.3.7"
 robolectric = "4.17"
 markdownRenderer = "0.46.0"
 jetbrainsMarkdown = "0.7.18"
@@ -29,6 +30,7 @@ espresso = "3.7.0"
 
 [libraries]
 androidx-emoji2-bundled = { group = "androidx.emoji2", name = "emoji2-bundled", version.ref = "emoji2" }
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 # core-ktx is empty since 1.19; its extensions are part of core.
 androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

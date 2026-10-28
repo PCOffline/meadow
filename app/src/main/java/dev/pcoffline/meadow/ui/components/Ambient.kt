@@ -333,8 +333,10 @@ private fun DrawScope.rain(t: Float, night: Boolean, heavy: Boolean) {
     val color = if (night) Color(0xFFB7C4D6).copy(alpha = 0.35f) else Color(0xFF7E93A8).copy(alpha = 0.4f)
     val length = 10.dp.toPx()
     val slant = 2.5.dp.toPx()
-    val drops = if (heavy) rainDrops else rainDrops.take(30)
-    drops.forEachIndexed { i, p ->
+    // Drawn every frame, so nothing here allocates.
+    val count = if (heavy) rainDrops.size else 30
+    for (i in 0 until count) {
+        val p = rainDrops[i]
         val fall = ((p.y + t * (0.85f + (i % 3) * 0.1f)) % 1f) * (size.height + length) - length
         val x = p.x * size.width - fall * 0.06f
         drawLine(color, Offset(x, fall), Offset(x - slant, fall + length), strokeWidth = 1.2.dp.toPx(), cap = StrokeCap.Round)
@@ -350,11 +352,14 @@ private fun DrawScope.snow(t: Float) {
     }
 }
 
+/** Each mist band's height (of the sky) and starting offset (of the width). */
+private val FOG_BANDS = listOf(0.3f to 0f, 0.48f to 0.4f, 0.66f to 0.75f)
+
 /** Pale bands of mist drifting slowly across. */
 private fun DrawScope.fog(t: Float, night: Boolean) {
     val color = if (night) Color(0xFF8A93A6).copy(alpha = 0.16f) else Color.White.copy(alpha = 0.38f)
     val band = 20.dp.toPx()
-    listOf(0.3f to 0f, 0.48f to 0.4f, 0.66f to 0.75f).forEachIndexed { i, (height, offset) ->
+    FOG_BANDS.forEachIndexed { i, (height, offset) ->
         val x = ((t * (4f + i * 2f) + size.width * offset) % (size.width * 1.6f)) - size.width * 0.8f
         drawRoundRect(
             color,
