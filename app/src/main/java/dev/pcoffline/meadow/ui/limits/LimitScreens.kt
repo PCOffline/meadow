@@ -94,14 +94,13 @@ import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.ui.limitText
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeWindow
-import dev.pcoffline.meadow.ui.components.shareText
+import dev.pcoffline.meadow.ui.components.ShareCommitment
 import dev.pcoffline.meadow.ui.requests.BeePicks
 import dev.pcoffline.meadow.ui.requests.BumblebeePicker
 import dev.pcoffline.meadow.ui.requests.pendingRequestFor
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
 import dev.pcoffline.meadow.ui.requestSummary
 import dev.pcoffline.meadow.ui.ActionState
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -286,7 +285,6 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
     val updated = stringResource(R.string.limit_editor_updated)
     val requested = stringResource(R.string.limit_editor_requested)
     val shareLabel = stringResource(R.string.share_title)
-    val context = LocalContext.current
     val res = LocalResources.current
     val removed = stringResource(R.string.limit_editor_removed)
 
@@ -373,7 +371,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                         celebrate()
                         // A commitment just made is the one most worth telling someone about.
                         val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed))
-                        action.toast(if (existing == null) planted else updated, shareLabel) { context.shareText(shared) }
+                        action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared) }
                     } else {
                         action.toast(requested)
                     }
@@ -402,9 +400,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             }
             // Straight to Android's share sheet: picking where it goes is the only choice to make.
             TextButton(
-                onClick = {
-                    context.shareText(res.getString(R.string.share_limit, existing.appName, res.limitText(existing)))
-                },
+                onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             ) {
                 Text(stringResource(R.string.limit_editor_share))

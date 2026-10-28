@@ -58,5 +58,10 @@
     <string name="settings_sign_out_stay">Stay</string>
 
     <string name="share_title">Share</string>
+    <string name="share_commitment_title">Share this commitment</string>
+    <string name="share_commitment_in_meadow">Send in Meadow</string>
+    <string name="share_commitment_send_to">Send to %1$s</string>
+    <string name="share_commitment_sent">Sent to %1$s 💌</string>
+    <string name="share_commitment_other_apps">Other apps</string>
     <string name="share_limit">I\'ve committed to %2$s on %1$s with Meadow 🌼</string>
 </resources>

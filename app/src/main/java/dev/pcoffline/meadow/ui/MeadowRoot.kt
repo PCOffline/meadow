@@ -70,6 +70,7 @@ import dev.pcoffline.meadow.ui.chat.ChatScreen
 import dev.pcoffline.meadow.ui.circle.AcceptInviteDialog
 import dev.pcoffline.meadow.ui.circle.PeopleScreen
 import dev.pcoffline.meadow.ui.circle.FriendScreen
+import dev.pcoffline.meadow.ui.components.ShareCommitmentHost
 import dev.pcoffline.meadow.ui.components.AccountEntry
 import dev.pcoffline.meadow.ui.components.LocalAccount
 import dev.pcoffline.meadow.ui.components.OfflineBar
@@ -311,6 +312,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
             }
         }
         askFor?.let { AskForTimeDialog(packageName = it, onDismiss = { askFor = null }) }
+        ShareCommitmentHost()
         if (strictGateCovers(destination)) StrictGate(profile.strictMode, onTroubleshoot = { nav.navigate(TroubleshootRoute) })
         if (accountConfirmed && acceptedTerms < LegalDoc.CURRENT_VERSION) {
             TermsUpdateDialog(onAccept = { scope.launch { AppGraph.profiles.acceptTerms(LegalDoc.CURRENT_VERSION) } })

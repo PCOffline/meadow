@@ -84,8 +84,12 @@ class LimitJourneyTest : EndToEndTest() {
             node(R.string.limit_editor_plant).performScrollTo().performClick()
             waitFor(R.string.limit_editor_planted)
             waitForBackend(limit) { it.int("dailyMinutes") == 45 && it.int("weeklyMinutes") == 300 && it.has("schedule") }
-            // A new commitment can be shared straight from the note that says it's planted.
+            // A new commitment can be shared straight from the note that says it's planted. With
+            // nobody in the circle yet, the sheet offers only other apps.
             node(R.string.share_title).performClick()
+            waitFor(R.string.share_commitment_title)
+            node(R.string.share_commitment_in_meadow).assertDoesNotExist()
+            node(R.string.share_commitment_other_apps).performClick()
             val weekly = app.resources.minutesText(300)
             intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString(weekly)))))
             waitForSnackbarToGo(R.string.limit_editor_planted)
@@ -102,6 +106,8 @@ class LimitJourneyTest : EndToEndTest() {
             // Sharing the commitment hands its words to the share sheet.
             compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
             node(R.string.limit_editor_share).performScrollTo().performClick()
+            waitFor(R.string.share_commitment_title)
+            node(R.string.share_commitment_other_apps).performClick()
             // The limit as it is now: the weekly part shared earlier is gone.
             val now = allOf(containsString("on Pebbles with Meadow"), not(containsString(weekly)))
             intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, now))))

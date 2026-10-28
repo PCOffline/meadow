@@ -50,6 +50,7 @@ Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee
 gets a chat with you, and your requests appear in it as cards they can answer with one tap.
 Send photos and GIFs (straight from your keyboard too), and long-press a message to copy it.
+When you plant or change a limit, share it with them in their chat, or through any other app.
 From a chat you can ask them to be your Bumblebee too, or offer to be theirs. When someone stops
 being your Bumblebee, your chat with them closes.
 
