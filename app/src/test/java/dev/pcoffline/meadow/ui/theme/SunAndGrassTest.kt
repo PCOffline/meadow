@@ -1,12 +1,17 @@
 package dev.pcoffline.meadow.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import dev.pcoffline.meadow.ui.components.AfternoonSky
+import dev.pcoffline.meadow.ui.components.tinted
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
 
-/** Every theme keeps the same gold sun and green grass, only their hue leaning a little its way. */
+/**
+ * Every theme keeps the same gold sun and green grass, only their hue leaning a little its way,
+ * and tints its daytime sky without turning it grey.
+ */
 class SunAndGrassTest {
     private fun apart(a: Float, b: Float) = abs((a - b + 540f).mod(360f) - 180f)
 
@@ -50,6 +55,21 @@ class SunAndGrassTest {
             assertTrue(theme.name, garden.petals.none { it == garden.sun })
         }
     }
+
+    private fun saturation(c: Color): Float {
+        val max = maxOf(c.red, c.green, c.blue)
+        val min = minOf(c.red, c.green, c.blue)
+        return if (max == min) 0f else (max - min) / (1f - abs(max + min - 1f))
+    }
+
+    @Test
+    fun `every theme's afternoon sky is a clear pale colour, not grey`() {
+        GardenTheme.entries.forEach { theme ->
+            val sky = tinted(AfternoonSky, gardenColorsFor(theme, dark = false))
+            assertTrue("$theme sky is greyish: $sky", saturation(sky) >= 0.25f)
+            assertTrue("$theme sky is too dark for the ink on it: $sky", lightness(sky) >= 0.8f)
+        }
+    }
 }
 
-private fun hueColor(degrees: Float) = Color.hsl(degrees.mod(360f), 0.8f, 1f)
+private fun hueColor(degrees: Float) = Color.hsl(degrees.mod(360f), 0.8f, 0.6f)

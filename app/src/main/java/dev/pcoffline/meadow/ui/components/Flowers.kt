@@ -207,10 +207,11 @@ fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Colo
 /**
  * Rolling hills with a scatter of tiny flowers (toadstools in the mushroom forest), drawn behind
  * screen headers. Given the [sky] behind them and the [text] drawn over them, the hills are shaded
- * just enough to keep that text readable (4.5:1).
+ * just enough to keep that text readable (4.5:1). [rise] below 1 keeps them lower, that share of
+ * their full height above the bottom.
  */
 @Composable
-fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? = null) {
+fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? = null, rise: Float = 1f) {
     val garden = Garden.colors
     val mushrooms = Garden.theme == GardenTheme.MUSHROOM
     val (backColor, frontColor) = remember(garden, sky, text) {
@@ -228,23 +229,25 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
     Canvas(modifier) {
         val w = size.width
         val h = size.height
+        // From a share of the way down to a height, squeezed towards the bottom by [rise].
+        fun y(share: Float) = h * (1f - (1f - share) * rise)
         val back = Path().apply {
-            moveTo(0f, h * 0.55f)
-            cubicTo(w * 0.25f, h * 0.30f, w * 0.55f, h * 0.70f, w, h * 0.38f)
+            moveTo(0f, y(0.55f))
+            cubicTo(w * 0.25f, y(0.30f), w * 0.55f, y(0.70f), w, y(0.38f))
             lineTo(w, h); lineTo(0f, h); close()
         }
         drawPath(back, backColor)
         val front = Path().apply {
-            moveTo(0f, h * 0.78f)
-            cubicTo(w * 0.3f, h * 0.55f, w * 0.7f, h * 0.95f, w, h * 0.68f)
+            moveTo(0f, y(0.78f))
+            cubicTo(w * 0.3f, y(0.55f), w * 0.7f, y(0.95f), w, y(0.68f))
             lineTo(w, h); lineTo(0f, h); close()
         }
         drawPath(front, frontColor)
         val dots = listOf(0.08f to 0.82f, 0.21f to 0.72f, 0.37f to 0.80f, 0.63f to 0.86f, 0.78f to 0.74f, 0.91f to 0.80f)
         val unit = 1.dp.toPx()
-        dots.forEachIndexed { i, (x, y) ->
+        dots.forEachIndexed { i, (x, down) ->
             val color = garden.petals[i % garden.petals.size]
-            translate(w * x, h * y) {
+            translate(w * x, y(down)) {
                 if (mushrooms) {
                     tinyToadstool(color, unit)
                 } else {

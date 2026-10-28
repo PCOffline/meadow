@@ -9,10 +9,16 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.runtime.CompositionLocalProvider
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.showcase.DemoGarden
+import dev.pcoffline.meadow.ui.components.LocalSkyHour
+import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
@@ -64,5 +70,20 @@ class ThemeLooksTest : ScreenTest() {
             val inCard = shot.count(sun, card.left.toInt(), card.top.toInt(), card.right.toInt(), card.bottom.toInt())
             assertTrue("$theme: $inCard", inCard > 30)
         }
+    }
+
+    @Test
+    fun `the sun sits clear below your picture and Settings`() {
+        show { CompositionLocalProvider(LocalSkyHour provides 14) { GardenContent(DemoGarden.robin, DemoGarden.garden) } }
+        val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
+        val sun = gardenColorsFor(GardenTheme.MEADOW, dark = false).sun
+        val row = listOf(R.string.action_settings, R.string.profile_open).map {
+            compose.onNode(hasContentDescription(text(it))).fetchSemanticsNode().boundsInRoot
+        }
+        val rowBottom = row.maxOf { it.bottom }
+        val sunTop = (0 until shot.height).first { y -> (0 until shot.width).any { x -> shot.count(sun, x, y, x + 1, y + 1) == 1 } }
+        // The sun's rays reach 15dp past its disc; they end above the row's bottom edge, not on it.
+        val clearance = (sunTop - rowBottom) / compose.density.density
+        assertTrue("the sun's disc starts ${clearance}dp below the row", clearance >= 20f)
     }
 }

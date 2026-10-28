@@ -60,6 +60,8 @@ data class GardenColors(
     val sun: Color,
     /** The hills' grass: one fresh green everywhere, leaning a little towards the theme's hue the same way. */
     val grass: Color,
+    /** A pale tint the daytime sky takes on in this theme. */
+    val sky: Color,
 ) {
     val petals: List<Color> get() = listOf(petalPink, petalLavender, petalHoney, petalPeach, petalSky)
 }
@@ -97,6 +99,8 @@ private data class Seed(
     /** Flower colours, the theme's own flower first. */
     val petals: List<Color>,
     val leaf: Color,
+    /** A pale tint for the daytime sky, so it takes on the theme without going grey. */
+    val sky: Color,
 )
 
 // Each page is lightly tinted with its theme's own colour, as cherry blossom's is pink, and its
@@ -106,32 +110,38 @@ private val Seeds = mapOf(
         Color(0xFF4F7F4C), Color(0xFFB4646C), Color(0xFF6B7FB8), Color(0xFFF3F6EA),
         listOf(Color(0xFFEFA3B0), Color(0xFFB9A9E0), Color(0xFFF2C24F), Color(0xFFF5B48A), Color(0xFF93C1E6)),
         Color(0xFF86B56F),
+        Color(0xFFCDE8F2),
     ),
     GardenTheme.BLOSSOM to Seed(
         Color(0xFFB5577A), Color(0xFF7F8F5A), Color(0xFF8E6FB0), Color(0xFFFCEBEE),
         listOf(Color(0xFFF4B6C8), Color(0xFFF9D3DF), Color(0xFFE8A0A6), Color(0xFFD7B6E0), Color(0xFFFFE1A8)),
         Color(0xFF9DB57E),
+        Color(0xFFF0B4C8),
     ),
     GardenTheme.LAVENDER to Seed(
         Color(0xFF6B57A8), Color(0xFFA0607E), Color(0xFF5E8C7A), Color(0xFFF5F2FB),
         listOf(Color(0xFFB7A6E4), Color(0xFFD5C8F2), Color(0xFF9C88D2), Color(0xFFF1B5C8), Color(0xFFF3D98F)),
         Color(0xFF97B39A),
+        Color(0xFFD9CCF2),
     ),
     GardenTheme.SUNFLOWER to Seed(
         Color(0xFF9A6412), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFFF8E8),
         listOf(Color(0xFFF4C13E), Color(0xFFF7D774), Color(0xFFEC9F35), Color(0xFFF0B184), Color(0xFFD98E5F)),
         Color(0xFF92B45E),
+        Color(0xFFFBE3A6),
     ),
     GardenTheme.POND to Seed(
         Color(0xFF2E7A80), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFECF6F4),
         listOf(Color(0xFFF2B2C4), Color(0xFF98CBE0), Color(0xFFB5E0D3), Color(0xFFF0D98A), Color(0xFFC8B8EA)),
         Color(0xFF72B39A),
+        Color(0xFFBFE6E3),
     ),
     GardenTheme.MUSHROOM to Seed(
         // A woodland floor: toadstool red, chanterelle, tan and brown caps, and moss.
         Color(0xFF9B3F2E), Color(0xFF5E7A45), Color(0xFF8A6D4E), Color(0xFFF5F1E8),
         listOf(Color(0xFFD4573F), Color(0xFFE59B52), Color(0xFFBF9670), Color(0xFF9E6B4A), Color(0xFFC7A2D8)),
         Color(0xFF7FA05F),
+        Color(0xFFEEC49A),
     ),
 )
 
@@ -356,6 +366,7 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
             toward = if (dark) Color.White else Color.Black),
         sun = leanTowards(Sun, s.primary, share = 0.2f, maxDegrees = 8f),
         grass = leanTowards(Grass, s.primary, share = 0.2f, maxDegrees = 12f).let { if (dark) lerp(it, Color.Black, 0.08f) else it },
+        sky = s.sky,
     )
 }
 

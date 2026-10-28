@@ -11,8 +11,9 @@ import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -237,20 +238,31 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
     val now = rememberResumedNow()
     val locale = currentLocale()
     val today = remember(now.toLocalDate(), locale) { now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)) }
-    val density = LocalDensity.current
-    var boxHeight by remember { mutableIntStateOf(0) }
-    var rowHeight by remember { mutableIntStateOf(0) }
-    // The sun or moon sits on the right just below your picture and Settings, never behind them,
-    // and beside today's total.
-    val rowBottom = WindowInsets.statusBars.getTop(density) + with(density) { HEADER_TOP.toPx() } + rowHeight
-    val celestialY = if (boxHeight == 0) 0.5f else (rowBottom + with(density) { CELESTIAL_GAP.toPx() }) / boxHeight
-    Box(Modifier.fillMaxWidth().onSizeChanged { boxHeight = it.height }) {
-        SkyScene(mood, Modifier.matchParentSize(), celestial = Offset(0.82f, celestialY))
+    val gap = with(LocalDensity.current) { CELESTIAL_GAP.toPx() }
+    // Where the top row (your picture and Settings) ends within the header. It stays put while
+    // the garden scrolls, so the header only redraws when its layout changes.
+    val layout = remember { HeaderLayout() }
+    var rowEnds by remember { mutableFloatStateOf(0f) }
+    var headerHeight by remember { mutableIntStateOf(0) }
+    fun measure() {
+        val header = layout.header ?: return
+        val row = layout.row ?: return
+        if (!header.isAttached || !row.isAttached) return
+        rowEnds = header.localPositionOf(row, Offset(0f, row.size.height.toFloat())).y
+        headerHeight = header.size.height
+    }
+    Box(Modifier.fillMaxWidth().onGloballyPositioned { layout.header = it; measure() }) {
+        // The sun or moon sits on the right just below your picture and Settings, clear of them,
+        // beside today's total; the butterflies keep below them too.
+        val share = if (headerHeight == 0) 0f else rowEnds / headerHeight
+        // The sun is drawn 2% higher than asked (see SkyScene), so that comes back off.
+        val celestialY = if (headerHeight == 0) 0.5f else (rowEnds + gap) / headerHeight + 0.02f
+        SkyScene(mood, Modifier.matchParentSize(), celestial = Offset(0.82f, celestialY), clearAbove = share)
         // Room around the words, and at the bottom for the hills to show.
-        Column(Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = HEADER_TOP, bottom = 52.dp)) {
+        Column(Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 60.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.onSizeChanged { rowHeight = it.height },
+                modifier = Modifier.onGloballyPositioned { layout.row = it; measure() },
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky)
@@ -273,7 +285,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                     Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.action_settings), tint = mood.onSky)
                 }
             }
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(36.dp))
             Text(stringResource(R.string.garden_screen_time_today), style = MaterialTheme.typography.labelLarge, color = mood.onSky)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -292,10 +304,14 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
     }
 }
 
-private val HEADER_TOP = 12.dp
+/** The garden header's top row and the header itself, as last laid out. */
+private class HeaderLayout {
+    var header: LayoutCoordinates? = null
+    var row: LayoutCoordinates? = null
+}
 
-/** How far below the header's top row the sun or moon's middle sits: clear of its glow. */
-private val CELESTIAL_GAP = 48.dp
+/** How far below the header's top row the sun's middle sits: its rays end 10dp above the row. */
+private val CELESTIAL_GAP = 45.dp
 
 @Composable
 private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {

@@ -55,6 +55,7 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Weather
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.graphics.lerp
+import dev.pcoffline.meadow.ui.theme.GardenColors
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import nl.dionsegijn.konfetti.compose.KonfettiView
@@ -184,17 +185,28 @@ fun rememberSkyMood(): SkyMood {
     val base = when {
         dark || hour !in 5..20 -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
         hour <= 10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
-        hour <= 16 -> SkyMood(Color(0xFFD9ECF2), Color(0xFFF8F4E8), false, ink, greeting)
+        hour <= 16 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
         else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
     }.under(weather)
-    // The sky takes on the theme's colour and fades into the page below it.
+    // The sky takes on the theme's colour and fades into the page below it. By day that's the
+    // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
-        top = androidx.compose.ui.graphics.lerp(base.top, scheme.primary, if (base.night) 0.10f else 0.14f),
+        top = if (base.night) {
+            androidx.compose.ui.graphics.lerp(base.top, scheme.primary, 0.10f)
+        } else {
+            tinted(base.top, Garden.colors)
+        },
         // A night sky over a light page keeps its own colours, so its light text stays readable.
         bottom = if (base.night && !dark) base.bottom else androidx.compose.ui.graphics.lerp(base.bottom, scheme.background, 0.6f),
     )
 }
+
+/** The top of a clear afternoon sky, before the theme tints it. */
+internal val AfternoonSky = Color(0xFFD9ECF2)
+
+/** A daytime sky's [top] in the theme of [garden]: half its own, half the theme's sky tint. */
+internal fun tinted(top: Color, garden: GardenColors): Color = lerp(top, garden.sky, 0.5f)
 
 /**
  * Clouds, fog, rain and snow veil the sky in grey, the top more than the bottom. The veils stay
@@ -215,12 +227,13 @@ private fun SkyMood.under(weather: Weather?): SkyMood {
 /**
  * The living backdrop for headers: sky gradient, sun or moon, drifting clouds, rolling hills with
  * tiny flowers, the theme's two butterflies by day and fireflies and stars by night. The sun or
- * moon sits at [celestial] (fractions of the width and height), clear of whatever is on top.
+ * moon sits at [celestial] (fractions of the width and height), clear of whatever is on top, and
+ * the butterflies keep below [clearAbove] (a fraction of the height) so they don't cross it.
  * The [SkyMood.weather] brings more clouds, fog, rain, snow or a storm; the butterflies and
  * fireflies shelter from rain and snow.
  */
 @Composable
-fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = Offset(0.82f, 0.24f)) {
+fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = Offset(0.82f, 0.24f), clearAbove: Float = 0f) {
     val garden = Garden.colors
     val theme = Garden.theme
     val butterflies = remember(theme) { butterfliesFor(theme) }
@@ -252,7 +265,10 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = O
             }
             if (weather == Weather.FOG) fog(t, mood.night)
         }
-        MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky)
+        // A sun or moon set low keeps clear of the hills: they sink until it's above them. Where
+        // it sits, the back hill tops out 53% of the way up at full height.
+        val rise = ((0.93f - celestial.y) / 0.53f).coerceIn(0.6f, 1f)
+        MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky, rise = rise)
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
             // Butterflies and fireflies shelter from rain and snow.
@@ -268,8 +284,9 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = O
                 }
                 else -> {
                     // The theme's two butterflies, the smaller one further off and higher up.
-                    flutter(butterflies[1], t, seed = 2.1f, lane = 0.38f, length = 9.5.dp.toPx(), speed = 0.11f)
-                    flutter(butterflies[0], t, seed = 0.4f, lane = 0.52f, length = 13.dp.toPx(), speed = 0.14f)
+                    val below = clearAbove.coerceIn(0f, 0.6f)
+                    flutter(butterflies[1], t, seed = 2.1f, lane = below + (1f - below) * 0.38f, length = 9.5.dp.toPx(), speed = 0.11f)
+                    flutter(butterflies[0], t, seed = 0.4f, lane = below + (1f - below) * 0.52f, length = 13.dp.toPx(), speed = 0.14f)
                 }
             }
         }

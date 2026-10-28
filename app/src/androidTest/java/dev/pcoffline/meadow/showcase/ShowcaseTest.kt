@@ -89,8 +89,17 @@ class ShowcaseTest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
+        // The first test after the emulator boots can be drawn before its window is in front.
+        val until = System.currentTimeMillis() + 10_000
+        while (!focused() && System.currentTimeMillis() < until) Thread.sleep(100)
         Thread.sleep(800) // Let images and entrance animations settle.
         shell("screencap -p $DIR/$name.png")
+    }
+
+    private fun focused(): Boolean {
+        var focused = false
+        compose.runOnUiThread { focused = compose.activity.hasWindowFocus() }
+        return focused
     }
 
     /** Records the screen while [drive] plays animations frame by frame on the test clock. */
