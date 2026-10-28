@@ -59,6 +59,6 @@ each colour pair against WCAG AA contrast. Give each new screen a screen test th
 ## README images
 
 `ShowcaseTest` makes the screenshots and animations. The Screenshots workflow runs it on an
-emulator when a pull request changes the app's screens. Then it commits the images to the pull
-request. To run it on another branch, start it from the Actions tab. `docs/art/build.py` draws
+emulator when a push to `main` changes the app's screens. Then it commits the images to `main`.
+To run it on a different branch, start it from the Actions tab. `docs/art/build.py` draws
 the banner and the illustrations.
