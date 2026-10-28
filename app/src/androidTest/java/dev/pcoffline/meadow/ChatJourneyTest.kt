@@ -3,12 +3,14 @@ package dev.pcoffline.meadow
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -54,9 +56,14 @@ class ChatJourneyTest : EndToEndTest() {
             val chatId = ChatRepository.chatIdFor(me, sam.uid)
             sam.send(chatId, "Thanks for looking after me")
 
-            // People shows Sam with the last message, and opens the chat.
+            // People shows Sam with what they are to this person and an unread mark, not the
+            // message itself, and opens the chat.
             tab(R.string.tab_people).performClick()
-            waitForText("Thanks for looking after me")
+            waitForText(text(R.string.circle_garden_role))
+            compose.waitUntil(20_000) {
+                compose.onAllNodesWithContentDescription(text(R.string.chats_unread), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onAllNodesWithText("Thanks for looking after me").assertCountEquals(0)
             compose.onNode(hasText("Sam") and hasClickAction()).performClick()
             waitForText(text(R.string.chat_placeholder))
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
