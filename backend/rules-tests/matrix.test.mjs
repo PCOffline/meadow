@@ -46,7 +46,7 @@ before(async () => {
     await setDoc(doc(db, "friendCodes/ABC234"), { uid: "sam" });
     await setDoc(doc(db, "removals/x"), { ownerUid: "sam", beeUid: "bee" });
     await setDoc(doc(db, "rateLimits/sam"), { request: [] });
-    await setDoc(doc(db, "chatUploads/chats|bee_sam|sam|abc12345.jpg"), { path: "chats/bee_sam/sam/abc12345.jpg", at: Timestamp.now() });
+    await setDoc(doc(db, "chatUploads/chats~bee_sam~sam~abc12345.jpg"), { path: "chats/bee_sam/sam/abc12345.jpg", at: Timestamp.now() });
     await setDoc(doc(db, "inviteLinks/AbCdEfGh12345678"), { ownerUid: "sam" });
     await setDoc(doc(db, "invites/i1"), { fromUid: "sam", toUid: "stranger" });
     await setDoc(doc(db, "requests/r1"), { requesterId: "sam", approverIds: ["bee"], status: "pending" });
@@ -103,7 +103,7 @@ describe("reading", () => {
     ["a friend code", "friendCodes/ABC234", []],
     ["a pending removal", "removals/x", []],
     ["rate limits", "rateLimits/sam", []],
-    ["an unsent chat picture's record", "chatUploads/chats|bee_sam|sam|abc12345.jpg", []],
+    ["an unsent chat picture's record", "chatUploads/chats~bee_sam~sam~abc12345.jpg", []],
     ["an invite link", "inviteLinks/AbCdEfGh12345678", []],
     ["an invite", "invites/i1", ["sam", "stranger"]],
     ["sam's request (it lists every Bumblebee asked)", "requests/r1", ["sam"]],

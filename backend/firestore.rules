@@ -257,7 +257,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['path', 'at'])
         && picture() is string
         && picture().matches('chats/[A-Za-z0-9_-]{1,128}/' + me() + '/[A-Za-z0-9_-]{8,64}[.](jpg|gif)')
-        && id == picture().replace('/', '|')
+        && id == picture().replace('/', '~')
         && request.resource.data.at == request.time
         && me() in chatOf().participants
         && !chatOf().get('closed', false);

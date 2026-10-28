@@ -964,7 +964,7 @@ describe("chat and alerts", () => {
     const chatId = [sam.uid, bee.uid].toSorted().join("_");
     const unsent = `chats/${chatId}/${sam.uid}/unsent1234.jpg`;
     const sent = `chats/${chatId}/${sam.uid}/sent12345.jpg`;
-    const noteOf = (path) => `chatUploads/${path.replaceAll("/", "|")}`;
+    const noteOf = (path) => `chatUploads/${path.replaceAll("/", "~")}`;
     // Noted before uploading, as the app does (storage.rules requires it).
     await admin((db) => Promise.all([unsent, sent].map((path) => setDoc(doc(db, noteOf(path)), { path, at: serverTimestamp() }))));
     await env.withSecurityRulesDisabled(async (ctx) => {

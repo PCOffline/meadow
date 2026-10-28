@@ -65,5 +65,7 @@ test("a photo link gets a new token, keeping everything else", () => {
 test("where a chat picture was sent, and the id of its note", () => {
   assert.equal(chatOfPicture("chats/a_b/a/photo1234.jpg"), "a_b");
   assert.equal(chatOfPicture("photo.jpg"), "");
-  assert.equal(uploadId("chats/a_b/a/photo1234.jpg"), "chats|a_b|a|photo1234.jpg");
+  assert.equal(uploadId("chats/a_b/a/photo1234.jpg"), "chats~a_b~a~photo1234.jpg");
+  // storage.rules looks the note up by a URL it doesn't escape, so the id must need no escaping.
+  assert.equal(encodeURIComponent(uploadId("chats/a_b/a/photo1234.jpg")), uploadId("chats/a_b/a/photo1234.jpg"));
 });

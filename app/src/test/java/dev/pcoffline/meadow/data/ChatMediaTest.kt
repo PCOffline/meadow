@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.net.URLEncoder
 
 /** Chat pictures: where they go, which are GIFs, how far photos shrink, and what an export takes along. */
 class ChatMediaTest {
@@ -22,7 +23,10 @@ class ChatMediaTest {
 
     @Test
     fun `a picture's note is named after its path, as the rules require`() {
-        assertEquals("chats|chat1|robin|0123456789abcdef.jpg", ChatMedia.noteIdFor("chats/chat1/robin/0123456789abcdef.jpg"))
+        val id = ChatMedia.noteIdFor("chats/a1_b2/a1/0123456789abcdef.jpg")
+        assertEquals("chats~a1_b2~a1~0123456789abcdef.jpg", id)
+        // storage.rules looks the note up by a URL it doesn't escape, so the id must need no escaping.
+        assertEquals(id, URLEncoder.encode(id, Charsets.UTF_8))
     }
 
     @Test
