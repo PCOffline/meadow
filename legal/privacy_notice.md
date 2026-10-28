@@ -1,6 +1,6 @@
 # Privacy notice
 
-Version 3 · updated 27 October 2026
+Version 3 · updated 28 October 2026
 
 Meadow helps you keep the app time limits you choose, with the help of friends you trust (your Bumblebees). This notice explains what Meadow collects, why, who can see it, and the choices you have. We've tried to keep it short and plain.
 
@@ -14,6 +14,7 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 - **What's on screen.** The garden keeper (an accessibility service) notices which app is in front so it can close apps whose time is up. In strict mode it also reads the words on a few system settings screens, to stop Meadow being switched off. This happens on your phone only. Meadow never reads what you type, and never stores or sends what's on your screen.
 - **Notifications from resting apps.** With notification access, Meadow hides notifications from apps whose time is up and pauses their media. It only looks at which app posted them, and never stores or sends their content.
 - **Your list of installed apps,** used to let you pick apps to limit.
+- **Your approximate location, only if you turn on the weather in the sky.** Meadow asks Android for your rough location (never your precise one), rounds it to about 11 km, and asks Open-Meteo for the weather there (see below). It keeps only the weather and when it was read, never where. Turn it off in Settings, or take the location permission away, and it stops.
 - **Your settings and protection status:** whether strict mode is on, which permissions Meadow has, and battery settings. Nobody else can see them.
 
 ## What Meadow stores online, and why
@@ -49,6 +50,8 @@ Meadow uses Google Firebase (Authentication, Cloud Firestore, Cloud Functions, C
 If you ask for a sign-in link, Firebase emails it to you.
 
 Your phone keeps a copy of the chat photos and GIFs it has shown, so they open quickly, until you sign out.
+
+If you turn on the weather in the sky, your phone asks Open-Meteo (open-meteo.com) for the weather at your rounded location, at most every half an hour while Meadow is open. Open-Meteo sees that rounded location and your IP address, as with any website; Meadow's own servers never see either.
 
 When Meadow checks for updates, your phone asks GitHub for the latest release. GitHub sees your IP address, as with any website. You can turn automatic checks off.
 

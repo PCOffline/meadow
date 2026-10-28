@@ -79,6 +79,27 @@ class LocalStore(context: Context) {
         _autoUpdate.value = enabled
     }
 
+    private val _weatherOn = MutableStateFlow(prefs.getBoolean(KEY_WEATHER_ON, false))
+
+    /** Whether the sky shows the weather, from the phone's rough location. Off unless turned on. */
+    val weatherOn: StateFlow<Boolean> = _weatherOn.asStateFlow()
+
+    private val _weather = MutableStateFlow(read<WeatherReading>(KEY_WEATHER))
+
+    /** The last weather read. Where it was read for is never kept. */
+    val weather: StateFlow<WeatherReading?> = _weather.asStateFlow()
+
+    fun setWeatherOn(on: Boolean) {
+        prefs.edit { putBoolean(KEY_WEATHER_ON, on) }
+        _weatherOn.value = on
+        if (!on) setWeather(null)
+    }
+
+    fun setWeather(reading: WeatherReading?) {
+        write(KEY_WEATHER, reading)
+        _weather.value = reading
+    }
+
     private val _weekRule = MutableStateFlow(
         WeekRule(
             first = DayOfWeek.of(prefs.getInt(KEY_WEEK_FIRST, DayOfWeek.MONDAY.value)),
@@ -189,6 +210,8 @@ class LocalStore(context: Context) {
         _theme.value = null
         _darkMode.value = null
         _autoUpdate.value = true
+        _weatherOn.value = false
+        _weather.value = null
         _weekRule.value = WeekRule()
         _acceptedTerms.value = 0
     }
@@ -288,6 +311,8 @@ class LocalStore(context: Context) {
         const val KEY_THEME = "theme"
         const val KEY_DARK_MODE = "dark_mode"
         const val KEY_AUTO_UPDATE = "auto_update"
+        const val KEY_WEATHER_ON = "weather_on"
+        const val KEY_WEATHER = "weather"
         const val KEY_WEEK_FIRST = "week_first"
         const val KEY_WEEK_PREVIOUS = "week_previous"
         const val KEY_WEEK_LIMITS_FROM = "week_limits_from"

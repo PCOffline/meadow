@@ -86,10 +86,13 @@ import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import java.time.LocalDate
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.pcoffline.meadow.data.Weather
+import dev.pcoffline.meadow.ui.components.LocalSkyWeather
 
 /**
  * Debug builds only: every screen in each of its states, drawn from [DemoGarden], with the theme,
- * day or night and being offline switched from the list. Opened from its own launcher icon,
+ * day or night, the weather in the sky and being offline switched from the list. Opened from its own launcher icon,
  * "Meadow screens". The data is made up; what a screen does when tapped (saving a limit, say)
  * still acts on whoever is signed in to this build.
  */
@@ -110,6 +113,8 @@ internal fun Gallery(scenarios: List<Scenario> = Scenarios.all) {
     var theme by rememberSaveable { mutableStateOf(GardenTheme.MEADOW) }
     var mode by rememberSaveable { mutableStateOf(DarkMode.LIGHT) }
     var offline by rememberSaveable { mutableStateOf(false) }
+    // Null follows the phone's own weather setting.
+    var weather by rememberSaveable { mutableStateOf<Weather?>(null) }
     // Offline here is pretend: the real state comes back on leaving the gallery.
     val wasOnline = remember { Connectivity.online.value }
     DisposableEffect(offline) {
@@ -117,19 +122,21 @@ internal fun Gallery(scenarios: List<Scenario> = Scenarios.all) {
         onDispose { Connectivity.set(wasOnline) }
     }
     MeadowTheme(theme, mode) {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            val index = open
-            if (index == null) {
-                ScenarioList(
-                    scenarios, theme, mode, offline,
-                    onTheme = { theme = it }, onMode = { mode = it }, onOffline = { offline = it }, onOpen = { open = it },
-                )
-            } else {
-                BackHandler { open = null }
-                // As in the app: below the status bar, with the offline strip on top.
-                Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                    OfflineBar()
-                    Box(Modifier.weight(1f)) { SnackbarScope { scenarios[index].content() } }
+        CompositionLocalProvider(LocalSkyWeather provides weather) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                val index = open
+                if (index == null) {
+                    ScenarioList(
+                        scenarios, theme, mode, offline, weather,
+                        onTheme = { theme = it }, onMode = { mode = it }, onOffline = { offline = it }, onWeather = { weather = it }, onOpen = { open = it },
+                    )
+                } else {
+                    BackHandler { open = null }
+                    // As in the app: below the status bar, with the offline strip on top.
+                    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                        OfflineBar()
+                        Box(Modifier.weight(1f)) { SnackbarScope { scenarios[index].content() } }
+                    }
                 }
             }
         }
@@ -142,9 +149,11 @@ private fun ScenarioList(
     theme: GardenTheme,
     mode: DarkMode,
     offline: Boolean,
+    weather: Weather?,
     onTheme: (GardenTheme) -> Unit,
     onMode: (DarkMode) -> Unit,
     onOffline: (Boolean) -> Unit,
+    onWeather: (Weather?) -> Unit,
     onOpen: (Int) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -160,6 +169,14 @@ private fun ScenarioList(
             Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DarkMode.entries.forEach { m ->
                     FilterChip(selected = m == mode, onClick = { onMode(m) }, label = { Text(stringResource(m.label)) })
+                }
+            }
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (listOf(null) + Weather.entries).forEach { w ->
+                    val label = w?.name?.lowercase()?.replace('_', ' ')?.replaceFirstChar { it.uppercase() } ?: "Phone's weather"
+                    FilterChip(selected = w == weather, onClick = { onWeather(w) }, label = { Text(label) })
                 }
             }
         }

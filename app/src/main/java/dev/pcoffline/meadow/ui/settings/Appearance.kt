@@ -2,6 +2,11 @@
 
 package dev.pcoffline.meadow.ui.settings
 
+import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,7 +30,15 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,7 +105,54 @@ internal fun AppearanceCard() {
                     ) { Text(stringResource(mode.label), maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
             }
+            WeatherRow()
         }
+    }
+}
+
+/**
+ * The weather in the sky, off unless turned on. Turning it on asks for approximate location (never
+ * precise); without it, there's a way to Android's settings. Taking the permission away there
+ * shows it off again.
+ */
+@Composable
+private fun WeatherRow() {
+    val context = LocalContext.current
+    val on by AppGraph.store.weatherOn.collectAsStateWithLifecycle()
+    var permitted by remember { mutableStateOf(AppGraph.weather.hasPermission()) }
+    var denied by rememberSaveable { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        permitted = AppGraph.weather.hasPermission()
+        if (permitted) denied = false
+        onPauseOrDispose { }
+    }
+    fun turnOn() {
+        AppGraph.weather.turnOn()
+        AppGraph.scope.launch { AppGraph.weather.refreshIfStale() }
+    }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permitted = granted
+        denied = !granted
+        if (granted) turnOn()
+    }
+    SwitchRow(
+        title = stringResource(R.string.settings_weather),
+        body = stringResource(R.string.settings_weather_body),
+        checked = on && permitted,
+    ) { want ->
+        when {
+            !want -> AppGraph.weather.turnOff()
+            permitted -> turnOn()
+            else -> ask.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+    }
+    if (denied) {
+        Text(stringResource(R.string.settings_weather_denied), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = {
+            runCatching {
+                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+            }
+        }) { Text(stringResource(R.string.settings_weather_allow)) }
     }
 }
 

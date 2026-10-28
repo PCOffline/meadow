@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
+import dev.pcoffline.meadow.data.WeatherRepository
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.Connectivity
@@ -79,6 +80,7 @@ object AppGraph {
     val profiles by lazy { ProfileRepository(app, backend, store, share) { sync } }
     val notifier by lazy { Notifier(app, store) }
     val updater by lazy { Updater(app) }
+    val weather by lazy { WeatherRepository(app, store) }
     val protection by lazy { ProtectionMonitor(app, tracker, store, share, scope, backendReady) }
 
     fun init(application: Application) {

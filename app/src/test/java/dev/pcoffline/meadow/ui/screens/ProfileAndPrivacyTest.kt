@@ -22,7 +22,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.Manifest
 import dev.pcoffline.meadow.AppGraph
+import org.robolectric.Shadows.shadowOf
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Days
@@ -41,6 +43,7 @@ import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -88,6 +91,32 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.onNode(hasText(text(GardenTheme.LAVENDER.label), substring = true) and hasClickAction()).performScrollTo().assertExists()
         node(R.string.dark_mode_dark).performScrollTo().assertExists()
         assertAccessible()
+    }
+
+    @Test
+    fun `the weather in the sky is off until turned on, and shows off again without the location permission`() {
+        AppGraph.store.setWeatherOn(false)
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        show { AppearanceCard() }
+        val weather = compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true))
+        weather.performScrollTo().assertIsOff()
+        weather.performClick().assertIsOn()
+        assertTrue(AppGraph.store.weatherOn.value)
+        weather.performClick().assertIsOff()
+        assertFalse(AppGraph.store.weatherOn.value)
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `turned on but with the location permission taken away, the weather reads as off`() {
+        shadowOf(app).denyPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
+        AppGraph.store.setWeatherOn(true)
+        try {
+            show { AppearanceCard() }
+            compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true)).performScrollTo().assertIsOff()
+        } finally {
+            AppGraph.store.setWeatherOn(false)
+        }
     }
 
     @Test

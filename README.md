@@ -36,7 +36,8 @@ friend who has to approve is much harder to argue with.
 
 ### A garden that grows with your time
 Every app you limit is a flower that blooms while there's time left, wilts as it runs out and
-sleeps outside the hours you allow it. The sky follows your day, from a peach sunrise to a starry night with fireflies. Gentle reminders
+sleeps outside the hours you allow it. The sky follows your day, from a peach sunrise to a starry night with fireflies, and,
+if you like, the weather outside: clouds, fog, rain, snow or a storm. Gentle reminders
 arrive at five minutes and one minute left.
 
 ### Limits that fit your week

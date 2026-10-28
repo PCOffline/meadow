@@ -50,7 +50,13 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.key
 import java.util.concurrent.TimeUnit
 import androidx.core.content.ContextCompat
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.Weather
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.graphics.lerp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Angle
 import nl.dionsegijn.konfetti.core.Party
@@ -112,7 +118,14 @@ fun Modifier.pressBounce(interaction: MutableInteractionSource): Modifier = comp
 
 @Immutable
 /** The sky behind a header. [onSky] is readable on all of it, hills included. */
-data class SkyMood(val top: Color, val bottom: Color, val night: Boolean, val onSky: Color, @StringRes val greeting: Int)
+data class SkyMood(
+    val top: Color,
+    val bottom: Color,
+    val night: Boolean,
+    val onSky: Color,
+    @StringRes val greeting: Int,
+    val weather: Weather? = null,
+)
 
 /**
  * The current time, refreshed whenever the screen comes back into view, so a garden left open
@@ -131,12 +144,36 @@ fun rememberResumedNow(): LocalDateTime {
 /** Pins the sky to an hour of the day (screenshots); null follows the clock. */
 val LocalSkyHour = androidx.compose.runtime.staticCompositionLocalOf<Int?> { null }
 
-/** The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights. */
+/** Pins the sky's weather (screenshots); unpinned, it follows the forecast for those who turn it on. */
+val LocalSkyWeather = androidx.compose.runtime.staticCompositionLocalOf<Weather?> { null }
+
+/**
+ * The weather for those who turned it on, read again each time the screen comes back into view
+ * (at most every half an hour).
+ */
+@Composable
+private fun rememberLiveWeather(): Weather? {
+    val reading by AppGraph.store.weather.collectAsStateWithLifecycle()
+    val on by AppGraph.store.weatherOn.collectAsStateWithLifecycle()
+    var resumedAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LifecycleResumeEffect(on) {
+        resumedAt = System.currentTimeMillis()
+        if (on) AppGraph.scope.launch { AppGraph.weather.refreshIfStale() }
+        onPauseOrDispose { }
+    }
+    return AppGraph.weather.current(reading, on, maxOf(resumedAt, reading?.atMillis ?: 0L))
+}
+
+/**
+ * The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights.
+ * With the weather on, clouds, rain and snow grey it a little.
+ */
 @Composable
 fun rememberSkyMood(): SkyMood {
     val dark = dev.pcoffline.meadow.ui.theme.LocalDarkTheme.current
     val pinned = LocalSkyHour.current
     val hour = pinned ?: rememberResumedNow().hour
+    val weather = LocalSkyWeather.current ?: if (pinned == null) rememberLiveWeather() else null
     val greeting = when (hour) {
         in 5..11 -> R.string.greeting_morning
         in 12..16 -> R.string.greeting_afternoon
@@ -149,7 +186,7 @@ fun rememberSkyMood(): SkyMood {
         hour <= 10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
         hour <= 16 -> SkyMood(Color(0xFFD9ECF2), Color(0xFFF8F4E8), false, ink, greeting)
         else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
-    }
+    }.under(weather)
     // The sky takes on the theme's colour and fades into the page below it.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
@@ -160,9 +197,27 @@ fun rememberSkyMood(): SkyMood {
 }
 
 /**
+ * Clouds, fog, rain and snow veil the sky in grey, the top more than the bottom. The veils stay
+ * light by day and dark by night, so the text on the sky reads as well as under a clear one.
+ */
+private fun SkyMood.under(weather: Weather?): SkyMood {
+    val (veil, amount) = when (weather) {
+        null, Weather.CLEAR, Weather.PARTLY_CLOUDY -> return copy(weather = weather)
+        Weather.CLOUDY -> (if (night) Color(0xFF30384A) else Color(0xFFD6DCE2)) to 0.6f
+        Weather.FOG -> (if (night) Color(0xFF3A4150) else Color(0xFFE4E5E1)) to 0.7f
+        Weather.RAIN -> (if (night) Color(0xFF283040) else Color(0xFFC6D0DA)) to 0.65f
+        Weather.SNOW -> (if (night) Color(0xFF34405A) else Color(0xFFE2E8F0)) to 0.6f
+        Weather.STORM -> (if (night) Color(0xFF222838) else Color(0xFFB9C0CB)) to 0.7f
+    }
+    return copy(top = lerp(top, veil, amount), bottom = lerp(bottom, veil, amount * 0.4f), weather = weather)
+}
+
+/**
  * The living backdrop for headers: sky gradient, sun or moon, drifting clouds, rolling hills with
  * tiny flowers, the theme's two butterflies by day and fireflies and stars by night. The sun or
  * moon sits at [celestial] (fractions of the width and height), clear of whatever is on top.
+ * The [SkyMood.weather] brings more clouds, fog, rain, snow or a storm; the butterflies and
+ * fireflies shelter from rain and snow.
  */
 @Composable
 fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = Offset(0.82f, 0.24f)) {
@@ -172,39 +227,50 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = O
     val clock = rememberClock()
     val stars = remember { List(28) { Offset(Random(it * 31).nextFloat(), Random(it * 17 + 3).nextFloat() * 0.55f) } }
     val sky = remember(mood.top, mood.bottom) { Brush.verticalGradient(listOf(mood.top, mood.bottom)) }
+    val weather = mood.weather
+    val clouds = remember(weather, mood.night) { Clouds.of(weather, mood.night) }
     Box(modifier) {
         // Each animated layer redraws on its own, without redrawing the still hills between them.
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
             drawRect(sky)
+            if (weather == Weather.STORM) lightning(t, mood.night)
             if (mood.night) {
-                stars.forEachIndexed { i, p ->
-                    val twinkle = 0.35f + 0.65f * abs(sin(t * 0.9f + i * 1.7f))
-                    drawCircle(Color.White.copy(alpha = twinkle * 0.85f), radius = if (i % 5 == 0) 2.4f else 1.5f, center = Offset(p.x * size.width, p.y * size.height))
+                if (clouds.starsShow) {
+                    stars.forEachIndexed { i, p ->
+                        if (weather == Weather.PARTLY_CLOUDY && i % 2 == 1) return@forEachIndexed
+                        val twinkle = 0.35f + 0.65f * abs(sin(t * 0.9f + i * 1.7f))
+                        drawCircle(Color.White.copy(alpha = twinkle * 0.85f), radius = if (i % 5 == 0) 2.4f else 1.5f, center = Offset(p.x * size.width, p.y * size.height))
+                    }
                 }
-                moon(Offset(size.width * celestial.x, size.height * celestial.y), 22.dp.toPx(), mood.top)
-            } else {
+                if (clouds.celestialShows) moon(Offset(size.width * celestial.x, size.height * celestial.y), 22.dp.toPx(), mood.top)
+            } else if (clouds.celestialShows) {
                 sun(Offset(size.width * (celestial.x + 0.02f), size.height * (celestial.y - 0.02f)), 20.dp.toPx(), t, garden.petalHoney)
             }
-            val cloudAlpha = if (mood.night) 0.10f else 0.85f
-            cloud(Offset(((t * 9f) % (size.width + 240f)) - 120f, size.height * 0.18f), 1f, cloudAlpha)
-            cloud(Offset(((t * 5.5f + size.width * 0.55f) % (size.width + 240f)) - 120f, size.height * 0.32f), 0.7f, cloudAlpha)
+            CLOUD_PATHS.take(clouds.count).forEach { (speed, offset, height, scale) ->
+                cloud(Offset(((t * speed + size.width * offset) % (size.width + 240f)) - 120f, size.height * height), scale, clouds.alpha, clouds.color)
+            }
+            if (weather == Weather.FOG) fog(t, mood.night)
         }
         MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky)
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
-            if (mood.night) {
-                repeat(6) { i ->
+            // Butterflies and fireflies shelter from rain and snow.
+            when {
+                weather == Weather.RAIN || weather == Weather.STORM -> rain(t, mood.night, heavy = weather == Weather.STORM)
+                weather == Weather.SNOW -> snow(t)
+                mood.night -> repeat(6) { i ->
                     val x = size.width * (0.1f + 0.15f * i) + sin(t * 0.6f + i) * 18f
                     val y = size.height * (0.62f + 0.05f * (i % 3)) + cos(t * 0.8f + i * 2f) * 10f
                     val glow = 0.4f + 0.6f * abs(sin(t * 1.3f + i))
                     drawCircle(garden.petalHoney.copy(alpha = 0.25f * glow), radius = 9f, center = Offset(x, y))
                     drawCircle(garden.petalHoney.copy(alpha = glow), radius = 2.6f, center = Offset(x, y))
                 }
-            } else {
-                // The theme's two butterflies, the smaller one further off and higher up.
-                flutter(butterflies[1], t, seed = 2.1f, lane = 0.38f, length = 9.5.dp.toPx(), speed = 0.19f)
-                flutter(butterflies[0], t, seed = 0f, lane = 0.52f, length = 13.dp.toPx(), speed = 0.25f)
+                else -> {
+                    // The theme's two butterflies, the smaller one further off and higher up.
+                    flutter(butterflies[1], t, seed = 2.1f, lane = 0.38f, length = 9.5.dp.toPx(), speed = 0.19f)
+                    flutter(butterflies[0], t, seed = 0f, lane = 0.52f, length = 13.dp.toPx(), speed = 0.25f)
+                }
             }
         }
     }
@@ -234,8 +300,85 @@ private fun DrawScope.moon(center: Offset, radius: Float, sky: Color) {
     drawCircle(sky, radius = radius * 0.86f, center = center + Offset(radius * 0.45f, -radius * 0.25f))
 }
 
-private fun DrawScope.cloud(at: Offset, scale: Float, alpha: Float) {
-    val c = Color.White.copy(alpha = alpha)
+/** How the clouds look in each weather, and whether the sun, moon and stars get through. */
+private data class Clouds(val count: Int, val alpha: Float, val color: Color, val celestialShows: Boolean, val starsShow: Boolean) {
+    companion object {
+        fun of(weather: Weather?, night: Boolean): Clouds = when (weather) {
+            null, Weather.CLEAR -> Clouds(2, if (night) 0.10f else 0.85f, Color.White, celestialShows = true, starsShow = true)
+            Weather.PARTLY_CLOUDY -> Clouds(3, if (night) 0.16f else 0.9f, Color.White, celestialShows = true, starsShow = true)
+            Weather.CLOUDY, Weather.SNOW -> Clouds(5, if (night) 0.18f else 0.9f, Color.White, celestialShows = false, starsShow = false)
+            Weather.FOG -> Clouds(3, if (night) 0.12f else 0.7f, Color.White, celestialShows = false, starsShow = false)
+            Weather.RAIN -> Clouds(5, if (night) 0.22f else 0.85f, Color(0xFFE6EAEF), celestialShows = false, starsShow = false)
+            Weather.STORM -> Clouds(5, if (night) 0.45f else 0.7f, if (night) Color(0xFF5A6273) else Color(0xFF9AA2AF), celestialShows = false, starsShow = false)
+        }
+    }
+}
+
+/** Each cloud's drift speed (px a second), starting offset (of the width), height (of the sky) and size. */
+private val CLOUD_PATHS = listOf(
+    CloudPath(9f, 0f, 0.18f, 1f),
+    CloudPath(5.5f, 0.55f, 0.32f, 0.7f),
+    CloudPath(7f, 0.3f, 0.08f, 0.85f),
+    CloudPath(4f, 0.8f, 0.42f, 0.9f),
+    CloudPath(6.5f, 0.12f, 0.26f, 0.6f),
+)
+
+private data class CloudPath(val speed: Float, val offset: Float, val height: Float, val scale: Float)
+
+private val rainDrops = List(46) { Offset(Random(it * 13 + 5).nextFloat(), Random(it * 29 + 1).nextFloat()) }
+private val snowFlakes = List(36) { Offset(Random(it * 11 + 7).nextFloat(), Random(it * 23 + 2).nextFloat()) }
+
+/** Thin, slanted streaks falling steadily; heavier in a storm. */
+private fun DrawScope.rain(t: Float, night: Boolean, heavy: Boolean) {
+    val color = if (night) Color(0xFFB7C4D6).copy(alpha = 0.35f) else Color(0xFF7E93A8).copy(alpha = 0.4f)
+    val length = 10.dp.toPx()
+    val slant = 2.5.dp.toPx()
+    val drops = if (heavy) rainDrops else rainDrops.take(30)
+    drops.forEachIndexed { i, p ->
+        val fall = ((p.y + t * (0.85f + (i % 3) * 0.1f)) % 1f) * (size.height + length) - length
+        val x = p.x * size.width - fall * 0.06f
+        drawLine(color, Offset(x, fall), Offset(x - slant, fall + length), strokeWidth = 1.2.dp.toPx(), cap = StrokeCap.Round)
+    }
+}
+
+/** Soft flakes drifting down, swaying as they go. */
+private fun DrawScope.snow(t: Float) {
+    snowFlakes.forEachIndexed { i, p ->
+        val y = ((p.y + t * (0.07f + (i % 4) * 0.015f)) % 1f) * (size.height + 12f) - 6f
+        val x = p.x * size.width + sin(t * 0.8f + i) * 6.dp.toPx()
+        drawCircle(Color.White.copy(alpha = 0.85f), radius = (1.4f + (i % 3) * 0.6f).dp.toPx(), center = Offset(x, y))
+    }
+}
+
+/** Pale bands of mist drifting slowly across. */
+private fun DrawScope.fog(t: Float, night: Boolean) {
+    val color = if (night) Color(0xFF8A93A6).copy(alpha = 0.16f) else Color.White.copy(alpha = 0.38f)
+    val band = 20.dp.toPx()
+    listOf(0.3f to 0f, 0.48f to 0.4f, 0.66f to 0.75f).forEachIndexed { i, (height, offset) ->
+        val x = ((t * (4f + i * 2f) + size.width * offset) % (size.width * 1.6f)) - size.width * 0.8f
+        drawRoundRect(
+            color,
+            topLeft = Offset(x, size.height * height),
+            size = Size(size.width * 1.1f, band),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(band / 2f),
+        )
+    }
+}
+
+/**
+ * Now and then the storm sky brightens softly, for a quarter of a second every seven: far below
+ * the three flashes a second that can trigger seizures. Without animations the clock stands at 0,
+ * so it never flashes.
+ */
+private fun DrawScope.lightning(t: Float, night: Boolean) {
+    val phase = t % 7f
+    if (phase < 5f || phase > 5.25f) return
+    val glow = sin((phase - 5f) / 0.25f * PI.toFloat())
+    drawRect(Color.White.copy(alpha = (if (night) 0.14f else 0.22f) * glow))
+}
+
+private fun DrawScope.cloud(at: Offset, scale: Float, alpha: Float, color: Color = Color.White) {
+    val c = color.copy(alpha = alpha)
     val r = 18f * scale * density / 2.5f
     drawCircle(c, r * 1.4f, at)
     drawCircle(c, r * 1.1f, at + Offset(-r * 1.5f, r * 0.35f))

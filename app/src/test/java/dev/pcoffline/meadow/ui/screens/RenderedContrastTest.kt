@@ -26,6 +26,7 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.a11y.contrastProblems
 import dev.pcoffline.meadow.data.BeeStats
 import dev.pcoffline.meadow.data.Privacy
+import dev.pcoffline.meadow.data.Weather
 import dev.pcoffline.meadow.enforcement.ProtectionState
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.showcase.DemoGarden
@@ -37,6 +38,7 @@ import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
 import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
+import dev.pcoffline.meadow.ui.components.LocalSkyWeather
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.BeeStatsContent
@@ -105,6 +107,15 @@ class RenderedContrastTest : ScreenTest() {
         // Morning, afternoon, evening and night skies each put their own colours behind the header.
         sweep(listOf(8, 13, 19, 23)) { hour ->
             CompositionLocalProvider(LocalSkyHour provides hour) { GardenContent(DemoGarden.robin, DemoGarden.garden) }
+        }
+
+    @Test
+    fun `the garden, in every weather, by day and by night`() =
+        // Clouds, fog, rain, snow and a storm each veil the sky and draw over it.
+        sweep(Weather.entries.flatMap { w -> listOf(13, 23).map { w to it } }) { (weather, hour) ->
+            CompositionLocalProvider(LocalSkyHour provides hour, LocalSkyWeather provides weather) {
+                GardenContent(DemoGarden.robin, DemoGarden.garden)
+            }
         }
 
     @Test
