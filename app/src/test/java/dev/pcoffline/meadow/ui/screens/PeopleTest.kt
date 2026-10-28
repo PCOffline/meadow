@@ -53,15 +53,30 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `everyone opens their chat, showing the latest message or what they are to you`() {
+    fun `everyone opens their chat, showing their bio and not the latest message`() {
         val opened = mutableListOf<String>()
         show { PeopleContent(robin, DemoGarden.people, onOpenChat = { opened += it }) }
-        compose.onNodeWithText(DemoGarden.chat.lastMessage).performScrollTo().assertExists()
+        compose.onNodeWithText(DemoGarden.maya.bio).performScrollTo().assertExists()
         compose.onNodeWithText(DemoGarden.theo.bio).performScrollTo().assertExists()
+        compose.onNodeWithText(DemoGarden.chat.lastMessage).assertDoesNotExist()
+        compose.onNodeWithText(DemoGarden.chatWithAna.lastMessage).assertDoesNotExist()
         compose.onNodeWithText("Maya").performScrollTo().performClick()
-        compose.onNodeWithText(DemoGarden.chatWithAna.lastMessage).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithText(DemoGarden.ana.bio).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf("maya_robin", "ana_robin"), opened)
         assertAccessible()
+    }
+
+    @Test
+    fun `someone with no bio shows what they are to you`() {
+        show {
+            PeopleContent(
+                robin,
+                People(bumblebees = listOf(DemoGarden.maya.copy(bio = "")), lookingAfter = listOf(DemoGarden.ana.copy(bio = "")), chats = listOf(chatWithMaya(read = false))),
+            )
+        }
+        node(R.string.circle_bee_role).performScrollTo().assertExists()
+        node(R.string.circle_garden_role).performScrollTo().assertExists()
+        compose.onNodeWithText("How was the walk?").assertDoesNotExist()
     }
 
     @Test
@@ -84,7 +99,7 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `an unread chat says so, not only in bold`() {
+    fun `an unread chat has a mark that opens it`() {
         val opened = mutableListOf<String>()
         show { PeopleContent(robin, People(bumblebees = listOf(DemoGarden.maya), chats = listOf(chatWithMaya(read = false))), onOpenChat = { opened += it }) }
         compose.onNodeWithContentDescription(text(R.string.chats_unread)).performScrollTo().performClick()

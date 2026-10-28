@@ -56,7 +56,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -243,8 +242,8 @@ fun PeopleContent(
 }
 
 /**
- * Someone in my circle, opening our chat: the latest message (bolder while unread), or failing
- * that what they are to me. A Bumblebee [leavingAt] some time says so, with a way to keep them.
+ * Someone in my circle, opening our chat: their bio, or failing that what they are to me, and a
+ * dot while the chat has news. A Bumblebee [leavingAt] some time says so, with a way to keep them.
  */
 @Composable
 private fun PersonRow(
@@ -259,17 +258,15 @@ private fun PersonRow(
     val action = rememberAction()
     val kept = stringResource(R.string.circle_bee_kept, person.displayName)
     val unread = chat?.isUnread(myUid) == true
-    val last = chat?.lastMessage?.takeIf { it.isNotBlank() }
     PersonCard(
         avatar = person.avatar,
         name = person.displayName,
-        about = when {
-            leavingAt != null -> stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
-            last != null -> last
-            else -> person.bio.ifBlank { role }
+        about = if (leavingAt != null) {
+            stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
+        } else {
+            person.bio.ifBlank { role }
         },
         aboutIsWarning = leavingAt != null,
-        aboutIsNew = unread && leavingAt == null,
         modifier = modifier,
         error = action.error,
         onClick = onOpen,
@@ -439,7 +436,6 @@ private fun PersonCard(
     about: String,
     modifier: Modifier,
     aboutIsWarning: Boolean = false,
-    aboutIsNew: Boolean = false,
     error: String? = null,
     onClick: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
@@ -454,7 +450,6 @@ private fun PersonCard(
                     about,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (aboutIsWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (aboutIsNew) FontWeight.SemiBold else null,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
