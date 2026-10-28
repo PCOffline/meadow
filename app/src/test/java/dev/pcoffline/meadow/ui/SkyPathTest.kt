@@ -1,12 +1,13 @@
 package dev.pcoffline.meadow.ui
 
 import dev.pcoffline.meadow.ui.components.arcAt
+import dev.pcoffline.meadow.ui.components.cloudHeight
 import dev.pcoffline.meadow.ui.components.skyProgress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The sun crosses the sky with the day, and the moon with the night. */
+/** The sun crosses the sky with the day, and the moon with the night; clouds keep to the open sky. */
 class SkyPathTest {
     @Test
     fun `the sun rises at five, is halfway at one and sets at nine`() {
@@ -35,5 +36,19 @@ class SkyPathTest {
         assertEquals(0.1f, arcAt(0f).x, 1e-4f)
         assertEquals(0.9f, arcAt(1f).x, 1e-4f)
         assertEquals(0f, arcAt(1f).y, 1e-4f)
+    }
+
+    @Test
+    fun `clouds keep to the open sky between the words, wherever their path is`() {
+        listOf(0.08f, 0.18f, 0.26f, 0.32f, 0.42f).forEach { path ->
+            val y = cloudHeight(path, clearAbove = 0.3f, horizon = 0.6f)
+            // A cloud reaches about 10dp, 3% of the garden's header, above and below its middle.
+            assertTrue("$path at $y", y - 0.03f >= 0.3f && y + 0.03f <= 0.6f)
+        }
+    }
+
+    @Test
+    fun `with no open sky marked out, clouds keep their own paths`() {
+        assertEquals(0.18f, cloudHeight(0.18f, clearAbove = 0f, horizon = 0f), 1e-6f)
     }
 }
