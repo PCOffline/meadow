@@ -96,6 +96,20 @@ class SiteMeasureTest {
         assertNull(AppGraph.sites.current())
     }
 
+    @Test
+    fun `a site's sound is the browser's in front, so that's whose media stops`() {
+        service.onForeground("com.android.chrome")
+
+        assertEquals("com.android.chrome", service.browserInFront())
+    }
+
+    @Test
+    fun `with no browser in front no browser's media is stopped`() {
+        service.onForeground("com.example.notes")
+
+        assertNull(service.browserInFront())
+    }
+
     private companion object {
         const val SITE = "site:example.org"
     }

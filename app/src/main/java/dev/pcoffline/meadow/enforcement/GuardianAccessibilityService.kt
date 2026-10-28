@@ -114,7 +114,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         return isActivity
     }
 
-    private fun onForeground(pkg: String) {
+    internal fun onForeground(pkg: String) {
         if (pkg == currentPackage) return
         currentPackage?.takeIf { AppGraph.engine.limitFor(it) != null }?.let {
             lastLimitedLeft = it
@@ -190,6 +190,9 @@ class GuardianAccessibilityService : AccessibilityService() {
         if (bar.isFocused) return AddressBar.Unreadable
         return AddressBar.Shows(bar.text?.toString().orEmpty())
     }
+
+    /** The browser in front, if it's one whose address bar Meadow reads. */
+    internal fun browserInFront(): String? = currentPackage?.takeIf { addressBarOf(it) != null }
 
     /** Measures [site] if it's still the one in front; false once it's been left. */
     @MainThread
@@ -290,6 +293,8 @@ class GuardianAccessibilityService : AccessibilityService() {
         val since = SystemClock.elapsedRealtime()
         BlockActivity.launch(this, pkg)
         MeadowNotificationListener.rest(this, pkg)
+        // A website's sound plays in its browser, which the rest screen covers along with it.
+        if (Sites.isSite(pkg)) browserInFront()?.let { MeadowNotificationListener.pauseMedia(this, setOf(it)) }
         scope.launch { makeSureBlocked(pkg, since) }
     }
 
