@@ -1,6 +1,6 @@
 # Privacy notice
 
-Version 3 · updated 28 October 2026
+Version 4 · updated 28 October 2026
 
 Meadow helps you keep the app time limits you choose, with the help of friends you trust (your Bumblebees). This notice explains what Meadow collects, why, who can see it, and the choices you have. We've tried to keep it short and plain.
 
@@ -11,9 +11,10 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 ## What stays on your phone
 
 - **Your detailed screen time.** Meadow reads Android's usage log to measure how long each app is open. The full history (up to 120 days) stays on your phone; only the summaries you choose to share below leave it.
-- **What's on screen.** The garden keeper (an accessibility service) notices which app is in front so it can close apps whose time is up. In strict mode it also reads the words on a few system settings screens, to stop Meadow being switched off. This happens on your phone only. Meadow never reads what you type, and never stores or sends what's on your screen.
+- **What's on screen.** The garden keeper (an accessibility service) notices which app is in front so it can close apps whose time is up. In strict mode it also reads the words on a few system settings screens, to stop Meadow being switched off. If you limit a website, it also reads the address bar of the browser in front (Chrome or Chromium, Firefox, Edge, Samsung Internet, Brave, Opera, Vivaldi, Kiwi or DuckDuckGo), only to tell whether that site is open; any other address is let go of at once. This happens on your phone only. Meadow never reads what you type, the pages you visit or your browsing history, and never stores or sends what's on your screen.
 - **Notifications from resting apps.** With notification access, Meadow hides notifications from apps whose time is up and pauses their media. It only looks at which app posted them, and never stores or sends their content.
 - **Your list of installed apps,** used to let you pick apps to limit.
+- **Time on the websites you limit,** measured while they're open, for the last 8 days. Only the sites you added are measured; no other site is recorded.
 - **Your approximate location, only if you turn on the weather in the sky.** Meadow asks Android for your rough location (never your precise one), rounds it to about 11 km, and asks Open-Meteo for the weather there (see below). It keeps only the weather and when it was read, never where. Turn it off in Settings, or take the location permission away, and it stops.
 - **Your settings and protection status:** whether strict mode is on, which permissions Meadow has, and battery settings. Nobody else can see them.
 
@@ -23,7 +24,7 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 |---|---|
 | Your name, picture (emoji or photo), short bio and friend code | So your Bumblebees know who you are |
 | Your email address, if you add one, and how you sign in (password or emailed link) | To sign you in and recover your garden |
-| Your limits (app name, minutes and allowed hours) | So they can't be loosened without a Bumblebee's yes. Your Bumblebees see them only if you turn that on |
+| Your limits (the app's or website's name, minutes and allowed hours) | So they can't be loosened without a Bumblebee's yes. Your Bumblebees see them only if you turn that on |
 | Requests, answers, and chat messages, including photos and GIFs you send. A request includes how long you've used that app today and how much today allows | So you and your Bumblebees can talk and decide |
 | Today's screen time, and today's top apps with their minutes, each shared on its own | So your Bumblebees can see how you're doing. **Optional, off unless you turn it on** |
 | Your progress: this week's screen time compared with last week's, how many weeks in a row it went down, and on how many of the last 7 days you kept your limits | So your Bumblebees can see how you're doing over time. **Optional, off unless you turn it on** |

@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.usage
 
+import dev.pcoffline.meadow.data.Sites
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -61,7 +62,8 @@ class AppCatalog(private val context: Context) {
         return usage.filter { (pkg, ms) -> ms > 0 && pkg in launchable && pkg !in homes }
     }
 
-    fun label(packageName: String): String = labelCache.getOrPut(packageName) {
+    /** The app's name, or a website's domain. */
+    fun label(packageName: String): String = Sites.domainOf(packageName) ?: labelCache.getOrPut(packageName) {
         runCatching { pm.getApplicationLabel(pm.applicationInfo(packageName)).toString() }
             .getOrDefault(packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() })
     }

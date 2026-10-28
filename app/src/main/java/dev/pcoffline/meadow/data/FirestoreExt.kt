@@ -5,6 +5,7 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,8 +18,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "MeadowFirestore"
 
-/** Live query results via the SDK's own Flow. A failed listener is logged and listens again ([relisten]). */
-fun Query.observe(): Flow<QuerySnapshot> = tracedSnapshots().relisten("Query listener")
+/**
+ * Live query results via the SDK's own Flow. A failed listener is logged and listens again
+ * ([relisten]). With [metadataChanges] INCLUDE it also hears the server confirm what the cache
+ * already showed.
+ */
+fun Query.observe(metadataChanges: MetadataChanges = MetadataChanges.EXCLUDE): Flow<QuerySnapshot> =
+    tracedSnapshots(metadataChanges).relisten("Query listener")
 
 fun DocumentReference.observe(): Flow<DocumentSnapshot> = tracedSnapshots().relisten("Document listener")
 
@@ -53,7 +59,8 @@ fun <T> Flow<T>.retryWithBackoff(onFailure: suspend (cause: Throwable, waitMs: L
  * Holds back what [fromCache] says came from this phone's cache while [online], for up to
  * [waitMs], so a screen opened after a change made elsewhere (a Bumblebee answering) doesn't act
  * on the old copy first. The server's copy, arriving meanwhile, replaces it; offline, or with a
- * server slow to answer, the cached copy is what there is.
+ * server slow to answer, the cached copy is what there is. Listen with metadata changes, or a
+ * server that only confirms the cache is never heard and the wait always runs out.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 fun <T> Flow<T>.preferServer(

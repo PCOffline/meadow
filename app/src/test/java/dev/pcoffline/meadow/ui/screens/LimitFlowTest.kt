@@ -132,6 +132,41 @@ class LimitFlowTest : ScreenTest() {
     }
 
     @Test
+    fun `typing a website's address offers to limit the website`() {
+        val picked = mutableListOf<String>()
+        show { AppPickerScreen(onBack = {}, onPick = { picked += it }) }
+        compose.onNode(hasSetTextAction()).performTextInput("https://www.YouTube.com/watch?v=1")
+        compose.waitUntil(5_000) { shows(text(R.string.picker_site, "youtube.com")) }
+        node(R.string.picker_no_match, "https://www.YouTube.com/watch?v=1").assertDoesNotExist()
+        node(R.string.picker_site, "youtube.com").performClick()
+        assertEquals(listOf("site:youtube.com"), picked)
+        assertAccessible()
+    }
+
+    @Test
+    fun `a word that isn't an address offers no website`() {
+        show { AppPickerScreen(onBack = {}, onPick = {}) }
+        compose.onNode(hasSetTextAction()).performTextInput("youtube")
+        compose.waitUntil(5_000) { shows(text(R.string.picker_no_match, "youtube")) }
+        compose.onNodeWithText(text(R.string.picker_site_kind)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a website's limit says which browsers it's counted in`() {
+        show {
+            LimitEditor("site:youtube.com", LimitEditorState(appName = "youtube.com", loaded = true), onDone = {})
+        }
+        node(R.string.limit_editor_site_browsers).assertExists()
+        compose.onNodeWithText("youtube.com").assertExists()
+    }
+
+    @Test
+    fun `an app's limit says nothing about browsers`() {
+        editor(LimitEditorState())
+        node(R.string.limit_editor_site_browsers).assertDoesNotExist()
+    }
+
+    @Test
     fun `a tap steps once, and holding keeps stepping`() {
         editor(LimitEditorState())
         val more = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))

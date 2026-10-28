@@ -11,5 +11,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- A stand-in browser, so websites can be limited in the tests. -->
+        <activity
+            android:name="dev.pcoffline.meadow.StandInBrowserActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:label="Stand-in browser" />
     </application>
 </manifest>

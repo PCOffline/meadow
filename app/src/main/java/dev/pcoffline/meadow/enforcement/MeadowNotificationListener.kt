@@ -9,6 +9,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.Sites
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -104,6 +105,9 @@ class MeadowNotificationListener : NotificationListenerService() {
          * (a floating window, a player) keeps running. Android only lets this stop background apps.
          */
         fun stopInBackground(context: Context, pkg: String) {
+            // A website has no process of its own (its browser is more than the site), and its
+            // address is never written anywhere, the log included.
+            if (Sites.isSite(pkg)) return
             runCatching { context.getSystemService(ActivityManager::class.java).killBackgroundProcesses(pkg) }
                 .onFailure { Log.w(TAG, "Could not stop $pkg", it) }
         }

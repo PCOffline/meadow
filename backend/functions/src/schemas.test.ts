@@ -94,6 +94,11 @@ test("decisions accept an optional smaller amount", () => {
 
 test("emergency unlocks need a real reason and a set length", () => {
   assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home" }).success);
+  // For one app or website, or every limit; never anything that isn't one.
+  assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "com.maps" }).success);
+  assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "site:maps.example.com" }).success);
+  assert.ok(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: null }).success);
+  assert.equal(EmergencyInput.safeParse({ minutes: 30, reason: "Need maps to get home", packageName: "anything at all" }).success, false);
   assert.equal(firstError(EmergencyInput.safeParse({ minutes: 45, reason: "Need maps to get home" })), "Pick 15, 30 or 60 minutes.");
   assert.equal(firstError(EmergencyInput.safeParse({ minutes: 15, reason: "pls" })), "Please say briefly what the emergency is.");
 });
@@ -101,4 +106,18 @@ test("emergency unlocks need a real reason and a set length", () => {
 test("only package names are looked up as limits", () => {
   assert.ok(isPackageName("com.instagram.android"));
   for (const bad of ["", "com/instagram", "..", "com..insta", "Maps app"]) assert.equal(isPackageName(bad), false, bad);
+});
+
+test("a website is limited under its domain, in lower case, and nothing else passes for one", () => {
+  for (const ok of ["site:youtube.com", "site:m.youtube.com", "site:xn--bcher-kva.de", "site:my-site.co.uk", "site:a1.io"]) {
+    assert.ok(isPackageName(ok), ok);
+  }
+  const bad = [
+    "site:", "site:youtube", "site:YouTube.com", "site:-bad.com", "site:bad-.com", "site:you tube.com", "site:youtube.com/",
+    "site:youtube.com/watch", "site:https://youtube.com", "site:a..com", "site:.com", "site:youtube.com.", `site:${"a".repeat(64)}.com`,
+    "site:youtube.com:443", "site:you_tube.com", "site:../x.com", "web:youtube.com",
+  ];
+  for (const b of bad) assert.equal(isPackageName(b), false, b);
+  assert.equal(isPackageName(`site:${"a".repeat(60)}.${"b".repeat(60)}.${"c".repeat(60)}.com`), true);
+  assert.equal(isPackageName(`site:${["a", "b", "c", "d"].map((l) => l.repeat(50)).join(".")}.com`), false, "over 200 characters");
 });

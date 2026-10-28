@@ -20,7 +20,9 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -353,9 +355,18 @@ abstract class EndToEndTest {
     protected fun tapForDialog(@StringRes id: Int) {
         eventually("${text(id)} enabled") { runCatching { node(id).assertIsEnabled() }.isSuccess }
         node(id).performScrollTo()
+        val button = hasText(text(id)) and hasClickAction()
+        // Scrolled just into view, the editor's last button sits on the screen's bottom edge, where
+        // the system's navigation takes the touch: bring it up towards the middle of its page.
+        val page = compose.onAllNodes(hasScrollAction() and hasAnyDescendant(button)).fetchSemanticsNodes()
+            .minByOrNull { it.boundsInWindow.height }
+        if (page != null) {
+            val off = compose.onNode(button).fetchSemanticsNode().boundsInWindow.center.y - page.boundsInWindow.center.y
+            compose.onNode(hasScrollAction() and SemanticsMatcher("page") { it.id == page.id })
+                .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, off) }
+        }
         // Scrolling there is animated, and a touch while the page still moves only stops it, as a
         // finger's would: the tap waits until the button has come to rest.
-        val button = hasText(text(id)) and hasClickAction()
         var last = compose.onNode(button).fetchSemanticsNode().boundsInWindow
         poll("${text(id)} at rest") {
             Thread.sleep(300)

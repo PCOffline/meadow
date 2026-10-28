@@ -11,7 +11,11 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
+import androidx.annotation.MainThread
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.BuildConfig
+import dev.pcoffline.meadow.data.Browsers
+import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.usage.activityInfo
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +34,10 @@ import kotlinx.coroutines.withContext
  * a limited app has no time left its window is closed, the block screen appears, its
  * notifications and media stop and its process is ended once in the background. In strict mode
  * it also keeps the settings pages that could switch Meadow off out of reach.
+ *
+ * For limited websites, it reads the address bar of the browser in front (only in the browsers in
+ * [Browsers], and only while a website is limited), compares it with the limited sites and lets
+ * go of it: no address is kept or sent. A limited site in front is watched like an app.
  */
 class GuardianAccessibilityService : AccessibilityService() {
     /** Background work: budget watchers and strict-mode reads; internal so tests can wait for it. */
@@ -47,6 +55,13 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     /** The limited app shown in picture-in-picture, if any. */
     @Volatile private var pipPackage: String? = null
+
+    /** The limited website (its id) open in the browser in front, if any. */
+    @Volatile private var sitePackage: String? = null
+    private var siteJob: Job? = null
+    private var siteTrailing: Job? = null
+    private var siteRecheck = false
+    private var lastSiteCheck = 0L
     private var lastLimitedLeft: String? = null
     private var lastLimitedLeftAt = 0L
     private val watchers = HashMap<String, Job>()
@@ -76,6 +91,7 @@ class GuardianAccessibilityService : AccessibilityService() {
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 if (AppGraph.store.strictMode.value && pkg in GUARDED_SYSTEM_PACKAGES) checkStrict(pkg, force = false)
+                if (pkg == currentPackage) checkSite(pkg, force = false)
             }
             else -> Unit // The service config only subscribes to the window events above.
         }
@@ -98,7 +114,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         return isActivity
     }
 
-    private fun onForeground(pkg: String) {
+    internal fun onForeground(pkg: String) {
         if (pkg == currentPackage) return
         currentPackage?.takeIf { AppGraph.engine.limitFor(it) != null }?.let {
             lastLimitedLeft = it
@@ -106,11 +122,93 @@ class GuardianAccessibilityService : AccessibilityService() {
         }
         currentPackage = pkg
         AppGraph.engine.setForeground(pkg)
+        // A site stays open only while its browser does; back in a browser, its address is read again.
+        setSite(null)
+        checkSite(pkg, force = true)
         // Picture-in-picture often starts just as its app is left.
         scanWindows()
     }
 
-    private fun onScreen(pkg: String) = pkg == currentPackage || pkg in sidePackages || pkg == pipPackage
+    private fun onScreen(pkg: String) = pkg == currentPackage || pkg in sidePackages || pkg == pipPackage || pkg == sitePackage
+
+    /** The limited sites' domains; empty when none is limited, and then no address bar is read. */
+    private fun limitedDomains(): List<String> = AppGraph.store.limits.value.mapNotNull { Sites.domainOf(it.packageName) }
+
+    private fun addressBarOf(pkg: String): String? =
+        Browsers.addressBarOf(pkg, if (BuildConfig.TEST_BROWSER.isEmpty()) emptyMap() else mapOf(BuildConfig.TEST_BROWSER to "url_bar"))
+
+    /**
+     * Reads the address bar of [pkg], a browser in front, if any website is limited. At most a
+     * couple of times a second, off the main thread; a change while reading is read again after.
+     */
+    private fun checkSite(pkg: String, force: Boolean) {
+        val bar = addressBarOf(pkg) ?: return
+        val domains = limitedDomains()
+        if (domains.isEmpty()) return
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - lastSiteCheck < SITE_CHECK_MS) {
+            // Read once more when the changes settle, so the last address is never missed.
+            if (siteTrailing?.isActive != true) {
+                siteTrailing = scope.launch {
+                    delay(SITE_CHECK_MS)
+                    withContext(Dispatchers.Main) { currentPackage?.let { checkSite(it, force = true) } }
+                }
+            }
+            return
+        }
+        if (siteJob?.isActive == true) {
+            siteRecheck = true
+            return
+        }
+        lastSiteCheck = now
+        siteJob = scope.launch {
+            val read = readAddressBar(bar)
+            withContext(Dispatchers.Main) {
+                // Gone to another app while reading: what was read no longer applies.
+                if (pkg == currentPackage) {
+                    when (read) {
+                        AddressBar.Unreadable -> Unit
+                        is AddressBar.Shows -> setSite(Sites.match(read.text, domains)?.let(Sites::idFor))
+                    }
+                }
+                siteJob = null
+                if (siteRecheck) {
+                    siteRecheck = false
+                    currentPackage?.let { checkSite(it, force = true) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Only the address bar is read, by its id: never the page. While someone is typing in it,
+     * what it shows isn't where they are, so it counts as unreadable and the last site stands.
+     */
+    private fun readAddressBar(id: String): AddressBar {
+        val root = rootInActiveWindow ?: return AddressBar.Unreadable
+        val bar = runCatching { root.findAccessibilityNodeInfosByViewId(id) }.getOrNull()?.firstOrNull() ?: return AddressBar.Unreadable
+        if (bar.isFocused) return AddressBar.Unreadable
+        return AddressBar.Shows(bar.text?.toString().orEmpty())
+    }
+
+    /** The browser in front, if it's one whose address bar Meadow reads. */
+    internal fun browserInFront(): String? = currentPackage?.takeIf { addressBarOf(it) != null }
+
+    /** Measures [site] if it's still the one in front; false once it's been left. */
+    @MainThread
+    internal fun measureSite(site: String): Boolean {
+        if (site != sitePackage) return false
+        AppGraph.sites.seen(site)
+        return true
+    }
+
+    @MainThread
+    internal fun setSite(site: String?) {
+        if (site == sitePackage) return
+        if (sitePackage != null) AppGraph.sites.left()
+        sitePackage = site
+        updateWatchers()
+    }
 
     /** Finds limited apps in other windows: split screen and picture-in-picture. */
     private fun scanWindows() {
@@ -141,7 +239,7 @@ class GuardianAccessibilityService : AccessibilityService() {
     /** One watcher per limited app on screen; watchers of apps no longer shown stop. */
     @Synchronized
     private fun updateWatchers() {
-        val shown = (sidePackages + listOfNotNull(currentPackage, pipPackage))
+        val shown = (sidePackages + listOfNotNull(currentPackage, pipPackage, sitePackage))
             .filter { it != packageName && AppGraph.engine.limitFor(it) != null }
             .toSet()
         watchers.entries.removeAll { (pkg, job) -> (pkg !in shown || !job.isActive).also { gone -> if (gone) job.cancel() } }
@@ -159,6 +257,9 @@ class GuardianAccessibilityService : AccessibilityService() {
                 first = true
                 continue
             }
+            // A website's time is measured as it's watched, on the main thread where the site in
+            // front changes: measured from here, a visit just left could open again and keep counting.
+            if (Sites.isSite(pkg) && !withContext(Dispatchers.Main) { measureSite(pkg) }) return
             val budget = AppGraph.engine.budget(pkg, forceRefresh = first) ?: return
             first = false
             if (budget.exhausted) {
@@ -181,6 +282,8 @@ class GuardianAccessibilityService : AccessibilityService() {
      * background open for a few seconds, so going Home first would leave nothing shown.
      */
     internal fun block(pkg: String) {
+        // A covered site's time stops with it; it's read again from the address bar if it comes back.
+        if (pkg == sitePackage) setSite(null)
         // Already covered: opening the screen again, or going Home, would only make it flicker.
         if (BlockActivity.isShowingFor(pkg) && pkg !in sidePackages && pkg != pipPackage) return
         if (pkg == pipPackage) {
@@ -188,9 +291,12 @@ class GuardianAccessibilityService : AccessibilityService() {
             pipPackage = null
         }
         val since = SystemClock.elapsedRealtime()
-        BlockActivity.launch(this, pkg)
+        val browser = if (Sites.isSite(pkg)) browserInFront() else null
+        BlockActivity.launch(this, pkg, browser)
         MeadowNotificationListener.rest(this, pkg)
-        scope.launch { makeSureBlocked(pkg, since) }
+        // A website's sound plays in its browser, which the rest screen covers along with it.
+        browser?.let { MeadowNotificationListener.pauseMedia(this, setOf(it)) }
+        scope.launch { makeSureBlocked(pkg, since, browser) }
     }
 
     /**
@@ -198,7 +304,7 @@ class GuardianAccessibilityService : AccessibilityService() {
      * on screen beside it (the other split-screen half) is left with Home, once, after which the
      * block screen has to show again.
      */
-    private suspend fun makeSureBlocked(pkg: String, launchedAt: Long) {
+    private suspend fun makeSureBlocked(pkg: String, launchedAt: Long, browser: String?) {
         var since = launchedAt
         var leftHome = false
         repeat(BLOCK_ATTEMPTS) {
@@ -217,7 +323,7 @@ class GuardianAccessibilityService : AccessibilityService() {
                         since = SystemClock.elapsedRealtime()
                         performGlobalAction(GLOBAL_ACTION_HOME)
                     }
-                    !shown -> BlockActivity.launch(this@GuardianAccessibilityService, pkg)
+                    !shown -> BlockActivity.launch(this@GuardianAccessibilityService, pkg, browser)
                     else -> Unit // Shown; the app's own window events haven't caught up yet.
                 }
             }
@@ -306,6 +412,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         // Long enough to outlast the few seconds Android holds screens back after Home.
         private const val BLOCK_CHECK_MS = 1_000L
         private const val BLOCK_ATTEMPTS = 10
+        private const val SITE_CHECK_MS = 500L
         private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")
 
         val GUARDED_SYSTEM_PACKAGES = setOf(
@@ -319,6 +426,12 @@ class GuardianAccessibilityService : AccessibilityService() {
             "com.android.permissioncontroller",
         )
     }
+}
+
+/** What a browser's address bar shows: an address (or search) to compare, or nothing readable. */
+internal sealed interface AddressBar {
+    data object Unreadable : AddressBar
+    data class Shows(val text: String) : AddressBar
 }
 
 /** Decides which system screens are off limits while strict mode is on. */

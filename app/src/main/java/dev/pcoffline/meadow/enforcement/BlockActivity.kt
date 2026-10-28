@@ -6,9 +6,11 @@ import android.app.ActivityOptions
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -55,6 +57,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Days
@@ -113,6 +116,8 @@ class BlockActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Kept as the screen's own, so Open reads the browser it now names.
+        setIntent(intent)
         packageState.value = intent.getStringExtra(EXTRA_PACKAGE)
     }
 
@@ -146,13 +151,26 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    /** Opens the app again, or a website in the browser it was open in (or any, if that's gone). */
     private fun openApp(pkg: String) {
-        packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        val browser = intent.getStringExtra(EXTRA_BROWSER)
+        val opened = openIntents(pkg, browser).any { runCatching { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess }
+        if (!opened) Log.w(TAG, "Nothing could open what was resting")
         finish()
     }
 
     companion object {
         const val EXTRA_PACKAGE = "package"
+        /** For a website: the browser it was open in, to open it there again. */
+        const val EXTRA_BROWSER = "browser"
+        private const val TAG = "BlockActivity"
+
+        /** What opens [pkg] again, best first: a website in [browser], then in any browser; an app itself. */
+        internal fun Context.openIntents(pkg: String, browser: String?): List<Intent> {
+            val domain = Sites.domainOf(pkg) ?: return listOfNotNull(packageManager.getLaunchIntentForPackage(pkg))
+            val site = Intent(Intent.ACTION_VIEW, "https://$domain".toUri())
+            return listOfNotNull(browser?.let { Intent(site).setPackage(it) }, site)
+        }
 
         /** The app the screen last showed for, and when (elapsed realtime). */
         @Volatile private var lastShown: Pair<String, Long>? = null
@@ -171,9 +189,10 @@ class BlockActivity : ComponentActivity() {
         fun shownSince(packageName: String, since: Long): Boolean =
             lastShown?.let { (pkg, at) -> pkg == packageName && at >= since } == true
 
-        fun launch(context: Context, packageName: String) {
+        fun launch(context: Context, packageName: String, browser: String? = null) {
             val intent = Intent(context, BlockActivity::class.java)
                 .putExtra(EXTRA_PACKAGE, packageName)
+                .putExtra(EXTRA_BROWSER, browser)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
             try {
                 context.startActivity(intent)

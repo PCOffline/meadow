@@ -42,9 +42,11 @@ test("nobody else can change your photo", async () => {
   await assertFails(uploadBytes(ref(storageOf(null), "avatars/sam"), jpeg(), image));
 });
 
-test("only images under 2 MB are accepted", async () => {
+test("only JPEGs under 2 MB are accepted, as the app makes them", async () => {
   await assertFails(uploadBytes(ref(storageOf("sam"), "avatars/sam"), jpeg(2 * 1024 * 1024 + 1), image));
   await assertFails(uploadBytes(ref(storageOf("sam"), "avatars/sam"), jpeg(), { contentType: "text/html" }));
+  // A picture a browser would run as a page.
+  await assertFails(uploadBytes(ref(storageOf("sam"), "avatars/sam"), jpeg(), { contentType: "image/svg+xml" }));
 });
 
 test("your circle can see your photo; strangers and signed-out visitors can't", async () => {

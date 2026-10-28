@@ -1,8 +1,10 @@
 package dev.pcoffline.meadow.data
 
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
@@ -36,9 +38,10 @@ class RequestRepository(
         requests.whereEqualTo("requesterId", uid)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(100)
-            .observe()
+            .observe(if (fresh) MetadataChanges.INCLUDE else MetadataChanges.EXCLUDE)
             .let { if (fresh) it.preferServer({ snapshot -> snapshot.metadata.isFromCache }) else it }
             .map { snapshot -> snapshot.documents.map { it.toRequest() } }
+            .distinctUntilChanged()
 
     /** One of my own requests. */
     fun observe(id: String): Flow<LimitRequest?> =

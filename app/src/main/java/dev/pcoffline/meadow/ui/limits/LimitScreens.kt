@@ -76,6 +76,7 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.data.ChangeOutcome
 import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.LimitRequest
@@ -158,6 +159,7 @@ fun AppPickerScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val rows by viewModel.rows.collectAsStateWithLifecycle()
+    val limits by AppGraph.store.limits.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize()) {
         BackTopBar(stringResource(R.string.picker_title), onBack = onBack)
         OutlinedTextField(
@@ -173,10 +175,27 @@ fun AppPickerScreen(
             Loading()
         } else {
             val filtered = remember(list, query) { list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) } }
-            if (filtered.isEmpty() && query.isNotBlank()) {
+            // Typing an address offers the website itself, above any apps that match.
+            val site = remember(query) { query.takeIf { '.' in it }?.let(Sites::normalize) }
+            if (filtered.isEmpty() && query.isNotBlank() && site == null) {
                 Hint(stringResource(R.string.picker_no_match, query.trim()), Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
             }
             LazyColumn(Modifier.fillMaxSize().imePadding()) {
+                if (site != null) {
+                    item(key = "site") {
+                        val id = Sites.idFor(site)
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.picker_site, site)) },
+                            supportingContent = { Text(stringResource(R.string.picker_site_kind)) },
+                            leadingContent = { AppIcon(id) },
+                            trailingContent = {
+                                if (limits.any { it.packageName == id }) Pill(stringResource(R.string.picker_planted), MaterialTheme.colorScheme.primaryContainer)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            modifier = Modifier.animateItem().clickable { onPick(id) }.padding(horizontal = 8.dp),
+                        )
+                    }
+                }
                 items(filtered, key = { it.packageName }) { row ->
                     ListItem(
                         headlineContent = { Text(row.label) },
@@ -321,6 +340,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 asleep = state.budget?.sleeping == true,
             )
         }
+        if (Sites.isSite(packageName)) Hint(stringResource(R.string.limit_editor_site_browsers))
 
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn, editable) { dailyOn = it }

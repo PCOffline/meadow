@@ -242,6 +242,16 @@ describe("limits", () => {
     await assertFails(setDoc(doc(as("bee"), "users/sam/limits/com.tok"), { ...limit(15), packageName: "com.tok" }));
   });
 
+  test("a limit is filed under an app's package or a website's domain, nothing else", async () => {
+    await seed();
+    for (const ok of ["site:youtube.com", "site:m.youtube.com", "site:xn--bcher-kva.de"]) {
+      await assertSucceeds(setDoc(doc(as("sam"), `users/sam/limits/${ok}`), { ...limit(15), packageName: ok }));
+    }
+    for (const bad of ["site:YouTube.com", "site:youtube", "site:-x.com", "site:you tube.com", "site:a..com", "web:youtube.com", "Maps app", `com.${"a".repeat(200)}`]) {
+      await assertFails(setDoc(doc(as("sam"), `users/sam/limits/${bad}`), { ...limit(15), packageName: bad }));
+    }
+  });
+
   test("allowed hours can be set on a new limit, but with Bumblebees only change through the backend", async () => {
     await seed();
     const evenings = { 1: [{ from: 600, to: 1320 }] };
@@ -387,11 +397,13 @@ describe("requests, invites and links", () => {
     await assertFails(updateDoc(doc(as("sam"), "requests/r1"), { status: "approved" }));
   });
 
-  test("removals and rate limits are the backend's alone", async () => {
+  test("removals, rate limits and unsent pictures are the backend's alone", async () => {
     await assertFails(getDoc(doc(as("sam"), "removals/sam_bee")));
     await assertFails(setDoc(doc(as("sam"), "removals/sam_bee"), { ownerUid: "sam", beeUid: "bee" }));
     await assertFails(getDoc(doc(as("sam"), "rateLimits/sam")));
     await assertFails(setDoc(doc(as("sam"), "rateLimits/sam"), {}));
+    await assertFails(getDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|abc12345.jpg")));
+    await assertFails(deleteDoc(doc(as("sam"), "chatUploads/chats|bee_sam|sam|abc12345.jpg")));
   });
 
   test("invite links, friend codes and the test outbox are hidden", async () => {
@@ -461,6 +473,9 @@ describe("chats", () => {
     await assertFails(updateDoc(chat, { lastSenderId: "bee" }));
     await assertFails(updateDoc(chat, { participants: ["sam", "stranger"] }));
     await assertSucceeds(updateDoc(chat, { "lastRead.sam": serverTimestamp() }));
+    // When I last read it is now, never a time or anything else made up.
+    await assertFails(updateDoc(chat, { "lastRead.sam": Timestamp.fromMillis(Date.now() + 86_400_000) }));
+    await assertFails(updateDoc(chat, { "lastRead.sam": "x".repeat(10_000) }));
   });
 
   test("once the two part ways, the chat is closed: read-only for them, still shut to everyone else", async () => {

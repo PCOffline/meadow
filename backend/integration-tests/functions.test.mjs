@@ -957,6 +957,37 @@ describe("chat and alerts", () => {
     assert.equal(await copies(), 1);
   });
 
+  test("a picture never sent in a message is deleted after an hour; a sent one stays", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
+    const unsent = `chats/${chatId}/${sam.uid}/unsent1234.jpg`;
+    const sent = `chats/${chatId}/${sam.uid}/sent12345.jpg`;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      for (const bucket of BUCKETS) {
+        for (const path of [unsent, sent]) await uploadBytes(storageRef(ctx.storage(`gs://${bucket}`), path), new Uint8Array([255, 216, 255]), { contentType: "image/jpeg" });
+      }
+    });
+    await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
+      senderId: sam.uid, kind: "image", path: sent, width: 640, height: 480, gif: false, createdAt: serverTimestamp(),
+    }));
+    // Each upload is noted as it lands in the backend's bucket.
+    await eventually(async () => assert.ok(await read(`chatUploads/${unsent.replaceAll("/", "|")}`)));
+    // Uploaded to both possible default buckets (see readFile): the backend's own copy is the one swept.
+    const copies = async (path) => (await Promise.all(BUCKETS.map(async (bucket) =>
+      (await fetch(`http://127.0.0.1:9199/v0/b/${bucket}/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } })).ok))).filter(Boolean).length;
+
+    // Not yet an hour: both stay.
+    await sam.call("runSchedulesForTests", { now: Date.now() });
+    assert.equal(await copies(unsent), 2);
+    const later = await sam.call("runSchedulesForTests", { now: Date.now() + 2 * 3600_000 });
+    assert.ok(later.unsentPictures >= 1);
+    assert.equal(await copies(unsent), 1);
+    assert.equal(await copies(sent), 2);
+    assert.equal(await read(`chatUploads/${unsent.replaceAll("/", "|")}`), undefined);
+  });
+
   test("a protection alert reaches every Bumblebee, without saying which setting changed", async () => {
     const sam = await person("Sam");
     const bee = await person("Bee");
