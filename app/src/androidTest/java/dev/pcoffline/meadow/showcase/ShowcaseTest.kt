@@ -4,8 +4,12 @@ import android.os.ParcelFileDescriptor
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +30,8 @@ import androidx.core.view.WindowCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.enforcement.RestContent
 import dev.pcoffline.meadow.ui.Badges
 import dev.pcoffline.meadow.ui.MeadowTabBar
@@ -33,13 +39,18 @@ import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.Tab
 import dev.pcoffline.meadow.ui.auth.AuthScreen
 import dev.pcoffline.meadow.ui.chat.ChatContent
+import dev.pcoffline.meadow.ui.circle.FriendPage
 import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
+import dev.pcoffline.meadow.ui.limits.BackTopBar
+import dev.pcoffline.meadow.ui.limits.LimitEditor
+import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
+import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
@@ -239,6 +250,49 @@ class ShowcaseTest {
     }
 
     @Test
+    fun limit() {
+        val youtube = AppLimit("demo.youtube", "YouTube", 60, 0)
+        val state = LimitEditorState(
+            existing = youtube, appName = "YouTube", budget = AppBudget(youtube, 52 * MIN, 240 * MIN, 0, 0), bumblebeeCount = 2, loaded = true,
+        )
+        show {
+            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+                BackTopBar(state.appName, onBack = {})
+                LimitEditor(youtube.packageName, state, onDone = {})
+            }
+        }
+        capture("limit")
+    }
+
+    @Test
+    fun friend() {
+        show {
+            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+                BackTopBar(DemoGarden.anaPage.profile.displayName, onBack = {})
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) { FriendPage(DemoGarden.anaPage, false) }
+            }
+        }
+        capture("friend")
+    }
+
+    @Test
+    fun privacy() {
+        show {
+            Box(Modifier.navigationBarsPadding()) {
+                PrivacyPreviewContent(DemoGarden.robin, DemoGarden.today, DemoGarden.progress, DemoGarden.myLimits, save = {})
+            }
+        }
+        capture("privacy")
+    }
+
+    @Test
+    fun emergency() {
+        val rest = DemoGarden.rest
+        show(hour = 21) { RestContent("demo.tiktok", rest.copy(budget = DemoGarden.tiktok.copy(emergencyUntilMillis = System.currentTimeMillis() + 30 * MIN))) }
+        capture("emergency")
+    }
+
+    @Test
     fun profile() {
         show { ProfileScreen(DemoGarden.robin, onBack = {}) }
         capture("profile")
@@ -260,5 +314,6 @@ class ShowcaseTest {
 
     private companion object {
         const val DIR = "/sdcard/Pictures/meadow"
+        const val MIN = 60_000L
     }
 }

@@ -458,7 +458,7 @@ Android emulator):
 ./gradlew installDebug -Pmeadow.emulatorHost=10.0.2.2
 ```
 
-The README's *Tests* section lists every test suite and how to run it. To watch every request
+[CONTRIBUTING.md](../CONTRIBUTING.md#checks) lists each test suite and how to run it. To watch every request
 and why it was allowed or refused, see [Debugging Meadow](debugging.md).
 
 ## Troubleshooting
