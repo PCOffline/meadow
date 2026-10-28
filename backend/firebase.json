@@ -88,7 +88,8 @@
   "storage": {
     "rules": "storage.rules",
     "postdeploy": [
-      "node \"$PROJECT_DIR/apply-lifecycle.cjs\""
+      "node \"$PROJECT_DIR/apply-lifecycle.cjs\"",
+      "node \"$PROJECT_DIR/check-rules-access.cjs\""
     ]
   }
 }

@@ -194,10 +194,12 @@ The deploy does these steps:
 2. It sends the Storage rules. Then it sets the lifecycle rule of the bucket
    (`backend/apply-lifecycle.cjs`, from `backend/storage-lifecycle.json`). It replaces only the
    rule of Meadow (a delete rule for `exports/`) and keeps all other rules on the bucket.
-3. It compiles the functions (`backend/build-functions.cjs`). Then it deploys them to the
+3. It makes sure that the Storage rules can read Firestore (`backend/check-rules-access.cjs`).
+   The rules read chats and accounts to decide who sees a photo.
+4. It compiles the functions (`backend/build-functions.cjs`). Then it deploys them to the
    region in `backend/functions/.env` (see below), with two scheduled jobs: `expireRequests`
    every 5 minutes and `hourlyCare` every hour.
-4. It makes the legal pages and the app links (`backend/predeploy.cjs`). Then it publishes
+5. It makes the legal pages and the app links (`backend/predeploy.cjs`). Then it publishes
    `backend/hosting/` to `https://<project-id>.web.app`.
 
 The app deletes each data export when it downloads it. The lifecycle rule deletes the exports
@@ -208,7 +210,8 @@ The **first** deploy turns on the Google Cloud APIs that the functions need: Clo
 Cloud Build, Artifact Registry, Cloud Run, Eventarc, Pub/Sub and Cloud Scheduler. This can take
 some minutes. If the deploy fails just after it turns on an API, wait two minutes and run the
 same command again. If the deploy asks to set a cleanup policy for function images, answer
-**yes**. Then the storage cost stays at zero.
+**yes**. Then the storage cost stays at zero. If it asks to grant a role to Cloud Storage for
+Firebase for cross-service rules, answer **yes**.
 
 **Make sure that the deploy worked:**
 
@@ -415,6 +418,9 @@ creates a `github-deploy` service account with the roles that a deploy needs:
 
 - It can act only as the service account of the functions, not as other accounts in the
   project.
+- It can read the IAM policy of the project, to check the Storage role below.
+
+The script also lets the Storage rules read Firestore. A deploy from CI can't grant this role.
 - For a public repository, the sign-in also checks the numeric ID of the repository. Thus a
   different repository with the same name later can't deploy.
 
@@ -516,6 +522,18 @@ request and why the rules allowed or refused it, read [Debugging Meadow](debuggi
 
 **`HTTP Error: 403, … API has not been used in project … or it is disabled`.** A Google Cloud API
 is new. Wait two minutes and deploy again.
+
+**The deploy stops with *Storage rules may not read Firestore*, or chat photos fail.** Cloud
+Storage needs a role to read Firestore from the Storage rules. Without it, Storage refuses chat
+photos and the profile photos of friends. Run `.github/scripts/setup-deploy-access.sh` again, or
+run these commands as the project owner:
+
+```bash
+gcloud beta services identity create --service firebasestorage.googleapis.com --project <project-id>
+gcloud projects add-iam-policy-binding <project-id> --role roles/firebaserules.firestoreServiceAgent \
+  --member "serviceAccount:service-<project-number>@gcp-sa-firebasestorage.iam.gserviceaccount.com" \
+  --condition None
+```
 
 **`Could not build the function due to a missing permission on the build service account`.**
 Newer Google Cloud projects build functions as the Compute Engine default service account, and
