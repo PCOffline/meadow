@@ -197,7 +197,7 @@ data class RestState(
 class RestViewModel(private val packageName: String) : ViewModel() {
     private val pending = AppGraph.sync.profile.flatMapLatest { state ->
         val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
-        AppGraph.requests.outgoing(uid, fresh = true).map { requests ->
+        AppGraph.requests.outgoing(uid).map { requests ->
             requests.firstOrNull {
                 it.type == RequestType.EXTRA_TIME && it.packageName == packageName &&
                     it.status == RequestStatus.PENDING && it.dayKey == Days.todayKey()

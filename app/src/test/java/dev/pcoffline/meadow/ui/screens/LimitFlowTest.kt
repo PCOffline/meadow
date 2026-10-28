@@ -105,6 +105,25 @@ class LimitFlowTest : ScreenTest() {
     }
 
     @Test
+    fun `until it's known whether a question is open, asking waits but the limit shows`() {
+        val limit = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)
+        editor(LimitEditorState(existing = limit, bumblebeeCount = 1, pendingKnown = false))
+        node(R.string.limit_editor_ask_remove).performScrollTo().assertIsNotEnabled()
+        // Looser: asking a Bumblebee waits too.
+        repeat(2) { compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick() }
+        node(R.string.limit_editor_ask).performScrollTo().assertIsNotEnabled()
+        // Tighter needs nobody's yes, so it can be saved meanwhile.
+        repeat(4) { compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick() }
+        node(R.string.action_save).performScrollTo().assertIsEnabled()
+    }
+
+    @Test
+    fun `with no Bumblebees, nothing waits on a question that can't be open`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), pendingKnown = false))
+        node(R.string.limit_editor_remove).performScrollTo().assertIsEnabled()
+    }
+
+    @Test
     fun `searching for an app that isn't there says so`() {
         show { AppPickerScreen(onBack = {}, onPick = {}) }
         compose.onNode(hasSetTextAction()).performTextInput("zzqx")
