@@ -92,7 +92,7 @@ abstract class EndToEndTest {
         try {
             compose.waitUntil(timeout) { runCatching(check).getOrDefault(false) }
         } catch (e: ComposeTimeoutException) {
-            throw AssertionError("Never saw $what. On screen: ${screenText()}", e)
+            throw AssertionError("Never saw $what. On screen: ${screenText()}${failedActions()}", e)
         }
     }
 
@@ -100,7 +100,7 @@ abstract class EndToEndTest {
     protected fun poll(what: String, timeout: Long = 20_000, check: () -> Boolean) {
         val end = System.currentTimeMillis() + timeout
         while (!runCatching(check).getOrDefault(false)) {
-            if (System.currentTimeMillis() > end) throw AssertionError("Never saw $what. On screen: ${screenText()}")
+            if (System.currentTimeMillis() > end) throw AssertionError("Never saw $what. On screen: ${screenText()}${failedActions()}")
             Thread.sleep(250)
         }
     }
@@ -112,7 +112,7 @@ abstract class EndToEndTest {
             compose.waitUntil(timeout) { runCatching { showing(value, substring) }.getOrDefault(false) }
         } catch (e: ComposeTimeoutException) {
             // One line, so CI logs show where it stopped and what was on screen instead.
-            throw AssertionError("Never saw \"$value\". On screen: ${screenText()}", e)
+            throw AssertionError("Never saw \"$value\". On screen: ${screenText()}${failedActions()}", e)
         }
     }
 
@@ -126,6 +126,19 @@ abstract class EndToEndTest {
             walk(root)
         }.distinct().joinToString(" | ").replace('\n', ' ').take(1500)
     }.getOrElse { "(couldn't read the screen: $it)" }
+
+    /**
+     * The app's latest failed action with its cause, from the log. A screen that shows "Something
+     * went wrong" hides the cause from people; a failed test needs it.
+     */
+    protected fun failedActions(): String = runCatching {
+        val log = ParcelFileDescriptor.AutoCloseInputStream(
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("logcat -d -v time -t 300 -s Meadow:W"),
+        ).use { it.readBytes().decodeToString() }
+        val lines = log.lines()
+        val last = lines.indexOfLast { "Action failed" in it }
+        if (last < 0) "" else " Last failed action: " + lines.drop(last).take(8).joinToString(" ⏎ ") { it.trim() }.take(1200)
+    }.getOrDefault("")
 
     /** Every node that takes a tap, with its words and where it is: for when a tap seems lost. */
     protected fun tappables(): String = runCatching {
@@ -212,7 +225,7 @@ abstract class EndToEndTest {
         val end = System.currentTimeMillis() + timeout
         while (!runCatching { check(read()) }.getOrDefault(false)) {
             if (System.currentTimeMillis() > end) {
-                throw AssertionError("$path never changed. Now: ${runCatching(read).getOrNull()}. On screen: ${screenText()}")
+                throw AssertionError("$path never changed. Now: ${runCatching(read).getOrNull()}. On screen: ${screenText()}${failedActions()}")
             }
             Thread.sleep(250)
             // Keeps the app's own clock in step, so a pause it takes before saving (the privacy
