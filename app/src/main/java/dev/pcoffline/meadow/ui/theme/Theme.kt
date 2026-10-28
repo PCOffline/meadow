@@ -61,7 +61,7 @@ data class GardenColors(
     /** The hills' grass: one fresh green everywhere, leaning a little towards the theme's hue the same way. */
     val grass: Color,
     /** A pale tint the daytime sky takes on in this theme. */
-    val sky: Color,
+    val skyTint: Color,
 ) {
     val petals: List<Color> get() = listOf(petalPink, petalLavender, petalHoney, petalPeach, petalSky)
 }
@@ -366,7 +366,7 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
             toward = if (dark) Color.White else Color.Black),
         sun = leanTowards(Sun, s.primary, share = 0.2f, maxDegrees = 8f),
         grass = leanTowards(Grass, s.primary, share = 0.2f, maxDegrees = 12f).let { if (dark) lerp(it, Color.Black, 0.08f) else it },
-        sky = s.sky,
+        skyTint = s.sky,
     )
 }
 

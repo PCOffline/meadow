@@ -229,7 +229,7 @@ internal fun arcAt(progress: Float): Offset {
 internal val AfternoonSky = Color(0xFFD9ECF2)
 
 /** A daytime sky's [top] in the theme of [garden]: half its own, half the theme's sky tint. */
-internal fun tinted(top: Color, garden: GardenColors): Color = lerp(top, garden.sky, 0.5f)
+internal fun tinted(top: Color, garden: GardenColors): Color = lerp(top, garden.skyTint, 0.5f)
 
 /**
  * Clouds, fog, rain and snow veil the sky in grey, the top more than the bottom. The veils stay

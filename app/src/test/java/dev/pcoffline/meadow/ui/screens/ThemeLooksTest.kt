@@ -49,13 +49,18 @@ class ThemeLooksTest : ScreenTest() {
         return compose.onNode(isRoot()).captureToImage().toPixelMap()
     }
 
+    private val stalk = Color(0xFFF1E6D2)
+
     @Test
-    fun `the mushroom forest grows mushrooms on pale stalks, and other gardens flowers`() {
-        val stalk = Color(0xFFF1E6D2)
+    fun `the mushroom forest grows mushrooms on pale stalks`() {
         val mushroom = flower(GardenTheme.MUSHROOM)
         assertTrue(mushroom.count(stalk) > 100)
         // A red cap with pale spots on it.
         assertTrue(mushroom.count(Color.Red) > 300)
+    }
+
+    @Test
+    fun `other gardens grow flowers, with no stalks`() {
         assertEquals(0, flower(GardenTheme.MEADOW).count(stalk))
     }
 
