@@ -37,11 +37,13 @@ class SiteMeasureTest {
         service = controller.get()
         shadowOf(Looper.getMainLooper()).idle()
         AppGraph.sites.left()
+        BlockActivity.showing = null
     }
 
     @After
     fun tearDown() {
         AppGraph.sites.left()
+        BlockActivity.showing = null
         controller.destroy()
     }
 
@@ -61,6 +63,29 @@ class SiteMeasureTest {
 
         assertFalse(service.measureSite(SITE))
         assertNull(AppGraph.sites.current())
+    }
+
+    @Test
+    fun `a site covered by the rest screen stops being measured at once`() {
+        service.setSite(SITE)
+        service.measureSite(SITE)
+
+        service.block(SITE)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertNull(AppGraph.sites.current())
+        assertFalse(service.measureSite(SITE))
+    }
+
+    @Test
+    fun `a site already behind the rest screen isn't measured either`() {
+        service.setSite(SITE)
+        BlockActivity.showing = SITE
+
+        service.block(SITE)
+
+        assertNull(AppGraph.sites.current())
+        assertFalse(service.measureSite(SITE))
     }
 
     @Test

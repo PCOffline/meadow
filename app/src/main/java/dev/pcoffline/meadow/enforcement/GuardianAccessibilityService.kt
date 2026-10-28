@@ -279,6 +279,8 @@ class GuardianAccessibilityService : AccessibilityService() {
      * background open for a few seconds, so going Home first would leave nothing shown.
      */
     internal fun block(pkg: String) {
+        // A covered site's time stops with it; it's read again from the address bar if it comes back.
+        if (pkg == sitePackage) setSite(null)
         // Already covered: opening the screen again, or going Home, would only make it flicker.
         if (BlockActivity.isShowingFor(pkg) && pkg !in sidePackages && pkg != pipPackage) return
         if (pkg == pipPackage) {
