@@ -118,6 +118,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 @Composable
 fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable () -> Unit = {}) {
@@ -223,22 +225,29 @@ data class LimitEditorState(
     val bumblebeeCount: Int = 0,
     /** My unanswered question about this app; only one can be open at a time. */
     val pending: LimitRequest? = null,
+    /** Whether [pending] is known yet: the server is asked, since the phone's copy may be out of date. */
+    val pendingKnown: Boolean = true,
     val loaded: Boolean = false,
 )
+
+/** What's known of my open question about an app: [request] is null when there's none. */
+private class Known(val request: LimitRequest?)
 
 class LimitEditorViewModel(private val packageName: String) : ViewModel() {
     val state: StateFlow<LimitEditorState> = combine(
         AppGraph.store.limits,
         AppGraph.store.approverCount,
-        pendingRequestFor(packageName),
-    ) { limits, bees, pending ->
+        // The editor shows at once; only asking waits until it's known whether a question is open.
+        pendingRequestFor(packageName).map<LimitRequest?, Known?> { Known(it) }.onStart { emit(null) },
+    ) { limits, bees, known ->
         val existing = limits.firstOrNull { it.packageName == packageName }
         LimitEditorState(
             existing = existing,
             appName = existing?.appName ?: AppGraph.catalog.label(packageName),
             budget = AppGraph.engine.budget(packageName),
             bumblebeeCount = bees,
-            pending = pending,
+            pending = known?.request,
+            pendingKnown = known != null,
             loaded = true,
         )
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, LimitEditorState())
@@ -297,8 +306,10 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
     // Asking, and hours, days and caps with Bumblebees, go through the backend; the rest is saved offline too.
     val needsConnection = needsApproval || (existing != null && hasBees && !existing.sameUncomparable(proposed))
     val editable = !action.busy
-    // The backend takes one open question per app, so another has to wait for its answer.
+    // The backend takes one open question per app, so another has to wait for its answer (or
+    // until it's known whether there is one).
     val waiting = state.pending
+    val askBlocked = waiting != null || !state.pendingKnown
     val anyLimitOn = dailyOn || weeklyOn || hoursOn || caps.isNotEmpty()
     val planted = stringResource(R.string.limit_editor_planted)
     val updated = stringResource(R.string.limit_editor_updated)
@@ -397,7 +408,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                     }
                 }
             },
-            enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && waiting != null) && (online || !needsConnection),
+            enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && askBlocked) && (online || !needsConnection),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text(
@@ -413,7 +424,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         if (existing != null) {
             OutlinedButton(
                 onClick = { confirmRemove = true },
-                enabled = !action.busy && !(hasBees && waiting != null),
+                enabled = !action.busy && !(hasBees && askBlocked),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
