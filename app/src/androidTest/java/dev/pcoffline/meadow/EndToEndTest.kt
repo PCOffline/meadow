@@ -9,6 +9,8 @@ import android.content.Intent
 import android.graphics.Rect
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.view.MotionEvent
+import android.view.Window
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.SemanticsActions
@@ -350,18 +352,41 @@ abstract class EndToEndTest {
      * a tap that never reached the button from a click that opened nothing.
      */
     protected fun tapForDialog(@StringRes id: Int) {
+        val touches = recordTouches()
         tapWhenEnabled(id)
         fun opens() = runCatching {
             compose.waitUntil(10_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty() }
         }.isSuccess
         if (opens()) return
         val tappable = tappables()
-        node(id).performSemanticsAction(SemanticsActions.OnClick)
         val windows = windowsOnScreen()
+        val window = "Meadow's window got: ${touches().ifEmpty { listOf("nothing") }.joinToString()}"
+        // Where a finger would tap: Android's own input, as from adb.
+        val center = compose.onNode(hasText(text(id)) and hasClickAction()).fetchSemanticsNode().boundsInWindow.center
+        shell("input tap ${center.x.toInt()} ${center.y.toInt()}")
+        if (opens()) throw AssertionError("Compose's tap on ${text(id)} was lost, but a real tap opened the dialog. $window Tappable: $tappable Windows: $windows")
+        node(id).performSemanticsAction(SemanticsActions.OnClick)
         throw AssertionError(
-            if (opens()) "A tap on ${text(id)} never reached it, but its click opened the dialog. Tappable: $tappable Windows: $windows"
-            else "${text(id)} opened no dialog, tapped or clicked. Tappable: $tappable Windows: $windows",
+            if (opens()) "No tap reached ${text(id)}, but its click opened the dialog. $window Tappable: $tappable Windows: $windows"
+            else "${text(id)} opened no dialog, tapped or clicked. $window Tappable: $tappable Windows: $windows",
         )
+    }
+
+    /** Starts noting the touches the window in front gets; the result lists them so far. */
+    private fun recordTouches(): () -> List<String> {
+        val seen = java.util.Collections.synchronizedList(ArrayList<String>())
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val window = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull()?.window
+                ?: return@runOnMainSync
+            val original = window.callback
+            window.callback = object : Window.Callback by original {
+                override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+                    seen += "${MotionEvent.actionToString(event.actionMasked)}@${event.rawX.toInt()},${event.rawY.toInt()}"
+                    return original.dispatchTouchEvent(event)
+                }
+            }
+        }
+        return { seen.toList() }
     }
 
     /**
