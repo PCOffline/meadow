@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -105,6 +106,8 @@ class LimitChangeJourneyTest : EndToEndTest() {
             // Asking to remove it: Sam says not today, with a word why, and it stays.
             tab(R.string.tab_garden).performClick()
             openTheLimit()
+            // Answered, the question no longer holds asking again back.
+            eventually("asking to remove allowed") { runCatching { node(R.string.limit_editor_ask_remove).assertIsEnabled() }.isSuccess }
             node(R.string.limit_editor_ask_remove).performScrollTo().performClick()
             typeIntoDialog(hasSetTextAction(), "I've got it under control")
             inDialog(text(R.string.limit_remove_ask)).performClick()

@@ -101,15 +101,13 @@ class BumblebeeJourneyTest : EndToEndTest() {
             // only what's still shared is shown: not even this phone's cached copy of the rest.
             val privacy = "users/${sam.uid}/private/account"
             await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to true, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
-            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
-            openGardenOf("Sam")
+            reopenGardenOf("Sam")
             waitForText(text(R.string.friend_limits))
             eventually("today's time and progress gone") {
                 !showing(text(R.string.friend_screen_time, app.resources.minutesText(42))) && !showing(text(R.string.progress_title))
             }
             await(sam.db.document(privacy).update("privacy", mapOf("shareLimits" to false, "shareTime" to false, "shareApps" to false, "shareProgress" to false)))
-            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
-            openGardenOf("Sam")
+            reopenGardenOf("Sam")
             waitForText(text(R.string.friend_step_down, "Sam"))
             eventually("Sam's page read") { !showing(text(R.string.loading_garden)) }
             waitForText(text(R.string.friend_nothing_shared, "Sam"))

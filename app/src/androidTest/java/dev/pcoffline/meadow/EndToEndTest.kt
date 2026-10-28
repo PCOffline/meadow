@@ -145,7 +145,9 @@ abstract class EndToEndTest {
      * which [hideKeyboard] doesn't watch, and test taps reach the dialog's buttons regardless.
      */
     protected fun typeIntoDialog(field: SemanticsMatcher, value: String) {
-        compose.onNode(field and hasAnyAncestor(isDialog())).performTextInput(value)
+        val inDialog = field and hasAnyAncestor(isDialog())
+        eventually("the dialog's field") { compose.onAllNodes(inDialog).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(inDialog).performTextInput(value)
         compose.waitForIdle()
     }
 
@@ -322,6 +324,13 @@ abstract class EndToEndTest {
     /** Opens the garden of [name], whom this phone looks after: from People, through their chat. */
     protected fun openGardenOf(name: String) {
         openChatWith(name)
+        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
+    }
+
+    /** From [name]'s garden, back to their chat (where the garden opened from) and into the garden again. */
+    protected fun reopenGardenOf(name: String) {
+        compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+        waitForText(text(R.string.chat_placeholder))
         compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
     }
 }
