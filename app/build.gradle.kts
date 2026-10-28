@@ -162,6 +162,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.emoji2.bundled)
+    implementation(libs.androidx.exifinterface)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -136,6 +138,14 @@ fun ShareCommitmentContent(
     ) {
         Text(stringResource(R.string.share_commitment_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
         MeadowCard(Modifier.fillMaxWidth()) { Text(text, style = MaterialTheme.typography.bodyLarge) }
+        // While the circle loads, say so, rather than leaving only other apps to pick.
+        if (people == null) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(R.string.share_commitment_loading), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         if (!people.isNullOrEmpty()) {
             Text(stringResource(R.string.share_commitment_in_meadow), style = MaterialTheme.typography.titleSmall)
             people.forEach { person ->

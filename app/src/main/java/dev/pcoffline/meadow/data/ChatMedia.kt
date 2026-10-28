@@ -3,9 +3,7 @@ package dev.pcoffline.meadow.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
 import androidx.core.graphics.scale
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
@@ -30,7 +28,8 @@ import java.util.UUID
  */
 class ChatMedia(private val context: Context) {
     private val storage by lazy { FirebaseStorage.getInstance() }
-    private val downloads = Mutex()
+    /** One lock per picture: each is fetched once, and a slow one doesn't hold up the rest. */
+    private val downloads = HashMap<String, Mutex>()
 
     /** A picture ready to send. */
     class Prepared(val bytes: ByteArray, val width: Int, val height: Int, val gif: Boolean)
@@ -51,7 +50,7 @@ class ChatMedia(private val context: Context) {
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw FriendlyException(R.string.error_photo)
             return@withContext Prepared(bytes, bounds.outWidth, bounds.outHeight, gif = true)
         }
-        val bitmap = decode(uri)
+        val bitmap = Pictures.decode(context, uri, MAX_SIDE * 2)
         val (width, height) = scaledSize(bitmap.width, bitmap.height, MAX_SIDE)
         val scaled = if (width == bitmap.width) bitmap else bitmap.scale(width, height)
         val bytes = ByteArrayOutputStream().use { out ->
@@ -74,7 +73,7 @@ class ChatMedia(private val context: Context) {
     }
 
     /** This phone's copy of [path], fetched the first time. Null once it's gone (its chat closed). */
-    suspend fun file(path: String): File? = downloads.withLock {
+    suspend fun file(path: String): File? = synchronized(downloads) { downloads.getOrPut(path) { Mutex() } }.withLock {
         val file = cacheFile(path)
         if (file.exists()) return@withLock file
         val bytes = try {
@@ -95,24 +94,6 @@ class ChatMedia(private val context: Context) {
         Trace.request("download $path", describe = { "${it.size} bytes" }) { storage.reference.child(path).getBytes(MAX_BYTES.toLong()).await() }
 
     private fun cacheFile(path: String) = File(cacheDir(context), sha256(path))
-
-    private fun decode(uri: Uri): Bitmap {
-        val resolver = context.contentResolver
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            return ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                val longest = maxOf(info.size.width, info.size.height)
-                if (longest > MAX_SIDE * 2) decoder.setTargetSampleSize(longest / (MAX_SIDE * 2))
-            }
-        }
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = (maxOf(bounds.outWidth, bounds.outHeight) / (MAX_SIDE * 2)).coerceAtLeast(1)
-        }
-        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw FriendlyException(R.string.error_photo)
-    }
 
     companion object {
         /** Longest side of a photo as sent: plenty for a phone screen. */

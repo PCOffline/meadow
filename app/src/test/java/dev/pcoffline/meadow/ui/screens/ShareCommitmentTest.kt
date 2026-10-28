@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -44,8 +45,16 @@ class ShareCommitmentTest : ScreenTest() {
     fun `with nobody in the circle, only other apps are offered`() {
         show { ShareCommitmentContent(words, emptyList(), onSend = { _, _ -> }, onOtherApps = {}) }
         node(R.string.share_commitment_in_meadow).assertDoesNotExist()
+        node(R.string.share_commitment_loading).assertDoesNotExist()
         node(R.string.share_commitment_other_apps).assertExists()
         assertAccessible()
+    }
+
+    @Test
+    fun `while the circle loads, it says so, and other apps can already be picked`() {
+        show { ShareCommitmentContent(words, people = null, onSend = { _, _ -> }, onOtherApps = {}) }
+        node(R.string.share_commitment_loading).assertExists()
+        node(R.string.share_commitment_other_apps).assertIsEnabled()
     }
 
     @Test

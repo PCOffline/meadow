@@ -64,6 +64,7 @@
     <string name="share_title">Share</string>
     <string name="share_commitment_title">Share this commitment</string>
     <string name="share_commitment_in_meadow">Send in Meadow</string>
+    <string name="share_commitment_loading">Finding your circle…</string>
     <string name="share_commitment_send_to">Send to %1$s</string>
     <string name="share_commitment_sent">Sent to %1$s 💌</string>
     <string name="share_commitment_other_apps">Other apps</string>

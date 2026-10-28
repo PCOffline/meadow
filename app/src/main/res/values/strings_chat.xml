@@ -7,6 +7,10 @@
     <string name="chat_closed_title">This chat isn\'t open</string>
     <string name="chat_placeholder">Write something kind…</string>
     <string name="chat_sending">sending…</string>
+    <plurals name="chat_sending_pictures">
+        <item quantity="one">Sending a picture…</item>
+        <item quantity="other">Sending %1$d pictures…</item>
+    </plurals>
     <string name="chat_message_options">Message options</string>
     <string name="chat_copy">Copy</string>
     <string name="chat_copied">Message copied</string>

@@ -5,6 +5,9 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -80,18 +84,31 @@ class ChatPicturesTest : ScreenTest() {
         val sent = mutableListOf<Uri>()
         // A GIF from the keyboard arrives the same way as a pasted picture.
         val gif = Uri.parse("content://keyboard.example/gifs/wave.gif")
+        val photo = Uri.parse("content://keyboard.example/photos/sea.gif")
         val clipboard = app.getSystemService(ClipboardManager::class.java)
-        clipboard.setPrimaryClip(ClipData(ClipDescription("GIF", arrayOf("image/gif")), ClipData.Item(gif)))
+        // Two pasted at once: both go, in order.
+        clipboard.setPrimaryClip(ClipData(ClipDescription("GIFs", arrayOf("image/gif")), ClipData.Item(gif)).apply { addItem(ClipData.Item(photo)) })
         show { ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSendPicture = { sent += it }, requestCard = { _, _ -> }) }
         compose.onNodeWithContentDescription(text(R.string.chat_add_picture)).assertIsEnabled()
 
         compose.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.PasteText)
         compose.waitForIdle()
-        assertEquals(listOf(gif), sent)
+        assertEquals(listOf(gif, photo), sent)
         // It's sent as a picture, not pasted as text.
         assertTrue(compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().none { node ->
             node.config.getOrNull(SemanticsProperties.EditableText)?.text?.isNotEmpty() == true
         })
+    }
+
+    @Test
+    fun `pictures on their way say so until they're sent`() {
+        var uploading by mutableIntStateOf(2)
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, uploading = uploading, requestCard = { _, _ -> }) }
+        compose.onNodeWithText(app.resources.getQuantityString(R.plurals.chat_sending_pictures, 2, 2)).assertExists()
+        uploading = 1
+        compose.onNodeWithText(app.resources.getQuantityString(R.plurals.chat_sending_pictures, 1, 1)).assertExists()
+        uploading = 0
+        compose.onNodeWithText(app.resources.getQuantityString(R.plurals.chat_sending_pictures, 1, 1)).assertDoesNotExist()
     }
 
     @Test
