@@ -48,6 +48,17 @@ in-app copy, and comments in code.
 - Don't document what isn't built. Remove what no longer exists.
 - Commands, paths, versions and settings in docs must work as written.
 
+## In-app copy
+
+Say what people need to act, nothing more.
+
+- No implementation details: no services, providers, error codes, browsers, accuracy figures or
+  how a feature works. Those belong in the README, `docs/` and the legal documents.
+- Keep notes and descriptions to a minimum. A setting's description, if it has one, is a few
+  words, for example "Requires location services".
+- No side notes, caveats or reassurances under controls. The exceptions are the disclosures
+  Android and Google Play require before asking for a sensitive permission.
+
 ## Legal documents
 
 `legal/` holds the privacy notice, the terms of use and the third-party licences. The app shows

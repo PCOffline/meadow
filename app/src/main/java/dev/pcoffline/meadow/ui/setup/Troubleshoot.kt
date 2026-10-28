@@ -55,17 +55,17 @@ sealed interface PushTest {
     /** This phone couldn't register, so nothing can reach it. */
     data object NoPhone : PushTest
 
-    /** Google refused every phone, with its [reasons]. */
-    data class Undelivered(val reasons: List<String>) : PushTest
+    /** Google refused every phone. */
+    data object Undelivered : PushTest
 
     /** The test couldn't be asked for at all. */
     data class Failed(val message: String) : PushTest
 
     companion object {
-        fun of(phones: Int, delivered: Int, errors: List<String>): PushTest = when {
+        fun of(phones: Int, delivered: Int): PushTest = when {
             delivered > 0 -> Sent
             phones == 0 -> NoPhone
-            else -> Undelivered(errors.map { it.removePrefix("messaging/") }.distinct())
+            else -> Undelivered
         }
     }
 }
@@ -105,7 +105,6 @@ fun TroubleshootScreen(onBack: () -> Unit, onOpenSetup: () -> Unit) {
                     PushTest.of(
                         phones = (result["phones"] as? Number)?.toInt() ?: 0,
                         delivered = (result["delivered"] as? Number)?.toInt() ?: 0,
-                        errors = (result["errors"] as? List<*>).orEmpty().filterIsInstance<String>(),
                     )
                 }.getOrElse { PushTest.Failed(it.friendlyMessage(context)) }
             }
@@ -227,7 +226,7 @@ private fun NotificationsCard(silentChannels: List<String>?, onSettings: () -> U
                     when (it) {
                         PushTest.Sent -> stringResource(R.string.trouble_notify_sent)
                         PushTest.NoPhone -> stringResource(R.string.trouble_notify_no_phone)
-                        is PushTest.Undelivered -> stringResource(R.string.trouble_notify_undelivered, it.reasons.joinToString())
+                        PushTest.Undelivered -> stringResource(R.string.trouble_notify_undelivered)
                         is PushTest.Failed -> it.message
                     },
                     style = MaterialTheme.typography.bodySmall,

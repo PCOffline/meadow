@@ -108,6 +108,14 @@ class ProfileAndPrivacyTest : ScreenTest() {
     }
 
     @Test
+    fun `the weather toggle only says it needs location services`() {
+        showScrolling { AppearanceCard() }
+        compose.onNode(isToggleable() and hasText(text(R.string.settings_weather), substring = true))
+            .performScrollTo()
+            .assert(hasText("Requires location services", substring = true))
+    }
+
+    @Test
     fun `turned on but with the location permission taken away, the weather reads as off`() {
         shadowOf(app).denyPermissions(Manifest.permission.ACCESS_COARSE_LOCATION)
         AppGraph.store.setWeatherOn(true)

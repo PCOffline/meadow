@@ -19,7 +19,7 @@
     <string name="picker_search">Search apps, or type a website</string>
     <string name="picker_site">Limit %1$s</string>
     <string name="picker_site_kind">A website</string>
-    <string name="limit_editor_site_browsers">Counted in Chrome, Firefox, Edge, Samsung Internet, Brave, Opera, Vivaldi, Kiwi and DuckDuckGo, with every part of the site. Meadow only checks the address bar for this site, and keeps no history.</string>
+    <string name="limit_editor_site_browsers">Counted in your browsers.</string>
     <string name="picker_no_match">No apps match “%1$s”</string>
     <string name="picker_used_today">%1$s today</string>
     <string name="picker_not_opened">Not opened today</string>

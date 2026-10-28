@@ -20,8 +20,7 @@
     <string name="settings_protections_button">Review protections</string>
     <string name="settings_appearance_title">Appearance</string>
     <string name="settings_weather">Weather in the sky</string>
-    <string name="settings_weather_body">Rain, snow or sun over your garden, from your rough location. Only Open-Meteo sees it, rounded to about 10 km.</string>
-    <string name="settings_weather_denied">Meadow needs your approximate location for this.</string>
+    <string name="settings_weather_body">Requires location services</string>
     <string name="settings_weather_allow">Allow in Android settings</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_share_limits">Limits</string>

@@ -15,7 +15,7 @@
     <string name="setup_overlay_body">Backs up the resting screen.</string>
     <string name="setup_admin_title">Uninstall protection</string>
     <string name="setup_admin_body">Makes uninstalling deliberate.</string>
-    <string name="setup_admin_explanation">Meadow gets no admin powers from this, so the list below is empty. It only means Meadow has to be turned off here before it can be uninstalled.</string>
+    <string name="setup_admin_explanation">Meadow has to be turned off here before it can be uninstalled.</string>
     <string name="setup_battery_title">Run in the background</string>
     <string name="setup_battery_body">Keeps Meadow running.</string>
     <string name="setup_sharing_title">What your Bumblebees see</string>
@@ -29,7 +29,7 @@
     <string name="setup_keeper_how">Next, tap \"Installed apps\" or \"Downloaded apps\", then \"Meadow garden keeper\". Turn it on and tap \"Allow\".</string>
     <string name="setup_listener_how">Next, turn on \"Allow notification access\" (or the switch next to Meadow), then tap \"Allow\".</string>
     <string name="setup_overlay_how">Next, turn on \"Allow display over other apps\".</string>
-    <string name="setup_admin_how">Next, tap \"Activate\". Its list of actions is empty: Meadow asks for no admin powers.</string>
+    <string name="setup_admin_how">Next, tap \"Activate\".</string>
     <string name="setup_step_done">Done ✓</string>
     <string name="setup_step_allow">Allow</string>
     <string name="setup_step_required">Required</string>
@@ -38,7 +38,7 @@
     <string name="setup_done">Into the garden 🌼</string>
     <string name="setup_later">I\'ll do this later</string>
     <string name="backend_missing_title">The garden needs its soil</string>
-    <string name="backend_missing_body">This build of Meadow isn\'t connected to a backend yet. Add your Firebase project\'s google-services.json to the app folder, deploy the backend, then rebuild. The README walks through each step.</string>
+    <string name="backend_missing_body">This build isn\'t connected to a server. See the README.</string>
 
     <string name="setup_listener_title">Notification access</string>
     <string name="setup_listener_body">Quiets resting apps\' notifications and media.</string>
@@ -57,7 +57,7 @@
     <string name="trouble_notify_sending">Sending…</string>
     <string name="trouble_notify_sent">Sent. Two test notifications should appear within a minute. If they don\'t, follow the steps below.</string>
     <string name="trouble_notify_no_phone">This phone couldn\'t sign up for notifications. Check that you\'re online and Google Play services is up to date, then try again.</string>
-    <string name="trouble_notify_undelivered">Google couldn\'t deliver to this phone (%1$s). Try again in a few minutes.</string>
+    <string name="trouble_notify_undelivered">Couldn\'t reach this phone. Try again in a few minutes.</string>
     <string name="trouble_open">Open settings</string>
     <string name="trouble_more_help">More help for this phone</string>
     <string name="trouble_battery_title">Unrestricted battery</string>

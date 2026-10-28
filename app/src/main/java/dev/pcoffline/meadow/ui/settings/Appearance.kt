@@ -148,7 +148,6 @@ private fun WeatherRow() {
         }
     }
     if (denied) {
-        Text(stringResource(R.string.settings_weather_denied), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = {
             runCatching {
                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
