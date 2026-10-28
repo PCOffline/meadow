@@ -342,15 +342,18 @@ private fun RestCard(state: RestState, onAsk: () -> Unit, onEmergency: () -> Uni
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(8.dp))
-        when {
-            state.unlocked -> Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_open, state.appName)) }
-            state.pendingRequest != null -> Note(stringResource(R.string.rest_pending, minutesText(state.pendingRequest.minutes)))
-            !state.signedIn -> Note(stringResource(R.string.rest_signed_out))
-            !state.hasBumblebees -> Note(stringResource(R.string.rest_no_bees))
-            else -> Button(onClick = onAsk, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_ask)) }
-        }
-        OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_home)) }
-        if (!state.unlocked) {
+        if (state.unlocked) {
+            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_open, state.appName)) }
+            OutlinedButton(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_home)) }
+        } else {
+            // Putting the phone down is the way forward here; asking for more is the other choice.
+            Button(onClick = onHome, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_home)) }
+            when {
+                state.pendingRequest != null -> Note(stringResource(R.string.rest_pending, minutesText(state.pendingRequest.minutes)))
+                !state.signedIn -> Note(stringResource(R.string.rest_signed_out))
+                !state.hasBumblebees -> Note(stringResource(R.string.rest_no_bees))
+                else -> OutlinedButton(onClick = onAsk, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.rest_ask)) }
+            }
             TextButton(onClick = onEmergency) { Text(stringResource(R.string.rest_emergency), color = MaterialTheme.colorScheme.error) }
         }
     }

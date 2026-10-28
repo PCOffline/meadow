@@ -78,6 +78,7 @@
     <string name="duration_days">%1$dd</string>
     <string name="duration_days_hours">%1$dd %2$dh</string>
     <string name="duration_under_a_minute">&lt;1m</string>
+    <string name="duration_seconds">%1$ds</string>
     <string name="update_failed_checksum">The download didn\'t check out, so it wasn\'t installed. Please try again.</string>
     <string name="update_failed_signature">This update couldn\'t be verified, so it wasn\'t installed.</string>
     <string name="update_failed_check">Couldn\'t check for updates just now. Please try again later.</string>

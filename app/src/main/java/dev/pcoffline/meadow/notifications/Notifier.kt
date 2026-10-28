@@ -16,7 +16,7 @@ import dev.pcoffline.meadow.data.LocalStore
 import dev.pcoffline.meadow.data.Trace
 import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.enforcement.BlockActivity
-import dev.pcoffline.meadow.ui.durationText
+import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
 
 class Notifier(private val context: Context, private val store: LocalStore) {
@@ -73,15 +73,14 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         post(GUARDIAN_ID, guardianNotification(text))
     }
 
-    /** Gentle reminders at five minutes and one minute left, once each per day. */
+    /**
+     * A reminder as an app's time runs out, at each of [WARNING_POINTS_MS], once each per day.
+     * Only a notification: the app on screen is never covered before its time is up.
+     */
     fun maybeWarn(budget: AppBudget) {
         val remaining = budget.remainingMs
         if (remaining <= 0 || remaining == Long.MAX_VALUE || budget.emergency) return
-        val threshold = when {
-            remaining <= 60_000L -> 1
-            remaining <= 5 * 60_000L -> 5
-            else -> return
-        }
+        val threshold = warningPoint(remaining) ?: return
         val today = Days.todayKey()
         // Extra time from a Bumblebee changes the allowance, and earns its own reminders.
         // Each cap's hours earn their own reminders, too.
@@ -99,7 +98,7 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         val pkg = budget.limit.packageName
         val builder = NotificationCompat.Builder(context, CH_WARNINGS)
             .setSmallIcon(R.drawable.ic_flower)
-            .setContentTitle(context.getString(R.string.notify_warning_title, res.durationText(remaining), app))
+            .setContentTitle(context.getString(R.string.notify_warning_title, timeLeftText(remaining), app))
             .setContentText(context.getString(body, app))
             .setAutoCancel(true)
             .setTimeoutAfter(remaining + 60_000L)
@@ -109,6 +108,14 @@ class Notifier(private val context: Context, private val store: LocalStore) {
         }
         post(pkg.hashCode(), builder.build())
     }
+
+    /** Time left, rounded up, so a reminder at 15 minutes reads "15m", and seconds in the last minute. */
+    internal fun timeLeftText(remainingMs: Long): String =
+        if (remainingMs < 60_000L) {
+            context.getString(R.string.duration_seconds, ((remainingMs + 999) / 1000).toInt())
+        } else {
+            res.minutesText(((remainingMs + 59_999) / 60_000).toInt())
+        }
 
     /** Shown when an app can't be closed on screen (no overlay permission): tap to see the rest screen. */
     fun timeUp(budget: AppBudget) {
@@ -228,6 +235,13 @@ class Notifier(private val context: Context, private val store: LocalStore) {
     }
 
     companion object {
+        /** When to remind someone that an app's time is running out: 15, 10, 5, 2 and 1 minutes, then 30 seconds left. */
+        val WARNING_POINTS_MS = listOf(15, 10, 5, 2, 1).map { it * 60_000L } + 30_000L
+
+        /** The reminder [remainingMs] has reached: the smallest of [WARNING_POINTS_MS] at or above it. */
+        internal fun warningPoint(remainingMs: Long): Long? = WARNING_POINTS_MS.lastOrNull { remainingMs <= it }
+
+
         const val GUARDIAN_ID = 1
         const val UPDATE_ID = 2
         const val CH_GUARDIAN = "guardian"

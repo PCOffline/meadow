@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="garden_greeting">%1$s, %2$s %3$s</string>
-    <string name="garden_greeting_plain">%1$s, %2$s</string>
+    <string name="garden_greeting">%1$s, %2$s</string>
     <string name="garden_screen_time_today">Screen time today</string>
     <plurals name="garden_across_apps">
         <item quantity="one">across %1$d app</item>
