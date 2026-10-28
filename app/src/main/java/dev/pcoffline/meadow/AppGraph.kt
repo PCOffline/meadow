@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
+import dev.pcoffline.meadow.data.SiteClock
 import dev.pcoffline.meadow.data.WeatherRepository
 import dev.pcoffline.meadow.data.AuthRepository
 import dev.pcoffline.meadow.data.Backend
@@ -75,7 +76,8 @@ object AppGraph {
     val catalog by lazy { AppCatalog(app) }
     val history by lazy { UsageHistory(app, tracker, catalog) }
     val progress by lazy { ProgressMeter(history, store) }
-    val engine by lazy { LimitEngine(store, tracker, history, catalog) }
+    val sites by lazy { SiteClock(app) }
+    val engine by lazy { LimitEngine(store, tracker, history, catalog, sites) }
     val emergency by lazy { EmergencyRepository(app, backend, store) }
     val profiles by lazy { ProfileRepository(app, backend, store, share) { sync } }
     val notifier by lazy { Notifier(app, store) }

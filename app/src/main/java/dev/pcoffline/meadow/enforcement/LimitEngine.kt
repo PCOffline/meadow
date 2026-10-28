@@ -5,6 +5,8 @@ import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.Grant
 import dev.pcoffline.meadow.data.LocalStore
 import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.SiteClock
+import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.data.dailyMinutesOn
@@ -101,13 +103,16 @@ data class AppBudget(
 /**
  * Turns committed limits, approved grants and measured usage into budgets.
  * Usage is re-measured at most every [REFRESH_MS]; in between, the time the current
- * foreground app has been open is added on top so countdowns stay accurate.
+ * foreground app has been open is added on top so countdowns stay accurate. Websites' time comes
+ * from [sites], measured as it goes, and only counts toward their own limits (it's already part
+ * of the browser's time).
  */
 class LimitEngine(
     private val store: LocalStore,
     private val tracker: UsageTracker,
     private val history: UsageHistory,
     private val catalog: AppCatalog,
+    private val sites: SiteClock,
 ) {
     private var todayKey: String = ""
     private var todayUsage: Map<String, Long> = emptyMap()
@@ -175,16 +180,26 @@ class LimitEngine(
         val now = ZonedDateTime.now()
         val dayOfWeek = today.dayOfWeek.value
         val minuteNow = now.hour * 60 + now.minute
+        val nowMillis = now.toInstant().toEpochMilli()
+        val todayStart = Days.startMillis(today)
+        val anySite = limits.any { Sites.isSite(it.packageName) }
+        val siteToday = if (anySite) sites.usageBetween(todayStart, nowMillis) else emptyMap()
+        val siteEarlier = if (anySite && needsWeek) {
+            sites.usageBetween(Days.startMillis(week.limitStart(today)), todayStart)
+        } else {
+            emptyMap()
+        }
         return limits.map { limit ->
             val pkg = limit.packageName
-            val usedToday = (todayUsage[pkg] ?: 0L) + if (pkg == foregroundPackage) extra else 0L
+            val site = Sites.isSite(pkg)
+            val usedToday = if (site) siteToday[pkg].orZero() else (todayUsage[pkg] ?: 0L) + if (pkg == foregroundPackage) extra else 0L
             val bonusToday = grants.bonus(pkg) { it == key }
             val schedule = limit.schedule
             val outside = schedule != null && !schedule.allows(now)
             AppBudget(
                 limit = limit,
                 usedTodayMs = usedToday,
-                usedWeekMs = (earlierThisWeek[pkg] ?: 0L) + usedToday,
+                usedWeekMs = (if (site) siteEarlier[pkg] else earlierThisWeek[pkg]).orZero() + usedToday,
                 bonusTodayMinutes = bonusToday,
                 bonusWeekMinutes = grants.bonus(pkg) { dayKey ->
                     Days.parse(dayKey)?.let { week.limitStart(it) == week.limitStart(today) } == true
@@ -193,12 +208,12 @@ class LimitEngine(
                 outsideHours = outside,
                 untilScheduleChangeMs = schedule?.let { it.untilChange(now)?.toMillis() ?: Long.MAX_VALUE / 2 },
                 outsideHoursAllowanceMs = if (schedule == null || bonusToday == 0) 0L else {
-                    val outsideUsed = usedToday - insideHoursToday(schedule)[pkg].orZero() -
-                        if (pkg == foregroundPackage && !outside) extra else 0L
+                    val outsideUsed = usedToday - insideHoursToday(schedule, pkg) -
+                        if (pkg == foregroundPackage && !outside && !site) extra else 0L
                     bonusToday * AppBudget.MINUTE - outsideUsed.coerceAtLeast(0L)
                 },
                 dailyMinutesToday = limit.dailyMinutesOn(dayOfWeek),
-            ).withCaps(limit, dayOfWeek, minuteNow, now, bonusToday, if (pkg == foregroundPackage) extra else 0L)
+            ).withCaps(limit, dayOfWeek, minuteNow, now, bonusToday, if (pkg == foregroundPackage && !site) extra else 0L)
         }
     }
 
@@ -209,7 +224,7 @@ class LimitEngine(
         val pkg = limit.packageName
         val today = now.toLocalDate()
         val (cap, left) = on.map { cap ->
-            val used = usageWithin(listOf(cap.window))[pkg].orZero() + extra
+            val used = usageWithin(listOf(cap.window), pkg) + extra
             cap to (cap.minutes + bonus) * AppBudget.MINUTE - used
         }.minBy { it.second }
         val ends = TimeWindow.edge(today, cap.to, now.zone).toInstant().toEpochMilli() - now.toInstant().toEpochMilli()
@@ -220,8 +235,20 @@ class LimitEngine(
     private var insideHoursMeasuredAt = 0L
 
     /** Today's usage inside the allowed hours, measured with usage and cached alongside it. */
-    private fun insideHoursToday(schedule: Schedule): Map<String, Long> =
-        usageWithin(schedule.windowsOn(Days.today().dayOfWeek.value))
+    private fun insideHoursToday(schedule: Schedule, pkg: String): Long =
+        usageWithin(schedule.windowsOn(Days.today().dayOfWeek.value), pkg)
+
+    /** [pkg]'s usage today within [windows]: a site's as measured so far, an app's as last measured. */
+    private fun usageWithin(windows: List<TimeWindow>, pkg: String): Long {
+        if (!Sites.isSite(pkg)) return usageWithin(windows)[pkg].orZero()
+        val today = Days.today()
+        val zone = ZoneId.systemDefault()
+        return windows.sumOf { w ->
+            val from = TimeWindow.edge(today, w.from, zone).toInstant().toEpochMilli()
+            val to = TimeWindow.edge(today, w.to, zone).toInstant().toEpochMilli()
+            sites.usageBetween(from, minOf(to, System.currentTimeMillis()))[pkg].orZero()
+        }
+    }
 
     /** Today's usage within [windows], measured with usage and cached alongside it. */
     private fun usageWithin(windows: List<TimeWindow>): Map<String, Long> {

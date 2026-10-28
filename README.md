@@ -46,6 +46,11 @@ Add a weekly limit, the hours an app may be used (or all day, in one tap), and c
 like up to 30 minutes between 10:00 and 16:00. Every one of them applies, and the app rests as
 soon as any is used up. Pick times on a clock, and set several days at once.
 
+### Websites too
+Type a website's address to limit it like an app: youtube.com covers every part of it, in Chrome,
+Firefox, Edge, Samsung Internet, Brave, Opera, Vivaldi and DuckDuckGo. Only the sites you add are
+looked for, and no history is kept.
+
 ### Friends who have your back
 Invite a friend with a link and they become your Bumblebee. Only a Bumblebee can give you extra
 time, loosen a limit or remove one. Making a limit stricter is always up to you. Each Bumblebee

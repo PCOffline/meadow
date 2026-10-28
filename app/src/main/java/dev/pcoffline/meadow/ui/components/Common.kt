@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.data.Avatar
 import dev.pcoffline.meadow.data.Photos
 import dev.pcoffline.meadow.ui.theme.AvatarColor
@@ -208,7 +209,8 @@ fun AppIcon(packageName: String, modifier: Modifier = Modifier, size: Dp = 40.dp
             modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            Text("🌱", fontSize = (size.value * 0.45f).sp)
+            // A website has no icon of its own on the phone.
+            Text(if (Sites.isSite(packageName)) "🌐" else "🌱", fontSize = (size.value * 0.45f).sp)
         }
     }
 }

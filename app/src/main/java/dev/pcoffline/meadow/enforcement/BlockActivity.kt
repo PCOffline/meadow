@@ -6,6 +6,7 @@ import android.app.ActivityOptions
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -55,6 +56,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Days
@@ -146,8 +148,11 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    /** Opens the app again, or a website in the browser. */
     private fun openApp(pkg: String) {
-        packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        val intent = Sites.domainOf(pkg)?.let { Intent(Intent.ACTION_VIEW, "https://$it".toUri()) }
+            ?: packageManager.getLaunchIntentForPackage(pkg)
+        intent?.let { runCatching { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
         finish()
     }
 

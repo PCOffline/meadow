@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The stand-in browser's address bar, read by the garden keeper as in a real browser. -->
+    <item name="url_bar" type="id" />
+</resources>

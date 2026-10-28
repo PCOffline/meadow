@@ -14,8 +14,14 @@ export const EMERGENCY_MINUTES = [15, 30, 60];
 // Ids and package names become document paths, so they can't contain "/" or be "." or "..".
 const id = z.string().trim().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const note = z.string().trim().max(280).default("");
-const packageName = z.string().trim().regex(/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/, errors.whichApp).max(200);
-/** Whether `s` is a package name, and so safe to use as a limit's document id. */
+// A website is limited under "site:" and its domain, in lower case ASCII: "site:youtube.com".
+const domainLabel = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+const packageName = z
+  .string()
+  .trim()
+  .regex(new RegExp(`^(?:[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*|site:${domainLabel}(?:\\.${domainLabel})+)$`), errors.whichApp)
+  .max(200);
+/** Whether `s` is a package name or a website's id, and so safe to use as a limit's document id. */
 export const isPackageName = (s: string): boolean => packageName.safeParse(s).success;
 const appName = z.string().trim().max(100).nullish();
 const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, errors.badDate);

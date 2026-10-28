@@ -144,6 +144,7 @@ class ProfileRepository(
         }
         runCatchingCancellable { backend.auth.signOut() }
         store.clearAll()
+        AppGraph.sites.clear()
         listOf(UsageHistory.FILE, UsageHistory.LEGACY_FILE).forEach { context.filesDir.resolve(it).delete() }
         ChatMedia.clearCache(context)
     }
