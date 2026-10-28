@@ -86,4 +86,23 @@ class ThemeLooksTest : ScreenTest() {
         val clearance = (sunTop - rowBottom) / compose.density.density
         assertTrue("the sun's disc starts ${clearance}dp below the row", clearance >= 20f)
     }
+
+    /** The middle of the drawn sun disc, in pixels, with the garden's sky pinned to [hour]. */
+    private fun sunAt(hour: Int): Float {
+        show { CompositionLocalProvider(LocalSkyHour provides hour) { GardenContent(DemoGarden.robin, DemoGarden.garden) } }
+        val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
+        val sun = gardenColorsFor(GardenTheme.MEADOW, dark = false).sun
+        val xs = (0 until shot.width).filter { x -> shot.count(sun, x, 0, x + 1, shot.height / 2) > 0 }
+        return (xs.min() + xs.max()) / 2f / shot.width
+    }
+
+    @Test
+    fun `the sun is on the left in the morning`() {
+        assertTrue(sunAt(8) < 0.4f)
+    }
+
+    @Test
+    fun `the sun is on the right in the evening`() {
+        assertTrue(sunAt(19) > 0.7f)
+    }
 }

@@ -89,11 +89,26 @@ class ShowcaseTest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
-        // The first test after the emulator boots can be drawn before its window is in front.
-        val until = System.currentTimeMillis() + 10_000
-        while (!focused() && System.currentTimeMillis() < until) Thread.sleep(100)
+        // A screen can be captured before its window is in front, or before it's drawn: then it's
+        // one flat colour. Wait for it, and never save a blank page.
+        val until = System.currentTimeMillis() + 15_000
+        while ((!focused() || blank()) && System.currentTimeMillis() < until) Thread.sleep(250)
+        check(!blank()) { "$name stayed blank" }
         Thread.sleep(800) // Let images and entrance animations settle.
         shell("screencap -p $DIR/$name.png")
+    }
+
+    /** Whether the screen below the status bar is all one colour. */
+    private fun blank(): Boolean {
+        val shot = automation.takeScreenshot() ?: return true
+        try {
+            val first = shot.getPixel(shot.width / 2, shot.height / 3)
+            return (1 until 20).all { i ->
+                shot.getPixel(shot.width * (i % 5 + 1) / 6, shot.height * (i / 5 + 2) / 7) == first
+            }
+        } finally {
+            shot.recycle()
+        }
     }
 
     private fun focused(): Boolean {

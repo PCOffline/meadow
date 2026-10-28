@@ -37,8 +37,9 @@ friend who has to approve is much harder to argue with.
 ### A garden that grows with your time
 Every app you limit is a flower that blooms while there's time left, wilts as it runs out and
 sleeps outside the hours you allow it (in the Mushroom forest, a mushroom that opens and droops
-the same way). The sky follows your day, from a peach sunrise to a starry night with fireflies,
-with two butterflies drifting and gliding over the hills by day, and, if you like, the weather
+the same way). The sky follows your day, from a peach sunrise to a starry night with fireflies:
+the sun crosses it from morning to evening, and the moon by night. By day two butterflies drift
+and glide over the hills, and, if you like, the sky shows the weather
 outside: clouds, fog, rain, snow or a storm. Gentle reminders arrive at five minutes and one
 minute left.
 

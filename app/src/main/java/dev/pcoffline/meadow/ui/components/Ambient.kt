@@ -126,6 +126,8 @@ data class SkyMood(
     val onSky: Color,
     @StringRes val greeting: Int,
     val weather: Weather? = null,
+    /** How far the sun has come across the sky, or the moon by night: 0 rising, 1 setting (see [skyProgress]). */
+    val progress: Float = 0.5f,
 )
 
 /**
@@ -173,7 +175,9 @@ private fun rememberLiveWeather(): Weather? {
 fun rememberSkyMood(): SkyMood {
     val dark = dev.pcoffline.meadow.ui.theme.LocalDarkTheme.current
     val pinned = LocalSkyHour.current
-    val hour = pinned ?: rememberResumedNow().hour
+    val now = rememberResumedNow()
+    val hour = pinned ?: now.hour
+    val minute = if (pinned == null) now.minute else 0
     val weather = LocalSkyWeather.current ?: if (pinned == null) rememberLiveWeather() else null
     val greeting = when (hour) {
         in 5..11 -> R.string.greeting_morning
@@ -192,6 +196,7 @@ fun rememberSkyMood(): SkyMood {
     // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
+        progress = skyProgress(hour, minute),
         top = if (base.night) {
             androidx.compose.ui.graphics.lerp(base.top, scheme.primary, 0.10f)
         } else {
@@ -200,6 +205,24 @@ fun rememberSkyMood(): SkyMood {
         // A night sky over a light page keeps its own colours, so its light text stays readable.
         bottom = if (base.night && !dark) base.bottom else androidx.compose.ui.graphics.lerp(base.bottom, scheme.background, 0.6f),
     )
+}
+
+/**
+ * How far across the sky the sun is at [hour]:[minute], from 0 as it rises at 5:00 to 1 as it sets
+ * at 21:00; by night, how far the moon is, from 0 at 21:00 to 1 at 5:00.
+ */
+internal fun skyProgress(hour: Int, minute: Int): Float {
+    val t = hour + minute / 60f
+    return if (hour in 5..20) (t - 5f) / 16f else ((t - 21f + 24f) % 24f) / 8f
+}
+
+/**
+ * Where the sun or moon is along its arc, [progress] across: x from 10% to 90% of the width, and
+ * how high it has climbed, 0 at either end and 1 at the top.
+ */
+internal fun arcAt(progress: Float): Offset {
+    val p = progress.coerceIn(0f, 1f)
+    return Offset(0.1f + 0.8f * p, sin(PI.toFloat() * p))
 }
 
 /** The top of a clear afternoon sky, before the theme tints it. */
@@ -228,12 +251,19 @@ private fun SkyMood.under(weather: Weather?): SkyMood {
  * The living backdrop for headers: sky gradient, sun or moon, drifting clouds, rolling hills with
  * tiny flowers, the theme's two butterflies by day and fireflies and stars by night. The sun or
  * moon sits at [celestial] (fractions of the width and height), clear of whatever is on top, and
- * the butterflies keep below [clearAbove] (a fraction of the height) so they don't cross it.
+ * the butterflies keep below [clearAbove] (a fraction of the height) so they don't cross it. With
+ * a [horizon] (a fraction of the height), the hills rise no higher than it, leaving the sky above.
  * The [SkyMood.weather] brings more clouds, fog, rain, snow or a storm; the butterflies and
  * fireflies shelter from rain and snow.
  */
 @Composable
-fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = Offset(0.82f, 0.24f), clearAbove: Float = 0f) {
+fun SkyScene(
+    mood: SkyMood,
+    modifier: Modifier = Modifier,
+    celestial: Offset = Offset(0.82f, 0.24f),
+    clearAbove: Float = 0f,
+    horizon: Float = 0f,
+) {
     val garden = Garden.colors
     val theme = Garden.theme
     val butterflies = remember(theme) { butterfliesFor(theme) }
@@ -265,9 +295,8 @@ fun SkyScene(mood: SkyMood, modifier: Modifier = Modifier, celestial: Offset = O
             }
             if (weather == Weather.FOG) fog(t, mood.night)
         }
-        // A sun or moon set low keeps clear of the hills: they sink until it's above them. Where
-        // it sits, the back hill tops out 53% of the way up at full height.
-        val rise = ((0.93f - celestial.y) / 0.53f).coerceIn(0.6f, 1f)
+        // At full height the back hill tops out 62% of the way up.
+        val rise = if (horizon <= 0f) 1f else ((1f - horizon) / 0.62f).coerceIn(0.4f, 1f)
         MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky, rise = rise)
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
