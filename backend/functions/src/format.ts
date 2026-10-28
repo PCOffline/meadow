@@ -92,11 +92,8 @@ export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** The record of an upload to [path]: document ids can't hold "/". */
+/** The note of a chat picture at [path] (chatUploads): document ids can't hold "/". */
 export const uploadId = (path: string): string => path.replaceAll("/", "|");
-
-/** Whether [path] is a picture in a chat's folder (chats/{chatId}/{uid}/{file}). */
-export const isChatPicture = (path: string | undefined): path is string => /^chats\/[^/]+\/[^/]+\/[^/]+$/.test(path ?? "");
 
 /** The chat a picture at [path] was sent in. */
 export const chatOfPicture = (path: string): string => path.split("/")[1] ?? "";

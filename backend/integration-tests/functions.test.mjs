@@ -964,6 +964,9 @@ describe("chat and alerts", () => {
     const chatId = [sam.uid, bee.uid].toSorted().join("_");
     const unsent = `chats/${chatId}/${sam.uid}/unsent1234.jpg`;
     const sent = `chats/${chatId}/${sam.uid}/sent12345.jpg`;
+    const noteOf = (path) => `chatUploads/${path.replaceAll("/", "|")}`;
+    // Noted before uploading, as the app does (storage.rules requires it).
+    await admin((db) => Promise.all([unsent, sent].map((path) => setDoc(doc(db, noteOf(path)), { path, at: serverTimestamp() }))));
     await env.withSecurityRulesDisabled(async (ctx) => {
       for (const bucket of BUCKETS) {
         for (const path of [unsent, sent]) await uploadBytes(storageRef(ctx.storage(`gs://${bucket}`), path), new Uint8Array([255, 216, 255]), { contentType: "image/jpeg" });
@@ -972,8 +975,11 @@ describe("chat and alerts", () => {
     await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
       senderId: sam.uid, kind: "image", path: sent, width: 640, height: 480, gif: false, createdAt: serverTimestamp(),
     }));
-    // Each upload is noted as it lands in the backend's bucket.
-    await eventually(async () => assert.ok(await read(`chatUploads/${unsent.replaceAll("/", "|")}`)));
+    // Sending it crosses its note off.
+    await eventually(async () => assert.equal(await read(noteOf(sent)), undefined));
+    // A note that outlived its message (noted again after) is only crossed off by the sweep.
+    await eventually(async () => assert.equal((await outbox(bee.uid, "chat")).length, 1));
+    await admin((db) => setDoc(doc(db, noteOf(sent)), { path: sent, at: serverTimestamp() }));
     // Uploaded to both possible default buckets (see readFile): the backend's own copy is the one swept.
     const copies = async (path) => (await Promise.all(BUCKETS.map(async (bucket) =>
       (await fetch(`http://127.0.0.1:9199/v0/b/${bucket}/o/${encodeURIComponent(path)}`, { headers: { Authorization: "Bearer owner" } })).ok))).filter(Boolean).length;
@@ -985,7 +991,8 @@ describe("chat and alerts", () => {
     assert.ok(later.unsentPictures >= 1);
     assert.equal(await copies(unsent), 1);
     assert.equal(await copies(sent), 2);
-    assert.equal(await read(`chatUploads/${unsent.replaceAll("/", "|")}`), undefined);
+    assert.equal(await read(noteOf(unsent)), undefined);
+    assert.equal(await read(noteOf(sent)), undefined);
   });
 
   test("a protection alert reaches every Bumblebee, without saying which setting changed", async () => {

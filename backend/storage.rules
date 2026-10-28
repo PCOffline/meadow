@@ -23,8 +23,13 @@ service firebase.storage {
       }
       allow read: if request.auth != null && request.auth.uid in chat().participants;
       // Never over a picture already there (the app names each one anew).
+      // Noted first in chatUploads (see firestore.rules), so one never sent is deleted.
+      function noted() {
+        return firestore.exists(/databases/(default)/documents/chatUploads/$('chats|' + chatId + '|' + uid + '|' + file));
+      }
       allow create: if request.auth != null && request.auth.uid == uid
         && resource == null
+        && noted()
         && uid in chat().participants
         && !chat().get('closed', false)
         && request.resource.size < 5 * 1024 * 1024

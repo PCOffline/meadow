@@ -247,9 +247,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Chat pictures uploaded and not yet known to be sent, swept by the backend.
+    // A chat picture about to be uploaded: its sender notes it first, as storage.rules requires,
+    // so the backend can delete it if no message ever sends it. Its id is its path with "|" for
+    // "/". Only the backend reads, changes or deletes these.
     match /chatUploads/{id} {
-      allow read, write: if false;
+      function picture() { return request.resource.data.path; }
+      function chatOf() { return get(/databases/$(database)/documents/chats/$(picture().split('/')[1])).data; }
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['path', 'at'])
+        && picture() is string
+        && picture().matches('chats/[A-Za-z0-9_-]{1,128}/' + me() + '/[A-Za-z0-9_-]{8,64}[.](jpg|gif)')
+        && id == picture().replace('/', '|')
+        && request.resource.data.at == request.time
+        && me() in chatOf().participants
+        && !chatOf().get('closed', false);
+      allow read, update, delete: if false;
     }
 
     // Invite links are created, previewed and redeemed only through Cloud Functions.
