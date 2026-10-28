@@ -129,7 +129,7 @@ class AskJourneyTest : EndToEndTest() {
             waitForText(text(R.string.garden_tile_extra, app.resources.minutesText(10)))
 
             // People's button asks about the same limited apps.
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitForSnackbarToGo(R.string.ask_sent)
             compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).performClick()
             try {

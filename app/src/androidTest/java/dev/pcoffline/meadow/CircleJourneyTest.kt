@@ -77,7 +77,7 @@ class CircleJourneyTest : EndToEndTest() {
         val (kai, sam) = kaiAndSam()
         ActivityScenario.launch(MainActivity::class.java).use {
             intoTheGarden("Kai")
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitFor(R.string.people_title)
 
             // Sam asks by Kai's code; Kai says not now, and nothing changes.
@@ -107,7 +107,7 @@ class CircleJourneyTest : EndToEndTest() {
         val (kai, sam) = kaiAndSam()
         ActivityScenario.launch(MainActivity::class.java).use {
             intoTheGarden("Kai")
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitFor(R.string.people_title)
             val code = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
 
@@ -156,7 +156,7 @@ class CircleJourneyTest : EndToEndTest() {
         val (kai, _) = kaiAndSam()
         ActivityScenario.launch(MainActivity::class.java).use {
             intoTheGarden("Kai")
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitFor(R.string.people_title)
 
             // Sharing a link makes one and hands it to the share sheet.

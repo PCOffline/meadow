@@ -68,7 +68,7 @@ class DecidingJourneyTest : EndToEndTest() {
 
             // 30 minutes asked; Bee gives 10, with a note.
             val first = sam.ask("Instagram", "com.instagram.android", 30, "Homework research")
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitForText("Homework research", substring = true)
             compose.onAllNodesWithText(text(R.string.request_say_yes)).onFirst().performScrollTo().performClick()
             waitForText(text(R.string.request_decide_yes_title, "Sam"))
@@ -98,7 +98,7 @@ class DecidingJourneyTest : EndToEndTest() {
             // The third arrives as a notification: tapping it opens People, and its
             // "Say yes" answers without opening Meadow at all.
             val third = sam.ask("WhatsApp", "com.whatsapp", 5, "Replying to my coach")
-            node(R.string.tab_garden).performClick()
+            tab(R.string.tab_garden).performClick()
             MeadowMessagingService().onMessageReceived(
                 RemoteMessage.Builder("meadow@fcm.googleapis.com")
                     .setData(mapOf("type" to "request_new", "to" to me, "requestId" to third, "title" to "Sam", "body" to "Replying to my coach"))

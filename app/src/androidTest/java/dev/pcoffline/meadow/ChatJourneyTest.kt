@@ -50,7 +50,7 @@ class ChatJourneyTest : EndToEndTest() {
             sam.send(chatId, "Thanks for looking after me")
 
             // People shows Sam with the last message, and opens the chat.
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitForText("Thanks for looking after me")
             compose.onNode(hasText("Sam") and hasClickAction()).performClick()
             waitForText(text(R.string.chat_placeholder))

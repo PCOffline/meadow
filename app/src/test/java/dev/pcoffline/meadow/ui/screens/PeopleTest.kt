@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +59,7 @@ class PeopleTest : ScreenTest() {
         compose.onNodeWithText(DemoGarden.chat.lastMessage).performScrollTo().assertExists()
         compose.onNodeWithText(DemoGarden.theo.bio).performScrollTo().assertExists()
         compose.onNodeWithText("Maya").performScrollTo().performClick()
-        compose.onNodeWithText(DemoGarden.chatWithAna.lastMessage).performScrollTo().performClick()
+        compose.onNodeWithText(DemoGarden.chatWithAna.lastMessage).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf("maya_robin", "ana_robin"), opened)
         assertAccessible()
     }
@@ -183,7 +185,7 @@ class PeopleTest : ScreenTest() {
 
     @Test
     fun `a chat with a Bumblebee can remove them`() {
-        show { ChatContent(robin, DemoGarden.chat, DemoGarden.messages) }
+        show { ChatContent(robin, DemoGarden.chat, DemoGarden.messages, requestCard = { _, _ -> }) }
         compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Maya")).assertDoesNotExist()
         compose.onNodeWithContentDescription(text(R.string.action_more)).performClick()
         node(R.string.chat_remove_bee).assertExists()
@@ -193,7 +195,7 @@ class PeopleTest : ScreenTest() {
     @Test
     fun `a chat with a Bumblebee who's leaving can keep them`() {
         val leaving = robin.copy(pendingRemovals = mapOf(DemoGarden.maya.uid to System.currentTimeMillis() + 3_600_000))
-        show { ChatContent(leaving, DemoGarden.chat, DemoGarden.messages) }
+        show { ChatContent(leaving, DemoGarden.chat, DemoGarden.messages, requestCard = { _, _ -> }) }
         compose.onNodeWithContentDescription(text(R.string.action_more)).performClick()
         node(R.string.chat_keep_bee).assertExists()
         node(R.string.chat_remove_bee).assertDoesNotExist()

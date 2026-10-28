@@ -67,9 +67,10 @@ class GardenJourneyTest : EndToEndTest() {
             compose.onNodeWithText(text(R.string.friend_nothing_shared, "Robin")).assertDoesNotExist()
             waitForBackend("users/$uid/private/account") { privacy("shareApps")(it) && !privacy("shareTime")(it) }
             waitFor(R.string.settings_privacy_saved)
+            // The snackbar would take the tap.
+            waitForSnackbarToGo(R.string.settings_privacy_saved)
             node(R.string.setup_sharing_done).performScrollTo().performClick()
             node(R.string.setup_sharing_example).assertDoesNotExist()
-            waitForSnackbarToGo(R.string.settings_privacy_saved)
             node(R.string.setup_later).performScrollTo().performClick()
 
             // Garden, then the profile.

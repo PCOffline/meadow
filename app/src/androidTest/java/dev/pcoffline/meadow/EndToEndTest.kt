@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.semantics.Role
 import android.app.Activity
 import android.app.Application
 import android.app.UiAutomation
@@ -64,6 +65,10 @@ abstract class EndToEndTest {
 
     protected fun text(@StringRes id: Int, vararg args: Any) = app.getString(id, *args)
     protected fun node(@StringRes id: Int): SemanticsNodeInteraction = compose.onNodeWithText(text(id))
+
+    /** A tab in the bar at the bottom: a screen's title can read the same ("People"). */
+    protected fun tab(@StringRes id: Int): SemanticsNodeInteraction =
+        compose.onNode(hasText(text(id)) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab))
     protected fun inDialog(value: String, substring: Boolean = false): SemanticsNodeInteraction =
         compose.onNode(hasText(value, substring) and hasAnyAncestor(isDialog()))
 
@@ -285,7 +290,7 @@ abstract class EndToEndTest {
     protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
         val token = friend.call("createInviteLink")!!["token"] as String
         val me = FirebaseAuth.getInstance().currentUser!!.uid
-        node(R.string.tab_people).performClick()
+        tab(R.string.tab_people).performClick()
         waitFor(R.string.people_title)
         val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
@@ -303,7 +308,7 @@ abstract class EndToEndTest {
     /** From the circle screen, opens the garden of the person called [name]. */
     /** Opens the chat with [name] from People, where everyone opens their chat. */
     protected fun openChatWith(name: String) {
-        node(R.string.tab_people).performClick()
+        tab(R.string.tab_people).performClick()
         val person = hasText(name) and hasClickAction()
         eventually("$name in People") { runCatching { compose.onNode(hasScrollToNodeAction()).performScrollToNode(person) }.isSuccess }
         compose.onNode(person).performClick()

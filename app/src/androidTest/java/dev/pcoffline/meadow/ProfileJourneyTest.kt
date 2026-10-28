@@ -60,7 +60,7 @@ class ProfileJourneyTest : EndToEndTest() {
             startAsGuest("Robin")
             val uid = FirebaseAuth.getInstance().currentUser!!.uid
             // Every tab has the way to the profile, in the same corner.
-            node(R.string.tab_growth).performClick()
+            tab(R.string.tab_growth).performClick()
             compose.onNodeWithContentDescription(text(R.string.profile_open)).performClick()
             waitFor(R.string.profile_title)
 
@@ -86,7 +86,7 @@ class ProfileJourneyTest : EndToEndTest() {
 
             // The theme and night mode are in Settings; they apply at once and follow the account to other phones.
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
-            node(R.string.tab_garden).performClick()
+            tab(R.string.tab_garden).performClick()
             compose.onNodeWithContentDescription(text(R.string.action_settings)).performClick()
             waitFor(R.string.settings_appearance_title)
             compose.onNode(hasText(text(R.string.theme_lavender), substring = true) and hasClickAction()).performScrollTo().performClick()

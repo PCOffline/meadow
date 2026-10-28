@@ -76,7 +76,7 @@ class BumblebeeJourneyTest : EndToEndTest() {
                     "message" to "Finishing a message to my sister", "dayKey" to today, "usedMinutes" to 29, "allowedMinutes" to 30,
                 ),
             )!!["requestId"] as String
-            node(R.string.tab_people).performClick()
+            tab(R.string.tab_people).performClick()
             waitFor(R.string.people_waiting)
             waitForText(text(R.string.request_they_ask, "Sam"))
             waitForText("Finishing a message to my sister", substring = true)

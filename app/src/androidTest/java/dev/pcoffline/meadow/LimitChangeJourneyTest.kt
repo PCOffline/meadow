@@ -103,7 +103,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
 
             // Asking to remove it: Sam says not today, with a word why, and it stays.
-            node(R.string.tab_garden).performClick()
+            tab(R.string.tab_garden).performClick()
             openTheLimit()
             node(R.string.limit_editor_ask_remove).performScrollTo().performClick()
             typeIntoDialog(hasSetTextAction(), "I've got it under control")

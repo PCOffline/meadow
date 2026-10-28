@@ -32,7 +32,7 @@ class GrowthJourneyTest : EndToEndTest() {
             startAsGuest("Robin")
 
             // Without usage access there's nothing to show; the way to turn it on is offered.
-            node(R.string.tab_growth).performClick()
+            tab(R.string.tab_growth).performClick()
             waitFor(R.string.stats_no_access_title)
             node(R.string.stats_no_access_action).performClick()
             waitFor(R.string.setup_title)
@@ -41,13 +41,13 @@ class GrowthJourneyTest : EndToEndTest() {
 
             // With it, and a few seconds spent in Pebbles, Pebbles shows up.
             shell("appops set ${app.packageName} GET_USAGE_STATS allow")
-            node(R.string.tab_garden).performClick()
+            tab(R.string.tab_garden).performClick()
             openPebbles()
             Thread.sleep(3_000)
             shell("am start -W -n ${app.packageName}/${MainActivity::class.java.name}")
             // Out of sight for long enough that Growth reads everything afresh when it's back.
             Thread.sleep(6_000)
-            node(R.string.tab_growth).performClick()
+            tab(R.string.tab_growth).performClick()
             waitForText("Pebbles")
             node(R.string.stats_week).performClick()
             waitFor(R.string.stats_this_week)

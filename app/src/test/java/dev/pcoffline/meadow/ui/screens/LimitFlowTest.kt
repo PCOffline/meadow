@@ -304,7 +304,7 @@ class LimitFlowTest : ScreenTest() {
     fun `three tabs, with everything waiting on people counted on People`() {
         show { MeadowTabBar(Tab.PEOPLE, Badges(requests = 2, invites = 1, chats = 3), onSelect = {}) }
         assertEquals(listOf(Tab.GARDEN, Tab.PEOPLE, Tab.STATS), Tab.entries)
-        compose.onNodeWithText("6").assertExists()
-        compose.onAllNodesWithText("2").assertCountEquals(0)
+        compose.onNodeWithText("6", useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithText("2", useUnmergedTree = true).assertCountEquals(0)
     }
 }
