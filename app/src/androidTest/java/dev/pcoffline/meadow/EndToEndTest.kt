@@ -353,9 +353,17 @@ abstract class EndToEndTest {
     protected fun tapForDialog(@StringRes id: Int) {
         eventually("${text(id)} enabled") { runCatching { node(id).assertIsEnabled() }.isSuccess }
         node(id).performScrollTo()
-        compose.waitForIdle()
+        // Scrolling there is animated, and a touch while the page still moves only stops it, as a
+        // finger's would: the tap waits until the button has come to rest.
+        val button = hasText(text(id)) and hasClickAction()
+        var last = compose.onNode(button).fetchSemanticsNode().boundsInWindow
+        poll("${text(id)} at rest") {
+            Thread.sleep(300)
+            val now = compose.onNode(button).fetchSemanticsNode().boundsInWindow
+            (now == last).also { last = now }
+        }
         // Meadow's window fills the screen, so where it is in the window is where it is on screen.
-        val center = compose.onNode(hasText(text(id)) and hasClickAction()).fetchSemanticsNode().boundsInWindow.center
+        val center = last.center
         shell("input tap ${center.x.toInt()} ${center.y.toInt()}")
         fun opens() = runCatching {
             compose.waitUntil(10_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty() }
