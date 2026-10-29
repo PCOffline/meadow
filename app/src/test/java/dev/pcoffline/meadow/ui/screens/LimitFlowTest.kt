@@ -2,6 +2,8 @@ package dev.pcoffline.meadow.ui.screens
 
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.performTextInput
 import android.app.Application
 import androidx.compose.foundation.layout.Column
@@ -192,6 +194,21 @@ class LimitFlowTest : ScreenTest() {
         more.performClick()
         compose.onNodeWithText(app.resources.minutesText(5 * 60 + 30)).assertExists()
         assertEquals(before, less.fetchSemanticsNode().boundsInRoot to more.fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test
+    fun `the daily presets sit in even columns, centred under the stepper`() {
+        editor(LimitEditorState())
+        val chips = listOf(15, 30, 45, 60, 90, 120).map {
+            compose.onNode(hasText(app.resources.minutesText(it)) and isSelectable()).fetchSemanticsNode().boundsInRoot
+        }
+        assertEquals("every chip is as wide as the others", 1, chips.map { it.width }.distinct().size)
+        val rows = chips.groupBy { it.top }.values
+        assertTrue("three in each row: ${rows.map { it.size }}", rows.all { it.size == 3 })
+        val less = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].fetchSemanticsNode().boundsInRoot
+        val more = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].fetchSemanticsNode().boundsInRoot
+        val stepper = (less.left + more.right) / 2
+        rows.forEach { row -> assertEquals(stepper, (row.minOf { it.left } + row.maxOf { it.right }) / 2, 2f) }
     }
 
     @Test

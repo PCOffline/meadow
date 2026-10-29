@@ -9,6 +9,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -604,11 +605,28 @@ private const val HOLD_REPEAT_MS = 120L
 private const val HOLD_FAST_REPEAT_MS = 50L
 private const val HOLD_FAST_AFTER = 8
 
+/** Common lengths in even columns, centred under the stepper, so a second row lines up with the first. */
 @Composable
 private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { minutes ->
-            FilterChip(selected = minutes == selected, onClick = { onSelect(minutes) }, label = { Text(minutesText(minutes)) }, enabled = enabled)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val gap = 8.dp
+        val width = (maxWidth - gap * (PRESET_COLUMNS - 1)) / PRESET_COLUMNS
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+            maxItemsInEachRow = PRESET_COLUMNS,
+        ) {
+            options.forEach { minutes ->
+                FilterChip(
+                    selected = minutes == selected,
+                    onClick = { onSelect(minutes) },
+                    label = { Text(minutesText(minutes), Modifier.fillMaxWidth(), textAlign = TextAlign.Center, maxLines = 1) },
+                    enabled = enabled,
+                    modifier = Modifier.width(width),
+                )
+            }
         }
     }
 }
+
+private const val PRESET_COLUMNS = 3
