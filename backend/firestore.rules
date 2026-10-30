@@ -293,7 +293,8 @@ service cloud.firestore {
       allow read: if signedIn() && me() in resource.data.participants;
       allow create, delete: if false;
       // Each person updates only their own side of an open chat: the summary of a message they
-      // just sent, and when they last read the chat.
+      // just sent, and when they last read the chat. Older app versions also send lastMessage,
+      // the message's words; the backend deletes it (onChatMessage).
       allow update: if signedIn() && me() in resource.data.participants
         && !resource.data.get('closed', false)
         && changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'lastRead'])

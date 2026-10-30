@@ -43,15 +43,12 @@ class ChatRepository(private val backend: Backend) {
                 "createdAt" to FieldValue.serverTimestamp(),
             ),
         )
-        batch.update(chatRef, summaryOf(uid, body))
+        batch.update(chatRef, summaryOf(uid))
         batch.commit().awaitWrite()
     }
 
-    /**
-     * Sends a picture already uploaded to [picture]'s path. [summary] stands for it in the chat
-     * list ("📷 Photo"). Throws if the server refuses it.
-     */
-    suspend fun sendPicture(chatId: String, picture: ChatPicture, summary: String) {
+    /** Sends a picture already uploaded to [picture]'s path. Throws if the server refuses it. */
+    suspend fun sendPicture(chatId: String, picture: ChatPicture) {
         val uid = backend.requireUid()
         val chatRef = chats.document(chatId)
         val batch = backend.db.batch()
@@ -67,12 +64,12 @@ class ChatRepository(private val backend: Backend) {
                 "createdAt" to FieldValue.serverTimestamp(),
             ),
         )
-        batch.update(chatRef, summaryOf(uid, summary))
+        batch.update(chatRef, summaryOf(uid))
         batch.commit().awaitWrite()
     }
 
-    private fun summaryOf(uid: String, text: String) = mapOf(
-        "lastMessage" to text.take(140),
+    /** Who sent the latest message and when, for the unread mark. Never its words. */
+    private fun summaryOf(uid: String) = mapOf(
         "lastMessageAt" to FieldValue.serverTimestamp(),
         "lastSenderId" to uid,
         "lastRead.$uid" to FieldValue.serverTimestamp(),

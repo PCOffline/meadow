@@ -100,7 +100,7 @@ class ChatJourneyTest : EndToEndTest() {
                 val media = AppGraph.chatMedia
                 val picture = media.prepare(Uri.fromFile(photo))
                 media.upload(me, chatId, picture).also {
-                    AppGraph.chats.sendPicture(chatId, ChatPicture(it, picture.width, picture.height, picture.gif), text(R.string.chat_photo))
+                    AppGraph.chats.sendPicture(chatId, ChatPicture(it, picture.width, picture.height, picture.gif))
                 }
             }
             waitForBackendDocs("chats/$chatId/messages") { messages -> messages.any { it.string("kind") == "image" && it.string("path") == path } }

@@ -174,8 +174,7 @@ class ChatViewModel(private val chatId: String, private val myUid: String) : Vie
         val media = AppGraph.chatMedia
         val picture = media.prepare(uri)
         val path = media.upload(myUid, chatId, picture)
-        val summary = AppGraph.app.getString(if (picture.gif) R.string.chat_gif else R.string.chat_photo)
-        AppGraph.chats.sendPicture(chatId, ChatPicture(path, picture.width, picture.height, picture.gif), summary)
+        AppGraph.chats.sendPicture(chatId, ChatPicture(path, picture.width, picture.height, picture.gif))
     }
 
     fun markRead() {

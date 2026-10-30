@@ -234,7 +234,6 @@ fun DocumentSnapshot.toChat() = Chat(
             photoUrl = m["photo"] as? String,
         )
     }?.toMap() ?: emptyMap(),
-    lastMessage = getString("lastMessage") ?: "",
     lastMessageAtMillis = millis("lastMessageAt"),
     lastSenderId = getString("lastSenderId"),
     lastReadMillis = timestampMap("lastRead"),

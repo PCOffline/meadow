@@ -53,7 +53,13 @@ export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{message
   }
   const text = message.kind === "image" ? (message.gif === true ? chatMedia.gif : chatMedia.photo) : String(message.text ?? "");
   const chat = await chats().doc(event.params.chatId).get();
-  if (!chat.exists || chat.get("closed") === true) return;
+  if (!chat.exists) return;
+  // Older app versions still copy the message's words onto the chat. Nothing reads them, so they go.
+  if (chat.get("lastMessage") !== undefined) {
+    await chat.ref.update({ lastMessage: FieldValue.delete() })
+      .catch((e) => logger.warn("Chat preview not cleared", { chatId: event.params.chatId, error: String(e) }));
+  }
+  if (chat.get("closed") === true) return;
   const participants = (chat.get("participants") as string[] | undefined) ?? [];
   const names = (chat.get("names") as Record<string, string> | undefined) ?? {};
   const avatars = (chat.get("avatars") as Record<string, { flower?: string; photo?: string | null }> | undefined) ?? {};
@@ -153,15 +159,31 @@ export async function migrateProfiles(limit = 200): Promise<number> {
   return legacy.size;
 }
 
+/**
+ * Chats that older app versions wrote keep a copy of their latest message's words. Nothing reads
+ * it, so it goes. Safe to run again.
+ */
+export async function clearChatPreviews(limit = 400): Promise<number> {
+  // Only chats that still have the copy are listed.
+  const legacy = await chats().orderBy("lastMessage").limit(limit).get();
+  if (!legacy.empty) {
+    const batch = db().batch();
+    for (const doc of legacy.docs) batch.update(doc.ref, { lastMessage: FieldValue.delete() });
+    await batch.commit();
+  }
+  return legacy.size;
+}
+
 /** Requests are short-lived: settle unanswered ones soon after they expire. */
 export const expireRequests = onSchedule("every 5 minutes", async () => {
   const expired = await expireStaleRequests(Date.now());
   if (expired > 0) logger.info("Expired requests", { expired });
 });
 
-/** Hourly housekeeping: finish Bumblebee removals, delete unsent chat pictures, notice quiet phones. */
+/** Hourly housekeeping: finish Bumblebee removals, delete unsent chat pictures and old chat previews, notice quiet phones. */
 export async function housekeeping(now: number) {
   const migrated = await migrateProfiles();
+  const chatPreviews = await clearChatPreviews();
 
   const removed = await finishDueRemovals(now);
   const unsentPictures = await sweepUnsentPictures(now);
@@ -189,7 +211,7 @@ export async function housekeeping(now: number) {
     for (const d of back.docs) batch.update(d.ref, { staleNotified: false });
     await batch.commit();
   }
-  const done = { migrated, removed, unsentPictures, quiet: quiet.size, recovered: back.size };
+  const done = { migrated, chatPreviews, removed, unsentPictures, quiet: quiet.size, recovered: back.size };
   logger.info("Hourly care done", done);
   return done;
 }
