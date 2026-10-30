@@ -224,4 +224,23 @@ class EditorsTest : ScreenTest() {
         assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(7))
         assertEquals(listOf(TimeWindow(8 * 60, 20 * 60)), schedule.windowsOn(5))
     }
+
+    @Test
+    fun `copying hours changes only the days picked, and a day off has nothing to copy`() {
+        val morning = listOf(TimeWindow(9 * 60, 12 * 60))
+        val long = listOf(TimeWindow(8 * 60, 20 * 60))
+        var schedule by mutableStateOf(Schedule((1..7).associateWith { if (it <= 2) morning else if (it == 7) emptyList() else long }))
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
+        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.SUNDAY))).assertDoesNotExist()
+        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.MONDAY))).performClick()
+        // Tuesday has these hours already: it isn't picked, and can't be.
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.TUESDAY)).assertIsNotSelected().assertIsNotEnabled()
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.WEDNESDAY)).assertIsNotSelected()
+        compose.onNodeWithContentDescription(dayName(DayOfWeek.FRIDAY)).performClick()
+        node(R.string.action_ok).performClick()
+        assertEquals(morning, schedule.windowsOn(5))
+        assertEquals(morning, schedule.windowsOn(2))
+        assertEquals(long, schedule.windowsOn(3))
+        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(7))
+    }
 }

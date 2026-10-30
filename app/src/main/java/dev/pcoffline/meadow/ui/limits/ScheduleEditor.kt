@@ -133,7 +133,7 @@ private fun presetLabel(preset: List<TimeWindow>): String {
 /**
  * One weekday: its name and a switch for whether the app may be used that day at all, then
  * whether that's all day or set hours. Switching a day on gives it [opening], the hours of
- * another open day. [onCopy] gives this day's hours to others.
+ * another open day. [onCopy] gives this day's hours to others, when it has any.
  */
 @Composable
 private fun DayRow(
@@ -159,9 +159,12 @@ private fun DayRow(
                     )
                 }
             }
-            val copy = stringResource(R.string.schedule_copy_description, name)
-            TextButton(onClick = onCopy, enabled = enabled, modifier = Modifier.semantics { contentDescription = copy }) {
-                Text(stringResource(R.string.schedule_copy), style = MaterialTheme.typography.labelMedium)
+            // A day that's off has no hours to copy; its switch turns other days off.
+            if (windows.isNotEmpty()) {
+                val copy = stringResource(R.string.schedule_copy_description, name)
+                TextButton(onClick = onCopy, enabled = enabled, modifier = Modifier.semantics { contentDescription = copy }) {
+                    Text(stringResource(R.string.schedule_copy), style = MaterialTheme.typography.labelMedium)
+                }
             }
             Switch(
                 checked = windows.isNotEmpty(),
@@ -186,16 +189,19 @@ private fun DayRow(
     }
 }
 
-/** Gives [from]'s hours to the days picked, several at once. */
+/**
+ * Gives [from]'s hours to the days picked, several at once. Only the picked days change. Days
+ * that already have these hours can't be picked, since copying changes nothing there.
+ */
 @Composable
 private fun CopyDaysDialog(from: Int, schedule: Schedule, firstDay: DayOfWeek, onDismiss: () -> Unit, onCopy: (List<Int>) -> Unit) {
     val name = DayOfWeek.of(from).getDisplayName(TextStyle.FULL, currentLocale())
-    // Days that already match start picked, so the dialog shows where these hours already are.
-    var days by rememberSaveable { mutableStateOf((1..7).filter { it != from && schedule.windowsOn(it) == schedule.windowsOn(from) }) }
+    val same = (1..7).filter { schedule.windowsOn(it) == schedule.windowsOn(from) }
+    var days by rememberSaveable { mutableStateOf(emptyList<Int>()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.schedule_copy_title, name)) },
-        text = { DayChips(days, firstDay, enabled = true, taken = listOf(from)) { days = it } },
+        text = { DayChips(days, firstDay, enabled = true, taken = same) { days = it } },
         confirmButton = { TextButton(onClick = { onCopy(days) }, enabled = days.isNotEmpty()) { Text(stringResource(R.string.action_ok)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
