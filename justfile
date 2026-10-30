@@ -135,6 +135,11 @@ deploy-hosting:
 functions-log:
     cd backend && {{ firebase }} functions:log
 
+# Set up the accounts the backend runs as, before the first deploy (docs/self-hosting.md, 4)
+[group('backend')]
+backend-accounts project:
+    .github/scripts/setup-backend-accounts.sh {{ project }}
+
 # Let GitHub Actions deploy to Firebase without a stored key (docs/self-hosting.md, 7.6)
 [group('backend')]
 deploy-access project repo:

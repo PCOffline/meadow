@@ -1,7 +1,7 @@
 // Checks after every Storage deploy (see firebase.json) that Storage's rules may read Firestore.
 // storage.rules reads chats and accounts from Firestore. Without the role below, Storage refuses
 // every chat photo and every friend's profile photo. `firebase deploy` offers to grant the role
-// only when a person runs it, not in CI, so .github/scripts/setup-deploy-access.sh grants it.
+// only when a person runs it, not in CI, so .github/scripts/setup-backend-accounts.sh grants it.
 // CommonJS for the same reason as predeploy.cjs.
 const { accessToken } = require("./apply-lifecycle.cjs");
 
@@ -55,7 +55,7 @@ async function main() {
     return;
   }
   const what = allowed === null ? "Couldn't check that Storage rules may read Firestore" : "Storage rules may not read Firestore, so chat photos and friends' photos fail";
-  const fix = `Run .github/scripts/setup-deploy-access.sh again, or run as a project owner:\n${grantCommands(project)}`;
+  const fix = `Run .github/scripts/setup-backend-accounts.sh again, or run as a project owner:\n${grantCommands(project)}`;
   if (allowed === null) {
     console.warn(`${process.env.GITHUB_ACTIONS ? "::warning::" : ""}${what}. ${fix}`);
     return;

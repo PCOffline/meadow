@@ -169,7 +169,26 @@ Optional, but recommended: limit the key to your app.
 
 ## 4. Deploy the backend
 
-From your clone:
+Before the first deploy, set up the accounts that the backend runs as. Install
+[gcloud](https://cloud.google.com/sdk/docs/install) and its beta commands
+(`gcloud components install beta`). Sign in as the project owner, then run from your clone:
+
+```bash
+just backend-accounts <project-id>
+# or: .github/scripts/setup-backend-accounts.sh <project-id>
+```
+
+The script does these things:
+
+- It creates the `meadow-functions` service account. All functions run as this account. It can
+  use Firestore, the files in the default bucket, Authentication (to delete accounts) and Cloud
+  Messaging, and nothing more.
+- It lets the Storage rules read Firestore.
+- It removes the roles that the Compute Engine default service account had to run the functions.
+  That account only builds the functions now. It keeps its roles until no function runs as it,
+  so run the script again after the next deploy.
+
+Then deploy:
 
 ```bash
 cd backend
@@ -179,8 +198,7 @@ npm --prefix functions ci     # the packages of the Cloud Functions
 firebase deploy --only firestore,functions,storage,hosting
 ```
 
-The lifecycle rule needs a Google Cloud sign-in and a Firebase sign-in. Install
-[gcloud](https://cloud.google.com/sdk/docs/install) and run
+The lifecycle rule needs a Google Cloud sign-in and a Firebase sign-in. Run
 `gcloud auth application-default login` one time. Without it, the deploy stops after the rules
 and tells you why.
 
@@ -417,16 +435,23 @@ just deploy-access <project-id> <owner>/<repo>
 ```
 
 Type the repository name exactly as GitHub shows it, for example `PCOffline/meadow`. The script
-creates a `github-deploy` service account with the roles that a deploy needs:
+first runs `setup-backend-accounts.sh` (step 4). Then it creates a `github-deploy` service account
+that can deploy the backend and can't read or change its data:
 
-- It can act only as the service account of the functions, not as other accounts in the
-  project.
-- It can read the IAM policy of the project, to check the Storage role below.
+- It can change the functions, their triggers and schedules, the rules, the indexes and hosting.
+- It can act only as `meadow-functions` and as the account that builds the functions, not as
+  other accounts in the project.
+- On the default bucket, it can set the lifecycle rule. It can't read the files.
+- Two custom roles, `meadowDeploy` and `meadowBucketLifecycle`, give the few permissions that no
+  narrow role has. The script lists each one and why.
+- It loses the broad roles that earlier versions of the script gave, for example
+  `roles/firebase.admin`.
 - For a public repository, the sign-in also checks the numeric ID of the repository. Thus a
   different repository with the same name later can't deploy.
 
-The script also lets the Storage rules read Firestore. A deploy from CI can't grant this role.
 The script needs the beta commands of gcloud. Install them first: `gcloud components install beta`.
+Run the script again after the first deploy. Then it can also manage the functions' images, which
+that deploy creates.
 
 The script shows the variables to add under **Settings → Secrets and variables → Actions →
 Variables**:
@@ -530,7 +555,7 @@ is new. Wait two minutes and deploy again.
 **The deploy fails with *Storage rules may not read Firestore*, or chat photos fail.** Cloud
 Storage needs a role to read Firestore from the Storage rules. Without it, Storage refuses chat
 photos and the profile photos of friends. The check runs after the deploy publishes the
-backend, so only the app release waits for the fix. Run `.github/scripts/setup-deploy-access.sh`
+backend, so only the app release waits for the fix. Run `.github/scripts/setup-backend-accounts.sh`
 again, or run these commands as the project owner:
 
 ```bash
@@ -600,23 +625,15 @@ function, run
 output must show `allUsers` with `roles/run.invoker`.
 
 **The functions can't get to Firestore.** Their log shows `7 PERMISSION_DENIED: Missing or
-insufficient permissions`, and the app gets `INTERNAL`. The functions run as the Compute Engine
-default service account (`<project-number>-compute@developer.gserviceaccount.com`). Newer Google
-Cloud projects give it no roles, as with the Cloud Build role above. Give it only the roles that
-the functions use: Firestore, Storage (data exports), Authentication (account deletion), Cloud
-Messaging (notifications), and calls to the functions from Firestore triggers and schedules:
+insufficient permissions`, and the app gets `INTERNAL`. The functions run as the
+`meadow-functions` service account. It doesn't exist yet, or it lost a role. Run
+`.github/scripts/setup-backend-accounts.sh <project-id>` again. This takes effect in one minute,
+with no new deploy.
 
-```bash
-SA=$(gcloud run services describe createprofile --region=<region> --project=<project-id> \
-  --format='value(spec.template.spec.serviceAccountName)')
-for role in roles/datastore.user roles/storage.objectAdmin roles/firebaseauth.admin \
-  roles/firebasecloudmessaging.admin roles/eventarc.eventReceiver roles/run.invoker; do
-  gcloud projects add-iam-policy-binding <project-id> --member="serviceAccount:$SA" \
-    --role="$role" --condition=None
-done
-```
-
-This takes effect in one minute, with no new deploy.
+**The deploy fails with `meadow-functions@… does not exist` or a missing `actAs` permission.** Run
+`.github/scripts/setup-backend-accounts.sh <project-id>` before you deploy. With GitHub Actions,
+run `.github/scripts/setup-deploy-access.sh` again, because it also lets the deploy use the new
+account.
 
 **`Firebase Storage has not been set up` or `could not find the default bucket`.** Do step 2.5,
 then deploy again.
@@ -681,6 +698,8 @@ permissions that they ask for.
 If your organisation limits identity federation, use a key (7.6).
 
 **Deliver fails at *Deploy* with `Permission denied` or `does not have permission`.** The
-`github-deploy` service account doesn't have a role that it needs, often for a new product. The
-error names the permission. Under **IAM**, give the role that has it, or run the setup script
-again.
+`github-deploy` service account doesn't have a permission that it needs, often for a new product
+or a new version of the Firebase CLI. First run `.github/scripts/setup-deploy-access.sh` again. If
+the error stays, it names the permission. Add the permission to `DEPLOY_PERMISSIONS` in the
+script, run the script again, and open a pull request with the change. The functions that run now
+stay as they are until a deploy works.

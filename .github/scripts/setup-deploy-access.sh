@@ -3,8 +3,9 @@
 #
 #   .github/scripts/setup-deploy-access.sh <firebase-project-id> <github-owner/repo>
 #
-# Creates a "github-deploy" service account with the roles a Firebase deploy needs, and lets only
-# the Deliver workflow on the repository's main branch act as it. Safe to run again. Needs gcloud
+# Creates a "github-deploy" service account that may deploy Meadow's backend and read none of its
+# data, and lets only the Deliver workflow on the repository's main branch act as it. Also sets up
+# the accounts the backend runs as (setup-backend-accounts.sh). Safe to run again. Needs gcloud
 # with its beta component (`gcloud components install beta`), signed in as a project owner, and
 # curl. Prints the repository variables to set at the end.
 set -euo pipefail
@@ -20,23 +21,51 @@ ACCOUNT="$ACCOUNT_NAME@$PROJECT.iam.gserviceaccount.com"
 POOL="github"
 PROVIDER="github"
 
-# Roles for deploying rules, indexes, functions (with their triggers and schedules) and hosting.
+DEPLOY_ROLE="meadowDeploy"
+LIFECYCLE_ROLE="meadowBucketLifecycle"
+
+# What a deploy changes: the functions with their triggers and schedules, the Firestore and Storage
+# rules, the indexes and hosting. None of these roles reads or writes Meadow's data.
 ROLES=(
+  roles/cloudfunctions.developer
+  roles/run.developer
+  roles/eventarc.developer
+  roles/cloudscheduler.admin
+  roles/firebaserules.admin
+  roles/firebasehosting.admin
+  roles/firebasestorage.viewer          # finds the default bucket for the Storage rules
+  roles/datastore.indexAdmin
+  roles/serviceusage.serviceUsageAdmin  # turns on APIs and their service accounts
+  "projects/$PROJECT/roles/$DEPLOY_ROLE"
+)
+# What a deploy also needs and no narrow role gives.
+DEPLOY_PERMISSIONS=(
+  firebase.projects.get                 # every Firebase command
+  resourcemanager.projects.get          # the project number
+  resourcemanager.projects.getIamPolicy # the deploy's own checks, and backend/check-rules-access.cjs
+  datastore.databases.getMetadata       # the Firestore database
+  cloudfunctions.functions.setIamPolicy # anyone may call a new callable function,
+  run.services.setIamPolicy             # and a schedule calls its function as meadow-functions
+)
+# Earlier versions of this script granted these. Each gives far more than a deploy needs.
+OLD_ROLES=(
   roles/firebase.admin
   roles/cloudfunctions.admin
   roles/run.admin
   roles/eventarc.admin
   roles/pubsub.admin
-  roles/cloudscheduler.admin
   roles/artifactregistry.admin
-  roles/datastore.indexAdmin
   roles/serviceusage.serviceUsageConsumer
-  roles/browser # reads the project's IAM policy, for backend/check-rules-access.cjs
+  roles/browser
 )
 
 echo "Turning on the APIs that keyless sign-in needs"
 gcloud services enable iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com \
   cloudresourcemanager.googleapis.com --project "$PROJECT"
+
+"$(dirname "$0")/setup-backend-accounts.sh" "$PROJECT"
+NUMBER="$(gcloud projects describe "$PROJECT" --format 'value(projectNumber)')"
+REGION="$(sed -n 's/^MEADOW_REGION=//p' "$(dirname "$0")/../../backend/functions/.env" | tr -d '[:space:]')"
 
 if ! gcloud iam service-accounts describe "$ACCOUNT" --project "$PROJECT" > /dev/null 2>&1; then
   echo "Creating the $ACCOUNT_NAME service account"
@@ -44,48 +73,61 @@ if ! gcloud iam service-accounts describe "$ACCOUNT" --project "$PROJECT" > /dev
     --display-name "GitHub Actions deploys"
 fi
 
+# custom_role <id> <title> <permission>... creates the project's role, or sets its permissions.
+custom_role() {
+  local id="$1" title="$2"
+  shift 2
+  local permissions
+  permissions="$(IFS=,; echo "$*")"
+  if gcloud iam roles describe "$id" --project "$PROJECT" > /dev/null 2>&1; then
+    gcloud iam roles update "$id" --project "$PROJECT" --permissions "$permissions" --quiet > /dev/null
+  else
+    gcloud iam roles create "$id" --project "$PROJECT" --title "$title" --stage GA \
+      --permissions "$permissions" > /dev/null
+  fi
+}
+custom_role "$DEPLOY_ROLE" "Meadow deploy" "${DEPLOY_PERMISSIONS[@]}"
+custom_role "$LIFECYCLE_ROLE" "Meadow bucket lifecycle" storage.buckets.get storage.buckets.update
+
 echo "Granting it the roles a deploy needs"
 for role in "${ROLES[@]}"; do
   gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$ACCOUNT" \
     --role "$role" --condition None --quiet > /dev/null
 done
+for role in "${OLD_ROLES[@]}" roles/iam.serviceAccountUser; do
+  gcloud projects remove-iam-policy-binding "$PROJECT" --member "serviceAccount:$ACCOUNT" \
+    --role "$role" --condition None --quiet > /dev/null 2>&1 || true
+done
 
-# Functions run as the Compute Engine default service account, and the deploy must be allowed to
-# use it: that account only, not every service account in the project.
-NUMBER="$(gcloud projects describe "$PROJECT" --format 'value(projectNumber)')"
-RUNTIME="$NUMBER-compute@developer.gserviceaccount.com"
-echo "Letting it deploy functions that run as $RUNTIME"
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" --project "$PROJECT" \
-  --member "serviceAccount:$ACCOUNT" --role roles/iam.serviceAccountUser > /dev/null
-# Earlier versions of this script granted it on the whole project.
-gcloud projects remove-iam-policy-binding "$PROJECT" --member "serviceAccount:$ACCOUNT" \
-  --role roles/iam.serviceAccountUser --condition None --quiet > /dev/null 2>&1 || true
+# The functions run as meadow-functions and are built as the Compute Engine default account. The
+# deploy may use those two accounts only, not every service account in the project.
+for sa in "meadow-functions@$PROJECT.iam.gserviceaccount.com" "$NUMBER-compute@developer.gserviceaccount.com"; do
+  echo "Letting it deploy functions that use $sa"
+  gcloud iam service-accounts add-iam-policy-binding "$sa" --project "$PROJECT" \
+    --member "serviceAccount:$ACCOUNT" --role roles/iam.serviceAccountUser > /dev/null
+done
 
-# storage.rules reads Firestore, which Storage may do only with this role. `firebase deploy` offers
-# it only when a person runs it, and CI can't grant roles.
-echo "Letting Storage rules read Firestore"
-gcloud beta services identity create --service firebasestorage.googleapis.com --project "$PROJECT" > /dev/null
-gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member "serviceAccount:service-$NUMBER@gcp-sa-firebasestorage.iam.gserviceaccount.com" \
-  --role roles/firebaserules.firestoreServiceAgent --condition None --quiet > /dev/null
+# The deploy deletes old images of the functions and keeps the repository's cleanup policy. The
+# first deploy creates the repository: run this again after it.
+if gcloud artifacts repositories describe gcf-artifacts --location "$REGION" --project "$PROJECT" > /dev/null 2>&1; then
+  gcloud artifacts repositories add-iam-policy-binding gcf-artifacts --location "$REGION" --project "$PROJECT" \
+    --member "serviceAccount:$ACCOUNT" --role roles/artifactregistry.repoAdmin > /dev/null
+else
+  echo "No function images yet: after the first deploy, run this again." >&2
+fi
 
-# The deploy also sets the Storage bucket's lifecycle rule (backend/apply-lifecycle.cjs), so it
-# may manage the default bucket: that bucket only, not every bucket in the project.
-BUCKET=""
+# The deploy sets the default bucket's lifecycle rule (backend/apply-lifecycle.cjs): on that bucket
+# only, and without access to the files in it.
 for name in "$PROJECT.firebasestorage.app" "$PROJECT.appspot.com"; do
   if gcloud storage buckets describe "gs://$name" --project "$PROJECT" > /dev/null 2>&1; then
-    BUCKET="$name"
+    echo "Letting it set the lifecycle rule on gs://$name"
+    gcloud storage buckets add-iam-policy-binding "gs://$name" --member "serviceAccount:$ACCOUNT" \
+      --role "projects/$PROJECT/roles/$LIFECYCLE_ROLE" > /dev/null
+    gcloud storage buckets remove-iam-policy-binding "gs://$name" --member "serviceAccount:$ACCOUNT" \
+      --role roles/storage.admin > /dev/null 2>&1 || true
     break
   fi
 done
-if [ -n "$BUCKET" ]; then
-  echo "Letting it set the lifecycle rule on gs://$BUCKET"
-  gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member "serviceAccount:$ACCOUNT" \
-    --role roles/storage.admin > /dev/null
-else
-  echo "No default Storage bucket yet: create it (docs/self-hosting.md, 2.5), then run this again." >&2
-  exit 1
-fi
 
 if ! gcloud iam workload-identity-pools describe "$POOL" --project "$PROJECT" --location global > /dev/null 2>&1; then
   echo "Creating the workload identity pool"
