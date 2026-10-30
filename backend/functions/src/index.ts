@@ -12,7 +12,9 @@ if (!region) throw new Error("Set MEADOW_REGION in backend/functions/.env, e.g. 
 // call are several times faster, and one instance answers many calls at once (concurrency needs a
 // whole CPU), so far fewer calls wait for a new one to start. Billing is per request, so a small
 // group still stays inside the free allowance.
-setGlobalOptions({ region, maxInstances: 10, cpu: 1, memory: "512MiB", concurrency: 80 });
+// Every function runs as its own service account, which holds only what the functions use
+// (.github/scripts/setup-deploy-access.sh creates it). "name@" means name@<project>.iam.gserviceaccount.com.
+setGlobalOptions({ region, maxInstances: 10, cpu: 1, memory: "512MiB", concurrency: 80, serviceAccount: "meadow-functions@" });
 
 export {
   createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, inviteFromChat, respondInvite, cancelInvite,
