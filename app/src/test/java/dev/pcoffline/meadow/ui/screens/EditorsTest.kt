@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -127,7 +128,16 @@ class EditorsTest : ScreenTest() {
 
     private fun dayName(day: DayOfWeek) = day.getDisplayName(TextStyle.FULL, Locale.getDefault())
 
-    private fun daySwitch(day: DayOfWeek) = compose.onNodeWithContentDescription(text(R.string.schedule_day_allowed, dayName(day)))
+    private val daysSwitch get() = node(R.string.schedule_days_allowed)
+
+    /** A weekday's chip among the days to set. */
+    private fun dayChip(day: DayOfWeek) = compose.onNodeWithContentDescription(dayName(day))
+
+    /** The chip for all day; a day's line can read "All day" too. */
+    private val allDayChip get() = compose.onNode(hasText(text(R.string.schedule_all_day_chip)) and isSelectable())
+
+    /** A weekday's line in the list of each day's hours; tapping it picks that day alone. */
+    private fun dayLine(day: DayOfWeek) = compose.onNode(hasText(dayName(day)) and hasClickAction())
 
     @Test
     fun `the same hours every day - presets, adding and removing hours`() {
@@ -155,20 +165,24 @@ class EditorsTest : ScreenTest() {
     }
 
     @Test
-    fun `per weekday, a day is switched off and on, leaving the others as they were`() {
+    fun `per weekday, the picked days are switched off and on together, leaving the others as they were`() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 21 * 60)))
         showScrolling { ScheduleEditor(schedule) { schedule = it } }
         node(R.string.schedule_per_day).performClick()
 
-        daySwitch(DayOfWeek.WEDNESDAY).assertIsOn().performClick()
-        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(3))
-        (1..7).filter { it != 3 }.forEach { assertEquals(listOf(TimeWindow(9 * 60, 21 * 60)), schedule.windowsOn(it)) }
-        node(R.string.schedule_day_off).assertExists()
+        dayLine(DayOfWeek.SATURDAY).performClick()
+        dayChip(DayOfWeek.SATURDAY).assertIsSelected()
+        dayChip(DayOfWeek.MONDAY).assertIsNotSelected()
+        dayChip(DayOfWeek.SUNDAY).performClick()
+        daysSwitch.assertIsOn().performClick()
+        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(6))
+        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(7))
+        (1..5).forEach { assertEquals(listOf(TimeWindow(9 * 60, 21 * 60)), schedule.windowsOn(it)) }
+        compose.onAllNodesWithText(text(R.string.schedule_day_off)).assertCountEquals(2)
 
-        // On again, it takes the hours the other days have.
-        daySwitch(DayOfWeek.WEDNESDAY).assertIsOff().performClick()
-        assertEquals(Schedule.everyDay(TimeWindow(9 * 60, 21 * 60)).windowsOn(3), schedule.windowsOn(3))
-        node(R.string.schedule_day_off).assertDoesNotExist()
+        // On again, they take the hours the other days have.
+        daysSwitch.assertIsOff().performClick()
+        assertEquals(Schedule.everyDay(TimeWindow(9 * 60, 21 * 60)), schedule)
         assertAccessible(requireHeading = false)
     }
 
@@ -176,9 +190,10 @@ class EditorsTest : ScreenTest() {
     fun `per weekday, the days start on the chosen first day of the week`() {
         showScrolling { ScheduleEditor(Schedule.everyDay(TimeWindow.ALL_DAY), firstDay = DayOfWeek.SATURDAY) {} }
         node(R.string.schedule_per_day).performClick()
-        val tops = listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY)
-            .map { daySwitch(it).fetchSemanticsNode().boundsInRoot.top }
-        assertEquals(tops.sorted(), tops)
+        listOf(::dayChip, ::dayLine).forEach { find ->
+            val lefts = listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY, DayOfWeek.MONDAY).map { find(it).fetchSemanticsNode().boundsInRoot }
+            assertEquals(lefts.sortedWith(compareBy({ it.top }, { it.left })), lefts)
+        }
     }
 
     @Test
@@ -212,49 +227,40 @@ class EditorsTest : ScreenTest() {
         var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(9 * 60, 17 * 60)))
         showScrolling { ScheduleEditor(schedule) { schedule = it } }
         node(R.string.schedule_per_day).performClick()
-        val allDay = "${text(R.string.schedule_all_day_chip)}, ${dayName(DayOfWeek.WEDNESDAY)}"
-        compose.onNodeWithContentDescription(allDay).assertIsNotSelected().performClick()
+        dayLine(DayOfWeek.WEDNESDAY).performClick()
+        allDayChip.assertIsNotSelected().performClick()
         assertEquals(listOf(TimeWindow.ALL_DAY), schedule.windowsOn(3))
         assertEquals(listOf(TimeWindow(9 * 60, 17 * 60)), schedule.windowsOn(4))
         // Back to set hours: the hours the other days have.
-        compose.onNodeWithContentDescription(allDay).assertIsSelected().performClick()
+        allDayChip.assertIsSelected().performClick()
         assertEquals(listOf(TimeWindow(9 * 60, 17 * 60)), schedule.windowsOn(3))
         assertAccessible(requireHeading = false)
     }
 
     @Test
-    fun `per weekday, one day's hours are copied to several days at once`() {
-        var schedule by mutableStateOf(Schedule((1..7).associateWith { if (it == 1) listOf(TimeWindow(9 * 60, 12 * 60)) else listOf(TimeWindow(8 * 60, 20 * 60)) }))
+    fun `per weekday, several days get the same hours at once`() {
+        val morning = listOf(TimeWindow(9 * 60, 12 * 60))
+        val long = listOf(TimeWindow(8 * 60, 20 * 60))
+        var schedule by mutableStateOf(Schedule((1..7).associateWith { if (it == 1) morning else long }))
         showScrolling { ScheduleEditor(schedule) { schedule = it } }
-        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.MONDAY))).performClick()
-        compose.onNodeWithText(text(R.string.schedule_copy_title, dayName(DayOfWeek.MONDAY))).assertExists()
-        // Monday is the one being copied, so it can't be picked.
-        compose.onNodeWithContentDescription(dayName(DayOfWeek.MONDAY)).assertIsNotEnabled()
-        node(R.string.action_ok).assertIsNotEnabled()
-        compose.onNodeWithContentDescription(dayName(DayOfWeek.SATURDAY)).performClick()
-        compose.onNodeWithContentDescription(dayName(DayOfWeek.SUNDAY)).performClick()
-        node(R.string.action_ok).performClick()
-        assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(6))
-        assertEquals(listOf(TimeWindow(9 * 60, 12 * 60)), schedule.windowsOn(7))
-        assertEquals(listOf(TimeWindow(8 * 60, 20 * 60)), schedule.windowsOn(5))
+        // At first, the first day and the days with its hours: Monday alone here.
+        dayChip(DayOfWeek.MONDAY).assertIsSelected()
+        dayChip(DayOfWeek.TUESDAY).assertIsNotSelected()
+        node(R.string.schedule_days_differ).assertDoesNotExist()
+        dayChip(DayOfWeek.SATURDAY).performClick()
+        dayChip(DayOfWeek.SUNDAY).performClick()
+        node(R.string.schedule_days_differ).assertExists()
+        allDayChip.performClick()
+        listOf(1, 6, 7).forEach { assertEquals(listOf(TimeWindow.ALL_DAY), schedule.windowsOn(it)) }
+        assertEquals(long, schedule.windowsOn(5))
+        node(R.string.schedule_days_differ).assertDoesNotExist()
     }
 
     @Test
-    fun `copying hours changes only the days picked, and a day off has nothing to copy`() {
-        val morning = listOf(TimeWindow(9 * 60, 12 * 60))
-        val long = listOf(TimeWindow(8 * 60, 20 * 60))
-        var schedule by mutableStateOf(Schedule((1..7).associateWith { if (it <= 2) morning else if (it == 7) emptyList() else long }))
-        showScrolling { ScheduleEditor(schedule) { schedule = it } }
-        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.SUNDAY))).assertDoesNotExist()
-        compose.onNodeWithContentDescription(text(R.string.schedule_copy_description, dayName(DayOfWeek.MONDAY))).performClick()
-        // Tuesday has these hours already: it isn't picked, and can't be.
-        compose.onNodeWithContentDescription(dayName(DayOfWeek.TUESDAY)).assertIsNotSelected().assertIsNotEnabled()
-        compose.onNodeWithContentDescription(dayName(DayOfWeek.WEDNESDAY)).assertIsNotSelected()
-        compose.onNodeWithContentDescription(dayName(DayOfWeek.FRIDAY)).performClick()
-        node(R.string.action_ok).performClick()
-        assertEquals(morning, schedule.windowsOn(5))
-        assertEquals(morning, schedule.windowsOn(2))
-        assertEquals(long, schedule.windowsOn(3))
-        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(7))
+    fun `per weekday, with no days picked there's nothing to set`() {
+        showScrolling { ScheduleEditor(Schedule((1..7).associateWith { if (it == 1) listOf(TimeWindow(9 * 60, 12 * 60)) else listOf(TimeWindow.ALL_DAY) })) {} }
+        dayChip(DayOfWeek.MONDAY).performClick()
+        node(R.string.schedule_pick_some).assertExists()
+        node(R.string.schedule_days_allowed).assertDoesNotExist()
     }
 }
