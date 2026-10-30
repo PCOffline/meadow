@@ -65,6 +65,7 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
     val sentYes = stringResource(R.string.request_sent_yes)
     val sentNo = stringResource(R.string.request_sent_no)
     val withdrawn = stringResource(R.string.request_withdrawn)
+    var askingAgain by rememberSaveable { mutableStateOf(false) }
 
     MeadowCard(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -135,8 +136,17 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
                 modifier = Modifier.padding(top = 4.dp),
             ) { Text(stringResource(R.string.request_withdraw)) }
         }
+        // Nobody answered in time: the same question again, ready to send or change.
+        if (mine && request.status == RequestStatus.EXPIRED && request.type == RequestType.EXTRA_TIME && request.packageName != null) {
+            TextButton(onClick = { askingAgain = true }, modifier = Modifier.padding(top = 4.dp)) {
+                Text(stringResource(R.string.request_ask_again))
+            }
+        }
     }
 
+    if (askingAgain) {
+        AskForTimeDialog(request.packageName, onDismiss = { askingAgain = false }, initialMinutes = request.minutes, initialMessage = request.message)
+    }
     deciding?.let { approve ->
         DecideDialog(request, approve, onDismiss = { deciding = null }) { note, minutes ->
             deciding = null
@@ -211,13 +221,13 @@ private fun DecideDialog(request: LimitRequest, approve: Boolean, onDismiss: () 
     )
 }
 
-/** Lets someone ask their Bumblebees for extra minutes on a limited app. */
+/** Lets someone ask their Bumblebees for extra minutes on a limited app, starting from [initialMinutes] and [initialMessage]. */
 @Composable
-fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit) {
+fun AskForTimeDialog(packageName: String?, onDismiss: () -> Unit, initialMinutes: Int = 15, initialMessage: String = "") {
     val limits by AppGraph.store.limits.collectAsStateWithLifecycle()
     var selected by rememberSaveable { mutableStateOf(packageName ?: limits.firstOrNull()?.packageName) }
-    var minutes by rememberSaveable { mutableIntStateOf(15) }
-    var message by rememberSaveable { mutableStateOf("") }
+    var minutes by rememberSaveable { mutableIntStateOf(initialMinutes) }
+    var message by rememberSaveable { mutableStateOf(initialMessage) }
     val picks = rememberBeePicks()
     val action = rememberAction()
     // Limits may arrive after the dialog opens, so fall back to the first one once they do.

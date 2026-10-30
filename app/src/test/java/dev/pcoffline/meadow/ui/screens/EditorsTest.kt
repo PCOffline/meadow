@@ -77,6 +77,20 @@ class EditorsTest : ScreenTest() {
     }
 
     @Test
+    fun `an ask nobody answered in time can be asked again, by the asker only`() {
+        var mine by mutableStateOf(true)
+        var status by mutableStateOf(RequestStatus.EXPIRED)
+        show { RequestCard(request(status = status), myUid = if (mine) "sam" else "bee") }
+        node(R.string.request_ask_again).assertHasClickAction()
+        assertAccessible(requireHeading = false)
+        mine = false
+        node(R.string.request_ask_again).assertDoesNotExist()
+        mine = true
+        status = RequestStatus.PENDING
+        node(R.string.request_ask_again).assertDoesNotExist()
+    }
+
+    @Test
     fun `a Bumblebee never learns which other Bumblebee answered`() {
         // The backend may know who decided; another Bumblebee's card must not show it.
         show { RequestCard(request(status = RequestStatus.APPROVED, decidedByName = "Robin", decisionNote = "Go for it"), myUid = "bee") }
