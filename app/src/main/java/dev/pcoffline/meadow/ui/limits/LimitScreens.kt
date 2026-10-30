@@ -605,16 +605,22 @@ private const val HOLD_REPEAT_MS = 120L
 private const val HOLD_FAST_REPEAT_MS = 50L
 private const val HOLD_FAST_AFTER = 8
 
-/** Common lengths in even columns, centred under the stepper, so a second row lines up with the first. */
+/**
+ * Common lengths in even columns, centred under the stepper, so a second row lines up with the
+ * first. Up to three columns, fewer when the longest length wouldn't fit (large text, narrow phone).
+ */
 @Composable
 private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
+    val widest = widestLabel(options, MaterialTheme.typography.labelLarge) + CHIP_PADDING
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val gap = 8.dp
-        val width = (maxWidth - gap * (PRESET_COLUMNS - 1)) / PRESET_COLUMNS
+        fun widthFor(columns: Int) = (maxWidth - gap * (columns - 1)) / columns
+        val columns = (PRESET_COLUMNS downTo 1).firstOrNull { widthFor(it) >= widest } ?: 1
+        val width = widthFor(columns)
         FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
-            maxItemsInEachRow = PRESET_COLUMNS,
+            maxItemsInEachRow = columns,
         ) {
             options.forEach { minutes ->
                 FilterChip(
@@ -630,3 +636,6 @@ private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onS
 }
 
 private const val PRESET_COLUMNS = 3
+
+/** A filter chip's padding either side of its label, with room to spare. */
+private val CHIP_PADDING = 24.dp
