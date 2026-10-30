@@ -7,7 +7,10 @@ const { accessToken } = require("./apply-lifecycle.cjs");
 
 const project = process.env.GCLOUD_PROJECT;
 const ROLE = "roles/firebaserules.firestoreServiceAgent";
-const AGENT = /^serviceAccount:service-\d+@gcp-sa-firebasestorage\.iam\.gserviceaccount\.com$/;
+const API = "https://cloudresourcemanager.googleapis.com/v1/projects";
+
+/** Storage's service agent in the project with [number]. */
+const agentOf = (number) => `serviceAccount:service-${number}@gcp-sa-firebasestorage.iam.gserviceaccount.com`;
 
 /** The commands that grant the role, for a project owner to run. */
 function grantCommands(project) {
@@ -19,18 +22,29 @@ function grantCommands(project) {
 }
 
 /**
- * Whether [project]'s IAM policy gives Storage's service agent [ROLE]: true or false, or null
- * when the policy can't be read.
+ * Whether [project]'s IAM policy gives its own Storage service agent [ROLE]: true or false, or
+ * null when the project or its policy can't be read (refused, unreachable or garbled).
  */
 async function storageMayReadFirestore(project, token, fetchFn = fetch) {
-  const response = await fetchFn(`https://cloudresourcemanager.googleapis.com/v1/projects/${encodeURIComponent(project)}:getIamPolicy`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ options: { requestedPolicyVersion: 3 } }),
-  });
-  if (!response.ok) return null;
-  const { bindings = [] } = await response.json();
-  return bindings.some((binding) => binding.role === ROLE && !binding.condition && (binding.members ?? []).some((member) => AGENT.test(member)));
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const url = `${API}/${encodeURIComponent(project)}`;
+  try {
+    const about = await fetchFn(url, { method: "GET", headers });
+    if (!about.ok) return null;
+    const { projectNumber } = await about.json();
+    if (!projectNumber) return null;
+    const response = await fetchFn(`${url}:getIamPolicy`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ options: { requestedPolicyVersion: 3 } }),
+    });
+    if (!response.ok) return null;
+    const { bindings = [] } = await response.json();
+    const agent = agentOf(projectNumber);
+    return bindings.some((binding) => binding.role === ROLE && !binding.condition && (binding.members ?? []).includes(agent));
+  } catch {
+    return null;
+  }
 }
 
 async function main() {
