@@ -230,8 +230,11 @@ private fun LimitsCard(limits: List<AppLimit>) {
             Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(limit.packageName, size = 28.dp)
                 Spacer(Modifier.width(10.dp))
-                Text(limit.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Text(limitText(limit), style = MaterialTheme.typography.labelMedium)
+                // A limit with hours, days or caps is long, so it goes under the name and doesn't squeeze it.
+                Column(Modifier.weight(1f)) {
+                    Text(limit.appName, style = MaterialTheme.typography.bodyMedium)
+                    Text(limitText(limit), style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

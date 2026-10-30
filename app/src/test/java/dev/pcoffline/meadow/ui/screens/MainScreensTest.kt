@@ -3,6 +3,12 @@ package dev.pcoffline.meadow.ui.screens
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.pcoffline.meadow.data.SharedPage
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.TimeCap
+import dev.pcoffline.meadow.data.TimeWindow
+import dev.pcoffline.meadow.ui.limitText
+import androidx.compose.ui.text.TextLayoutResult
 import dev.pcoffline.meadow.ui.circle.FriendPage
 import android.app.Application
 import androidx.compose.material3.Text
@@ -197,6 +203,22 @@ class MainScreensTest : ScreenTest() {
         node(R.string.loading_garden).assertDoesNotExist()
         // Not knowing isn't the same as nothing shared.
         node(R.string.friend_nothing_shared, DemoGarden.maya.displayName).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a Bumblebee sees each app's whole name beside a long limit`() {
+        val limit = AppLimit(
+            "com.instagram.android", "Instagram", dailyMinutes = 60, weeklyMinutes = 300,
+            schedule = Schedule.everyDay(TimeWindow(9 * 60, 22 * 60)),
+            caps = listOf(TimeCap((1..5).toList(), 9 * 60, 17 * 60, 30)),
+        )
+        show { FriendPage(SharedPage(DemoGarden.maya, null, null, null, listOf(limit))) }
+        compose.onNodeWithText(app.resources.limitText(limit)).assertExists()
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Instagram").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        // Squeezed, the name breaks over several lines; here every letter of it is on the first.
+        assertEquals("the name stays on one line", 1, layouts.single().lineCount)
+        assertEquals("the whole name is on it", "Instagram".length, layouts.single().getLineEnd(0))
     }
 
     @Test
