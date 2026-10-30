@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +75,7 @@ import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.UserProfile
+import java.text.Collator
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -145,8 +147,8 @@ fun PeopleScreen(
 
 /**
  * Everyone in one place, drawn from plain state (also used for tests and screenshots): what's
- * waiting for an answer first, then Bumblebees and gardens, each opening their chat, where
- * requests, their garden and Bumblebee choices are too.
+ * waiting for an answer first, then Bumblebees and gardens (unread chats first, then by name),
+ * each opening their chat, where requests, their garden and Bumblebee choices are too.
  */
 @Composable
 fun PeopleContent(
@@ -158,6 +160,11 @@ fun PeopleContent(
     var asking by rememberSaveable { mutableStateOf(false) }
     val chats = people.chats.associateBy { it.id }
     fun chatWith(uid: String) = ChatRepository.chatIdFor(profile.uid, uid)
+    // News first, then by name, in each section.
+    val collator = remember { Collator.getInstance() }
+    fun List<UserProfile>.inOrder() = sortedWith(
+        compareBy<UserProfile> { chats[chatWith(it.uid)]?.isUnread(profile.uid) != true }.thenBy(collator) { it.displayName },
+    )
     // Sections show only with someone in them, judged by the profile too (it's already here), so
     // they don't flash in while friends load.
     val (offers, asks) = people.outgoingInvites.partition { it.offer }
@@ -186,7 +193,7 @@ fun PeopleContent(
             }
 
             if (hasBees) item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
-            items(people.bumblebees, key = { "bee-" + it.uid }) { bee ->
+            items(people.bumblebees.inOrder(), key = { "bee-" + it.uid }) { bee ->
                 PersonRow(
                     bee, chats[chatWith(bee.uid)], profile.uid, Modifier.animateItem(),
                     role = stringResource(R.string.circle_bee_role),
@@ -202,7 +209,7 @@ fun PeopleContent(
                     }
                 }
             }
-            items(people.lookingAfter, key = { "garden-" + it.uid }) { friend ->
+            items(people.lookingAfter.inOrder(), key = { "garden-" + it.uid }) { friend ->
                 PersonRow(friend, chats[chatWith(friend.uid)], profile.uid, Modifier.animateItem(), role = stringResource(R.string.circle_garden_role)) {
                     onOpenChat(chatWith(friend.uid))
                 }

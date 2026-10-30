@@ -84,6 +84,27 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
+    fun `unread chats come first in each section, then everyone by name`() {
+        val (maya, theo, ana) = listOf(DemoGarden.maya, DemoGarden.theo, DemoGarden.ana)
+        val zoe = ana.copy(uid = "zoe", displayName = "Zoe", bio = "")
+        val bob = ana.copy(uid = "bob", displayName = "Bob", bio = "")
+        show {
+            PeopleContent(
+                robin,
+                People(
+                    bumblebees = listOf(maya, theo, ana),
+                    lookingAfter = listOf(zoe, bob),
+                    chats = listOf(chatWith(maya, read = true), chatWith(theo, read = false), chatWith(ana, read = true), chatWith(zoe, read = false)),
+                ),
+            )
+        }
+        // Everyone fits on the screen, so each card's place is where the list put it.
+        fun top(name: String) = compose.onNodeWithText(name).fetchSemanticsNode().boundsInRoot.top
+        assertEquals(listOf("Theo", "Ana", "Maya"), listOf("Ana", "Maya", "Theo").sortedBy(::top))
+        assertEquals(listOf("Zoe", "Bob"), listOf("Bob", "Zoe").sortedBy(::top))
+    }
+
+    @Test
     fun `what's waiting for you comes first, then your own asks`() {
         show { PeopleContent(robin, DemoGarden.people) }
         val waiting = compose.onNodeWithText(text(R.string.people_waiting)).getBoundsInRoot()
