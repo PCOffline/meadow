@@ -430,11 +430,15 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
             // Straight to Android's share sheet: picking where it goes is the only choice to make.
-            TextButton(
-                onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Text(stringResource(R.string.limit_editor_share))
+            // Only the saved limit is shared, so it waits while there are changes; saving them
+            // offers to share the new one.
+            if (proposed == existing) {
+                TextButton(
+                    onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text(stringResource(R.string.limit_editor_share))
+                }
             }
         }
         Spacer(Modifier.height(24.dp))
