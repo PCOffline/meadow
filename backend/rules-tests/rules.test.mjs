@@ -2,7 +2,7 @@
 import { after, before, beforeEach, describe, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs, serverTimestamp, setDoc, setLogLevel, Timestamp, updateDoc } from "firebase/firestore";
 
 // Denied writes are what these tests expect; the SDK would log each one as a warning.
 setLogLevel("error");
@@ -489,6 +489,9 @@ describe("chats", () => {
   test("chat summaries only change in the allowed ways", async () => {
     const chat = doc(as("sam"), "chats/bee_sam");
     await assertSucceeds(updateDoc(chat, { lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: "sam" }));
+    // The app sends no words, as the backend deletes any that older apps send.
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "chats/bee_sam"), { lastMessage: deleteField() }));
+    await assertSucceeds(updateDoc(chat, { lastMessageAt: serverTimestamp(), lastSenderId: "sam", "lastRead.sam": serverTimestamp() }));
     await assertFails(updateDoc(chat, { lastSenderId: "bee" }));
     await assertFails(updateDoc(chat, { participants: ["sam", "stranger"] }));
     await assertSucceeds(updateDoc(chat, { "lastRead.sam": serverTimestamp() }));

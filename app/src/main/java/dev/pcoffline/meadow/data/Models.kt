@@ -218,7 +218,6 @@ data class Chat(
     val participants: List<String>,
     val names: Map<String, String>,
     val avatars: Map<String, Avatar>,
-    val lastMessage: String,
     val lastMessageAtMillis: Long,
     val lastSenderId: String?,
     val lastReadMillis: Map<String, Long>,

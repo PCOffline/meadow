@@ -4,8 +4,9 @@
 #   .github/scripts/setup-deploy-access.sh <firebase-project-id> <github-owner/repo>
 #
 # Creates a "github-deploy" service account with the roles a Firebase deploy needs, and lets only
-# the Deliver workflow on the repository's main branch act as it. Safe to run again. Needs gcloud,
-# signed in as a project owner, and curl. Prints the repository variables to set at the end.
+# the Deliver workflow on the repository's main branch act as it. Safe to run again. Needs gcloud
+# with its beta component (`gcloud components install beta`), signed in as a project owner, and
+# curl. Prints the repository variables to set at the end.
 set -euo pipefail
 
 if [ $# -ne 2 ]; then
@@ -30,6 +31,7 @@ ROLES=(
   roles/artifactregistry.admin
   roles/datastore.indexAdmin
   roles/serviceusage.serviceUsageConsumer
+  roles/browser # reads the project's IAM policy, for backend/check-rules-access.cjs
 )
 
 echo "Turning on the APIs that keyless sign-in needs"
@@ -58,6 +60,14 @@ gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" --project "$PROJEC
 # Earlier versions of this script granted it on the whole project.
 gcloud projects remove-iam-policy-binding "$PROJECT" --member "serviceAccount:$ACCOUNT" \
   --role roles/iam.serviceAccountUser --condition None --quiet > /dev/null 2>&1 || true
+
+# storage.rules reads Firestore, which Storage may do only with this role. `firebase deploy` offers
+# it only when a person runs it, and CI can't grant roles.
+echo "Letting Storage rules read Firestore"
+gcloud beta services identity create --service firebasestorage.googleapis.com --project "$PROJECT" > /dev/null
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member "serviceAccount:service-$NUMBER@gcp-sa-firebasestorage.iam.gserviceaccount.com" \
+  --role roles/firebaserules.firestoreServiceAgent --condition None --quiet > /dev/null
 
 # The deploy also sets the Storage bucket's lifecycle rule (backend/apply-lifecycle.cjs), so it
 # may manage the default bucket: that bucket only, not every bucket in the project.

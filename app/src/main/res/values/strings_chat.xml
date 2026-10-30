@@ -27,8 +27,7 @@
     <string name="chat_ask_sent">Asked %1$s 💌</string>
     <string name="chat_offer_sent">Offer sent to %1$s 💌</string>
     <string name="chat_ask_waiting">Waiting for %1$s to answer 💌</string>
-    <!-- Stand in for a picture in the chat list and notifications; match chatMedia in the backend's copy.ts. -->
-    <string name="chat_photo">📷 Photo</string>
+    <!-- Names a GIF in a chat; matches chatMedia in the backend's copy.ts, which notifications use. -->
     <string name="chat_gif">GIF</string>
     <string name="chat_add_picture">Send a photo or GIF</string>
     <string name="chat_picture_photo">Photo</string>

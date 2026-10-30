@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Chat
+import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.SnackbarClearance
@@ -44,24 +46,62 @@ import org.robolectric.annotation.Config
 class PeopleTest : ScreenTest() {
     private val robin = DemoGarden.robin
 
-    private fun chatWithMaya(read: Boolean): Chat {
+    private fun chatWithMaya(read: Boolean): Chat = chatWith(DemoGarden.maya, read)
+
+    /** Robin's chat with [friend], whose latest message Robin has [read] or not. */
+    private fun chatWith(friend: UserProfile, read: Boolean): Chat {
         val now = System.currentTimeMillis()
         return DemoGarden.chat.copy(
-            lastMessage = "How was the walk?", lastMessageAtMillis = now - 1_000, lastSenderId = DemoGarden.maya.uid,
+            id = ChatRepository.chatIdFor(robin.uid, friend.uid), participants = listOf(friend.uid, robin.uid),
+            lastMessageAtMillis = now - 1_000, lastSenderId = friend.uid,
             lastReadMillis = if (read) mapOf(robin.uid to now) else emptyMap(),
         )
     }
 
     @Test
-    fun `everyone opens their chat, showing the latest message or what they are to you`() {
+    fun `everyone opens their chat, showing their bio and not the latest message`() {
         val opened = mutableListOf<String>()
         show { PeopleContent(robin, DemoGarden.people, onOpenChat = { opened += it }) }
-        compose.onNodeWithText(DemoGarden.chat.lastMessage).performScrollTo().assertExists()
+        compose.onNodeWithText(DemoGarden.maya.bio).performScrollTo().assertExists()
         compose.onNodeWithText(DemoGarden.theo.bio).performScrollTo().assertExists()
+        compose.onNodeWithText("Thank you! 💛").assertDoesNotExist()
         compose.onNodeWithText("Maya").performScrollTo().performClick()
-        compose.onNodeWithText(DemoGarden.chatWithAna.lastMessage).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithText(DemoGarden.ana.bio).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(listOf("maya_robin", "ana_robin"), opened)
         assertAccessible()
+    }
+
+    @Test
+    fun `someone with no bio shows what they are to you`() {
+        show {
+            PeopleContent(
+                robin,
+                People(bumblebees = listOf(DemoGarden.maya.copy(bio = "")), lookingAfter = listOf(DemoGarden.ana.copy(bio = "")), chats = listOf(chatWithMaya(read = false))),
+            )
+        }
+        node(R.string.circle_bee_role).performScrollTo().assertExists()
+        node(R.string.circle_garden_role).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `unread chats come first in each section, then everyone by name`() {
+        val (maya, theo, ana) = listOf(DemoGarden.maya, DemoGarden.theo, DemoGarden.ana)
+        val zoe = ana.copy(uid = "zoe", displayName = "Zoe", bio = "")
+        val bob = ana.copy(uid = "bob", displayName = "Bob", bio = "")
+        show {
+            PeopleContent(
+                robin,
+                People(
+                    bumblebees = listOf(maya, theo, ana),
+                    lookingAfter = listOf(zoe, bob),
+                    chats = listOf(chatWith(maya, read = true), chatWith(theo, read = false), chatWith(ana, read = true), chatWith(zoe, read = false)),
+                ),
+            )
+        }
+        // Everyone fits on the screen, so each card's place is where the list put it.
+        fun top(name: String) = compose.onNodeWithText(name).fetchSemanticsNode().boundsInRoot.top
+        assertEquals(listOf("Theo", "Ana", "Maya"), listOf("Ana", "Maya", "Theo").sortedBy(::top))
+        assertEquals(listOf("Zoe", "Bob"), listOf("Bob", "Zoe").sortedBy(::top))
     }
 
     @Test
@@ -84,7 +124,7 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `an unread chat says so, not only in bold`() {
+    fun `an unread chat has a mark that opens it`() {
         val opened = mutableListOf<String>()
         show { PeopleContent(robin, People(bumblebees = listOf(DemoGarden.maya), chats = listOf(chatWithMaya(read = false))), onOpenChat = { opened += it }) }
         compose.onNodeWithContentDescription(text(R.string.chats_unread)).performScrollTo().performClick()

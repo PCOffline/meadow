@@ -201,7 +201,6 @@ export async function postToChat(
     const batch = db().batch();
     batch.set(chatRef.collection("messages").doc(), { ...message, createdAt: FieldValue.serverTimestamp() });
     batch.update(chatRef, {
-      lastMessage: message.text.slice(0, 140),
       lastMessageAt: FieldValue.serverTimestamp(),
       lastSenderId: message.senderId,
     });

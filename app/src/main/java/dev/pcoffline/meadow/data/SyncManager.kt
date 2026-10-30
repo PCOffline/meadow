@@ -170,7 +170,9 @@ class SyncManager(
      * Troubleshoot does this before a test notification, so a failed registration at startup is
      * fixed there rather than leaving the phone silent.
      */
-    suspend fun registerThisPhone() = registerPushNow(backend.uid ?: error("Not signed in"))
+    suspend fun registerThisPhone() = runCatchingCancellable { registerPushNow(backend.uid ?: error("Not signed in")) }
+        .onFailure { Log.w(TAG, "Could not register for pushes", it) }
+        .getOrThrow()
 
     private suspend fun registerPushNow(uid: String) {
         FirebaseMessaging.getInstance().register().await()

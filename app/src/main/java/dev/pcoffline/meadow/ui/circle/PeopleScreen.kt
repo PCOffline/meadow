@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,7 +57,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,6 +75,7 @@ import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.UserProfile
+import java.text.Collator
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -146,8 +147,8 @@ fun PeopleScreen(
 
 /**
  * Everyone in one place, drawn from plain state (also used for tests and screenshots): what's
- * waiting for an answer first, then Bumblebees and gardens, each opening their chat, where
- * requests, their garden and Bumblebee choices are too.
+ * waiting for an answer first, then Bumblebees and gardens (unread chats first, then by name),
+ * each opening their chat, where requests, their garden and Bumblebee choices are too.
  */
 @Composable
 fun PeopleContent(
@@ -159,6 +160,11 @@ fun PeopleContent(
     var asking by rememberSaveable { mutableStateOf(false) }
     val chats = people.chats.associateBy { it.id }
     fun chatWith(uid: String) = ChatRepository.chatIdFor(profile.uid, uid)
+    // News first, then by name, in each section.
+    val collator = remember { Collator.getInstance() }
+    fun List<UserProfile>.inOrder() = sortedWith(
+        compareBy<UserProfile> { chats[chatWith(it.uid)]?.isUnread(profile.uid) != true }.thenBy(collator) { it.displayName },
+    )
     // Sections show only with someone in them, judged by the profile too (it's already here), so
     // they don't flash in while friends load.
     val (offers, asks) = people.outgoingInvites.partition { it.offer }
@@ -187,7 +193,7 @@ fun PeopleContent(
             }
 
             if (hasBees) item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
-            items(people.bumblebees, key = { "bee-" + it.uid }) { bee ->
+            items(people.bumblebees.inOrder(), key = { "bee-" + it.uid }) { bee ->
                 PersonRow(
                     bee, chats[chatWith(bee.uid)], profile.uid, Modifier.animateItem(),
                     role = stringResource(R.string.circle_bee_role),
@@ -203,7 +209,7 @@ fun PeopleContent(
                     }
                 }
             }
-            items(people.lookingAfter, key = { "garden-" + it.uid }) { friend ->
+            items(people.lookingAfter.inOrder(), key = { "garden-" + it.uid }) { friend ->
                 PersonRow(friend, chats[chatWith(friend.uid)], profile.uid, Modifier.animateItem(), role = stringResource(R.string.circle_garden_role)) {
                     onOpenChat(chatWith(friend.uid))
                 }
@@ -243,8 +249,8 @@ fun PeopleContent(
 }
 
 /**
- * Someone in my circle, opening our chat: the latest message (bolder while unread), or failing
- * that what they are to me. A Bumblebee [leavingAt] some time says so, with a way to keep them.
+ * Someone in my circle, opening our chat: their bio, or failing that what they are to me, and a
+ * dot while the chat has news. A Bumblebee [leavingAt] some time says so, with a way to keep them.
  */
 @Composable
 private fun PersonRow(
@@ -259,17 +265,15 @@ private fun PersonRow(
     val action = rememberAction()
     val kept = stringResource(R.string.circle_bee_kept, person.displayName)
     val unread = chat?.isUnread(myUid) == true
-    val last = chat?.lastMessage?.takeIf { it.isNotBlank() }
     PersonCard(
         avatar = person.avatar,
         name = person.displayName,
-        about = when {
-            leavingAt != null -> stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
-            last != null -> last
-            else -> person.bio.ifBlank { role }
+        about = if (leavingAt != null) {
+            stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
+        } else {
+            person.bio.ifBlank { role }
         },
         aboutIsWarning = leavingAt != null,
-        aboutIsNew = unread && leavingAt == null,
         modifier = modifier,
         error = action.error,
         onClick = onOpen,
@@ -439,7 +443,6 @@ private fun PersonCard(
     about: String,
     modifier: Modifier,
     aboutIsWarning: Boolean = false,
-    aboutIsNew: Boolean = false,
     error: String? = null,
     onClick: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
@@ -454,7 +457,6 @@ private fun PersonCard(
                     about,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (aboutIsWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (aboutIsNew) FontWeight.SemiBold else null,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

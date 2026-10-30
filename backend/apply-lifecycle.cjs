@@ -10,10 +10,10 @@ const project = process.env.GCLOUD_PROJECT;
 const API = "https://storage.googleapis.com/storage/v1/b";
 
 /** Application Default Credentials (CI, or `gcloud auth application-default login`), else gcloud's own sign-in. */
-async function accessToken() {
+async function accessToken(scopes = "https://www.googleapis.com/auth/devstorage.full_control") {
   try {
     const { GoogleAuth } = require("google-auth-library");
-    const token = await new GoogleAuth({ scopes: "https://www.googleapis.com/auth/devstorage.full_control" }).getAccessToken();
+    const token = await new GoogleAuth({ scopes }).getAccessToken();
     if (token) return token;
   } catch {
     // Not signed in that way; try gcloud.
@@ -22,7 +22,7 @@ async function accessToken() {
     return execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     throw new Error(
-      "Couldn't sign in to Google Cloud to set the Storage lifecycle rule. Run `gcloud auth application-default login` once, then deploy again.",
+      "Couldn't sign in to Google Cloud. Run `gcloud auth application-default login` once, then deploy again.",
     );
   }
 }
@@ -82,4 +82,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { applyLifecycle, mergeLifecycle };
+module.exports = { accessToken, applyLifecycle, mergeLifecycle };
