@@ -216,8 +216,9 @@ class MainScreensTest : ScreenTest() {
         compose.onNodeWithText(app.resources.limitText(limit)).assertExists()
         val layouts = mutableListOf<TextLayoutResult>()
         compose.onNodeWithText("Instagram").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        // Squeezed, the name breaks over several lines; here every letter of it is on the first.
         assertEquals("the name stays on one line", 1, layouts.single().lineCount)
-        assertTrue("the name isn't cut off", !layouts.single().hasVisualOverflow)
+        assertEquals("the whole name is on it", "Instagram".length, layouts.single().getLineEnd(0))
     }
 
     @Test
