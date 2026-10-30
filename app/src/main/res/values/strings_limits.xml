@@ -69,7 +69,6 @@
     <string name="schedule_window">%1$s–%2$s</string>
     <string name="schedule_all_day">all day</string>
     <string name="schedule_day_off">Not allowed</string>
-    <string name="schedule_day_allowed">Allowed on %1$s</string>
     <string name="schedule_starts">Starts at %1$s</string>
     <string name="schedule_ends">Ends at %1$s</string>
     <string name="schedule_never">never</string>
@@ -81,9 +80,11 @@
     <string name="schedule_remove_window">Remove these hours</string>
     <string name="schedule_bad_window">The end must be after the start.</string>
     <string name="schedule_all_day_chip">All day</string>
-    <string name="schedule_copy">Copy</string>
-    <string name="schedule_copy_description">Copy %1$s\'s hours to other days</string>
-    <string name="schedule_copy_title">Use %1$s\'s hours on</string>
+    <string name="schedule_pick_days">Days to set</string>
+    <string name="schedule_pick_some">Pick one or more days.</string>
+    <string name="schedule_days_differ">These days have different hours now. A change gives them all the same hours.</string>
+    <string name="schedule_days_allowed">Allowed on these days</string>
+    <string name="schedule_pick_day">Set the hours of %1$s</string>
     <string name="limit_editor_pick_time">Pick on a clock</string>
     <string name="limit_editor_days_own">Days with their own limit</string>
     <string name="limit_editor_days_add">Different on some days</string>
