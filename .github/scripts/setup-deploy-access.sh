@@ -4,8 +4,9 @@
 #   .github/scripts/setup-deploy-access.sh <firebase-project-id> <github-owner/repo>
 #
 # Creates a "github-deploy" service account with the roles a Firebase deploy needs, and lets only
-# the Deliver workflow on the repository's main branch act as it. Safe to run again. Needs gcloud,
-# signed in as a project owner, and curl. Prints the repository variables to set at the end.
+# the Deliver workflow on the repository's main branch act as it. Safe to run again. Needs gcloud
+# with its beta component (`gcloud components install beta`), signed in as a project owner, and
+# curl. Prints the repository variables to set at the end.
 set -euo pipefail
 
 if [ $# -ne 2 ]; then

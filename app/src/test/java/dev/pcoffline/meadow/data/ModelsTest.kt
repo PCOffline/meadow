@@ -63,7 +63,7 @@ class ModelsTest {
     fun `closed chats aren't listed and open as closed`() {
         val open = Chat(
             id = "a_b", participants = listOf("a", "b"), names = mapOf("a" to "Sam", "b" to "Bee"), avatars = emptyMap(),
-            lastMessage = "Hi", lastMessageAtMillis = 1L, lastSenderId = "a", lastReadMillis = emptyMap(),
+            lastMessageAtMillis = 1L, lastSenderId = "a", lastReadMillis = emptyMap(),
         )
         val closed = open.copy(id = "a_c", participants = listOf("a", "c"), names = emptyMap(), closed = true)
         assertEquals(listOf(open), ChatRepository.listed(listOf(open, closed)))

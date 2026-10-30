@@ -10,12 +10,16 @@ const { grantCommands, storageMayReadFirestore } = require("../check-rules-acces
 const ROLE = "roles/firebaserules.firestoreServiceAgent";
 const AGENT = "serviceAccount:service-123@gcp-sa-firebasestorage.iam.gserviceaccount.com";
 
-/** A fake fetch that answers getIamPolicy with [bindings], or with [status]; records every call. */
-function resourceManager(bindings, status = 200) {
+/**
+ * A fake fetch for project "meadow", number 123: it answers getIamPolicy with [bindings], or with
+ * [status], and the project lookup with [projectStatus]. Records every call.
+ */
+function resourceManager(bindings, status = 200, { projectStatus = 200 } = {}) {
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, method: init.method, auth: init.headers?.Authorization });
-    return { ok: status < 300, status, json: async () => ({ bindings }) };
+    if (url.endsWith(":getIamPolicy")) return { ok: status < 300, status, json: async () => ({ bindings }) };
+    return { ok: projectStatus < 300, status: projectStatus, json: async () => ({ projectId: "meadow", projectNumber: "123" }) };
   };
   return { fetch, calls };
 }
@@ -23,7 +27,10 @@ function resourceManager(bindings, status = 200) {
 test("passes when Storage's service agent has the role", async () => {
   const { fetch, calls } = resourceManager([{ role: "roles/owner", members: ["user:a@b.c"] }, { role: ROLE, members: [AGENT] }]);
   assert.equal(await storageMayReadFirestore("meadow", "token", fetch), true);
-  assert.deepEqual(calls, [{ url: "https://cloudresourcemanager.googleapis.com/v1/projects/meadow:getIamPolicy", method: "POST", auth: "Bearer token" }]);
+  assert.deepEqual(calls, [
+    { url: "https://cloudresourcemanager.googleapis.com/v1/projects/meadow", method: "GET", auth: "Bearer token" },
+    { url: "https://cloudresourcemanager.googleapis.com/v1/projects/meadow:getIamPolicy", method: "POST", auth: "Bearer token" },
+  ]);
 });
 
 test("fails when nobody has the role", async () => {
@@ -41,6 +48,12 @@ test("fails when the role goes to some other account", async () => {
   assert.equal(await storageMayReadFirestore("meadow", "token", fetch), false);
 });
 
+test("fails when the role goes to another project's Storage agent", async () => {
+  const other = "serviceAccount:service-456@gcp-sa-firebasestorage.iam.gserviceaccount.com";
+  const { fetch } = resourceManager([{ role: ROLE, members: [other] }]);
+  assert.equal(await storageMayReadFirestore("meadow", "token", fetch), false);
+});
+
 test("fails when the role holds only under a condition", async () => {
   const { fetch } = resourceManager([{ role: ROLE, members: [AGENT], condition: { expression: "false" } }]);
   assert.equal(await storageMayReadFirestore("meadow", "token", fetch), false);
@@ -48,6 +61,23 @@ test("fails when the role holds only under a condition", async () => {
 
 test("can't tell when the policy can't be read", async () => {
   const { fetch } = resourceManager([], 403);
+  assert.equal(await storageMayReadFirestore("meadow", "token", fetch), null);
+});
+
+test("can't tell when the project can't be looked up", async () => {
+  const { fetch } = resourceManager([{ role: ROLE, members: [AGENT] }], 200, { projectStatus: 403 });
+  assert.equal(await storageMayReadFirestore("meadow", "token", fetch), null);
+});
+
+test("can't tell when the API is out of reach", async () => {
+  const fetch = async () => {
+    throw new TypeError("fetch failed");
+  };
+  assert.equal(await storageMayReadFirestore("meadow", "token", fetch), null);
+});
+
+test("can't tell when the answer isn't JSON", async () => {
+  const fetch = async () => ({ ok: true, status: 200, json: async () => JSON.parse("<html>") });
   assert.equal(await storageMayReadFirestore("meadow", "token", fetch), null);
 });
 

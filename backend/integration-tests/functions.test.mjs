@@ -930,6 +930,26 @@ describe("chat and alerts", () => {
     assert.equal((await outbox(sam.uid, "chat")).length, 0);
   });
 
+  test("a chat keeps no copy of a message's words, even from an older app", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
+    // Older apps copy the words onto the chat as they send.
+    await admin(async (db) => {
+      await updateDoc(doc(db, `chats/${chatId}`), { lastMessage: "Hello bee", lastMessageAt: serverTimestamp(), lastSenderId: sam.uid });
+      await addDoc(collection(db, `chats/${chatId}/messages`), { senderId: sam.uid, kind: "text", text: "Hello bee", createdAt: serverTimestamp() });
+    });
+    await eventually(async () => assert.equal((await read(`chats/${chatId}`)).lastMessage, undefined));
+    assert.equal((await read(`chats/${chatId}`)).lastSenderId, sam.uid);
+
+    // A chat that got no message since then loses its copy in the hourly care.
+    await admin((db) => updateDoc(doc(db, `chats/${chatId}`), { lastMessage: "Still there?" }));
+    const done = await sam.call("runSchedulesForTests", { now: Date.now() });
+    assert.ok(done.chatPreviews >= 1);
+    assert.equal((await read(`chats/${chatId}`)).lastMessage, undefined);
+  });
+
   test("a photo is pushed as a photo, and the chat's pictures go when the chat closes", async () => {
     const sam = await person("Sam");
     const bee = await person("Bee");
