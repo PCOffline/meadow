@@ -11,6 +11,7 @@
     <string name="request_say_yes">Approve</string>
     <string name="request_not_today">Deny</string>
     <string name="request_withdraw">Withdraw</string>
+    <string name="request_ask_again">Ask again</string>
     <string name="request_withdrawn">Request withdrawn</string>
     <string name="request_sent_yes">Approved 🌸</string>
     <string name="request_sent_no">Denied 🍃</string>

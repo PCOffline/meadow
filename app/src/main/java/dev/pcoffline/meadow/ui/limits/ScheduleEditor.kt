@@ -3,6 +3,7 @@
 package dev.pcoffline.meadow.ui.limits
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -39,6 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +53,7 @@ import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.clockText
 import dev.pcoffline.meadow.ui.currentLocale
+import dev.pcoffline.meadow.ui.windowsText
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 
@@ -63,9 +68,9 @@ private val PRESETS = listOf(
 )
 
 /**
- * Edits when an app may be used: the same hours every day, or each weekday on its own, starting
- * on [firstDay]. Each weekday has a switch; a day switched off isn't allowed at all. Nothing can be
- * changed while not [enabled].
+ * Edits when an app may be used: the same hours every day, or by weekday, starting on [firstDay].
+ * By weekday, the hours are set for the days picked, several at once, and each day's hours are
+ * listed below. A day switched off isn't allowed at all. Nothing can be changed while not [enabled].
  */
 @Composable
 fun ScheduleEditor(schedule: Schedule, firstDay: DayOfWeek = DayOfWeek.MONDAY, enabled: Boolean = true, onChange: (Schedule) -> Unit) {
@@ -89,18 +94,11 @@ fun ScheduleEditor(schedule: Schedule, firstDay: DayOfWeek = DayOfWeek.MONDAY, e
             }
         }
         if (perDay) {
-            var copying by rememberSaveable { mutableStateOf<Int?>(null) }
-            week.forEachIndexed { i, day ->
-                if (i > 0) HorizontalDivider()
-                DayRow(day, schedule.windowsOn(day), opening, enabled, onCopy = { copying = day }) { onChange(Schedule(schedule.fullDays() + (day to it))) }
-            }
-            copying?.let { from ->
-                CopyDaysDialog(from, schedule, firstDay, onDismiss = { copying = null }) { days ->
-                    copying = null
-                    val windows = schedule.windowsOn(from)
-                    onChange(Schedule(schedule.fullDays() + days.associateWith { windows }))
-                }
-            }
+            // At first, the first day and every day with the same hours.
+            var picked by rememberSaveable { mutableStateOf(week.filter { schedule.windowsOn(it) == schedule.windowsOn(week.first()) }) }
+            PickedDaysEditor(schedule, picked, firstDay, opening, enabled, onPick = { picked = it }, onChange = onChange)
+            HorizontalDivider()
+            week.forEach { day -> DayHours(day, schedule.windowsOn(day), enabled) { picked = listOf(day) } }
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 PRESETS.forEach { preset ->
@@ -131,74 +129,70 @@ private fun presetLabel(preset: List<TimeWindow>): String {
 }
 
 /**
- * One weekday: its name and a switch for whether the app may be used that day at all, then
- * whether that's all day or set hours. Switching a day on gives it [opening], the hours of
- * another open day. [onCopy] gives this day's hours to others.
+ * The hours of the [picked] days, set for all of them at once: a switch for whether the app may be
+ * used on them at all, then whether that's all day or set hours. Switching them on gives them
+ * [opening], the hours of an open day. Picked days with different hours show the first one's,
+ * and a change gives them all the same.
  */
 @Composable
-private fun DayRow(
-    day: Int,
-    windows: List<TimeWindow>,
+private fun PickedDaysEditor(
+    schedule: Schedule,
+    picked: List<Int>,
+    firstDay: DayOfWeek,
     opening: List<TimeWindow>,
     enabled: Boolean,
-    onCopy: () -> Unit,
-    onChange: (List<TimeWindow>) -> Unit,
+    onPick: (List<Int>) -> Unit,
+    onChange: (Schedule) -> Unit,
 ) {
-    val name = DayOfWeek.of(day).getDisplayName(TextStyle.FULL, currentLocale())
-    val allowed = stringResource(R.string.schedule_day_allowed, name)
-    val allDay = windows == listOf(TimeWindow.ALL_DAY)
-    Column {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleSmall)
-                if (windows.isEmpty()) {
-                    Text(
-                        stringResource(R.string.schedule_day_off),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            val copy = stringResource(R.string.schedule_copy_description, name)
-            TextButton(onClick = onCopy, enabled = enabled, modifier = Modifier.semantics { contentDescription = copy }) {
-                Text(stringResource(R.string.schedule_copy), style = MaterialTheme.typography.labelMedium)
-            }
-            Switch(
-                checked = windows.isNotEmpty(),
-                onCheckedChange = { on -> onChange(if (on) opening else emptyList()) },
-                enabled = enabled,
-                modifier = Modifier.semantics { contentDescription = allowed },
-            )
-        }
-        if (windows.isNotEmpty()) {
-            val allDayLabel = stringResource(R.string.schedule_all_day_chip)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(
-                    selected = allDay,
-                    onClick = { onChange(if (allDay) opening.takeIf { it != listOf(TimeWindow.ALL_DAY) } ?: PRESETS.first() else listOf(TimeWindow.ALL_DAY)) },
-                    label = { Text(allDayLabel) },
-                    enabled = enabled,
-                    modifier = Modifier.semantics { contentDescription = "$allDayLabel, $name" },
-                )
-            }
-            if (!allDay) HoursEditor(windows, enabled, onChange)
-        }
+    Text(stringResource(R.string.schedule_pick_days), style = MaterialTheme.typography.titleSmall)
+    DayChips(picked, firstDay, enabled, onChange = onPick)
+    if (picked.isEmpty()) {
+        Text(stringResource(R.string.schedule_pick_some), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
     }
+    val windows = schedule.windowsOn(picked.first())
+    fun set(new: List<TimeWindow>) = onChange(Schedule(schedule.fullDays() + picked.associateWith { new }))
+    if (picked.any { schedule.windowsOn(it) != windows }) {
+        Text(stringResource(R.string.schedule_days_differ), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    val allowed = stringResource(R.string.schedule_days_allowed)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .toggleable(windows.isNotEmpty(), enabled = enabled, role = Role.Switch) { on -> set(if (on) opening else emptyList()) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(allowed, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = windows.isNotEmpty(), onCheckedChange = null, enabled = enabled)
+    }
+    if (windows.isEmpty()) return
+    val allDay = windows == listOf(TimeWindow.ALL_DAY)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(
+            selected = allDay,
+            onClick = { set(if (allDay) opening.takeIf { it != listOf(TimeWindow.ALL_DAY) } ?: PRESETS.first() else listOf(TimeWindow.ALL_DAY)) },
+            label = { Text(stringResource(R.string.schedule_all_day_chip)) },
+            enabled = enabled,
+        )
+    }
+    if (!allDay) HoursEditor(windows, enabled, ::set)
 }
 
-/** Gives [from]'s hours to the days picked, several at once. */
+/** One weekday and its hours, at a glance. Tapping it picks that day alone, to set its hours. */
 @Composable
-private fun CopyDaysDialog(from: Int, schedule: Schedule, firstDay: DayOfWeek, onDismiss: () -> Unit, onCopy: (List<Int>) -> Unit) {
-    val name = DayOfWeek.of(from).getDisplayName(TextStyle.FULL, currentLocale())
-    // Days that already match start picked, so the dialog shows where these hours already are.
-    var days by rememberSaveable { mutableStateOf((1..7).filter { it != from && schedule.windowsOn(it) == schedule.windowsOn(from) }) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.schedule_copy_title, name)) },
-        text = { DayChips(days, firstDay, enabled = true, taken = listOf(from)) { days = it } },
-        confirmButton = { TextButton(onClick = { onCopy(days) }, enabled = days.isNotEmpty()) { Text(stringResource(R.string.action_ok)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
+private fun DayHours(day: Int, windows: List<TimeWindow>, enabled: Boolean, onPick: () -> Unit) {
+    val name = DayOfWeek.of(day).getDisplayName(TextStyle.FULL, currentLocale())
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .clickable(enabled = enabled, onClickLabel = stringResource(R.string.schedule_pick_day, name), role = Role.Button, onClick = onPick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        Text(
+            LocalResources.current.windowsText(windows).replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /** A day's windows, and a button for one more while there's room. */
