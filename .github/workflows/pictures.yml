@@ -1,0 +1,122 @@
+name: Pictures
+
+# Draws a pull request's pictures on an Android emulator and puts them in its description: each
+# story step by step with a video, and every screen of the debug gallery in each look that
+# changed, before and after. Read "Pull requests" in AGENTS.md. The pictures are published on the
+# branch pictures/pr-<number>. A pull request from a fork gets them in the run's artifact only.
+on:
+  pull_request:
+    paths:
+      - 'app/src/**'
+      - '!app/src/test/**'
+      - '!app/src/testDebug/**'
+      - 'app/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
+      - '.github/scripts/pr_pictures.py'
+      - '.github/scripts/draw-pictures.sh'
+      - '.github/workflows/pictures.yml'
+
+# Each job asks for only what it needs.
+permissions: {}
+
+jobs:
+  pictures:
+    # A newer push to the same pull request makes an older drawing pointless.
+    concurrency:
+      group: pictures-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # publishes the pictures on their own branch
+      pull-requests: write # puts them in the pull request's description
+    timeout-minutes: 90
+    env:
+      NUMBER: ${{ github.event.pull_request.number }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      # A fork's pull request gets a token that can't publish.
+      SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # The publish step pushes the pictures' branch with these credentials.
+          persist-credentials: true
+      - name: Check out the base
+        run: |
+          base="$(git merge-base "origin/$BASE_REF" HEAD)"
+          echo "Base: $base"
+          git worktree add ../base "$base"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: true
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install image tools
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          pip install pillow
+      - name: Build the pull request and its base
+        run: |
+          ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
+          # The base may not build, or may have no pictures yet: then every picture is new.
+          (cd ../base && ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace) || echo "The base didn't build"
+      - name: Draw on an emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          # The tests turn the motion off for the gallery and on for the stories.
+          disable-animations: false
+          script: |
+            adb shell settings put global hide_error_dialogs 1
+            sleep 20
+            .github/scripts/draw-pictures.sh ../base build/pictures/before || echo "The base drew no pictures, or not all of them"
+            .github/scripts/draw-pictures.sh . build/pictures/after
+      - name: Prepare the pictures
+        env:
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          # Each run has a folder of its own, so a picture never comes from an older run's cache.
+          echo "FOLDER=$RUN" >> "$GITHUB_ENV"
+          python3 .github/scripts/pr_pictures.py build/pictures/before build/pictures/after build/pictures/site \
+            "https://raw.githubusercontent.com/$REPO/refs/heads/pictures/pr-$NUMBER/$RUN"
+      - name: Publish the pictures
+        if: env.SAME_REPO == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only this run's pictures: the branch has one commit, replaced on each run.
+          git worktree add --orphan -b "pictures/pr-$NUMBER" ../publish
+          mkdir -p "../publish/$FOLDER"
+          cp -r build/pictures/site/. "../publish/$FOLDER/"
+          cd ../publish
+          git add .
+          git commit -q -m "Pictures for pull request #$NUMBER"
+          git push --force origin "HEAD:refs/heads/pictures/pr-$NUMBER"
+      - name: Put them in the description
+        if: env.SAME_REPO == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$REPO/pulls/$NUMBER" --jq '.body // ""' > build/pictures/body.md
+          python3 .github/scripts/pr_pictures.py body build/pictures/body.md build/pictures/site/pictures.md > build/pictures/new-body.md
+          gh api -X PATCH "repos/$REPO/pulls/$NUMBER" -F body=@build/pictures/new-body.md > /dev/null
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: pictures
+          path: |
+            build/pictures/
+            app/build/reports/androidTests/
+          if-no-files-found: ignore
