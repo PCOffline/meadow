@@ -1,7 +1,7 @@
 [versions]
 # Unit test coverage (AGP runs it). 0.8.14 is the first with Java 25 support.
 jacoco = "0.8.15"
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 googleServices = "4.5.0"
 core = "1.19.1"
@@ -17,7 +17,7 @@ konfetti = "2.2.0"
 junit = "4.13.2"
 coil = "3.6.3"
 # The bundled Noto emoji font, so emoji look the same on every phone.
-emoji2 = "1.5.0"
+emoji2 = "1.7.0"
 exifinterface = "1.3.7"
 robolectric = "4.17"
 markdownRenderer = "0.46.0"
