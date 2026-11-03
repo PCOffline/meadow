@@ -213,7 +213,22 @@ data class RestState(
     val unlocked: Boolean get() = budget != null && !budget.exhausted
 }
 
-class RestViewModel(private val packageName: String) : ViewModel() {
+/**
+ * What the rest screen shows. [budgetOf] gives an app's budget, reading the usage log afresh when
+ * asked to (the engine's own, outside tests).
+ */
+class RestViewModel(
+    private val packageName: String,
+    private val budgetOf: (packageName: String, forceRefresh: Boolean) -> AppBudget? = AppGraph.engine::budget,
+) : ViewModel() {
+    /**
+     * Only the first budget reads the whole day's usage log afresh. The app is behind this screen,
+     * so its time doesn't grow, and an unlock or a yes changes the budget, not the usage. A full
+     * read on each change asked the system for the day's log several times in a few seconds,
+     * which can hold up the phone (#68). Later budgets use the engine's reading, at most 20 s old.
+     */
+    private val firstRead = java.util.concurrent.atomic.AtomicBoolean(true)
+
     private val pending = AppGraph.sync.profile.flatMapLatest { state ->
         val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
         AppGraph.requests.outgoing(uid).map { requests ->
@@ -234,7 +249,7 @@ class RestViewModel(private val packageName: String) : ViewModel() {
         val profile = (profileState as? ProfileState.Ready)?.profile
         RestState(
             appName = AppGraph.engine.limitFor(packageName)?.appName ?: AppGraph.catalog.label(packageName),
-            budget = AppGraph.engine.budget(packageName, forceRefresh = true),
+            budget = budgetOf(packageName, firstRead.getAndSet(false)),
             signedIn = profile != null,
             hasBumblebees = profile?.approverIds?.isNotEmpty() == true,
             // Unanswered requests expire; the ticker notices before the backend settles it.
