@@ -22,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.ui.limits.BackTopBar
+import dev.pcoffline.meadow.ui.limits.CapTemplates
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.limits.MinutesStepper
@@ -134,17 +135,20 @@ class LimitPickersTest : ScreenTest() {
     fun `templates fill in the days and the hours, and together they make a cap`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 60, weeklyMinutes = 0)))
         node(R.string.limit_editor_cap_add).performScrollTo().performClick()
+        // The week starts where the phone, or the person, says; other tests may have changed it.
+        val first = dev.pcoffline.meadow.AppGraph.store.weekRule.value.first
+        fun day(n: Int) = compose.onNodeWithContentDescription(java.time.DayOfWeek.of(n).getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()))
         node(R.string.cap_template_weekdays).performClick()
-        listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday").forEach { compose.onNodeWithContentDescription(it).assertIsSelected() }
-        compose.onNodeWithContentDescription("Saturday").assertIsNotSelected()
+        CapTemplates.weekdays(first).forEach { day(it).assertIsSelected() }
+        CapTemplates.weekends(first).forEach { day(it).assertIsNotSelected() }
         node(R.string.action_ok).assertIsNotEnabled()
         node(R.string.cap_template_evenings).performClick()
         compose.onNodeWithText(dev.pcoffline.meadow.ui.clockText(17 * 60)).assertExists()
         compose.onNodeWithText(dev.pcoffline.meadow.ui.clockText(22 * 60)).assertExists()
         node(R.string.action_ok).assertIsEnabled()
         node(R.string.cap_template_weekends).performClick()
-        listOf("Saturday", "Sunday").forEach { compose.onNodeWithContentDescription(it).assertIsSelected() }
-        compose.onNodeWithContentDescription("Monday").assertIsNotSelected()
+        CapTemplates.weekends(first).forEach { day(it).assertIsSelected() }
+        CapTemplates.weekdays(first).forEach { day(it).assertIsNotSelected() }
     }
 
     @Test
