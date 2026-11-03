@@ -24,7 +24,7 @@ export {
   createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, inviteFromChat, respondInvite, cancelInvite,
   removeApprover, cancelRemoval, stepDown,
 } from "./social";
-export { createRequest, decideRequest, cancelRequest, saveLimit } from "./requests";
+export { applyLimitSuggestion, createRequest, decideRequest, cancelRequest, saveLimit } from "./requests";
 export { emergencyUnlock } from "./emergency";
 export { exportMyData, deleteAccount } from "./account";
 export { sendTestPush } from "./diagnostics";

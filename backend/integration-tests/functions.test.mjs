@@ -1319,3 +1319,70 @@ describe("every callable is safe to call wrongly", () => {
     assert.equal(await read(`users/${sam.uid}/private/account`), undefined);
   });
 });
+
+describe("suggested limits", () => {
+  const chatIdOf = (a, b) => [a.uid, b.uid].sort().join("_");
+  const looser = { packageName: "com.insta", appName: "Instagram", dailyMinutes: 90, weeklyMinutes: 0 };
+
+  /** Sam with an hour's limit on Instagram, Bee as Sam's Bumblebee, and Sam as Flower's Bumblebee. */
+  async function circle() {
+    const [sam, bee, flower] = [await person("Sam"), await person("Bee"), await person("Flower")];
+    await link(sam, bee);
+    await link(flower, sam);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 60, weeklyMinutes: 0 }));
+    return { sam, bee, flower };
+  }
+
+  async function card(from, to, mode, limit) {
+    const ref = await admin((db) => addDoc(collection(db, `chats/${chatIdOf(from, to)}/messages`), {
+      senderId: from.uid, kind: "limit", mode, limit, createdAt: serverTimestamp(),
+    }));
+    return { chatId: chatIdOf(from, to), messageId: ref.id };
+  }
+
+  test("a Bumblebee's suggestion applies as sent, even looser, with no question", async () => {
+    const { sam, bee } = await circle();
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { ...looser, appName: "Insta (renamed)" }));
+    const saved = await read(`users/${sam.uid}/limits/com.insta`);
+    assert.equal(saved.dailyMinutes, 90);
+    // The limit keeps the name it was planted under.
+    assert.equal(saved.appName, "Instagram");
+    const asked = await admin(async (db) => (await getDocs(query(collection(db, "requests"), where("requesterId", "==", sam.uid)))).size);
+    assert.equal(asked, 0);
+  });
+
+  test("a suggestion plants a limit for an app with none", async () => {
+    const { sam, bee } = await circle();
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { packageName: "com.tiktok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 }));
+    const saved = await read(`users/${sam.uid}/limits/com.tiktok`);
+    assert.equal(saved.dailyMinutes, 20);
+    assert.equal(saved.appName, "TikTok");
+  });
+
+  test("a suggestion from someone who isn't my Bumblebee can't skip the approval", async () => {
+    const { sam, flower } = await circle();
+    // Sam looks after Flower; Flower is not Sam's Bumblebee.
+    await rejects(sam.call("applyLimitSuggestion", await card(flower, sam, "suggested", looser)), "permission-denied");
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).dailyMinutes, 60);
+  });
+
+  test("only a suggestion sent to me, in my chat, applies", async () => {
+    const { sam, bee } = await circle();
+    const stranger = await person("Stranger");
+    await rejects(sam.call("applyLimitSuggestion", await card(bee, sam, "shared", looser)), "failed-precondition");
+    const mine = await card(sam, bee, "suggested", looser);
+    // My own suggestion, and someone else's chat.
+    await rejects(sam.call("applyLimitSuggestion", mine), "failed-precondition");
+    await rejects(stranger.call("applyLimitSuggestion", await card(bee, sam, "suggested", looser)), "failed-precondition");
+    await rejects(sam.call("applyLimitSuggestion", { chatId: mine.chatId, messageId: "missing" }), "failed-precondition");
+    // A card that holds no limit.
+    await rejects(sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { ...looser, dailyMinutes: 0 })), "failed-precondition");
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).dailyMinutes, 60);
+  });
+
+  test("a limit card pushes which app it is for", async () => {
+    const { sam, bee } = await circle();
+    await card(bee, sam, "suggested", looser);
+    await eventually(async () => assert.ok((await outbox(sam.uid, "chat")).some((p) => String(p.body ?? p.text ?? JSON.stringify(p)).includes("Instagram"))));
+  });
+});

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatIdFor, chatOfPicture, formatMinutes, uploadId, INVITE_TOKEN_LENGTH, inviteUrl, limitText, randomFriendCode, randomInviteToken, storedAppName, summarize, withPhotoToken } from "./format";
+import { chatIdFor, chatOfPicture, formatMinutes, uploadId, INVITE_TOKEN_LENGTH, inviteUrl, limitText, pushText, randomFriendCode, randomInviteToken, storedAppName, summarize, withPhotoToken } from "./format";
 
 test("formats minutes like the app does", () => {
   assert.equal(formatMinutes(0), "0m");
@@ -68,4 +68,15 @@ test("where a chat picture was sent, and the id of its note", () => {
   assert.equal(uploadId("chats/a_b/a/photo1234.jpg"), "chats~a_b~a~photo1234.jpg");
   // storage.rules looks the note up by a URL it doesn't escape, so the id must need no escaping.
   assert.equal(encodeURIComponent(uploadId("chats/a_b/a/photo1234.jpg")), uploadId("chats/a_b/a/photo1234.jpg"));
+});
+
+test("a chat push says the words, a picture, or which app a limit card is for", () => {
+  assert.equal(pushText({ kind: "text", text: "Hi" }), "Hi");
+  assert.equal(pushText({ kind: "text" }), "");
+  assert.equal(pushText({ kind: "image", gif: true }), "GIF");
+  assert.equal(pushText({ kind: "image" }), "📷 Photo");
+  assert.equal(pushText({ kind: "limit", mode: "shared", limit: { appName: "Instagram" } }), "Shared a limit for Instagram");
+  assert.equal(pushText({ kind: "limit", mode: "suggested", limit: { appName: "Instagram" } }), "Suggested a limit for Instagram");
+  assert.equal(pushText({ kind: "limit", mode: "suggested", limit: { packageName: "com.instagram.android" } }), "Suggested a limit for com.instagram.android");
+  assert.equal(pushText({ kind: "limit", mode: "shared" }), "Shared a limit for ");
 });
