@@ -59,4 +59,11 @@ class DayNightTest {
         assertEquals(0.5f, celestialProgress(1, 0, night = true), 0.001f)
     }
 
+
+    @Test
+    fun `the rest screen's sky follows the chosen look too`() {
+        assertTrue(dev.pcoffline.meadow.enforcement.restingSky(dark = true).night)
+        assertFalse(dev.pcoffline.meadow.enforcement.restingSky(dark = false).night)
+    }
+
 }

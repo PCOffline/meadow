@@ -55,7 +55,7 @@ In a real emergency, unlock all your apps for up to one hour. You can do this th
 30 days. Calls and emergency apps never rest.
 
 <p align="center">
-  <img src="docs/images/screen-resting.png" alt="A resting app under a night sky, with a button to go home and a button to ask a Bumblebee" width="250">
+  <img src="docs/images/screen-resting.png" alt="A resting app under a calm sky, with a button to go home and a button to ask a Bumblebee" width="250">
   &nbsp;
   <img src="docs/images/screen-emergency.png" alt="An app open during an emergency unlock, with the time left" width="250">
 </p>
