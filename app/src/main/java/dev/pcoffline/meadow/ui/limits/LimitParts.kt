@@ -25,8 +25,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,9 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
@@ -173,7 +175,7 @@ fun CapsEditor(caps: List<TimeCap>, firstDay: DayOfWeek, enabled: Boolean, onCha
     }
     editing?.let { i ->
         CapDialog(
-            initial = caps.getOrNull(i) ?: TimeCap((1..5).toList(), 10 * 60, 16 * 60, 30),
+            initial = caps.getOrNull(i),
             firstDay = firstDay,
             onDismiss = { editing = null },
         ) { cap ->
@@ -183,18 +185,24 @@ fun CapsEditor(caps: List<TimeCap>, firstDay: DayOfWeek, enabled: Boolean, onCha
     }
 }
 
-/** One cap: its days, its hours on a clock and its minutes. Only a cap that makes sense saves. */
+/**
+ * One cap: its days, its hours on a clock and its minutes. A new cap ([initial] null) starts with
+ * no days and no hours; quick picks fill them in. Only a cap that makes sense saves.
+ */
 @Composable
-private fun CapDialog(initial: TimeCap, firstDay: DayOfWeek, onDismiss: () -> Unit, onSave: (TimeCap) -> Unit) {
-    var days by rememberSaveable { mutableStateOf(initial.days) }
-    var from by rememberSaveable { mutableIntStateOf(initial.from) }
-    var to by rememberSaveable { mutableIntStateOf(initial.to) }
-    var minutes by rememberSaveable { mutableIntStateOf(initial.minutes) }
+private fun CapDialog(initial: TimeCap?, firstDay: DayOfWeek, onDismiss: () -> Unit, onSave: (TimeCap) -> Unit) {
+    var days by rememberSaveable { mutableStateOf(initial?.days.orEmpty()) }
+    var from by rememberSaveable { mutableStateOf(initial?.from) }
+    var to by rememberSaveable { mutableStateOf(initial?.to) }
+    var minutes by rememberSaveable { mutableIntStateOf(initial?.minutes ?: 30) }
     var clock by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val start = from
+    val end = to
     val problem = when {
         days.isEmpty() -> R.string.limit_editor_cap_pick_days
-        from >= to -> R.string.schedule_bad_window
-        minutes >= to - from -> R.string.limit_editor_cap_too_long
+        start == null || end == null -> R.string.limit_editor_cap_pick_hours
+        start >= end -> R.string.schedule_bad_window
+        minutes >= end - start -> R.string.limit_editor_cap_too_long
         else -> null
     }
     AlertDialog(
@@ -202,13 +210,26 @@ private fun CapDialog(initial: TimeCap, firstDay: DayOfWeek, onDismiss: () -> Un
         title = { Text(stringResource(R.string.limit_editor_cap_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.cap_templates), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val weekdays = CapTemplates.weekdays(firstDay)
+                    val weekends = CapTemplates.weekends(firstDay)
+                    TemplateChip(R.string.cap_template_weekdays, days == weekdays) { days = weekdays }
+                    TemplateChip(R.string.cap_template_weekends, days == weekends) { days = weekends }
+                    CapTemplates.HOURS.forEach { t ->
+                        TemplateChip(t.label, from == t.from && to == t.to) {
+                            from = t.from
+                            to = t.to
+                        }
+                    }
+                }
                 DayChips(days, firstDay, enabled = true) { days = it }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val start = clockText(from)
-                    val end = clockText(to % TimeWindow.MINUTES_IN_DAY)
-                    TimeField(start, stringResource(R.string.schedule_starts, start), enabled = true) { clock = true }
+                    val startText = start?.let(::clockText) ?: stringResource(R.string.cap_start)
+                    val endText = end?.let { clockText(it % TimeWindow.MINUTES_IN_DAY) } ?: stringResource(R.string.cap_end)
+                    TimeField(startText, stringResource(R.string.schedule_starts, startText), enabled = true) { clock = true }
                     Text("–")
-                    TimeField(end, stringResource(R.string.schedule_ends, end), enabled = true) { clock = false }
+                    TimeField(endText, stringResource(R.string.schedule_ends, endText), enabled = true) { clock = false }
                 }
                 Text(stringResource(R.string.limit_editor_cap_minutes), style = MaterialTheme.typography.titleSmall)
                 MinutesStepper(minutes, step = 5, min = 5, max = 16 * 60, enabled = true, label = stringResource(R.string.limit_editor_cap_minutes)) { minutes = it }
@@ -216,38 +237,109 @@ private fun CapDialog(initial: TimeCap, firstDay: DayOfWeek, onDismiss: () -> Un
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(TimeCap(days, from, to, minutes)) }, enabled = problem == null) { Text(stringResource(R.string.action_ok)) }
+            TextButton(
+                onClick = { if (start != null && end != null) onSave(TimeCap(days, start, end, minutes)) },
+                enabled = problem == null,
+            ) { Text(stringResource(R.string.action_ok)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
-    clock?.let { start ->
-        TimeDialog(initialMinute = if (start) from else to % TimeWindow.MINUTES_IN_DAY, onDismiss = { clock = null }) { picked ->
+    clock?.let { isStart ->
+        TimeDialog(initialMinute = (if (isStart) from else to?.rem(TimeWindow.MINUTES_IN_DAY)) ?: CapTemplates.CLOCK_START, onDismiss = { clock = null }) { picked ->
             clock = null
             // Midnight as an end means the end of the day.
-            if (start) from = picked else to = if (picked == 0) TimeWindow.MINUTES_IN_DAY else picked
+            if (isStart) from = picked else to = if (picked == 0) TimeWindow.MINUTES_IN_DAY else picked
             true
         }
     }
 }
 
 /**
- * A length of time on a clock face: the hour hand counts hours, the minute hand minutes. Kept
- * between [min] and [max].
+ * A length of time, picked as hours and then minutes in steps of five. Only lengths from [min]
+ * to [max] can be picked, and OK gives exactly the length shown.
  */
 @Composable
 fun DurationDialog(title: String, minutes: Int, min: Int, max: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
-    val state = rememberTimePickerState(minutes / 60, minutes % 60, is24Hour = true)
-    val picked = state.hour * 60 + state.minute
+    val start = DurationChoices.snap(minutes, min, max)
+    var hour by rememberSaveable { mutableIntStateOf(start / 60) }
+    var minute by rememberSaveable { mutableIntStateOf(start % 60) }
+    val picked = hour * 60 + minute
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TimePicker(state)
-                Text(minutesText(picked.coerceIn(min, max)), style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    minutesText(picked),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+                    textAlign = TextAlign.Center,
+                )
+                Text(stringResource(R.string.duration_picker_hours), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DurationChoices.hours(min, max).forEach { h ->
+                        FilterChip(
+                            selected = h == hour,
+                            onClick = {
+                                hour = h
+                                minute = DurationChoices.snap(h * 60 + minute, min, max) - h * 60
+                            },
+                            label = { Text(stringResource(R.string.duration_hours, h)) },
+                        )
+                    }
+                }
+                Text(stringResource(R.string.duration_picker_minutes), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DurationChoices.MINUTES.forEach { m ->
+                        FilterChip(
+                            selected = m == minute,
+                            onClick = { minute = m },
+                            enabled = hour * 60 + m in min..max,
+                            label = { Text(stringResource(R.string.duration_minutes, m)) },
+                        )
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { onPick(picked.coerceIn(min, max)) }) { Text(stringResource(R.string.action_ok)) } },
+        confirmButton = { TextButton(onClick = { onPick(picked) }) { Text(stringResource(R.string.action_ok)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+}
+
+/** What [DurationDialog] offers: whole hours, then minutes in steps of five. */
+internal object DurationChoices {
+    val MINUTES: List<Int> = (0..55 step 5).toList()
+
+    /** The hours with at least one length from [min] to [max]. */
+    fun hours(min: Int, max: Int): List<Int> = (0..max / 60).filter { h -> MINUTES.any { h * 60 + it in min..max } }
+
+    /** [minutes] moved onto a five-minute step, and into [min]..[max]. */
+    fun snap(minutes: Int, min: Int, max: Int): Int = (Math.round(minutes / 5f) * 5).coerceIn(min, max)
+}
+
+@Composable
+private fun TemplateChip(@StringRes label: Int, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(selected = selected, onClick = onClick, label = { Text(stringResource(label)) })
+}
+
+/** Quick picks for a cap: days that follow the first day of the week, and hours of the day. */
+internal object CapTemplates {
+    data class Hours(@StringRes val label: Int, val from: Int, val to: Int)
+
+    val HOURS = listOf(
+        Hours(R.string.cap_template_mornings, 6 * 60, 12 * 60),
+        Hours(R.string.cap_template_afternoons, 12 * 60, 17 * 60),
+        Hours(R.string.cap_template_evenings, 17 * 60, 22 * 60),
+        Hours(R.string.cap_template_bedtime, 22 * 60, TimeWindow.MINUTES_IN_DAY),
+    )
+
+    /** Where the clock opens for a cap with no hours yet. */
+    const val CLOCK_START = 9 * 60
+
+    /** The five days from [first], as ISO day numbers in order. */
+    fun weekdays(first: DayOfWeek): List<Int> = weekFrom(first).take(5).sorted()
+
+    /** The two days after the weekdays. */
+    fun weekends(first: DayOfWeek): List<Int> = weekFrom(first).drop(5).sorted()
 }

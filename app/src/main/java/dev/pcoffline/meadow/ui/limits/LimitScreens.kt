@@ -5,6 +5,8 @@ package dev.pcoffline.meadow.ui.limits
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -397,8 +399,10 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         ErrorNote(action.error)
         Button(
             onClick = {
-                action.run(onSuccess = onDone) {
+                var closes = true
+                action.run(onSuccess = { if (closes) onDone() }) {
                     val outcome = AppGraph.limits.save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
+                    closes = closesAfterSave(existing, outcome)
                     if (outcome == ChangeOutcome.APPLIED) {
                         celebrate()
                         // A commitment just made is the one most worth telling someone about.
@@ -431,15 +435,13 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
             }
             // Straight to Android's share sheet: picking where it goes is the only choice to make.
-            // Only the saved limit is shared, so it waits while there are changes; saving them
-            // offers to share the new one.
-            if (proposed == existing) {
-                TextButton(
-                    onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) {
-                    Text(stringResource(R.string.limit_editor_share))
-                }
+            // Only the saved limit is shared, so it is greyed out while there are changes.
+            TextButton(
+                onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
+                enabled = proposed == existing && !action.busy,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) {
+                Text(stringResource(R.string.limit_editor_share))
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -545,9 +547,18 @@ internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: 
             textAlign = TextAlign.Center,
             maxLines = 1,
             color = if (clock && enabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            // A rounded, tinted button like the − and + beside it, so it reads as one to tap.
             modifier = Modifier.padding(horizontal = 8.dp)
-                .then(if (clock) Modifier.clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true } else Modifier)
-                .padding(horizontal = 8.dp, vertical = 4.dp).widthIn(min = widest),
+                .then(
+                    if (clock) {
+                        Modifier.clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f))
+                            .clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true }
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = 12.dp, vertical = 4.dp).widthIn(min = widest),
         )
         RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = enabled && value < max) {
             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))
@@ -643,3 +654,11 @@ private const val PRESET_COLUMNS = 3
 
 /** A filter chip's padding either side of its label, with room to spare. */
 private val CHIP_PADDING = 24.dp
+
+/**
+ * Whether the editor closes after a save. A change to a limit that applies at once keeps it open,
+ * so the saved limit can be shared from it; a new limit goes back to the garden, and a question
+ * for a Bumblebee closes too.
+ */
+internal fun closesAfterSave(existing: AppLimit?, outcome: ChangeOutcome): Boolean =
+    existing == null || outcome != ChangeOutcome.APPLIED
