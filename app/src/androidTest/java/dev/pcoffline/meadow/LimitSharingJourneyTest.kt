@@ -81,6 +81,8 @@ class LimitSharingJourneyTest : EndToEndTest() {
             inDialog(text(R.string.limit_apply)).performClick()
             waitForText(text(R.string.limit_apply_done, "Pebbles"))
             waitForBackend(limit) { it.int("dailyMinutes") == 90 }
+            // The note sits over the bottom of the screen, where Save will be.
+            waitForSnackbarToGo(R.string.limit_apply_done, "Pebbles")
             assertTrue("Sam was asked about a suggestion Sam made", samsInbox(sam).isEmpty())
 
             // Sam shares a limit of their own: Copy opens Kai's editor from it, over Kai's limit.
@@ -101,6 +103,7 @@ class LimitSharingJourneyTest : EndToEndTest() {
             waitForBackendDocs("chats/$chat/messages") { messages ->
                 messages.any { it.optString("kind") == "limit" && it.optString("mode") == "shared" && it.optString("senderId") == kai.uid }
             }
+            waitForSnackbarToGo(R.string.share_commitment_sent, "Sam")
 
             // Kai suggests a change from Sam's page: the limit menu, the editor, then Send.
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
