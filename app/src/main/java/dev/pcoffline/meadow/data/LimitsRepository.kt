@@ -54,16 +54,8 @@ class LimitsRepository(
             )
             return ChangeOutcome.APPLIED
         }
-        val data = mutableMapOf<String, Any>(
-            "packageName" to limit.packageName,
-            "appName" to limit.appName,
-            "dailyMinutes" to limit.dailyMinutes,
-            "weeklyMinutes" to limit.weeklyMinutes,
-            "updatedAt" to FieldValue.serverTimestamp(),
-        )
-        limit.schedule?.let { data["schedule"] = it.toFirestore() }
-        if (limit.dayMinutes.isNotEmpty()) data["dayMinutes"] = DayMinutes.toFirestore(limit.dayMinutes)
-        if (limit.caps.isNotEmpty()) data["caps"] = limit.caps.map(TimeCap::toFirestore)
+        val data = limitFields(limit).toMutableMap()
+        data["updatedAt"] = FieldValue.serverTimestamp()
         if (current == null) data["createdAt"] = FieldValue.serverTimestamp()
         // The local snapshot updates right away; offline writes are queued by Firestore.
         backend.user(uid).collection("limits").document(limit.packageName).set(data).awaitWrite()
@@ -86,7 +78,26 @@ class LimitsRepository(
         return ChangeOutcome.APPLIED
     }
 
+    /**
+     * Applies a limit one of my Bumblebees suggested in our chat. Their suggestion is the approval
+     * a change needs, and the backend checks that it is theirs and saves it as they sent it.
+     */
+    suspend fun applySuggestion(chatId: String, messageId: String) {
+        backend.call("applyLimitSuggestion", mapOf("chatId" to chatId, "messageId" to messageId))
+    }
+
     companion object {
         fun isLooser(old: AppLimit, new: AppLimit): Boolean = LimitRules.isLooser(old, new)
+
+        /** A limit's own fields, as Firestore stores them on a limit and on a chat's limit card. */
+        fun limitFields(limit: AppLimit): Map<String, Any> = buildMap {
+            put("packageName", limit.packageName)
+            put("appName", limit.appName)
+            put("dailyMinutes", limit.dailyMinutes)
+            put("weeklyMinutes", limit.weeklyMinutes)
+            limit.schedule?.let { put("schedule", it.toFirestore()) }
+            if (limit.dayMinutes.isNotEmpty()) put("dayMinutes", DayMinutes.toFirestore(limit.dayMinutes))
+            if (limit.caps.isNotEmpty()) put("caps", limit.caps.map(TimeCap::toFirestore))
+        }
     }
 }

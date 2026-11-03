@@ -82,6 +82,11 @@ import dev.pcoffline.meadow.ui.legal.TermsUpdateDialog
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.limits.LimitEditorScreen
+import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.ui.navigation.SuggestRoute
+import dev.pcoffline.meadow.ui.limits.SuggestLimitScreen
+import dev.pcoffline.meadow.ui.limits.LimitMenuActions
+import dev.pcoffline.meadow.ui.limits.LimitTemplate
 import dev.pcoffline.meadow.ui.navigation.ChatRoute
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.navigation.FriendRoute
@@ -261,7 +266,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                                 onOpenSettings = { nav.navigate(SettingsRoute) },
                                 onOpenProfile = { nav.navigate(ProfileRoute) },
                                 onOpenSetup = { nav.navigate(SetupRoute) },
-                                onPlantLimit = { nav.navigate(PickAppRoute) },
+                                onPlantLimit = { nav.navigate(PickAppRoute()) },
                                 onOpenLimit = { nav.navigate(LimitRoute(it)) },
                                 onOpenTroubleshoot = { nav.navigate(TroubleshootRoute) },
                             )
@@ -286,17 +291,38 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                         composable<LegalRoute> { entry ->
                             LegalScreen(LegalDoc.fromName(entry.toRoute<LegalRoute>().doc), onBack = { nav.popBackStack() })
                         }
-                        composable<PickAppRoute> {
+                        composable<PickAppRoute> { entry ->
+                            // A copy keeps its limit when another app is picked for it.
+                            val template = entry.toRoute<PickAppRoute>().template
                             AppPickerScreen(
                                 onBack = { nav.popBackStack() },
-                                onPick = { nav.navigate(LimitRoute(it)) { popUpTo<PickAppRoute> { inclusive = true } } },
+                                onPick = { pkg ->
+                                    val moved = LimitTemplate.decode(template)?.let { LimitTemplate.encode(LimitTemplate.forApp(it, pkg, AppGraph.catalog.label(pkg))) }
+                                    nav.navigate(LimitRoute(pkg, moved)) { popUpTo<PickAppRoute> { inclusive = true } }
+                                },
                             )
                         }
                         composable<LimitRoute> { entry ->
-                            LimitEditorScreen(entry.toRoute<LimitRoute>().packageName, onDone = { nav.popBackStack() })
+                            val route = entry.toRoute<LimitRoute>()
+                            val start = LimitTemplate.decode(route.template)
+                            LimitEditorScreen(
+                                route.packageName,
+                                onDone = { nav.popBackStack() },
+                                start = start,
+                                onChangeApp = route.template?.let { t ->
+                                    { nav.navigate(PickAppRoute(t)) { popUpTo<LimitRoute> { inclusive = true } } }
+                                },
+                            )
+                        }
+                        composable<SuggestRoute> { entry ->
+                            val route = entry.toRoute<SuggestRoute>()
+                            SuggestLimitScreen(route.chatId, route.packageName, route.appName, LimitTemplate.decode(route.template), onDone = { nav.popBackStack() })
                         }
                         composable<ChatRoute> { entry ->
-                            ChatScreen(profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() }, onOpenGarden = { nav.navigate(FriendRoute(it)) })
+                            ChatScreen(
+                                profile, entry.toRoute<ChatRoute>().chatId, onBack = { nav.popBackStack() }, onOpenGarden = { nav.navigate(FriendRoute(it)) },
+                                onCopyLimit = { nav.navigate(LimitRoute(it.packageName, LimitTemplate.encode(it))) },
+                            )
                         }
                         composable<FriendRoute> { entry ->
                             FriendScreen(
@@ -304,6 +330,13 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
                                 uid = entry.toRoute<FriendRoute>().uid,
                                 onBack = { nav.popBackStack() },
                                 onOpenChat = { nav.navigate(ChatRoute(it)) },
+                                limitMenu = LimitMenuActions(
+                                    onCopy = { nav.navigate(LimitRoute(it.packageName, LimitTemplate.encode(it))) },
+                                    onSuggest = { pkg, name, current ->
+                                        val chatId = ChatRepository.chatIdFor(profile.uid, entry.toRoute<FriendRoute>().uid)
+                                        nav.navigate(SuggestRoute(chatId, pkg, name, current?.let(LimitTemplate::encode)))
+                                    },
+                                ),
                             )
                         }
                     }

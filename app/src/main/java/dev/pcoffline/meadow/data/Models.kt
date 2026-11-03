@@ -231,7 +231,17 @@ data class Chat(
         lastMessageAtMillis > (lastReadMillis[me] ?: 0L)
 }
 
-enum class MessageKind { TEXT, IMAGE, REQUEST, SYSTEM }
+enum class MessageKind { TEXT, IMAGE, REQUEST, SYSTEM, LIMIT }
+
+/** What a limit card in a chat is: the sender's own limit, or one they wrote for the other person. */
+enum class LimitCardMode(val wire: String) {
+    SHARED("shared"),
+    SUGGESTED("suggested");
+
+    companion object {
+        fun fromWire(wire: String?): LimitCardMode? = entries.firstOrNull { it.wire == wire }
+    }
+}
 
 /** A photo or GIF sent in a chat: where it is in Storage, and its size to lay it out before it loads. */
 data class ChatPicture(val path: String, val width: Int, val height: Int, val gif: Boolean)
@@ -246,6 +256,9 @@ data class ChatMessage(
     val pending: Boolean,
     /** Set for [MessageKind.IMAGE]. */
     val picture: ChatPicture? = null,
+    /** Set for [MessageKind.LIMIT]: the limit on the card, and its kind. */
+    val limit: AppLimit? = null,
+    val limitMode: LimitCardMode? = null,
 )
 
 /** Today's usage of a person, as uploaded for their Bumblebees. */

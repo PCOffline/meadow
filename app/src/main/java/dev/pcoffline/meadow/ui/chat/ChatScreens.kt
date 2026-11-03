@@ -118,6 +118,8 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Chat
 import dev.pcoffline.meadow.data.ChatMessage
+import dev.pcoffline.meadow.ui.limits.LimitCardMessage
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.UserProfile
@@ -188,6 +190,7 @@ fun ChatScreen(
     chatId: String,
     onBack: () -> Unit,
     onOpenGarden: (uid: String) -> Unit = {},
+    onCopyLimit: (AppLimit) -> Unit = {},
     viewModel: ChatViewModel = viewModel(key = "chat-$chatId") { ChatViewModel(chatId, profile.uid) },
 ) {
     val loaded by viewModel.chat.collectAsStateWithLifecycle()
@@ -207,6 +210,7 @@ fun ChatScreen(
         invited = loaded?.chat?.otherId(profile.uid) in invited,
         onAskBee = { offer -> loaded?.chat?.let { viewModel.askBee(it.otherId(profile.uid), offer) } },
         onOpenGarden = onOpenGarden,
+        onCopyLimit = onCopyLimit,
     )
 }
 
@@ -239,6 +243,8 @@ fun ChatContent(
     onSendPicture: (List<Uri>) -> Unit = {},
     uploading: Int = 0,
     onOpenGarden: (uid: String) -> Unit = {},
+    // A limit card's Copy, or Change on a suggested one: opens my limit editor from it.
+    onCopyLimit: (AppLimit) -> Unit = {},
     pictureFile: suspend (path: String) -> File? = { AppGraph.chatMedia.file(it) },
     requestCard: @Composable (requestId: String, mine: Boolean) -> Unit = { id, mine -> RequestMessage(id, profile.uid, mine) },
 ) {
@@ -285,6 +291,12 @@ fun ChatContent(
                         MessageKind.SYSTEM -> SystemMessage(message)
                         MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
                         MessageKind.IMAGE -> PictureBubble(message, mine = message.senderId == profile.uid, pictureFile) { viewing = it }
+                        MessageKind.LIMIT -> chat?.let {
+                            LimitCardMessage(
+                                it.id, message, mine = message.senderId == profile.uid,
+                                fromBumblebee = message.senderId in profile.approverIds, onCopy = onCopyLimit,
+                            )
+                        }
                     }
                 }
             }

@@ -38,7 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.LimitCardMode
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.rememberAction
@@ -59,11 +61,14 @@ import kotlinx.coroutines.flow.mapNotNull
  * it outlives the screen that made the commitment.
  */
 object ShareCommitment {
-    private val pending = MutableStateFlow<String?>(null)
-    val text: StateFlow<String?> = pending.asStateFlow()
+    /** The words to share, and the limit they describe: sent as a limit card in a Meadow chat. */
+    data class Pending(val text: String, val limit: AppLimit?)
 
-    fun open(text: String) {
-        pending.value = text
+    private val pending = MutableStateFlow<Pending?>(null)
+    val shared: StateFlow<Pending?> = pending.asStateFlow()
+
+    fun open(text: String, limit: AppLimit? = null) {
+        pending.value = Pending(text, limit)
     }
 
     fun close() {
@@ -89,12 +94,12 @@ class ShareTargetsViewModel : ViewModel() {
 
 @Composable
 fun ShareCommitmentHost() {
-    val text by ShareCommitment.text.collectAsStateWithLifecycle()
-    text?.let { ShareCommitmentSheet(it, onDismiss = ShareCommitment::close) }
+    val shared by ShareCommitment.shared.collectAsStateWithLifecycle()
+    shared?.let { ShareCommitmentSheet(it.text, it.limit, onDismiss = ShareCommitment::close) }
 }
 
 @Composable
-private fun ShareCommitmentSheet(text: String, onDismiss: () -> Unit, viewModel: ShareTargetsViewModel = viewModel { ShareTargetsViewModel() }) {
+private fun ShareCommitmentSheet(text: String, limit: AppLimit?, onDismiss: () -> Unit, viewModel: ShareTargetsViewModel = viewModel { ShareTargetsViewModel() }) {
     val people by viewModel.people.collectAsStateWithLifecycle()
     val me by viewModel.me.collectAsStateWithLifecycle()
     val action = rememberAction()
@@ -108,7 +113,9 @@ private fun ShareCommitmentSheet(text: String, onDismiss: () -> Unit, viewModel:
             onSend = { person, sent ->
                 val uid = me ?: return@ShareCommitmentContent
                 action.run(successMessage = sent, onSuccess = onDismiss) {
-                    AppGraph.chats.send(ChatRepository.chatIdFor(uid, person.uid), text)
+                    val chatId = ChatRepository.chatIdFor(uid, person.uid)
+                    // In Meadow, a limit goes as a card they can copy; other apps get the words.
+                    if (limit != null) AppGraph.chats.sendLimit(chatId, limit, LimitCardMode.SHARED) else AppGraph.chats.send(chatId, text)
                 }
             },
             onOtherApps = {

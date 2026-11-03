@@ -79,6 +79,7 @@ import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Sites
 import dev.pcoffline.meadow.data.ChangeOutcome
+import dev.pcoffline.meadow.data.LimitCardMode
 import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.LimitsRepository
@@ -258,6 +259,9 @@ class LimitEditorViewModel(private val packageName: String) : ViewModel() {
 fun LimitEditorScreen(
     packageName: String,
     onDone: () -> Unit,
+    // A copied limit to start from, and a way to pick another app for it.
+    start: AppLimit? = null,
+    onChangeApp: (() -> Unit)? = null,
     viewModel: LimitEditorViewModel = viewModel(key = "limit-$packageName") { LimitEditorViewModel(packageName) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -266,26 +270,54 @@ fun LimitEditorScreen(
             stringResource(if (state.existing == null) R.string.limit_editor_new else R.string.limit_editor_existing),
             onBack = onDone,
         )
-        if (state.loaded) LimitEditor(packageName, state, onDone) else Loading()
+        if (state.loaded) LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp) else Loading()
+    }
+}
+
+/**
+ * Writes a limit for someone else's app, to send to them in [chatId] as a suggested limit card.
+ * Starts from [start], their limit, or from nothing for an app with no limit.
+ */
+@Composable
+fun SuggestLimitScreen(chatId: String, packageName: String, appName: String, start: AppLimit?, onDone: () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        BackTopBar(stringResource(R.string.limit_suggest_title), onBack = onDone)
+        LimitEditor(
+            packageName,
+            LimitEditorState(appName = appName, loaded = true),
+            onDone,
+            start = start,
+            sendTo = { AppGraph.chats.sendLimit(chatId, it, LimitCardMode.SUGGESTED) },
+        )
     }
 }
 
 @Composable
-internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: () -> Unit) {
+internal fun LimitEditor(
+    packageName: String,
+    state: LimitEditorState,
+    onDone: () -> Unit,
+    // Where the fields start: a copied or suggested limit. Without one, the saved limit.
+    start: AppLimit? = null,
+    onChangeApp: (() -> Unit)? = null,
+    // Set when suggesting: Send gives the limit to this, and nothing is saved here.
+    sendTo: (suspend (AppLimit) -> Unit)? = null,
+) {
     val existing = state.existing
-    var dailyOn by rememberSaveable { mutableStateOf(existing == null || existing.dailyMinutes > 0) }
-    var daily by rememberSaveable { mutableIntStateOf(existing?.dailyMinutes?.takeIf { it > 0 } ?: 30) }
-    var weeklyOn by rememberSaveable { mutableStateOf((existing?.weeklyMinutes ?: 0) > 0) }
-    var weekly by rememberSaveable { mutableIntStateOf(existing?.weeklyMinutes?.takeIf { it > 0 } ?: 180) }
-    var hoursOn by rememberSaveable { mutableStateOf(existing?.schedule != null) }
+    val from = start ?: existing
+    var dailyOn by rememberSaveable { mutableStateOf(from == null || from.dailyMinutes > 0) }
+    var daily by rememberSaveable { mutableIntStateOf(from?.dailyMinutes?.takeIf { it > 0 } ?: 30) }
+    var weeklyOn by rememberSaveable { mutableStateOf((from?.weeklyMinutes ?: 0) > 0) }
+    var weekly by rememberSaveable { mutableIntStateOf(from?.weeklyMinutes?.takeIf { it > 0 } ?: 180) }
+    var hoursOn by rememberSaveable { mutableStateOf(from?.schedule != null) }
     // Kept as JSON so it survives rotation.
     var scheduleJson by rememberSaveable {
-        mutableStateOf(ScheduleJson.encodeToString(Schedule.serializer(), existing?.schedule ?: Schedule.everyDay(TimeWindow(0, 22 * 60))))
+        mutableStateOf(ScheduleJson.encodeToString(Schedule.serializer(), from?.schedule ?: Schedule.everyDay(TimeWindow(0, 22 * 60))))
     }
     val schedule = ScheduleJson.decodeFromString(Schedule.serializer(), scheduleJson)
-    var groupsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(GroupsSerializer, dayGroups(existing?.dayMinutes.orEmpty()))) }
+    var groupsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(GroupsSerializer, dayGroups(from?.dayMinutes.orEmpty()))) }
     val groups = ScheduleJson.decodeFromString(GroupsSerializer, groupsJson)
-    var capsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(CapsSerializer, existing?.caps.orEmpty())) }
+    var capsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(CapsSerializer, from?.caps.orEmpty())) }
     val caps = ScheduleJson.decodeFromString(CapsSerializer, capsJson)
     val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
     var message by rememberSaveable { mutableStateOf("") }
@@ -294,7 +326,9 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
     val picks = rememberBeePicks()
     val action = rememberAction()
     val celebrate = LocalCelebrate.current
-    val hasBees = state.bumblebeeCount > 0
+    val suggesting = sendTo != null
+    // A suggestion is only sent: who looks after whom matters when it's applied.
+    val hasBees = state.bumblebeeCount > 0 && !suggesting
 
     val proposed = AppLimit(
         packageName, state.appName, if (dailyOn) daily else 0, if (weeklyOn) weekly else 0,
@@ -342,6 +376,11 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             )
         }
         if (Sites.isSite(packageName)) Hint(stringResource(R.string.limit_editor_site_browsers))
+        // Copying over a limit that's already here.
+        if (start != null && existing != null && !suggesting) {
+            Hint(stringResource(R.string.limit_copy_replaces, existing.appName))
+        }
+        onChangeApp?.let { TextButton(onClick = it, enabled = editable) { Text(stringResource(R.string.limit_copy_other_app)) } }
 
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn, editable) { dailyOn = it }
@@ -372,7 +411,9 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             CapsEditor(caps, week.first, editable) { capsJson = ScheduleJson.encodeToString(CapsSerializer, it) }
         }
 
-        if (waiting != null) {
+        if (suggesting) {
+            // Nothing else here: no question is open, and nothing is saved on this phone.
+        } else if (waiting != null) {
             PendingCard(waiting, action)
         } else if (needsApproval) {
             MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
@@ -395,6 +436,17 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
         }
         if (!online && needsConnection) OfflineNote()
         ErrorNote(action.error)
+        if (sendTo != null) {
+            val sent = stringResource(R.string.limit_suggest_sent)
+            Button(
+                onClick = { action.run(successMessage = sent, onSuccess = onDone) { sendTo(proposed) } },
+                // A chat message: Firestore queues it offline, so Send works offline too.
+                enabled = editable && anyLimitOn,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text(stringResource(R.string.limit_suggest_send)) }
+            Spacer(Modifier.height(24.dp))
+            return@Column
+        }
         Button(
             onClick = {
                 action.run(onSuccess = onDone) {
@@ -403,7 +455,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
                         celebrate()
                         // A commitment just made is the one most worth telling someone about.
                         val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed))
-                        action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared) }
+                        action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared, proposed) }
                     } else {
                         action.toast(requested)
                     }
@@ -435,7 +487,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             // offers to share the new one.
             if (proposed == existing) {
                 TextButton(
-                    onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
+                    onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing)), existing) },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 ) {
                     Text(stringResource(R.string.limit_editor_share))

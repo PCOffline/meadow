@@ -68,6 +68,25 @@ class ChatRepository(private val backend: Backend) {
         batch.commit().awaitWrite()
     }
 
+    /** Sends [limit] as a limit card: shared as it is, or suggested to the other person. Throws if the server refuses it. */
+    suspend fun sendLimit(chatId: String, limit: AppLimit, mode: LimitCardMode) {
+        val uid = backend.requireUid()
+        val chatRef = chats.document(chatId)
+        val batch = backend.db.batch()
+        batch.set(
+            chatRef.collection("messages").document(),
+            mapOf(
+                "senderId" to uid,
+                "kind" to "limit",
+                "mode" to mode.wire,
+                "limit" to LimitsRepository.limitFields(limit),
+                "createdAt" to FieldValue.serverTimestamp(),
+            ),
+        )
+        batch.update(chatRef, summaryOf(uid))
+        batch.commit().awaitWrite()
+    }
+
     /** Who sent the latest message and when, for the unread mark. Never its words. */
     private fun summaryOf(uid: String) = mapOf(
         "lastMessageAt" to FieldValue.serverTimestamp(),

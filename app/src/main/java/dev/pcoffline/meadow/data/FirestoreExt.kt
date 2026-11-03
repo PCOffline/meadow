@@ -248,6 +248,8 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
         "request" -> MessageKind.REQUEST
         "system" -> MessageKind.SYSTEM
         "image" -> MessageKind.IMAGE
+        // A card this version can't read shows as plain words (none), not as a broken card.
+        "limit" -> if (LimitCardMode.fromWire(getString("mode")) != null && limitOrNull(get("limit")) != null) MessageKind.LIMIT else MessageKind.TEXT
         else -> MessageKind.TEXT
     },
     requestId = getString("requestId"),
@@ -261,7 +263,25 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
             gif = getBoolean("gif") == true,
         )
     },
+    limit = limitOrNull(get("limit")),
+    limitMode = LimitCardMode.fromWire(getString("mode")),
 )
+
+/** A limit stored as a map (on a chat's limit card), or null when it isn't one. */
+fun limitOrNull(raw: Any?): AppLimit? {
+    val map = raw as? Map<*, *> ?: return null
+    val pkg = map["packageName"] as? String ?: return null
+    fun int(key: String) = (map[key] as? Number)?.toInt() ?: 0
+    return AppLimit(
+        packageName = pkg,
+        appName = map["appName"] as? String ?: pkg,
+        dailyMinutes = int("dailyMinutes"),
+        weeklyMinutes = int("weeklyMinutes"),
+        schedule = Schedule.fromFirestore(map["schedule"]),
+        dayMinutes = DayMinutes.fromFirestore(map["dayMinutes"]),
+        caps = TimeCap.listFromFirestore(map["caps"]),
+    )
+}
 
 fun DocumentSnapshot.toSharedApps(): List<SharedAppUsage> =
     (get("apps") as? List<*>)?.mapNotNull { raw ->
