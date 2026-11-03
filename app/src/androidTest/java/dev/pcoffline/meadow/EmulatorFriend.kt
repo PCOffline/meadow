@@ -36,6 +36,18 @@ class EmulatorFriend private constructor(private val firebase: FirebaseApp, val 
         await(batch.commit())
     }
 
+    /** Sends a limit card in a chat, as the app does: shared ("shared") or suggested ("suggested"). */
+    fun sendLimit(chatId: String, limit: Map<String, Any>, mode: String) {
+        val chat = db.document("chats/$chatId")
+        val batch = db.batch()
+        batch.set(
+            chat.collection("messages").document(),
+            mapOf("senderId" to uid, "kind" to "limit", "mode" to mode, "limit" to limit, "createdAt" to FieldValue.serverTimestamp()),
+        )
+        batch.update(chat, mapOf("lastMessageAt" to FieldValue.serverTimestamp(), "lastSenderId" to uid))
+        await(batch.commit())
+    }
+
     fun close() = firebase.delete()
 
     companion object {

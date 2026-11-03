@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { chatMedia } from "./copy";
 import { type Cap, type DayMinutes, describeCaps, describeDayMinutes, describeSchedule, type Schedule } from "./schedule";
 
 /** "disable_strict_mode" only appears on old requests: strict mode now turns off without asking. */
@@ -100,3 +101,14 @@ export const uploadId = (path: string): string => path.replaceAll("/", "~");
 
 /** The chat a picture at [path] was sent in. */
 export const chatOfPicture = (path: string): string => path.split("/")[1] ?? "";
+
+/** What a chat message's push says: its words, a picture, or which app a limit card is for. */
+export function pushText(message: { kind?: unknown; gif?: unknown; text?: unknown; mode?: unknown; limit?: { appName?: unknown; packageName?: unknown } }): string {
+  if (message.kind === "image") return message.gif === true ? chatMedia.gif : chatMedia.photo;
+  if (message.kind === "limit") {
+    const name = message.limit?.appName ?? message.limit?.packageName;
+    const appName = typeof name === "string" ? name : "";
+    return message.mode === "suggested" ? chatMedia.suggestedLimit(appName) : chatMedia.sharedLimit(appName);
+  }
+  return typeof message.text === "string" ? message.text : "";
+}

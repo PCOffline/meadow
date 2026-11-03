@@ -486,6 +486,34 @@ describe("chats", () => {
     await assertFails(addDoc(messages, { ...photo, senderId: "bee", path: "chats/bee_sam/bee/abc12345.jpg" }));
   });
 
+  test("a limit card holds a whole, valid limit, shared or suggested, and nothing else", async () => {
+    const messages = collection(as("sam"), "chats/bee_sam/messages");
+    const limit = { packageName: "com.instagram.android", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 };
+    const card = { senderId: "sam", kind: "limit", mode: "suggested", limit, createdAt: serverTimestamp() };
+    await assertSucceeds(addDoc(messages, card));
+    await assertSucceeds(addDoc(messages, { ...card, mode: "shared", limit: { ...limit, caps: [{ days: [1, 2, 3, 4, 5], from: 1020, to: 1320, minutes: 30 }] } }));
+    await assertSucceeds(addDoc(messages, { ...card, limit: { ...limit, packageName: "site:youtube.com", appName: "youtube.com" } }));
+    // Another kind, a limit that holds nothing back or is out of range, a bad app id, or extra fields.
+    await assertFails(addDoc(messages, { ...card, mode: "approved" }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0 } }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 5000 } }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, packageName: "../x" } }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, createdAt: serverTimestamp() } }));
+    await assertFails(addDoc(messages, { ...card, limit: "Instagram, 30m" }));
+    // Words for older app versions, but not many.
+    await assertSucceeds(addDoc(messages, { ...card, text: "Suggested a limit for Instagram" }));
+    await assertFails(addDoc(messages, { ...card, text: "x".repeat(201) }));
+    // A card that holds nothing back, or allowed hours too long to be real.
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0, caps: [] } }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0, dayMinutes: { 6: 0 } } }));
+    await assertSucceeds(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0, dayMinutes: { 6: 60 } } }));
+    const day = Array.from({ length: 7 }, (_, i) => ({ from: i * 60, to: i * 60 + 30 }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, schedule: { 1: day } } }));
+    await assertSucceeds(addDoc(messages, { ...card, limit: { ...limit, schedule: { 1: day.slice(0, 6) } } }));
+    await assertFails(addDoc(messages, { ...card, senderId: "bee" }));
+    await assertFails(addDoc(collection(as("stranger"), "chats/bee_sam/messages"), { ...card, senderId: "stranger" }));
+  });
+
   test("chat summaries only change in the allowed ways", async () => {
     const chat = doc(as("sam"), "chats/bee_sam");
     await assertSucceeds(updateDoc(chat, { lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: "sam" }));

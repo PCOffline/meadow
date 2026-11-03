@@ -1,12 +1,12 @@
-import { type DocumentData, type DocumentReference, FieldValue, Timestamp, type Transaction, type UpdateData } from "firebase-admin/firestore";
+import { type DocumentData, type DocumentReference, type DocumentSnapshot, FieldValue, Timestamp, type Transaction, type UpdateData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
 import { chatNotes, errors, pushes } from "./copy";
-import { consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
+import { chats, consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
 import { chatIdFor, formatMinutes, type RequestType, storedAppName, summarize } from "./format";
 import { type Cap, CapsSchema, type DayMinutes, DayMinutesSchema, isLimitStricter, normalize, normalizeCaps, normalizeDayMinutes, type Schedule } from "./schedule";
-import { CreateRequestInput, DecideRequestInput, RequestIdInput, SaveLimitInput } from "./schemas";
+import { ApplySuggestionInput, CreateRequestInput, DecideRequestInput, LimitCardSchema, RequestIdInput, SaveLimitInput } from "./schemas";
 
 const MAX_PENDING = 10;
 const REQUESTS_PER_HOUR = 10;
@@ -349,37 +349,108 @@ export const saveLimit = onCall(async (call) => {
   const ref = users().doc(uid).collection("limits").doc(input.packageName);
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const schedule = normalize(input.schedule);
-    const dayMinutes = normalizeDayMinutes(input.dayMinutes);
-    const caps = normalizeCaps(input.caps);
     const old = snap.data();
-    if (old) {
-      const before = {
-        dailyMinutes: old.dailyMinutes ?? 0,
-        weeklyMinutes: old.weeklyMinutes ?? 0,
-        schedule: old.schedule ?? null,
-        // Read as the phone reads them: anything malformed holds nothing back.
-        dayMinutes: DayMinutesSchema.safeParse(old.dayMinutes).data ?? null,
-        caps: CapsSchema.safeParse(old.caps).data ?? null,
-      };
-      const stricter = isLimitStricter(before, { dailyMinutes: input.dailyMinutes, weeklyMinutes: input.weeklyMinutes, schedule, dayMinutes, caps });
-      if (!stricter) {
-        const me = await loadPerson(uid, tx);
-        if (me.account.approverIds.length > 0) throw new HttpsError("failed-precondition", errors.needsAYes);
-      }
+    if (old && !isLimitStricter(storedLimit(old), shapeOf(input))) {
+      const me = await loadPerson(uid, tx);
+      if (me.account.approverIds.length > 0) throw new HttpsError("failed-precondition", errors.needsAYes);
     }
-    tx.set(ref, {
-      packageName: input.packageName,
-      // A limit keeps the name it was planted under; only a new one takes the phone's.
-      appName: snap.exists ? storedAppName(snap, input.packageName) : input.appName || input.packageName,
-      dailyMinutes: input.dailyMinutes,
-      weeklyMinutes: input.weeklyMinutes,
-      schedule: schedule ?? FieldValue.delete(),
-      dayMinutes: dayMinutes ?? FieldValue.delete(),
-      caps: caps ?? FieldValue.delete(),
-      updatedAt: FieldValue.serverTimestamp(),
-      ...(snap.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
-    }, { merge: true });
+    writeLimit(tx, ref, snap, input);
+  });
+  return { ok: true };
+});
+
+type LimitInput = {
+  packageName: string;
+  appName?: string | null;
+  dailyMinutes: number;
+  weeklyMinutes: number;
+  schedule?: unknown;
+  dayMinutes?: unknown;
+  caps?: unknown;
+};
+
+/** [input] as `isLimitStricter` compares it. */
+function shapeOf(input: LimitInput) {
+  return {
+    dailyMinutes: input.dailyMinutes,
+    weeklyMinutes: input.weeklyMinutes,
+    schedule: normalize(input.schedule as Schedule | null | undefined),
+    dayMinutes: normalizeDayMinutes(input.dayMinutes as DayMinutes | null | undefined),
+    caps: normalizeCaps(input.caps as Cap[] | null | undefined),
+  };
+}
+
+/** A stored limit, read as the phone reads it: anything malformed holds nothing back. */
+function storedLimit(old: DocumentData) {
+  return {
+    dailyMinutes: old.dailyMinutes ?? 0,
+    weeklyMinutes: old.weeklyMinutes ?? 0,
+    schedule: old.schedule ?? null,
+    dayMinutes: DayMinutesSchema.safeParse(old.dayMinutes).data ?? null,
+    caps: CapsSchema.safeParse(old.caps).data ?? null,
+  };
+}
+
+/** Writes [input] as the limit at [ref] (read as [snap]), in [tx]. */
+function writeLimit(tx: Transaction, ref: DocumentReference, snap: DocumentSnapshot, input: LimitInput) {
+  const shape = shapeOf(input);
+  tx.set(ref, {
+    packageName: input.packageName,
+    // A limit keeps the name it was planted under; only a new one takes the phone's.
+    appName: snap.exists ? storedAppName(snap, input.packageName) : input.appName || input.packageName,
+    dailyMinutes: shape.dailyMinutes,
+    weeklyMinutes: shape.weeklyMinutes,
+    schedule: shape.schedule ?? FieldValue.delete(),
+    dayMinutes: shape.dayMinutes ?? FieldValue.delete(),
+    caps: shape.caps ?? FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+    ...(snap.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+  }, { merge: true });
+}
+
+/** A suggestion can be applied for this long after it was sent: it is about the limit as it was then. */
+export const SUGGESTION_TTL_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * Applies a limit one of the caller's Bumblebees suggested in their chat, as it was sent. The
+ * Bumblebee's suggestion is the approval a change needs, so it applies even when looser. Like an
+ * approval, it applies once, and only for [SUGGESTION_TTL_MS] after it was sent. Open questions
+ * to change or remove the same limit are withdrawn, as what was applied settles them. Any other
+ * suggestion goes through the phone's usual save, with the usual rules.
+ */
+export const applyLimitSuggestion = onCall(async (call) => {
+  const uid = requireAuth(call);
+  const input = parse(ApplySuggestionInput, call.data);
+  const chatRef = chats().doc(input.chatId);
+  const messageRef = chatRef.collection("messages").doc(input.messageId);
+  const appliedRef = users().doc(uid).collection("appliedSuggestions").doc(`${input.chatId}_${input.messageId}`);
+  await db().runTransaction(async (tx) => {
+    const [chat, message, applied] = await Promise.all([tx.get(chatRef), tx.get(messageRef), tx.get(appliedRef)]);
+    const participants = (chat.get("participants") as string[] | undefined) ?? [];
+    const sender = message.get("senderId");
+    const ok = chat.exists && message.exists && chat.get("closed") !== true && participants.includes(uid)
+      && message.get("kind") === "limit" && message.get("mode") === "suggested"
+      && typeof sender === "string" && sender !== uid && participants.includes(sender);
+    if (!ok) throw new HttpsError("failed-precondition", errors.notASuggestion);
+    if (applied.exists) throw new HttpsError("failed-precondition", errors.suggestionUsed);
+    const sentAt = (message.get("createdAt") as Timestamp | undefined)?.toMillis() ?? 0;
+    if (Date.now() - sentAt > SUGGESTION_TTL_MS) throw new HttpsError("failed-precondition", errors.suggestionOld);
+    const limit = LimitCardSchema.safeParse(message.get("limit"));
+    if (!limit.success) throw new HttpsError("failed-precondition", errors.notASuggestion);
+    const me = await loadPerson(uid, tx);
+    if (!me.account.approverIds.includes(sender)) throw new HttpsError("permission-denied", errors.notYourBumblebee);
+    const ref = users().doc(uid).collection("limits").doc(limit.data.packageName);
+    const snap = await tx.get(ref);
+    // Other questions about this app's limit are settled by what was applied, so they're withdrawn.
+    const open = (await tx.get(requests().where("requesterId", "==", uid).where("status", "==", "pending"))).docs
+      .filter((d) => d.get("packageName") === limit.data.packageName && (d.get("type") === "change_limit" || d.get("type") === "remove_limit"));
+    const inboxes = await Promise.all(open.map((d) => existingInboxes(tx, d.id, (d.get("approverIds") as string[] | undefined) ?? [])));
+    writeLimit(tx, ref, snap, limit.data);
+    open.forEach((d, i) => {
+      tx.update(d.ref, { status: "cancelled", decidedAt: FieldValue.serverTimestamp() });
+      updateInboxes(tx, d.id, inboxes[i] ?? [], "cancelled");
+    });
+    tx.set(appliedRef, { chatId: input.chatId, messageId: input.messageId, by: sender, at: FieldValue.serverTimestamp() });
   });
   return { ok: true };
 });

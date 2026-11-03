@@ -5,8 +5,8 @@ import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions/v2";
 import { inChunks } from "./chunks";
-import { chatOfPicture, uploadId } from "./format";
-import { chatMedia, pushes } from "./copy";
+import { chatOfPicture, pushText, uploadId } from "./format";
+import { pushes } from "./copy";
 import { accountOf, accountRef, chats, chatUploads, db, heartbeats, invites, isEmulator, loadPerson, notify, profileOf, users } from "./db";
 import { expireStaleRequests } from "./requests";
 import { finishDueRemovals } from "./social";
@@ -43,15 +43,15 @@ export async function sweepUnsentPictures(now: number): Promise<number> {
   return deleted;
 }
 
-/** Pushes new chat messages, words or pictures, to the other person, while the chat is open. */
+/** Pushes new chat messages, words, pictures or limit cards, to the other person, while the chat is open. */
 export const onChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data?.data();
-  if (message?.kind !== "text" && message?.kind !== "image") return;
+  if (message?.kind !== "text" && message?.kind !== "image" && message?.kind !== "limit") return;
   // Sent: the picture stays.
   if (message.kind === "image" && typeof message.path === "string") {
     await chatUploads().doc(uploadId(message.path)).delete().catch(() => undefined);
   }
-  const text = message.kind === "image" ? (message.gif === true ? chatMedia.gif : chatMedia.photo) : String(message.text ?? "");
+  const text = pushText(message);
   const chat = await chats().doc(event.params.chatId).get();
   if (!chat.exists) return;
   // Older app versions still copy the message's words onto the chat. Nothing reads them, so they go.

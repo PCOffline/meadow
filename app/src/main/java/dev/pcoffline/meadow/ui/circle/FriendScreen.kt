@@ -34,6 +34,8 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.ui.limits.LimitMenuActions
+import dev.pcoffline.meadow.ui.limits.LimitMenu
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.SharedAppUsage
@@ -85,6 +87,7 @@ fun FriendScreen(
     uid: String,
     onBack: () -> Unit,
     onOpenChat: (String) -> Unit,
+    limitMenu: LimitMenuActions? = null,
     viewModel: FriendViewModel = viewModel(key = "friend-$uid") { FriendViewModel(uid) },
 ) {
     val friend by viewModel.friend.collectAsStateWithLifecycle()
@@ -110,6 +113,7 @@ fun FriendScreen(
             FriendDetails(
                 shared ?: SharedPage(f, null, null, null, null), waiting = shared == null, offline = !online, action, onBack,
                 onChat = { onOpenChat(ChatRepository.chatIdFor(me.uid, f.uid)) },
+                limitMenu = limitMenu,
             )
         }
     }
@@ -123,6 +127,7 @@ private fun FriendDetails(
     action: ActionState,
     onBack: () -> Unit,
     onChat: () -> Unit,
+    limitMenu: LimitMenuActions?,
 ) {
     val f = page.profile
     var confirmStepDown by rememberSaveable { mutableStateOf(false) }
@@ -131,7 +136,7 @@ private fun FriendDetails(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        FriendPage(page, waiting, offline) { FilledTonalButton(onClick = onChat) { Text(stringResource(R.string.action_chat)) } }
+        FriendPage(page, waiting, offline, limitMenu) { FilledTonalButton(onClick = onChat) { Text(stringResource(R.string.action_chat)) } }
         ErrorNote(action.error)
         OutlinedButton(onClick = { confirmStepDown = true }, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.friend_step_down, f.displayName))
@@ -161,7 +166,14 @@ private fun FriendDetails(
  * [offline], where they won't come.
  */
 @Composable
-fun FriendPage(page: SharedPage, waiting: Boolean = false, offline: Boolean = false, action: @Composable () -> Unit = {}) {
+fun FriendPage(
+    page: SharedPage,
+    waiting: Boolean = false,
+    offline: Boolean = false,
+    // The limit menu on their limits and apps; none on a preview of my own page.
+    limitMenu: LimitMenuActions? = null,
+    action: @Composable () -> Unit = {},
+) {
     val f = page.profile
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -181,13 +193,15 @@ fun FriendPage(page: SharedPage, waiting: Boolean = false, offline: Boolean = fa
         val nothing = page.progress == null && page.minutes == null && page.apps == null && page.limits == null
         if (nothing) Hint(stringResource(R.string.friend_nothing_shared, f.displayName))
         page.progress?.let { ProgressCard(it) }
-        if (page.minutes != null || page.apps != null) TodayCard(page.minutes, page.apps.orEmpty(), page.limits.orEmpty())
-        page.limits?.takeIf { it.isNotEmpty() }?.let { LimitsCard(it) }
+        val menuShows = limitMenu != null && (!page.apps.isNullOrEmpty() || !page.limits.isNullOrEmpty())
+        if (menuShows) Hint(stringResource(R.string.limit_menu_hint))
+        if (page.minutes != null || page.apps != null) TodayCard(page.minutes, page.apps.orEmpty(), page.limits.orEmpty(), limitMenu)
+        page.limits?.takeIf { it.isNotEmpty() }?.let { LimitsCard(it, limitMenu) }
     }
 }
 
 @Composable
-private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>, limits: List<AppLimit>) {
+private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>, limits: List<AppLimit>, limitMenu: LimitMenuActions?) {
     val today = Days.today().dayOfWeek.value
     val daily = limits.associate { it.packageName to it.dailyMinutesOn(today) }
     MeadowCard(Modifier.fillMaxWidth()) {
@@ -199,23 +213,25 @@ private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>, limits: List<Ap
         val max = apps.maxOfOrNull { it.minutes }?.coerceAtLeast(1) ?: 1
         apps.take(8).forEach { app ->
             val limit = daily[app.packageName] ?: 0
-            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(app.packageName, size = 28.dp)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Row {
-                        Text(app.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(
-                            if (limit > 0) stringResource(R.string.friend_used_of, minutesText(app.minutes), minutesText(limit))
-                            else minutesText(app.minutes),
-                            style = MaterialTheme.typography.labelMedium,
+            WithLimitMenu(app.packageName, app.appName, limits.firstOrNull { it.packageName == app.packageName }, limitMenu) {
+                Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AppIcon(app.packageName, size = 28.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row {
+                            Text(app.appName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Text(
+                                if (limit > 0) stringResource(R.string.friend_used_of, minutesText(app.minutes), minutesText(limit))
+                                else minutesText(app.minutes),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                        GrowthBar(
+                            if (limit > 0) app.minutes / limit.toFloat() else app.minutes / max.toFloat(),
+                            height = 6.dp,
+                            color = if (limit > 0) null else Garden.colors.growth,
                         )
                     }
-                    GrowthBar(
-                        if (limit > 0) app.minutes / limit.toFloat() else app.minutes / max.toFloat(),
-                        height = 6.dp,
-                        color = if (limit > 0) null else Garden.colors.growth,
-                    )
                 }
             }
         }
@@ -223,19 +239,30 @@ private fun TodayCard(minutes: Int?, apps: List<SharedAppUsage>, limits: List<Ap
 }
 
 @Composable
-private fun LimitsCard(limits: List<AppLimit>) {
+private fun LimitsCard(limits: List<AppLimit>, limitMenu: LimitMenuActions?) {
     MeadowCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.friend_limits), style = MaterialTheme.typography.titleMedium)
         limits.forEach { limit ->
-            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(limit.packageName, size = 28.dp)
-                Spacer(Modifier.width(10.dp))
-                // A limit with hours, days or caps is long, so it goes under the name and doesn't squeeze it.
-                Column(Modifier.weight(1f)) {
-                    Text(limit.appName, style = MaterialTheme.typography.bodyMedium)
-                    Text(limitText(limit), style = MaterialTheme.typography.labelMedium)
-                }
-            }
+            WithLimitMenu(limit.packageName, limit.appName, limit, limitMenu) { LimitRow(limit) }
         }
     }
+}
+
+@Composable
+private fun LimitRow(limit: AppLimit) {
+    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        AppIcon(limit.packageName, size = 28.dp)
+        Spacer(Modifier.width(10.dp))
+        // A limit with hours, days or caps is long, so it goes under the name and doesn't squeeze it.
+        Column(Modifier.weight(1f)) {
+            Text(limit.appName, style = MaterialTheme.typography.bodyMedium)
+            Text(limitText(limit), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/** [content] with the limit menu on it, when there is one. */
+@Composable
+private fun WithLimitMenu(packageName: String, appName: String, limit: AppLimit?, menu: LimitMenuActions?, content: @Composable () -> Unit) {
+    if (menu == null) content() else LimitMenu(packageName, appName, limit, menu) { content() }
 }

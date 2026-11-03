@@ -64,6 +64,10 @@ export const errors = {
   removalPending: "This Bumblebee is already leaving.",
   noRemoval: "This Bumblebee isn't leaving.",
   needsAYes: "This makes the limit easier, so a Bumblebee must approve it.",
+  notASuggestion: "This isn't a limit suggested to you.",
+  notYourBumblebee: "Only a suggestion from one of your Bumblebees applies without asking.",
+  suggestionUsed: "This suggestion is already applied.",
+  suggestionOld: "This suggestion is more than a week old. Ask for a new one.",
   noSharedChat: "You can only do this with someone you already chat with.",
 };
 
@@ -85,6 +89,8 @@ export const chatNotes = {
 export const chatMedia = {
   photo: "📷 Photo",
   gif: "GIF",
+  sharedLimit: (appName: string) => (appName ? `Shared a limit for ${appName}` : "Shared a limit"),
+  suggestedLimit: (appName: string) => (appName ? `Suggested a limit for ${appName}` : "Suggested a limit"),
 };
 
 /** Push notification texts. Titles are short; bodies say what to do next. */

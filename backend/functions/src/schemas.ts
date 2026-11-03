@@ -78,6 +78,12 @@ export const CreateRequestInput = z.discriminatedUnion("type", [
 /** A limit saved through the backend: hours, days or caps changed while someone has Bumblebees. */
 export const SaveLimitInput = z.object(limitShape).refine(hasALimit, errors.setALimit);
 
+/** A suggested limit in a chat, to apply as it was sent. */
+export const ApplySuggestionInput = z.object({ chatId: z.string().trim().regex(/^[A-Za-z0-9_-]{1,260}$/), messageId: id });
+
+/** The limit a chat's limit card holds, read back as the phone sent it. */
+export const LimitCardSchema = z.object(limitShape).refine(hasALimit, errors.setALimit);
+
 export const DecideRequestInput = z.object({
   requestId: id,
   approve: z.boolean(),

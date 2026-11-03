@@ -1278,7 +1278,7 @@ describe("every callable is safe to call wrongly", () => {
   const CALLABLES = [
     "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "inviteFromChat", "respondInvite", "cancelInvite",
     "removeApprover", "cancelRemoval", "stepDown", "createRequest", "decideRequest", "cancelRequest", "saveLimit",
-    "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush",
+    "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush", "applyLimitSuggestion",
   ];
 
   test("nothing works without signing in", async () => {
@@ -1317,5 +1317,132 @@ describe("every callable is safe to call wrongly", () => {
     await sam.call("deleteAccount").catch((e) => assert.notEqual(e.code, "functions/internal"));
     assert.equal(await read(`users/${sam.uid}`), undefined);
     assert.equal(await read(`users/${sam.uid}/private/account`), undefined);
+  });
+});
+
+describe("suggested limits", () => {
+  const chatIdOf = (a, b) => [a.uid, b.uid].sort().join("_");
+  const looser = { packageName: "com.insta", appName: "Instagram", dailyMinutes: 90, weeklyMinutes: 0 };
+
+  /** Sam with an hour's limit on Instagram, Bee as Sam's Bumblebee, and Sam as Flower's Bumblebee. */
+  async function circle() {
+    const [sam, bee, flower] = [await person("Sam"), await person("Bee"), await person("Flower")];
+    await link(sam, bee);
+    await link(flower, sam);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { packageName: "com.insta", appName: "Instagram", dailyMinutes: 60, weeklyMinutes: 0 }));
+    return { sam, bee, flower };
+  }
+
+  async function card(from, to, mode, limit) {
+    const ref = await admin((db) => addDoc(collection(db, `chats/${chatIdOf(from, to)}/messages`), {
+      senderId: from.uid, kind: "limit", mode, limit, createdAt: serverTimestamp(),
+    }));
+    return { chatId: chatIdOf(from, to), messageId: ref.id };
+  }
+
+  test("a Bumblebee's suggestion applies as sent, even looser, with no question", async () => {
+    const { sam, bee } = await circle();
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { ...looser, appName: "Insta (renamed)" }));
+    const saved = await read(`users/${sam.uid}/limits/com.insta`);
+    assert.equal(saved.dailyMinutes, 90);
+    // The limit keeps the name it was planted under.
+    assert.equal(saved.appName, "Instagram");
+    const asked = await admin(async (db) => (await getDocs(query(collection(db, "requests"), where("requesterId", "==", sam.uid)))).size);
+    assert.equal(asked, 0);
+  });
+
+  test("applying a suggestion withdraws my open questions about the same limit", async () => {
+    const { sam, bee } = await circle();
+    const { requestId } = await sam.call("createRequest", { type: "change_limit", packageName: "com.insta", dailyMinutes: 120, weeklyMinutes: 0, dayKey: today() });
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.tiktok`), { packageName: "com.tiktok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 }));
+    const other = await sam.call("createRequest", { type: "change_limit", packageName: "com.tiktok", dailyMinutes: 40, weeklyMinutes: 0, dayKey: today() });
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", looser));
+    assert.equal((await read(`requests/${requestId}`)).status, "cancelled");
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).status, "cancelled");
+    // A question about another app stays open.
+    assert.equal((await read(`requests/${other.requestId}`)).status, "pending");
+  });
+
+  test("a suggestion plants a limit for an app with none", async () => {
+    const { sam, bee } = await circle();
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { packageName: "com.tiktok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 }));
+    const saved = await read(`users/${sam.uid}/limits/com.tiktok`);
+    assert.equal(saved.dailyMinutes, 20);
+    assert.equal(saved.appName, "TikTok");
+  });
+
+  test("a suggestion from someone who isn't my Bumblebee can't skip the approval", async () => {
+    const { sam, flower } = await circle();
+    // Sam looks after Flower; Flower is not Sam's Bumblebee.
+    await rejects(sam.call("applyLimitSuggestion", await card(flower, sam, "suggested", looser)), "permission-denied");
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).dailyMinutes, 60);
+  });
+
+  test("only a suggestion sent to me, in my chat, applies", async () => {
+    const { sam, bee } = await circle();
+    const stranger = await person("Stranger");
+    await rejects(sam.call("applyLimitSuggestion", await card(bee, sam, "shared", looser)), "failed-precondition");
+    const mine = await card(sam, bee, "suggested", looser);
+    // My own suggestion, and someone else's chat.
+    await rejects(sam.call("applyLimitSuggestion", mine), "failed-precondition");
+    await rejects(stranger.call("applyLimitSuggestion", await card(bee, sam, "suggested", looser)), "failed-precondition");
+    await rejects(sam.call("applyLimitSuggestion", { chatId: mine.chatId, messageId: "missing" }), "failed-precondition");
+    // A card that holds no limit.
+    await rejects(sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { ...looser, dailyMinutes: 0 })), "failed-precondition");
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).dailyMinutes, 60);
+  });
+
+  test("a limit card pushes which app it is for", async () => {
+    const { sam, bee } = await circle();
+    await card(bee, sam, "suggested", looser);
+    await eventually(async () => assert.ok((await outbox(sam.uid, "chat")).some((p) => String(p.body).includes("Instagram"))));
+  });
+
+  test("the whole limit is saved as it was sent: hours, days and caps", async () => {
+    const { sam, bee } = await circle();
+    const full = {
+      ...looser,
+      schedule: { 1: [{ from: 540, to: 1260 }], 6: [{ from: 600, to: 1380 }] },
+      dayMinutes: { 6: 120 },
+      caps: [{ days: [1, 2, 3, 4, 5], from: 1020, to: 1320, minutes: 30 }],
+    };
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", full));
+    const saved = await read(`users/${sam.uid}/limits/com.insta`);
+    assert.deepEqual(
+      { dailyMinutes: saved.dailyMinutes, weeklyMinutes: saved.weeklyMinutes, schedule: saved.schedule, dayMinutes: saved.dayMinutes, caps: saved.caps },
+      { dailyMinutes: 90, weeklyMinutes: 0, schedule: full.schedule, dayMinutes: full.dayMinutes, caps: full.caps },
+    );
+  });
+
+  test("a suggestion is an approval once: it can't be applied again", async () => {
+    const { sam, bee } = await circle();
+    const sent = await card(bee, sam, "suggested", looser);
+    await sam.call("applyLimitSuggestion", sent);
+    // Sam tightens the limit again; the old suggestion can't undo that.
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { dailyMinutes: 30 }));
+    await rejects(sam.call("applyLimitSuggestion", sent), "failed-precondition", /already applied/);
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).dailyMinutes, 30);
+  });
+
+  test("a suggestion more than a week old no longer applies", async () => {
+    const { sam, bee } = await circle();
+    const ref = await admin((db) => addDoc(collection(db, `chats/${chatIdOf(bee, sam)}/messages`), {
+      senderId: bee.uid, kind: "limit", mode: "suggested", limit: looser, createdAt: Timestamp.fromMillis(Date.now() - 8 * 24 * 60 * 60_000),
+    }));
+    await rejects(sam.call("applyLimitSuggestion", { chatId: chatIdOf(bee, sam), messageId: ref.id }), "failed-precondition", /week old/);
+  });
+
+  test("a closed chat, or someone who is no longer my Bumblebee, can't approve", async () => {
+    const { sam, bee } = await circle();
+    const closedCard = await card(bee, sam, "suggested", looser);
+    await admin((db) => updateDoc(doc(db, `chats/${closedCard.chatId}`), { closed: true }));
+    await rejects(sam.call("applyLimitSuggestion", closedCard), "failed-precondition");
+
+    const other = await circle();
+    const sent = await card(other.bee, other.sam, "suggested", looser);
+    // Bee stops being Sam's Bumblebee, but the chat stays open.
+    await admin((db) => updateDoc(doc(db, `users/${other.sam.uid}/private/account`), { approverIds: [] }));
+    await rejects(other.sam.call("applyLimitSuggestion", sent), "permission-denied");
+    assert.equal((await read(`users/${other.sam.uid}/limits/com.insta`)).dailyMinutes, 60);
   });
 });

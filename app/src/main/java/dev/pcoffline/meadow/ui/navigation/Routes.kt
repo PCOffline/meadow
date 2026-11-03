@@ -8,8 +8,11 @@ import kotlinx.serialization.Serializable
 @Serializable data object PeopleRoute
 @Serializable data object SetupRoute
 @Serializable data object SettingsRoute
-@Serializable data object PickAppRoute
-@Serializable data class LimitRoute(val packageName: String)
+/** [template] is a copied limit (as [dev.pcoffline.meadow.ui.limits.LimitTemplate]) to start the picked app's limit from. */
+@Serializable data class PickAppRoute(val template: String? = null)
+@Serializable data class LimitRoute(val packageName: String, val template: String? = null)
+/** A limit suggested to the other person in [chatId], for their app, starting from [template] (their limit, if any). */
+@Serializable data class SuggestRoute(val chatId: String, val packageName: String, val appName: String, val template: String? = null)
 @Serializable data class ChatRoute(val chatId: String)
 @Serializable data class FriendRoute(val uid: String)
 @Serializable data object ProfileRoute

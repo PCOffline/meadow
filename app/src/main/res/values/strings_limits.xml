@@ -112,4 +112,26 @@
     <string name="duration_picker_hours">Hours</string>
     <string name="duration_picker_minutes">Minutes</string>
     <string name="limit_editor_cap_too_long">A cap must be shorter than its hours.</string>
+    <!-- Sharing, copying and suggesting limits (#93) -->
+    <string name="limit_card_shared">Shared limit</string>
+    <string name="limit_card_suggested">Suggested limit</string>
+    <string name="limit_card_shared_words">Shared a limit for %1$s</string>
+    <string name="limit_card_suggested_words">Suggested a limit for %1$s</string>
+    <string name="limit_menu_hint">Tap a limit for more</string>
+    <string name="limit_menu_open">More for %1$s</string>
+    <string name="limit_menu_copy">Copy this limit</string>
+    <string name="limit_menu_suggest_change">Suggest a change</string>
+    <string name="limit_menu_suggest_new">Suggest a limit</string>
+    <string name="limit_copy_replaces">This replaces your limit for %1$s.</string>
+    <string name="limit_copy_other_app">Choose another app</string>
+    <string name="limit_suggest_title">Suggest a limit</string>
+    <string name="limit_suggest_send">Send</string>
+    <string name="limit_suggest_sent">Suggestion sent 🌱</string>
+    <string name="limit_apply">Apply</string>
+    <string name="limit_change">Change</string>
+    <string name="limit_apply_title">Apply this limit?</string>
+    <string name="limit_apply_now">Now</string>
+    <string name="limit_apply_after">After</string>
+    <string name="limit_apply_done">The limit for %1$s is applied.</string>
+    <string name="limit_apply_not_on_phone">%1$s isn\'t on this phone.</string>
 </resources>

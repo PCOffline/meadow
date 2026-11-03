@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CreateRequestInput, DecideRequestInput, EmergencyInput, InviteByCodeInput, InviteIdInput, InviteTokenInput, ProfileInput, RemoveBumblebeeInput,
-  isPackageName, RequestIdInput, SaveLimitInput,
+  isPackageName, RequestIdInput, SaveLimitInput, ApplySuggestionInput, LimitCardSchema,
 } from "./schemas";
 
 const firstError = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues[0]?.message;
@@ -120,4 +120,17 @@ test("a website is limited under its domain, in lower case, and nothing else pas
   for (const b of bad) assert.equal(isPackageName(b), false, b);
   assert.equal(isPackageName(`site:${"a".repeat(60)}.${"b".repeat(60)}.${"c".repeat(60)}.com`), true);
   assert.equal(isPackageName(`site:${["a", "b", "c", "d"].map((l) => l.repeat(50)).join(".")}.com`), false, "over 200 characters");
+});
+
+test("a suggestion to apply names its chat and message", () => {
+  assert.ok(ApplySuggestionInput.safeParse({ chatId: "a_b", messageId: "m1" }).success);
+  assert.ok(!ApplySuggestionInput.safeParse({ chatId: "a/b", messageId: "m1" }).success);
+  assert.ok(!ApplySuggestionInput.safeParse({ chatId: "a_b" }).success);
+});
+
+test("a limit card holds a whole limit that holds something back", () => {
+  const card = { packageName: "com.instagram.android", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0 };
+  assert.ok(LimitCardSchema.safeParse(card).success);
+  assert.ok(!LimitCardSchema.safeParse({ ...card, dailyMinutes: 0 }).success);
+  assert.ok(!LimitCardSchema.safeParse({ ...card, packageName: "../x" }).success);
 });

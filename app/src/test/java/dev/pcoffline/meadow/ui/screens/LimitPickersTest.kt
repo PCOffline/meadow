@@ -203,7 +203,9 @@ class LimitPickersTest : ScreenTest() {
         compose.waitUntil(5_000) { compose.onAllNodes(hasText(text(R.string.share_title))).fetchSemanticsNodes().isNotEmpty() }
         node(R.string.limit_editor_updated).assertExists()
         node(R.string.share_title).performClick()
-        assertTrue(dev.pcoffline.meadow.ui.components.ShareCommitment.text.value.orEmpty().contains("Instagram"))
+        val shared = dev.pcoffline.meadow.ui.components.ShareCommitment.shared.value
+        assertTrue(shared?.text.orEmpty().contains("Instagram"))
+        assertEquals(pkg, shared?.limit?.packageName)
         dev.pcoffline.meadow.ui.components.ShareCommitment.close()
     }
 

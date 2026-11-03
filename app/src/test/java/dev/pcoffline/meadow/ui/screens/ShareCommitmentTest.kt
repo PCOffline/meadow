@@ -67,8 +67,8 @@ class ShareCommitmentTest : ScreenTest() {
     @Test
     fun `opening and closing the sheet holds the words until it's done`() {
         ShareCommitment.open(words)
-        assertEquals(words, ShareCommitment.text.value)
+        assertEquals(words, ShareCommitment.shared.value?.text)
         ShareCommitment.close()
-        assertNull(ShareCommitment.text.value)
+        assertNull(ShareCommitment.shared.value)
     }
 }

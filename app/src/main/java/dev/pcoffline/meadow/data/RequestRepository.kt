@@ -5,6 +5,7 @@ import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
@@ -97,5 +98,17 @@ class RequestRepository(
 
     suspend fun cancel(id: String) {
         backend.call("cancelRequest", mapOf("requestId" to id))
+    }
+
+    /** Withdraws my open questions to change or remove [packageName]'s limit: a limit just applied settles them. */
+    suspend fun withdrawChanges(packageName: String) {
+        val uid = backend.uid ?: return
+        outgoing(uid, fresh = true).first()
+            .filter { it.packageName == packageName && it.status == RequestStatus.PENDING && it.type in OPEN_CHANGES }
+            .forEach { cancel(it.id) }
+    }
+
+    private companion object {
+        val OPEN_CHANGES = setOf(RequestType.CHANGE_LIMIT, RequestType.REMOVE_LIMIT)
     }
 }
