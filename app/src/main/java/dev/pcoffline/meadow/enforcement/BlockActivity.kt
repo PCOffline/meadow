@@ -54,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
@@ -92,6 +93,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** The calm screen shown in place of an app whose time is up. */
 class BlockActivity : ComponentActivity() {
@@ -222,12 +224,16 @@ class RestViewModel(
     private val budgetOf: (packageName: String, forceRefresh: Boolean) -> AppBudget? = AppGraph.engine::budget,
 ) : ViewModel() {
     /**
-     * Only the first budget reads the whole day's usage log afresh. The app is behind this screen,
-     * so its time doesn't grow, and an unlock or a yes changes the budget, not the usage. A full
-     * read on each change asked the system for the day's log several times in a few seconds,
-     * which can hold up the phone (#68). Later budgets use the engine's reading, at most 20 s old.
+     * Each time the screen starts showing, its first budget reads the day's usage log afresh. Later
+     * budgets, on each change and tick, use the engine's last reading. Grants and unlocks are read
+     * live, so they show at once. The app behind the screen is not in use, so its usage stays the same.
      */
-    private val firstRead = java.util.concurrent.atomic.AtomicBoolean(true)
+    private val firstRead = AtomicBoolean(true)
+
+    /** The screen is showing again (it can come back for the same app): its next budget reads afresh. */
+    fun shownAgain() {
+        firstRead.set(true)
+    }
 
     private val pending = AppGraph.sync.profile.flatMapLatest { state ->
         val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
@@ -270,6 +276,10 @@ private val RestingSky = SkyMood(
 @Composable
 private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit) {
     val viewModel = viewModel(key = "rest-$pkg") { RestViewModel(pkg) }
+    LifecycleStartEffect(viewModel) {
+        viewModel.shownAgain()
+        onStopOrDispose { }
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
     RestContent(pkg, state, onHome, onOpen)
 }
