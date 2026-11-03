@@ -68,7 +68,9 @@ jobs:
             sleep 20
             mkdir -p build/showcase
             nohup adb logcat -v time > build/showcase/logcat.txt 2>&1 &
-            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
+            # The showcase draws only from DemoGarden, so the app's data stays between tests. Twice the
+            # emulator froze just as the app's data was cleared after a test.
+            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.clearPackageData=false -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
             adb get-state > /dev/null 2>&1 || { echo "::error::The emulator stopped answering during ShowcaseTest."; exit 1; }
             adb pull /sdcard/Pictures/meadow build/showcase
       # Why the emulator stopped answering: the crashes and the last lines it logged.
