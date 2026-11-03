@@ -54,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
@@ -92,6 +93,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** The calm screen shown in place of an app whose time is up. */
 class BlockActivity : ComponentActivity() {
@@ -213,7 +215,26 @@ data class RestState(
     val unlocked: Boolean get() = budget != null && !budget.exhausted
 }
 
-class RestViewModel(private val packageName: String) : ViewModel() {
+/**
+ * What the rest screen shows. [budgetOf] gives an app's budget, reading the usage log afresh when
+ * asked to (the engine's own, outside tests).
+ */
+class RestViewModel(
+    private val packageName: String,
+    private val budgetOf: (packageName: String, forceRefresh: Boolean) -> AppBudget? = AppGraph.engine::budget,
+) : ViewModel() {
+    /**
+     * Each time the screen starts showing, its first budget reads the day's usage log afresh. Later
+     * budgets, on each change and tick, use the engine's last reading. Grants and unlocks are read
+     * live, so they show at once. The app behind the screen is not in use, so its usage stays the same.
+     */
+    private val firstRead = AtomicBoolean(true)
+
+    /** The screen is showing again (it can come back for the same app): its next budget reads afresh. */
+    fun shownAgain() {
+        firstRead.set(true)
+    }
+
     private val pending = AppGraph.sync.profile.flatMapLatest { state ->
         val uid = (state as? ProfileState.Ready)?.profile?.uid ?: return@flatMapLatest flowOf(null)
         AppGraph.requests.outgoing(uid).map { requests ->
@@ -234,7 +255,7 @@ class RestViewModel(private val packageName: String) : ViewModel() {
         val profile = (profileState as? ProfileState.Ready)?.profile
         RestState(
             appName = AppGraph.engine.limitFor(packageName)?.appName ?: AppGraph.catalog.label(packageName),
-            budget = AppGraph.engine.budget(packageName, forceRefresh = true),
+            budget = budgetOf(packageName, firstRead.getAndSet(false)),
             signedIn = profile != null,
             hasBumblebees = profile?.approverIds?.isNotEmpty() == true,
             // Unanswered requests expire; the ticker notices before the backend settles it.
@@ -255,6 +276,10 @@ private val RestingSky = SkyMood(
 @Composable
 private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit) {
     val viewModel = viewModel(key = "rest-$pkg") { RestViewModel(pkg) }
+    LifecycleStartEffect(viewModel) {
+        viewModel.shownAgain()
+        onStopOrDispose { }
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
     RestContent(pkg, state, onHome, onOpen)
 }

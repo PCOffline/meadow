@@ -47,6 +47,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.theme.Garden
+import kotlin.math.ceil
+import dev.pcoffline.meadow.ui.minutesText
+import androidx.compose.ui.semantics.hideFromAccessibility
+import dev.pcoffline.meadow.R
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 
 /**
  * Rounded "stalk" bars. The highlighted bar (usually today) is drawn in petal pink; an optional
@@ -76,10 +83,25 @@ fun StalkBarChart(
     val gutter = with(density) { tag?.let { it.size.width.toDp() + TAG_GAP } ?: 0.dp }
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, tween(700)) }
-    val max = (values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f).coerceAtLeast(1f)
+    // The scale's top is a round length, named at the left, so the bars read as time (#81).
+    val topMinutes = axisTopMinutes((values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f))
+    val max = topMinutes.toFloat()
+    val topLabel = minutesText(topMinutes)
+    val axisStyle = MaterialTheme.typography.labelSmall
+    val axisPx = remember(topLabel, axisStyle, measurer) { maxOf(measurer.measure(topLabel, axisStyle).size.width, measurer.measure("0", axisStyle).size.width) }
+    val axisWidth = with(density) { axisPx.toDp() + TAG_GAP }
+    val described = stringResource(R.string.chart_axis_description, topLabel)
 
     Column(modifier) {
-        Canvas(Modifier.fillMaxWidth().height(height)) {
+        Row(Modifier.fillMaxWidth().height(height)) {
+        // Read out once, in the graph's description, so screen readers skip these two labels.
+        Column(Modifier.width(axisWidth).fillMaxHeight().semantics { hideFromAccessibility() }, verticalArrangement = Arrangement.SpaceBetween) {
+            Text(topLabel, style = axisStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text("0", style = axisStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        Canvas(Modifier.weight(1f).fillMaxHeight().semantics { contentDescription = described }) {
+            // A faint line at the top of the scale, where its label is.
+            drawLine(outlineVariant, Offset(0f, 0f), Offset(size.width - gutter.toPx(), 0f), strokeWidth = 1.dp.toPx())
             val n = values.size.coerceAtLeast(1)
             val plot = size.width - gutter.toPx()
             val slot = plot / n
@@ -128,6 +150,7 @@ fun StalkBarChart(
                 }
             }
         }
+        }
         // Each label is centred under its bar but may be wider than it, so "15" isn't cut to "1".
         Layout(
             content = {
@@ -142,7 +165,7 @@ fun StalkBarChart(
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = gutter),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = axisWidth, end = gutter),
         ) { measurables, constraints ->
             val width = constraints.maxWidth
             val slot = width.toFloat() / labels.size.coerceAtLeast(1)
@@ -252,3 +275,14 @@ fun MonthHeatmap(
 }
 
 private val TAG_GAP = 6.dp
+
+/**
+ * The top of a time graph's scale, in minutes, for bars up to [maxMinutes]: a quarter hour under
+ * an hour, whole hours up to six, and even hours above, so its label is a plain length.
+ */
+internal fun axisTopMinutes(maxMinutes: Float): Int {
+    if (maxMinutes <= 0f) return 60
+    if (maxMinutes <= 60f) return (ceil(maxMinutes / 15f).toInt() * 15).coerceAtLeast(15)
+    val hours = ceil(maxMinutes / 60f).toInt()
+    return (if (hours > 6) hours + hours % 2 else hours) * 60
+}
