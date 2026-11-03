@@ -50,8 +50,7 @@ import android.content.ClipData
 import android.os.Build
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
@@ -100,6 +99,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -493,7 +498,11 @@ private fun Bubble(message: ChatMessage, mine: Boolean) {
                     .padding(horizontal = 14.dp, vertical = 9.dp)
                     .alpha(if (message.pending) 0.6f else 1f),
             ) {
-                Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                if (selecting) {
+                    SelectableMessage(message.text, onDone = { selecting = false })
+                } else {
+                    Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                }
                 Text(
                     if (message.pending) stringResource(R.string.chat_sending) else relativeTime(message.createdAtMillis),
                     style = MaterialTheme.typography.labelSmall,
@@ -504,7 +513,6 @@ private fun Bubble(message: ChatMessage, mine: Boolean) {
             MessageOptions(message.text, expanded = options, onDismiss = { options = false }, onSelect = { selecting = true })
         }
     }
-    if (selecting) SelectTextDialog(message.text, onDismiss = { selecting = false })
 }
 
 /**
@@ -652,18 +660,28 @@ private fun MessageOptions(text: String, expanded: Boolean, onDismiss: () -> Uni
     }
 }
 
-/** The message on its own, where any part of it can be selected and copied or shared. */
+/**
+ * The message in place, with all of its words picked: the handles change what is picked, and
+ * Android's own bar copies or shares it. Leaving it (a tap elsewhere) ends the selection.
+ */
 @Composable
-private fun SelectTextDialog(text: String, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        text = {
-            SelectionContainer(Modifier.verticalScroll(rememberScrollState())) {
-                Text(text, style = MaterialTheme.typography.bodyLarge)
-            }
+private fun SelectableMessage(text: String, onDone: () -> Unit) {
+    var value by remember(text) { mutableStateOf(TextFieldValue(text, TextRange(0, text.length))) }
+    val focus = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    val style = MaterialTheme.typography.bodyLarge.copy(color = LocalContentColor.current)
+    BasicTextField(
+        value = value,
+        // Read only: only the selection can change.
+        onValueChange = { value = it.copy(text = text) },
+        readOnly = true,
+        textStyle = style,
+        modifier = Modifier.focusRequester(focus).onFocusChanged {
+            if (focused && !it.isFocused) onDone()
+            focused = it.isFocused
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
+    LaunchedEffect(Unit) { focus.requestFocus() }
 }
 
 @Composable

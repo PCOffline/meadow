@@ -55,6 +55,9 @@ import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.usage.UsageHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.TextRange
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -261,10 +264,15 @@ class MainScreensTest : ScreenTest() {
             it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
         }).onFirst().performSemanticsAction(SemanticsActions.OnLongClick)
         node(R.string.chat_select_text).performClick()
-        node(R.string.action_close).assertExists()
-        assertAccessible(requireHeading = false)
-        node(R.string.action_close).performClick()
+        // The message itself turns selectable, all of it picked, with no dialog over it (#79).
+        compose.onNode(isDialog()).assertDoesNotExist()
         node(R.string.action_close).assertDoesNotExist()
+        // The one text field with words in it: the message box below is empty.
+        val field = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)).fetchSemanticsNodes()
+            .map { it.config }.single { it[SemanticsProperties.EditableText].text.isNotEmpty() }
+        val whole = field[SemanticsProperties.EditableText].text
+        assertEquals(TextRange(0, whole.length), field[SemanticsProperties.TextSelectionRange])
+        assertAccessible(requireHeading = false)
     }
 
     @Test
