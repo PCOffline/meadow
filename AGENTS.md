@@ -25,6 +25,50 @@ Each branch does one task. It changes only what the task needs, and the tests fo
 - Fix an unrelated problem on a branch and pull request of its own.
 - Keep the diff as small as the task permits.
 
+## Pull requests
+
+Give each pull request the shape of Matt Pocock's
+[`pr` skill](https://github.com/mattpocock/skills/blob/main/skills/engineering/pr/SKILL.md):
+
+1. **Summary**: the smallest diagram, diff sketch or tree that makes the change clear.
+2. **Evidence**: before and after. Use screenshots for a visual change, and test runs for the rest.
+3. **Merge danger**: a one-way or two-way door, and the blast radius.
+
+A pull request that changes what people see or do also has a **story** and a **spec**. This
+applies to screens, layouts, colours, text, motion, notifications, and new or changed behaviour.
+Put them in the Summary and the Evidence.
+
+### Story
+
+The story shows the change as a person meets it. Put pictures first, and text under them.
+
+- Show each step in the order that a person does it. Give each step a screenshot or a video,
+  and one short line under it.
+- Show the before and the after next to each other.
+- Use a video or a GIF for motion, gestures, animations and anything that changes over time.
+- Show each state that the change touches. For example: empty, loading, waiting, error,
+  offline and done.
+- Show each look that the change touches: light and dark, each theme, large text and a narrow
+  phone.
+- Show the small details: spacing, alignment, wrapping, text that doesn't fit, touch feedback,
+  and what a screen reader says.
+
+To make the pictures, use **Meadow screens** in a debug build (CONTRIBUTING.md). On an emulator,
+`adb exec-out screencap -p > shot.png` takes a screenshot. `adb shell screenrecord
+/sdcard/demo.mp4` records a video, and `adb pull /sdcard/demo.mp4` copies it to your computer.
+Attach the pictures to the pull request. Don't commit them.
+
+If you can't make a picture, list it under **Missing pictures** in the pull request. A person
+adds each one before the merge.
+
+### Spec
+
+The spec says exactly what the change does, so that a reviewer can check the pictures against it.
+
+- State each rule, limit and edge case.
+- State what doesn't change.
+- Write it as plain statements in a vertical list, with no story in it.
+
 ## Tests
 
 Each feature and each fix adds tests. Each test fails without the change.
