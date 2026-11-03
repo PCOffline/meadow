@@ -101,7 +101,7 @@ class LimitSharingJourneyTest : EndToEndTest() {
             waitFor(R.string.share_commitment_in_meadow)
             compose.onNode(hasText("Sam") and hasClickAction()).performClick()
             waitForBackendDocs("chats/$chat/messages") { messages ->
-                messages.any { it.optString("kind") == "limit" && it.optString("mode") == "shared" && it.optString("senderId") == kai.uid }
+                messages.any { it.string("kind") == "limit" && it.string("mode") == "shared" && it.string("senderId") == kai.uid }
             }
             waitForSnackbarToGo(R.string.share_commitment_sent, "Sam")
 
@@ -115,7 +115,7 @@ class LimitSharingJourneyTest : EndToEndTest() {
             waitFor(R.string.limit_suggest_title)
             node(R.string.limit_suggest_send).performScrollTo().performClick()
             waitForBackendDocs("chats/$chat/messages") { messages ->
-                messages.any { it.optString("kind") == "limit" && it.optString("mode") == "suggested" && it.optString("senderId") == kai.uid }
+                messages.any { it.string("kind") == "limit" && it.string("mode") == "suggested" && it.string("senderId") == kai.uid }
             }
         }
     }
