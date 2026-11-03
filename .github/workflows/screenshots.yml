@@ -61,8 +61,6 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          # The screen recordings need more memory than the default 2 GB.
-          ram-size: 4096M
           # Animations stay on: the recordings show them.
           disable-animations: false
           script: |
@@ -71,8 +69,17 @@ jobs:
             mkdir -p build/showcase
             nohup adb logcat -v time > build/showcase/logcat.txt 2>&1 &
             ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
-            adb get-state > /dev/null 2>&1 || { echo "::error::The emulator stopped during ShowcaseTest. Read logcat.txt and the emulator crash data in the showcase-reports artifact."; exit 1; }
+            adb get-state > /dev/null 2>&1 || { echo "::error::The emulator stopped answering during ShowcaseTest."; exit 1; }
             adb pull /sdcard/Pictures/meadow build/showcase
+      # Why the emulator stopped answering: the crashes and the last lines it logged.
+      - name: Show the emulator log
+        if: failure()
+        run: |
+          log=build/showcase/logcat.txt
+          [ -f "$log" ] || { echo "No logcat was saved."; exit 0; }
+          grep -nE 'FATAL|ANR in|Watchdog|beginning of crash|lowmemorykiller|Kernel panic|reboot|died|DeadSystem' "$log" | tail -n 80 || true
+          echo "--- last lines ---"
+          tail -n 150 "$log"
       - name: Prepare images
         run: python3 .github/scripts/prepare_screenshots.py build/showcase/meadow docs/images
       - name: Commit images
