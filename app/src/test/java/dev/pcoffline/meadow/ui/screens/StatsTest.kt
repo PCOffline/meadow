@@ -36,6 +36,7 @@ import org.junit.Assert.assertTrue
 import dev.pcoffline.meadow.ui.components.StalkBarChart
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -168,8 +169,10 @@ class StatsTest : ScreenTest() {
     @Test
     fun `the time graph says its unit, with its top in hours and its base`() {
         show { StalkBarChart(values = listOf(30f, 200f, 95f), labels = listOf("Mon", "Tue", "Wed")) }
-        compose.onNodeWithText("4h").assertExists()
-        compose.onNodeWithText("0").assertExists()
+        // On screen, but read out once, in the description below.
+        val hidden = hasAnyAncestor(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        compose.onNode(hasText("4h") and hidden, useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("0") and hidden, useUnmergedTree = true).assertExists()
         compose.onNodeWithContentDescription(text(R.string.chart_axis_description, "4h"), substring = true).assertExists()
     }
 

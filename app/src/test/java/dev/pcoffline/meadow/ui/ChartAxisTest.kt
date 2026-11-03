@@ -30,4 +30,15 @@ class ChartAxisTest {
     fun `nothing used still has a scale`() {
         assertEquals(60, axisTopMinutes(0f))
     }
+
+    @Test
+    fun `the edges of each step stay in their step`() {
+        assertEquals(15, axisTopMinutes(15f))
+        assertEquals(30, axisTopMinutes(15.01f))
+        assertEquals(360, axisTopMinutes(360f))
+        assertEquals(480, axisTopMinutes(361f))
+        assertEquals(1440, axisTopMinutes(1440f))
+        assertEquals(60, axisTopMinutes(-5f))
+    }
+
 }

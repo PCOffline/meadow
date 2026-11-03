@@ -49,11 +49,11 @@ import dev.pcoffline.meadow.ui.currentLocale
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlin.math.ceil
 import dev.pcoffline.meadow.ui.minutesText
+import androidx.compose.ui.semantics.hideFromAccessibility
 import dev.pcoffline.meadow.R
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalResources
 
 /**
  * Rounded "stalk" bars. The highlighted bar (usually today) is drawn in petal pink; an optional
@@ -84,17 +84,18 @@ fun StalkBarChart(
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, tween(700)) }
     // The scale's top is a round length, named at the left, so the bars read as time (#81).
-    val top = axisTopMinutes((values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f))
-    val max = top.toFloat()
-    val topLabel = LocalResources.current.minutesText(top)
+    val topMinutes = axisTopMinutes((values.maxOrNull() ?: 0f).coerceAtLeast(referenceLine ?: 0f))
+    val max = topMinutes.toFloat()
+    val topLabel = minutesText(topMinutes)
     val axisStyle = MaterialTheme.typography.labelSmall
-    val axisPx = remember(topLabel, axisStyle) { maxOf(measurer.measure(topLabel, axisStyle).size.width, measurer.measure("0", axisStyle).size.width) }
+    val axisPx = remember(topLabel, axisStyle, measurer) { maxOf(measurer.measure(topLabel, axisStyle).size.width, measurer.measure("0", axisStyle).size.width) }
     val axisWidth = with(density) { axisPx.toDp() + TAG_GAP }
     val described = stringResource(R.string.chart_axis_description, topLabel)
 
     Column(modifier) {
         Row(Modifier.fillMaxWidth().height(height)) {
-        Column(Modifier.width(axisWidth).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+        // Read out once, in the graph's description, so screen readers skip these two labels.
+        Column(Modifier.width(axisWidth).fillMaxHeight().semantics { hideFromAccessibility() }, verticalArrangement = Arrangement.SpaceBetween) {
             Text(topLabel, style = axisStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             Text("0", style = axisStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
