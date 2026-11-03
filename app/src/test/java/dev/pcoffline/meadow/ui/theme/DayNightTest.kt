@@ -2,6 +2,7 @@ package dev.pcoffline.meadow.ui.theme
 
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.baseSky
+import dev.pcoffline.meadow.ui.components.celestialProgress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -44,4 +45,18 @@ class DayNightTest {
     fun `a dark page always has a night sky over it`() {
         (0..23).forEach { h -> assertTrue("dark at $h:00", baseSky(h, dark = true, greeting = R.string.greeting_afternoon).night) }
     }
+
+    @Test
+    fun `on a light page at night the sun stays set, rather than rising again`() {
+        // At 20:59 the sun is about to set; after 21:00 it stays down at the end of its arc.
+        listOf(21, 23, 1, 4).forEach { h -> assertEquals("at $h:00", 1f, celestialProgress(h, 0, night = false), 0f) }
+        assertTrue(celestialProgress(12, 0, night = false) < 1f)
+    }
+
+    @Test
+    fun `on a dark page the moon keeps its own timing`() {
+        assertEquals(0f, celestialProgress(21, 0, night = true), 0.001f)
+        assertEquals(0.5f, celestialProgress(1, 0, night = true), 0.001f)
+    }
+
 }

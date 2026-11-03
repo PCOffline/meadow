@@ -101,7 +101,7 @@ enum class DarkMode(val key: String, @StringRes val label: Int) {
     }
 }
 
-/** Night is from 21:00 to 5:00, the same night the sky shows. */
+/** Night is from 21:00 to 5:00: the hours the moon is out on a dark page. */
 fun isNightHour(hour: Int): Boolean = hour !in 5..20
 
 /** The hour of the day, kept up to date while it's on screen, so Clock changes over by itself. */
@@ -484,7 +484,9 @@ fun MeadowTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val dark = darkMode.isDarkAt(if (darkMode == DarkMode.CLOCK) rememberHourOfDay() else 0, systemDark)
+    // A pinned sky hour (screenshots and tests) also pins Clock's hour, so the two agree.
+    val hour = if (darkMode == DarkMode.CLOCK) dev.pcoffline.meadow.ui.components.LocalSkyHour.current ?: rememberHourOfDay() else 0
+    val dark = darkMode.isDarkAt(hour, systemDark)
     val seed = Seeds.getValue(theme)
     val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
     val garden = remember(theme, dark) { gardenColors(seed, dark) }

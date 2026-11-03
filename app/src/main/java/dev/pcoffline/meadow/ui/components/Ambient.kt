@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.isNightHour
 import dev.pcoffline.meadow.ui.theme.butterfliesFor
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
@@ -171,7 +172,8 @@ private fun rememberLiveWeather(): Weather? {
 }
 
 /**
- * The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights.
+ * The sky follows the clock: peach mornings, pale-blue days, lavender evenings. On a dark page
+ * it is a starry night at every hour (see [baseSky]).
  * With the weather on, clouds, rain and snow grey it a little.
  */
 @Composable
@@ -193,7 +195,7 @@ fun rememberSkyMood(): SkyMood {
     // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
-        progress = skyProgress(hour, minute),
+        progress = celestialProgress(hour, minute, base.night),
         top = if (base.night) {
             androidx.compose.ui.graphics.lerp(base.top, scheme.primary, 0.10f)
         } else {
@@ -219,12 +221,19 @@ internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int): SkyMoo
 }
 
 /**
+ * How far along its arc the sun or moon is. A night sky uses the moon's timing. A day sky after
+ * 21:00 (a light page at night) keeps the sun set at the end of its arc, so it does not rise again.
+ */
+internal fun celestialProgress(hour: Int, minute: Int, night: Boolean): Float =
+    if (night || !isNightHour(hour)) skyProgress(hour, minute) else 1f
+
+/**
  * How far across the sky the sun is at [hour]:[minute], from 0 as it rises at 5:00 to 1 as it sets
  * at 21:00; by night, how far the moon is, from 0 at 21:00 to 1 at 5:00.
  */
 internal fun skyProgress(hour: Int, minute: Int): Float {
     val t = hour + minute / 60f
-    return if (hour in 5..20) (t - 5f) / 16f else ((t - 21f + 24f) % 24f) / 8f
+    return if (!isNightHour(hour)) (t - 5f) / 16f else ((t - 21f + 24f) % 24f) / 8f
 }
 
 /**
