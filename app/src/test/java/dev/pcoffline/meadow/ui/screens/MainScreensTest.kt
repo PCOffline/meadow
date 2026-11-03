@@ -55,6 +55,10 @@ import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.usage.UsageHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isPopup
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.hasAnyDescendant
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -249,22 +253,21 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `a long press on a message copies it whole or opens it to select part of it`() {
+    fun `a long press on a message copies it, with no menu`() {
         show { ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, requestCard = { id, _ -> Text("Request $id") }) }
-        compose.onNodeWithText("Thank you! 💛").performTouchInput { longClick() }
-        node(R.string.chat_copy).performClick()
         val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
+        compose.onNodeWithText("Thank you! 💛").performTouchInput { longClick() }
         compose.waitUntil(5_000) { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "Thank you! 💛" }
+        // No menu or dialog to pick from (#79).
+        compose.onNode(isPopup()).assertDoesNotExist()
+        compose.onNode(isDialog()).assertDoesNotExist()
 
-        // As a screen reader's long-press does it.
-        compose.onAllNodes(SemanticsMatcher("has message options") {
-            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
-        }).onFirst().performSemanticsAction(SemanticsActions.OnLongClick)
-        node(R.string.chat_select_text).performClick()
-        node(R.string.action_close).assertExists()
+        // A screen reader's long-press copies too, and names what it does.
+        compose.onNode(SemanticsMatcher("copies the message") {
+            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_copy_message)
+        } and hasAnyDescendant(hasText("How's the reading going? 📚"))).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.waitUntil(5_000) { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "How's the reading going? 📚" }
         assertAccessible(requireHeading = false)
-        node(R.string.action_close).performClick()
-        node(R.string.action_close).assertDoesNotExist()
     }
 
     @Test
