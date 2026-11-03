@@ -71,8 +71,8 @@ class WeekLimitsJourneyTest : EndToEndTest() {
             waitFor(R.string.limit_editor_updated)
             waitForBackend(limit) { it.has("caps") && it.int("dailyMinutes") == 60 }
             eventually("the cap on this phone") {
-                // Weekdays follow the first day of the week this phone uses.
-                val weekdays = CapTemplates.weekdays(AppGraph.store.weekRule.value.first)
+                // Weekdays are the days outside this phone's region's weekend.
+                val weekdays = CapTemplates.weekdays(CapTemplates.region())
                 AppGraph.store.limits.value.single { it.packageName == pebbles }.caps == listOf(TimeCap(weekdays, 12 * 60, 17 * 60, 30))
             }
             assertTrue("Sam was asked about a stricter limit", samsInbox(sam).isEmpty())
@@ -88,8 +88,8 @@ class WeekLimitsJourneyTest : EndToEndTest() {
             node(R.string.share_commitment_in_meadow).assertDoesNotExist()
             waitForSnackbarToGo(R.string.share_commitment_sent, "Sam")
 
-            // No limit at weekends is looser than an hour a day, so Sam is asked. The editor is still
-            // open after the save, showing the limit as saved.
+            // No limit at weekends is looser than an hour a day, so Sam is asked.
+            openTheLimit()
             node(R.string.limit_editor_days_add).performScrollTo().performClick()
             day("Saturday").performScrollTo().performClick()
             day("Sunday").performScrollTo().performClick()

@@ -63,7 +63,6 @@
     <string name="days_weekends">at weekends</string>
     <string name="days_some">on %1$s</string>
     <string name="limit_editor_hours">Allowed hours</string>
-    <string name="limit_editor_share">Share this commitment</string>
     <string name="schedule_every_day">Every day</string>
     <string name="schedule_per_day">Per weekday</string>
     <string name="schedule_window">%1$s–%2$s</string>

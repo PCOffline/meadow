@@ -27,6 +27,7 @@ import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.limits.MinutesStepper
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotEquals
 import dev.pcoffline.meadow.data.ChangeOutcome
 import dev.pcoffline.meadow.data.TimeCap
@@ -34,6 +35,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertCountEquals
 import dev.pcoffline.meadow.data.Connectivity
+import dev.pcoffline.meadow.ui.limits.DurationChoices
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -106,14 +108,30 @@ class LimitPickersTest : ScreenTest() {
     }
 
     @Test
-    fun `OK gives exactly the length shown`() {
+    fun `picking the minutes gives the length at once, so any length is three taps`() {
         var picked = -1
+        // Tap one: the length.
         openPicker(value = 30) { picked = it }
+        // Tap two: its hours. Tap three: its minutes.
         hour(2).performScrollTo().performClick()
         minute(25).performScrollTo().performClick()
-        compose.onNodeWithText("2h 25m").assertExists()
-        node(R.string.action_ok).performClick()
         assertEquals(2 * 60 + 25, picked)
+    }
+
+    @Test
+    fun `OK gives the length shown, for a change of hours alone`() {
+        var picked = -1
+        openPicker(value = 30) { picked = it }
+        hour(3).performScrollTo().performClick()
+        compose.onNodeWithText("3h 30m").assertExists()
+        node(R.string.action_ok).performClick()
+        assertEquals(3 * 60 + 30, picked)
+    }
+
+    @Test
+    fun `every length from 5 minutes to 16 hours, in steps of 5, can be picked`() {
+        val reachable = DurationChoices.hours(5, 16 * 60).flatMap { h -> DurationChoices.MINUTES.map { h * 60 + it } }.filter { it in 5..16 * 60 }
+        assertEquals((5..16 * 60 step 5).toList(), reachable.sorted())
     }
 
     @Test
@@ -141,29 +159,52 @@ class LimitPickersTest : ScreenTest() {
     fun `templates fill in the days and the hours, and together they make a cap`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 60, weeklyMinutes = 0)))
         node(R.string.limit_editor_cap_add).performScrollTo().performClick()
-        // The week starts where the phone, or the person, says; other tests may have changed it.
-        val first = dev.pcoffline.meadow.AppGraph.store.weekRule.value.first
+        // The weekend is the region's own.
+        val region = CapTemplates.region()
         fun day(n: Int) = compose.onNodeWithContentDescription(java.time.DayOfWeek.of(n).getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()))
         node(R.string.cap_template_weekdays).performClick()
-        CapTemplates.weekdays(first).forEach { day(it).assertIsSelected() }
-        CapTemplates.weekends(first).forEach { day(it).assertIsNotSelected() }
+        CapTemplates.weekdays(region).forEach { day(it).assertIsSelected() }
+        CapTemplates.weekends(region).forEach { day(it).assertIsNotSelected() }
         node(R.string.action_ok).assertIsNotEnabled()
         node(R.string.cap_template_evenings).performClick()
         compose.onNodeWithText(dev.pcoffline.meadow.ui.clockText(17 * 60)).assertExists()
         compose.onNodeWithText(dev.pcoffline.meadow.ui.clockText(22 * 60)).assertExists()
         node(R.string.action_ok).assertIsEnabled()
         node(R.string.cap_template_weekends).performClick()
-        CapTemplates.weekends(first).forEach { day(it).assertIsSelected() }
-        CapTemplates.weekdays(first).forEach { day(it).assertIsNotSelected() }
+        CapTemplates.weekends(region).forEach { day(it).assertIsSelected() }
+        CapTemplates.weekdays(region).forEach { day(it).assertIsNotSelected() }
     }
 
     @Test
-    fun `Share stays in view, greyed out, until the changes are saved`() {
-        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)))
-        node(R.string.limit_editor_share).performScrollTo().assertIsEnabled()
-        compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription, listOf(text(R.string.limit_editor_more))))
-            .onFirst().performClick()
-        node(R.string.limit_editor_share).performScrollTo().assertIsNotEnabled()
+    fun `each region has its own weekend`() {
+        assertEquals(listOf(6, 7), CapTemplates.weekends("US"))
+        assertEquals(listOf(1, 2, 3, 4, 5), CapTemplates.weekdays("US"))
+        assertEquals(listOf(5, 6), CapTemplates.weekends("IL"))
+        assertEquals(listOf(1, 2, 3, 4, 7), CapTemplates.weekdays("IL"))
+        assertEquals(listOf(6, 7), CapTemplates.weekends("DE"))
+    }
+
+    @Test
+    fun `a saved change goes back, and its note offers to share the limit as saved`() {
+        var done = 0
+        compose.setContent {
+            dev.pcoffline.meadow.ui.theme.MeadowTheme {
+                dev.pcoffline.meadow.ui.SnackbarScope {
+                    LimitEditor(
+                        pkg, LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), appName = "Instagram", loaded = true),
+                        onDone = { done++ }, save = { _, _, _ -> ChangeOutcome.APPLIED },
+                    )
+                }
+            }
+        }
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
+        node(R.string.action_save).performScrollTo().performClick()
+        compose.waitUntil(5_000) { done == 1 }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText(text(R.string.share_title))).fetchSemanticsNodes().isNotEmpty() }
+        node(R.string.limit_editor_updated).assertExists()
+        node(R.string.share_title).performClick()
+        assertTrue(dev.pcoffline.meadow.ui.components.ShareCommitment.text.value.orEmpty().contains("Instagram"))
+        dev.pcoffline.meadow.ui.components.ShareCommitment.close()
     }
 
     private fun editorSaving(state: LimitEditorState, outcome: ChangeOutcome, onDone: () -> Unit) = show {
@@ -171,17 +212,6 @@ class LimitPickersTest : ScreenTest() {
             BackTopBar(text(R.string.limit_editor_existing), onBack = {})
             LimitEditor(pkg, state.copy(appName = "Instagram", loaded = true), onDone = onDone, save = { _, _, _ -> outcome })
         }
-    }
-
-    @Test
-    fun `a saved change to a limit keeps the editor open, so it can be shared`() {
-        var done = 0
-        editorSaving(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)), ChangeOutcome.APPLIED) { done++ }
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
-        node(R.string.action_save).performScrollTo().performClick()
-        compose.waitForIdle()
-        assertEquals("still open", 0, done)
-        node(R.string.limit_editor_share).performScrollTo().assertExists()
     }
 
     @Test
@@ -224,8 +254,7 @@ class LimitPickersTest : ScreenTest() {
 
     @Test
     fun `a saved cap opens as it is, with its quick picks lit, and saves unchanged`() {
-        val first = dev.pcoffline.meadow.AppGraph.store.weekRule.value.first
-        val cap = TimeCap(CapTemplates.weekdays(first), 17 * 60, 22 * 60, 45)
+        val cap = TimeCap(CapTemplates.weekdays(CapTemplates.region()), 17 * 60, 22 * 60, 45)
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 60, 0, caps = listOf(cap))))
         compose.onNode(SemanticsMatcher("edits a cap") { it.config.getOrNull(SemanticsActions.OnClick)?.label == text(R.string.limit_editor_cap_edit) }).performScrollTo().performClick()
         node(R.string.cap_template_weekdays).assertIsSelected()

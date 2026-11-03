@@ -405,13 +405,12 @@ internal fun LimitEditor(
         ErrorNote(action.error)
         Button(
             onClick = {
-                var closes = true
-                action.run(onSuccess = { if (closes) onDone() }) {
+                action.run(onSuccess = onDone) {
                     val outcome = save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
-                    closes = closesAfterSave(existing, outcome)
                     if (outcome == ChangeOutcome.APPLIED) {
                         celebrate()
-                        // A commitment just made is the one most worth telling someone about.
+                        // A commitment just made is the one most worth telling someone about: the
+                        // note that says it's saved offers to share it, as saved.
                         val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed))
                         action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared) }
                     } else {
@@ -439,15 +438,6 @@ internal fun LimitEditor(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
-            }
-            // Straight to Android's share sheet: picking where it goes is the only choice to make.
-            // Only the saved limit is shared, so it is greyed out while there are changes.
-            TextButton(
-                onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing))) },
-                enabled = proposed == existing && !action.busy,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Text(stringResource(R.string.limit_editor_share))
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -660,11 +650,3 @@ private const val PRESET_COLUMNS = 3
 
 /** A filter chip's padding either side of its label, with room to spare. */
 private val CHIP_PADDING = 24.dp
-
-/**
- * Whether the editor closes after a save. A change to a limit that applies at once keeps it open,
- * so the saved limit can be shared from it. A new limit goes back to the garden. A question for a
- * Bumblebee closes the editor too.
- */
-internal fun closesAfterSave(existing: AppLimit?, outcome: ChangeOutcome): Boolean =
-    existing == null || outcome != ChangeOutcome.APPLIED

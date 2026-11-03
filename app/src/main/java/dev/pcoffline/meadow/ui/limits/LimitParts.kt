@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -212,8 +213,10 @@ private fun CapDialog(initial: TimeCap?, firstDay: DayOfWeek, onDismiss: () -> U
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.cap_templates), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val weekdays = CapTemplates.weekdays(firstDay)
-                    val weekends = CapTemplates.weekends(firstDay)
+                    // Weekends differ by region: Saturday and Sunday in the US, Friday and Saturday in Israel.
+                    val region = remember { CapTemplates.region() }
+                    val weekdays = CapTemplates.weekdays(region)
+                    val weekends = CapTemplates.weekends(region)
                     TemplateChip(R.string.cap_template_weekdays, days == weekdays) { days = weekdays }
                     TemplateChip(R.string.cap_template_weekends, days == weekends) { days = weekends }
                     CapTemplates.HOURS.forEach { t ->
@@ -264,7 +267,8 @@ private fun CapDialog(initial: TimeCap?, firstDay: DayOfWeek, onDismiss: () -> U
 
 /**
  * A length of time, picked as hours and then minutes in steps of five. Only lengths from [min]
- * to [max] can be picked, and OK gives exactly the length shown.
+ * to [max] can be picked. Picking the minutes gives the length at once, so any length takes three
+ * taps: the length, its hours, its minutes. OK gives the length shown, for a change of hours alone.
  */
 @Composable
 fun DurationDialog(title: String, minutes: Int, min: Int, max: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
@@ -302,7 +306,8 @@ fun DurationDialog(title: String, minutes: Int, min: Int, max: Int, onDismiss: (
                     DurationChoices.MINUTES.forEach { m ->
                         FilterChip(
                             selected = m == minute,
-                            onClick = { minute = m },
+                            // The minutes come last, so they finish the pick.
+                            onClick = { onPick(hour * 60 + m) },
                             enabled = hour * 60 + m in min..max,
                             label = { Text(stringResource(R.string.duration_minutes, m)) },
                         )
@@ -345,9 +350,34 @@ internal object CapTemplates {
     /** Where the clock opens for a cap with no hours yet. */
     const val CLOCK_START = 9 * 60
 
-    /** The five days from [first], as ISO day numbers in order. */
-    fun weekdays(first: DayOfWeek): List<Int> = weekFrom(first).take(5).sorted()
+    /**
+     * The weekend in [region] (a country code, such as "US" or "IL"), as ISO day numbers in order:
+     * Saturday and Sunday in the US, Friday and Saturday in Israel. Android knows each region's.
+     */
+    fun weekends(region: String): List<Int> {
+        val data = runCatching { android.icu.util.Calendar.getWeekDataForRegion(region) }.getOrNull()
+            ?: return listOf(6, 7)
+        return weekendDays(data.weekendOnset, data.weekendCease)
+    }
 
-    /** The two days after the weekdays. */
-    fun weekends(first: DayOfWeek): List<Int> = weekFrom(first).drop(5).sorted()
+    /** The other days of the week in [region]. */
+    fun weekdays(region: String): List<Int> = (1..7).filter { it !in weekends(region) }
+
+    /**
+     * The days from [onset] to [cease] (as `java.util.Calendar` numbers: 1 is Sunday), as ISO day
+     * numbers (1 is Monday) in order. A weekend can wrap past the end of the week.
+     */
+    fun weekendDays(onset: Int, cease: Int): List<Int> {
+        val iso = { calendarDay: Int -> if (calendarDay == 1) 7 else calendarDay - 1 }
+        val days = mutableListOf(iso(onset))
+        var day = onset
+        while (day != cease) {
+            day = day % 7 + 1
+            days += iso(day)
+        }
+        return days.sorted()
+    }
+
+    /** This phone's region, for [weekends] and [weekdays]. */
+    fun region(): String = java.util.Locale.getDefault().country.ifBlank { "001" }
 }

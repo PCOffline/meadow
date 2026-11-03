@@ -231,13 +231,9 @@ class LimitFlowTest : ScreenTest() {
     }
 
     @Test
-    fun `a limit is shared as saved, so sharing waits until changes are saved`() {
+    fun `the editor has no Share button, as the note that says it's saved shares the limit`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)))
-        node(R.string.limit_editor_share).performScrollTo().assertIsEnabled()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick()
-        node(R.string.limit_editor_share).performScrollTo().assertIsNotEnabled()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
-        node(R.string.limit_editor_share).performScrollTo().assertIsEnabled()
+        compose.onAllNodes(hasText("Share", substring = true)).assertCountEquals(0)
     }
 
     @Test
