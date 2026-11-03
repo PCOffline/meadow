@@ -5,6 +5,8 @@ package dev.pcoffline.meadow.ui.limits
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -309,6 +311,8 @@ internal fun LimitEditor(
     sendTo: (suspend (AppLimit) -> Unit)? = null,
     // A copy for an app that isn't on this phone: it says so, and saves nothing.
     notHere: Boolean = false,
+    // Tests pass their own; the app saves through the limits repository.
+    save: suspend (limit: AppLimit, message: String, approverIds: List<String>?) -> ChangeOutcome = AppGraph.limits::save,
 ) {
     val existing = state.existing
     val from = start ?: existing
@@ -456,10 +460,11 @@ internal fun LimitEditor(
         Button(
             onClick = {
                 action.run(onSuccess = onDone) {
-                    val outcome = AppGraph.limits.save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
+                    val outcome = save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
                     if (outcome == ChangeOutcome.APPLIED) {
                         celebrate()
-                        // A commitment just made is the one most worth telling someone about.
+                        // A commitment just made is the one most worth telling someone about: the
+                        // note that says it's saved offers to share it, as saved.
                         val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed))
                         action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared, proposed) }
                     } else {
@@ -487,17 +492,6 @@ internal fun LimitEditor(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(if (hasBees) R.string.limit_editor_ask_remove else R.string.limit_editor_remove))
-            }
-            // Straight to Android's share sheet: picking where it goes is the only choice to make.
-            // Only the saved limit is shared, so it waits while there are changes; saving them
-            // offers to share the new one.
-            if (proposed == existing) {
-                TextButton(
-                    onClick = { ShareCommitment.open(res.getString(R.string.share_limit, existing.appName, res.limitText(existing)), existing) },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) {
-                    Text(stringResource(R.string.limit_editor_share))
-                }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -575,8 +569,8 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChang
 }
 
 /**
- * A length of time with − and + either side. With a [label], tapping the time opens a clock to
- * pick it straight away, for any length under a day.
+ * A length of time with − and + either side. With a [label], tapping the time opens a picker of
+ * hours and minutes, in steps of 5, for any length under a day.
  */
 @Composable
 internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: Boolean, label: String? = null, onChange: (Int) -> Unit) {
@@ -603,9 +597,18 @@ internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: 
             textAlign = TextAlign.Center,
             maxLines = 1,
             color = if (clock && enabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            // A rounded, tinted button like the − and + beside it, so it reads as one to tap.
             modifier = Modifier.padding(horizontal = 8.dp)
-                .then(if (clock) Modifier.clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true } else Modifier)
-                .padding(horizontal = 8.dp, vertical = 4.dp).widthIn(min = widest),
+                .then(
+                    if (clock) {
+                        Modifier.clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f))
+                            .clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true }
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = 12.dp, vertical = 4.dp).widthIn(min = widest),
         )
         RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = enabled && value < max) {
             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))

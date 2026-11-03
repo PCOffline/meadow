@@ -63,7 +63,6 @@
     <string name="days_weekends">at weekends</string>
     <string name="days_some">on %1$s</string>
     <string name="limit_editor_hours">Allowed hours</string>
-    <string name="limit_editor_share">Share this commitment</string>
     <string name="schedule_every_day">Every day</string>
     <string name="schedule_per_day">Per weekday</string>
     <string name="schedule_window">%1$s–%2$s</string>
@@ -85,7 +84,7 @@
     <string name="schedule_days_differ">These days have different hours now. A change gives them all the same hours.</string>
     <string name="schedule_days_allowed">Allowed on these days</string>
     <string name="schedule_pick_day">Set the hours of %1$s</string>
-    <string name="limit_editor_pick_time">Pick on a clock</string>
+    <string name="limit_editor_pick_time">Pick the length</string>
     <string name="limit_editor_days_own">Days with their own limit</string>
     <string name="limit_editor_days_add">Different on some days</string>
     <string name="limit_editor_days_remove">Remove these days</string>
@@ -98,6 +97,20 @@
     <string name="limit_editor_cap_title">Cap within hours</string>
     <string name="limit_editor_cap_minutes">Up to</string>
     <string name="limit_editor_cap_pick_days">Choose one or more days.</string>
+    <string name="limit_editor_cap_pick_hours">Choose the start and the end.</string>
+    <string name="cap_start">Start</string>
+    <string name="cap_end">End</string>
+    <string name="cap_pick_start">Choose when it starts</string>
+    <string name="cap_pick_end">Choose when it ends</string>
+    <string name="cap_templates">Quick picks</string>
+    <string name="cap_template_weekdays">Weekdays</string>
+    <string name="cap_template_weekends">Weekends</string>
+    <string name="cap_template_mornings">Mornings</string>
+    <string name="cap_template_afternoons">Afternoons</string>
+    <string name="cap_template_evenings">Evenings</string>
+    <string name="cap_template_bedtime">Bedtime</string>
+    <string name="duration_picker_hours">Hours</string>
+    <string name="duration_picker_minutes">Minutes</string>
     <string name="limit_editor_cap_too_long">A cap must be shorter than its hours.</string>
     <!-- Sharing, copying and suggesting limits (#93) -->
     <string name="limit_card_shared">Shared limit</string>

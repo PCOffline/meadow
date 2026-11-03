@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.isNightHour
 import dev.pcoffline.meadow.ui.theme.butterfliesFor
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
@@ -144,6 +145,9 @@ fun rememberResumedNow(): LocalDateTime {
     return now
 }
 
+/** How long the smaller of the theme's two butterflies is drawn, in dp. */
+internal const val SMALL_BUTTERFLY_DP = 9.5f
+
 /** Pins the sky to an hour of the day (screenshots); null follows the clock. */
 val LocalSkyHour = androidx.compose.runtime.staticCompositionLocalOf<Int?> { null }
 
@@ -168,7 +172,8 @@ private fun rememberLiveWeather(): Weather? {
 }
 
 /**
- * The sky follows the clock: peach mornings, pale-blue days, lavender evenings, starry nights.
+ * The sky follows the clock: peach mornings, pale-blue days, lavender evenings. On a dark page
+ * it is a starry night at every hour (see [baseSky]).
  * With the weather on, clouds, rain and snow grey it a little.
  */
 @Composable
@@ -185,27 +190,42 @@ fun rememberSkyMood(): SkyMood {
         in 17..21 -> R.string.greeting_evening
         else -> R.string.greeting_night
     }
-    val ink = Color(0xFF3E3A32)
-    val base = when {
-        dark || hour !in 5..20 -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
-        hour <= 10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
-        hour <= 16 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
-        else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
-    }.under(weather)
+    val base = baseSky(hour, dark, greeting).under(weather)
     // The sky takes on the theme's colour and fades into the page below it. By day that's the
     // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
-        progress = skyProgress(hour, minute),
+        progress = celestialProgress(hour, minute, base.night),
         top = if (base.night) {
             androidx.compose.ui.graphics.lerp(base.top, scheme.primary, 0.10f)
         } else {
             tinted(base.top, Garden.colors)
         },
-        // A night sky over a light page keeps its own colours, so its light text stays readable.
-        bottom = if (base.night && !dark) base.bottom else androidx.compose.ui.graphics.lerp(base.bottom, scheme.background, 0.6f),
+        bottom = androidx.compose.ui.graphics.lerp(base.bottom, scheme.background, 0.6f),
     )
 }
+
+/**
+ * The sky's own colours at [hour], before the theme and the weather tint them. The page's dark
+ * mode decides day or night, so the sky and the cards always agree (#74): a dark page has the
+ * night sky; a light page has the morning, afternoon or evening sky, and the evening sky by night.
+ */
+internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int): SkyMood {
+    val ink = Color(0xFF3E3A32)
+    return when {
+        dark -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
+        hour in 5..10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
+        hour in 11..16 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
+        else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
+    }
+}
+
+/**
+ * How far along its arc the sun or moon is. A night sky uses the moon's timing. A day sky after
+ * 21:00 (a light page at night) keeps the sun set at the end of its arc, so it does not rise again.
+ */
+internal fun celestialProgress(hour: Int, minute: Int, night: Boolean): Float =
+    if (night || !isNightHour(hour)) skyProgress(hour, minute) else 1f
 
 /**
  * How far across the sky the sun is at [hour]:[minute], from 0 as it rises at 5:00 to 1 as it sets
@@ -213,7 +233,7 @@ fun rememberSkyMood(): SkyMood {
  */
 internal fun skyProgress(hour: Int, minute: Int): Float {
     val t = hour + minute / 60f
-    return if (hour in 5..20) (t - 5f) / 16f else ((t - 21f + 24f) % 24f) / 8f
+    return if (!isNightHour(hour)) (t - 5f) / 16f else ((t - 21f + 24f) % 24f) / 8f
 }
 
 /**
@@ -315,7 +335,7 @@ fun SkyScene(
                 else -> {
                     // The theme's two butterflies, the smaller one further off and higher up.
                     val below = clearAbove.coerceIn(0f, 0.6f)
-                    flutter(butterflies[1], t, seed = 2.1f, lane = below + (1f - below) * 0.38f, length = 9.5.dp.toPx(), speed = 0.11f)
+                    flutter(butterflies[1], t, seed = 2.1f, lane = below + (1f - below) * 0.38f, length = SMALL_BUTTERFLY_DP.dp.toPx(), speed = 0.11f)
                     flutter(butterflies[0], t, seed = 0.4f, lane = below + (1f - below) * 0.52f, length = 13.dp.toPx(), speed = 0.14f)
                 }
             }

@@ -11,10 +11,8 @@
         <item quantity="one">Sending a picture…</item>
         <item quantity="other">Sending %1$d pictures…</item>
     </plurals>
-    <string name="chat_message_options">Message options</string>
-    <string name="chat_copy">Copy</string>
+    <string name="chat_copy_message">Copy message</string>
     <string name="chat_copied">Message copied</string>
-    <string name="chat_select_text">Select text</string>
     <string name="action_close">Close</string>
     <string name="chat_ask_bee">Ask %1$s to be your Bumblebee</string>
     <string name="chat_offer_bee">Offer to be %1$s\'s Bumblebee</string>

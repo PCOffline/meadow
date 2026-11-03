@@ -231,13 +231,9 @@ class LimitFlowTest : ScreenTest() {
     }
 
     @Test
-    fun `a limit is shared as saved, so sharing waits until changes are saved`() {
+    fun `the editor has no Share button, as the note that says it's saved shares the limit`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)))
-        node(R.string.limit_editor_share).performScrollTo().assertExists()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick()
-        node(R.string.limit_editor_share).assertDoesNotExist()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
-        node(R.string.limit_editor_share).performScrollTo().assertExists()
+        compose.onAllNodes(hasText("Share", substring = true)).assertCountEquals(0)
     }
 
     @Test
@@ -334,11 +330,13 @@ class LimitFlowTest : ScreenTest() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 60, weeklyMinutes = 0), bumblebeeCount = 1))
         node(R.string.limit_editor_cap_add).performScrollTo().performClick()
         node(R.string.limit_editor_cap_title).assertExists()
-        // Weekdays, 10:00–16:00 and 30 minutes to start with.
-        listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday").forEach { chip(it).assertIsSelected().performClick() }
+        // Nothing picked to start with.
         node(R.string.limit_editor_cap_pick_days).assertExists()
         node(R.string.action_ok).assertIsNotEnabled()
         chip("Monday").performClick()
+        node(R.string.limit_editor_cap_pick_hours).assertExists()
+        node(R.string.action_ok).assertIsNotEnabled()
+        node(R.string.cap_template_afternoons).performClick()
         node(R.string.action_ok).assertIsEnabled().performClick()
         compose.onNodeWithText("Up to 30m", substring = true).performScrollTo().assertExists()
         compose.onNodeWithText(text(R.string.days_some, "Mon"), substring = true, ignoreCase = true).assertExists()
@@ -363,16 +361,18 @@ class LimitFlowTest : ScreenTest() {
         compose.onNodeWithText(text(R.string.limit_editor_daily)).performClick()
         node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
         node(R.string.limit_editor_cap_add).performScrollTo().performClick()
+        node(R.string.cap_template_weekdays).performClick()
+        node(R.string.cap_template_evenings).performClick()
         node(R.string.action_ok).performClick()
         node(R.string.limit_editor_plant).performScrollTo().assertIsEnabled()
         node(R.string.limit_editor_pick_one).assertDoesNotExist()
     }
 
     @Test
-    fun `the daily limit can be picked on a clock`() {
+    fun `the daily limit can be picked as hours and minutes`() {
         editor(LimitEditorState())
         val pick = text(R.string.limit_editor_pick_time)
-        compose.onAllNodes(SemanticsMatcher("opens a clock") { it.config.getOrNull(SemanticsActions.OnClick)?.label == pick })
+        compose.onAllNodes(SemanticsMatcher("opens the length picker") { it.config.getOrNull(SemanticsActions.OnClick)?.label == pick })
             .onFirst().performClick()
         // The dialog is titled with what it sets, and keeps the value when confirmed.
         compose.onAllNodesWithText(text(R.string.limit_editor_daily)).assertCountEquals(2)

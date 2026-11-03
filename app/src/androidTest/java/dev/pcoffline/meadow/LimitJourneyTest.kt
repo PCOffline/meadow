@@ -101,16 +101,18 @@ class LimitJourneyTest : EndToEndTest() {
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.limit_editor_updated)
             waitForBackend(limit) { it.int("weeklyMinutes") == 0 && it.int("dailyMinutes") == 45 }
-            waitForSnackbarToGo(R.string.limit_editor_updated)
 
-            // Sharing the commitment hands its words to the share sheet.
-            compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
-            node(R.string.limit_editor_share).performScrollTo().performClick()
-            waitFor(R.string.share_commitment_title)
+            // The editor closes, and the note that says it's saved shares the commitment: its
+            // words go to the share sheet.
+            node(R.string.share_title).performClick()
+            waitFor(R.string.share_commitment_other_apps)
             node(R.string.share_commitment_other_apps).performClick()
             // The limit as it is now: the weekly part shared earlier is gone.
             val now = allOf(containsString("on Pebbles with Meadow"), not(containsString(weekly)))
             intended(allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, now))))
+            waitForSnackbarToGo(R.string.limit_editor_updated)
+            compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
+            waitFor(R.string.limit_editor_existing)
 
             // With nobody to ask, removing is immediate.
             node(R.string.limit_editor_remove).performScrollTo().performClick()
