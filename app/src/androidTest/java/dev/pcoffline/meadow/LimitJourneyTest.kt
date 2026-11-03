@@ -110,7 +110,8 @@ class LimitJourneyTest : EndToEndTest() {
                 compose.onAllNodes(hasText(text(R.string.limit_editor_share)) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
             }
             node(R.string.limit_editor_share).performScrollTo().performClick()
-            waitFor(R.string.share_commitment_title)
+            // The sheet, found by its own choice: its title is also the Share button's words.
+            waitFor(R.string.share_commitment_other_apps)
             node(R.string.share_commitment_other_apps).performClick()
             // The limit as it is now: the weekly part shared earlier is gone.
             val now = allOf(containsString("on Pebbles with Meadow"), not(containsString(weekly)))

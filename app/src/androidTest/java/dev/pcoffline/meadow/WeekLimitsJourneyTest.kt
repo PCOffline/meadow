@@ -78,13 +78,14 @@ class WeekLimitsJourneyTest : EndToEndTest() {
             assertTrue("Sam was asked about a stricter limit", samsInbox(sam).isEmpty())
 
             // The note that says it's saved shares it, straight into the chat with Sam.
+            // The open editor's Share button has the sheet's title as its words, so the sheet is
+            // found by its own choices.
             node(R.string.share_title).performClick()
-            waitFor(R.string.share_commitment_title)
-            node(R.string.share_commitment_in_meadow).assertExists()
+            waitFor(R.string.share_commitment_in_meadow)
             compose.onNode(hasText("Sam") and hasClickAction()).performClick()
             waitForText(text(R.string.share_commitment_sent, "Sam"))
             waitForBackendDocs("chats/$chat/messages") { messages -> messages.any { "Pebbles" in it.string("text").orEmpty() } }
-            node(R.string.share_commitment_title).assertDoesNotExist()
+            node(R.string.share_commitment_in_meadow).assertDoesNotExist()
             waitForSnackbarToGo(R.string.share_commitment_sent, "Sam")
 
             // No limit at weekends is looser than an hour a day, so Sam is asked. The editor is still
