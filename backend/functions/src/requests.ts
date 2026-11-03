@@ -408,30 +408,40 @@ function writeLimit(tx: Transaction, ref: DocumentReference, snap: DocumentSnaps
   }, { merge: true });
 }
 
+/** A suggestion can be applied for this long after it was sent: it is about the limit as it was then. */
+export const SUGGESTION_TTL_MS = 7 * 24 * 60 * 60_000;
+
 /**
  * Applies a limit one of the caller's Bumblebees suggested in their chat, as it was sent. The
- * Bumblebee's suggestion is the approval a change needs, so it applies even when looser. Any
- * other suggestion goes through the phone's usual save, with the usual rules.
+ * Bumblebee's suggestion is the approval a change needs, so it applies even when looser. Like an
+ * approval, it applies once, and only for [SUGGESTION_TTL_MS] after it was sent. Any other
+ * suggestion goes through the phone's usual save, with the usual rules.
  */
 export const applyLimitSuggestion = onCall(async (call) => {
   const uid = requireAuth(call);
   const input = parse(ApplySuggestionInput, call.data);
   const chatRef = chats().doc(input.chatId);
   const messageRef = chatRef.collection("messages").doc(input.messageId);
+  const appliedRef = users().doc(uid).collection("appliedSuggestions").doc(`${input.chatId}_${input.messageId}`);
   await db().runTransaction(async (tx) => {
-    const [chat, message] = await Promise.all([tx.get(chatRef), tx.get(messageRef)]);
+    const [chat, message, applied] = await Promise.all([tx.get(chatRef), tx.get(messageRef), tx.get(appliedRef)]);
     const participants = (chat.get("participants") as string[] | undefined) ?? [];
     const sender = message.get("senderId");
     const ok = chat.exists && message.exists && chat.get("closed") !== true && participants.includes(uid)
       && message.get("kind") === "limit" && message.get("mode") === "suggested"
       && typeof sender === "string" && sender !== uid && participants.includes(sender);
     if (!ok) throw new HttpsError("failed-precondition", errors.notASuggestion);
+    if (applied.exists) throw new HttpsError("failed-precondition", errors.suggestionUsed);
+    const sentAt = (message.get("createdAt") as Timestamp | undefined)?.toMillis() ?? 0;
+    if (Date.now() - sentAt > SUGGESTION_TTL_MS) throw new HttpsError("failed-precondition", errors.suggestionOld);
     const limit = LimitCardSchema.safeParse(message.get("limit"));
     if (!limit.success) throw new HttpsError("failed-precondition", errors.notASuggestion);
     const me = await loadPerson(uid, tx);
     if (!me.account.approverIds.includes(sender)) throw new HttpsError("permission-denied", errors.notYourBumblebee);
     const ref = users().doc(uid).collection("limits").doc(limit.data.packageName);
-    writeLimit(tx, ref, await tx.get(ref), limit.data);
+    const snap = await tx.get(ref);
+    writeLimit(tx, ref, snap, limit.data);
+    tx.set(appliedRef, { chatId: input.chatId, messageId: input.messageId, by: sender, at: FieldValue.serverTimestamp() });
   });
   return { ok: true };
 });

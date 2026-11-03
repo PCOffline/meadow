@@ -86,15 +86,26 @@ fun onThisPhone(packageName: String, installed: Set<String>): Boolean = Sites.is
 /**
  * Saves a suggested limit. From one of my Bumblebees ([fromBumblebee]), it is their approval, and the
  * backend saves it. From anyone else, it is saved as I would save it myself: a looser one asks.
+ * Either way it keeps my name for the app ([myName]): the sender's name is only theirs.
  */
-suspend fun applySuggested(chatId: String, message: ChatMessage, fromBumblebee: Boolean): ChangeOutcome {
+suspend fun applySuggested(
+    chatId: String,
+    message: ChatMessage,
+    fromBumblebee: Boolean,
+    myName: String,
+    applyAsApproval: suspend (chatId: String, messageId: String) -> Unit = { c, m -> AppGraph.limits.applySuggestion(c, m) },
+    save: suspend (AppLimit) -> ChangeOutcome = { AppGraph.limits.save(it) },
+): ChangeOutcome {
     val limit = message.limit ?: return ChangeOutcome.APPLIED
     if (fromBumblebee) {
-        AppGraph.limits.applySuggestion(chatId, message.id)
+        applyAsApproval(chatId, message.id)
         return ChangeOutcome.APPLIED
     }
-    return AppGraph.limits.save(limit)
+    return save(limit.copy(appName = myName))
 }
+
+/** The name to show for [limit]'s app: this phone's own when the app is here, else the name it came with. */
+fun localName(limit: AppLimit, onPhone: Boolean): String = if (onPhone && !Sites.isSite(limit.packageName)) AppGraph.catalog.label(limit.packageName) else limit.appName
 
 /**
  * A limit card in a chat: which app, the whole limit, and what can be done with it. Only the
@@ -128,10 +139,12 @@ private fun LimitCardContent(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.secondary,
         )
+        // This phone's name for the app, when it's here, not one the sender typed.
+        val name = remember(limit) { localName(limit, onThisPhone(limit.packageName, AppGraph.catalog.launchablePackages())) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppIcon(limit.packageName, size = 32.dp)
             Spacer(Modifier.width(10.dp))
-            Text(limit.appName, style = MaterialTheme.typography.titleMedium)
+            Text(name, style = MaterialTheme.typography.titleMedium)
         }
         Text(limitText(limit), style = MaterialTheme.typography.bodyMedium)
         if (mine) return@Column
@@ -153,14 +166,15 @@ private fun ApplyButtons(chatId: String, message: ChatMessage, limit: AppLimit, 
     val applied = stringResource(R.string.limit_apply_done, limit.appName)
     val asked = stringResource(R.string.limit_editor_requested)
     val notOnPhone = stringResource(R.string.limit_apply_not_on_phone, limit.appName)
+    val current = limits.firstOrNull { it.packageName == limit.packageName }
     fun apply() = action.run {
-        val outcome = applySuggested(chatId, message, fromBumblebee)
+        val name = current?.appName ?: localName(limit, onThisPhone(limit.packageName, AppGraph.catalog.launchablePackages()))
+        val outcome = applySuggested(chatId, message, fromBumblebee, name)
         action.toast(if (outcome == ChangeOutcome.APPLIED) applied else asked)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
-                val current = limits.firstOrNull { it.packageName == limit.packageName }
                 when (val next = ApplyStep.of(limit, current, onThisPhone(limit.packageName, AppGraph.catalog.launchablePackages()))) {
                     ApplyStep.NotOnPhone -> action.toast(notOnPhone)
                     ApplyStep.Apply -> apply()
@@ -181,6 +195,7 @@ private fun ApplyButtons(chatId: String, message: ChatMessage, limit: AppLimit, 
             title = { Text(stringResource(R.string.limit_apply_title)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(confirm.current.appName, style = MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.limit_apply_now), style = MaterialTheme.typography.titleSmall)
                     Text(res.limitText(confirm.current), style = MaterialTheme.typography.bodyMedium)
                     Text(stringResource(R.string.limit_apply_after), style = MaterialTheme.typography.titleSmall)

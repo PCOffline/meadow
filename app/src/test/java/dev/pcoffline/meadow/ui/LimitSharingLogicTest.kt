@@ -10,6 +10,8 @@ import dev.pcoffline.meadow.data.limitOrNull
 import dev.pcoffline.meadow.ui.limits.ApplyStep
 import dev.pcoffline.meadow.ui.limits.LimitTemplate
 import dev.pcoffline.meadow.ui.limits.onThisPhone
+import dev.pcoffline.meadow.ui.limits.applySuggested
+import dev.pcoffline.meadow.data.ChangeOutcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -69,4 +71,31 @@ class LimitSharingLogicTest {
         assertTrue(onThisPhone("com.instagram.android", setOf("com.instagram.android")))
         assertFalse(onThisPhone("com.instagram.android", setOf("com.other")))
     }
+
+    private fun suggested(limit: AppLimit) = dev.pcoffline.meadow.data.ChatMessage(
+        "m1", "bee", "", dev.pcoffline.meadow.data.MessageKind.LIMIT, null, 0L, pending = false, limit = limit, limitMode = LimitCardMode.SUGGESTED,
+    )
+
+    @Test
+    fun `a Bumblebee's suggestion goes to the backend as their approval`() = kotlinx.coroutines.runBlocking {
+        val approvals = mutableListOf<Pair<String, String>>()
+        val saved = mutableListOf<AppLimit>()
+        val outcome = applySuggested("chat", suggested(full), fromBumblebee = true, myName = "Insta",
+            applyAsApproval = { c, m -> approvals += c to m }, save = { saved += it; ChangeOutcome.APPLIED })
+        assertEquals(ChangeOutcome.APPLIED, outcome)
+        assertEquals(listOf("chat" to "m1"), approvals)
+        assertTrue(saved.isEmpty())
+    }
+
+    @Test
+    fun `anyone else's suggestion is saved the usual way, under my name for the app`() = kotlinx.coroutines.runBlocking {
+        val approvals = mutableListOf<Pair<String, String>>()
+        val saved = mutableListOf<AppLimit>()
+        val outcome = applySuggested("chat", suggested(full.copy(appName = "Calculator")), fromBumblebee = false, myName = "Instagram",
+            applyAsApproval = { c, m -> approvals += c to m }, save = { saved += it; ChangeOutcome.REQUESTED })
+        assertEquals(ChangeOutcome.REQUESTED, outcome)
+        assertTrue(approvals.isEmpty())
+        assertEquals(listOf(full), saved)
+    }
+
 }

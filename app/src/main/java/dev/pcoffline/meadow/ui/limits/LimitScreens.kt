@@ -264,13 +264,17 @@ fun LimitEditorScreen(
     onChangeApp: (() -> Unit)? = null,
     viewModel: LimitEditorViewModel = viewModel(key = "limit-$packageName") { LimitEditorViewModel(packageName) },
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val loaded by viewModel.state.collectAsStateWithLifecycle()
+    // A copy of a limit for an app that isn't here keeps its own name, and can't be saved until
+    // another app is chosen.
+    val notHere = start != null && remember(packageName) { !onThisPhone(packageName, AppGraph.catalog.launchablePackages()) }
+    val state = if (notHere && start != null) loaded.copy(appName = start.appName) else loaded
     Column(Modifier.fillMaxSize()) {
         BackTopBar(
             stringResource(if (state.existing == null) R.string.limit_editor_new else R.string.limit_editor_existing),
             onBack = onDone,
         )
-        if (state.loaded) LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp) else Loading()
+        if (state.loaded) LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp, notHere = notHere) else Loading()
     }
 }
 
@@ -280,6 +284,7 @@ fun LimitEditorScreen(
  */
 @Composable
 fun SuggestLimitScreen(chatId: String, packageName: String, appName: String, start: AppLimit?, onDone: () -> Unit) {
+    val res = LocalResources.current
     Column(Modifier.fillMaxSize()) {
         BackTopBar(stringResource(R.string.limit_suggest_title), onBack = onDone)
         LimitEditor(
@@ -287,7 +292,7 @@ fun SuggestLimitScreen(chatId: String, packageName: String, appName: String, sta
             LimitEditorState(appName = appName, loaded = true),
             onDone,
             start = start,
-            sendTo = { AppGraph.chats.sendLimit(chatId, it, LimitCardMode.SUGGESTED) },
+            sendTo = { AppGraph.chats.sendLimit(chatId, it, LimitCardMode.SUGGESTED, res.getString(R.string.limit_card_suggested_words, it.appName)) },
         )
     }
 }
@@ -302,6 +307,8 @@ internal fun LimitEditor(
     onChangeApp: (() -> Unit)? = null,
     // Set when suggesting: Send gives the limit to this, and nothing is saved here.
     sendTo: (suspend (AppLimit) -> Unit)? = null,
+    // A copy for an app that isn't on this phone: it says so, and saves nothing.
+    notHere: Boolean = false,
 ) {
     val existing = state.existing
     val from = start ?: existing
@@ -376,6 +383,7 @@ internal fun LimitEditor(
             )
         }
         if (Sites.isSite(packageName)) Hint(stringResource(R.string.limit_editor_site_browsers))
+        if (notHere) Hint(stringResource(R.string.limit_apply_not_on_phone, state.appName))
         // Copying over a limit that's already here.
         if (start != null && existing != null && !suggesting) {
             Hint(stringResource(R.string.limit_copy_replaces, existing.appName))
@@ -411,11 +419,9 @@ internal fun LimitEditor(
             CapsEditor(caps, week.first, editable) { capsJson = ScheduleJson.encodeToString(CapsSerializer, it) }
         }
 
-        if (suggesting) {
-            // Nothing else here: no question is open, and nothing is saved on this phone.
-        } else if (waiting != null) {
+        if (waiting != null && !suggesting) {
             PendingCard(waiting, action)
-        } else if (needsApproval) {
+        } else if (needsApproval && !suggesting) {
             MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
                 Text(stringResource(R.string.limit_editor_loosens_title), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
@@ -461,7 +467,7 @@ internal fun LimitEditor(
                     }
                 }
             },
-            enabled = editable && anyLimitOn && proposed != existing && !(needsApproval && askBlocked) && (online || !needsConnection),
+            enabled = editable && !notHere && anyLimitOn && proposed != existing && !(needsApproval && askBlocked) && (online || !needsConnection),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
             Text(

@@ -325,15 +325,36 @@ service cloud.firestore {
             && request.resource.data.height is int && request.resource.data.height > 0 && request.resource.data.height <= 8192
             && request.resource.data.gif is bool;
         }
-        // A limit card: a limit shared as it is, or one suggested to the other person.
+        // A day's allowed hours on a card: a short list (rules can't look inside each window).
+        function shortDay(s, day) {
+          return !(day in s) || (s[day] is list && s[day].size() <= 6);
+        }
+        function boundedSchedule(s) {
+          return s == null || (shortDay(s, '1') && shortDay(s, '2') && shortDay(s, '3') && shortDay(s, '4')
+            && shortDay(s, '5') && shortDay(s, '6') && shortDay(s, '7'));
+        }
+        function someDayLimit(m) {
+          return m != null && (m.get('1', 0) > 0 || m.get('2', 0) > 0 || m.get('3', 0) > 0 || m.get('4', 0) > 0
+            || m.get('5', 0) > 0 || m.get('6', 0) > 0 || m.get('7', 0) > 0);
+        }
+        // A card's limit holds something back, as the backend's check does.
+        function cardHoldsALimit(l) {
+          return l.dailyMinutes > 0 || l.weeklyMinutes > 0 || l.get('schedule', null) != null
+            || someDayLimit(l.get('dayMinutes', null)) || l.get('caps', []).size() > 0;
+        }
+        // A limit card: a limit shared as it is, or one suggested to the other person. Its words
+        // ("Shared a limit for Instagram") are for app versions that can't show a card.
         function limitMessage() {
-          return request.resource.data.keys().hasOnly(['senderId', 'kind', 'createdAt', 'mode', 'limit'])
+          return request.resource.data.keys().hasOnly(['senderId', 'kind', 'createdAt', 'mode', 'limit', 'text'])
             && request.resource.data.kind == 'limit'
             && request.resource.data.mode in ['shared', 'suggested']
+            && isString(request.resource.data.get('text', ''), 200)
             && request.resource.data.limit is map
             && request.resource.data.limit.packageName is string
             && !('createdAt' in request.resource.data.limit) && !('updatedAt' in request.resource.data.limit)
-            && validLimit(request.resource.data.limit, request.resource.data.limit.packageName);
+            && validLimit(request.resource.data.limit, request.resource.data.limit.packageName)
+            && boundedSchedule(request.resource.data.limit.get('schedule', null))
+            && cardHoldsALimit(request.resource.data.limit);
         }
         allow create: if participant() && isOpen()
           && request.resource.data.senderId == me()

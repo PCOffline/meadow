@@ -78,5 +78,6 @@ test("a chat push says the words, a picture, or which app a limit card is for", 
   assert.equal(pushText({ kind: "limit", mode: "shared", limit: { appName: "Instagram" } }), "Shared a limit for Instagram");
   assert.equal(pushText({ kind: "limit", mode: "suggested", limit: { appName: "Instagram" } }), "Suggested a limit for Instagram");
   assert.equal(pushText({ kind: "limit", mode: "suggested", limit: { packageName: "com.instagram.android" } }), "Suggested a limit for com.instagram.android");
-  assert.equal(pushText({ kind: "limit", mode: "shared" }), "Shared a limit for ");
+  assert.equal(pushText({ kind: "limit", mode: "shared" }), "Shared a limit");
+  assert.equal(pushText({ kind: "limit", mode: "suggested" }), "Suggested a limit");
 });

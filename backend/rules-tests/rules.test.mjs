@@ -500,7 +500,16 @@ describe("chats", () => {
     await assertFails(addDoc(messages, { ...card, limit: { ...limit, packageName: "../x" } }));
     await assertFails(addDoc(messages, { ...card, limit: { ...limit, createdAt: serverTimestamp() } }));
     await assertFails(addDoc(messages, { ...card, limit: "Instagram, 30m" }));
-    await assertFails(addDoc(messages, { ...card, text: "words too" }));
+    // Words for older app versions, but not many.
+    await assertSucceeds(addDoc(messages, { ...card, text: "Suggested a limit for Instagram" }));
+    await assertFails(addDoc(messages, { ...card, text: "x".repeat(201) }));
+    // A card that holds nothing back, or allowed hours too long to be real.
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0, caps: [] } }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0, dayMinutes: { 6: 0 } } }));
+    await assertSucceeds(addDoc(messages, { ...card, limit: { ...limit, dailyMinutes: 0, dayMinutes: { 6: 60 } } }));
+    const day = Array.from({ length: 7 }, (_, i) => ({ from: i * 60, to: i * 60 + 30 }));
+    await assertFails(addDoc(messages, { ...card, limit: { ...limit, schedule: { 1: day } } }));
+    await assertSucceeds(addDoc(messages, { ...card, limit: { ...limit, schedule: { 1: day.slice(0, 6) } } }));
     await assertFails(addDoc(messages, { ...card, senderId: "bee" }));
     await assertFails(addDoc(collection(as("stranger"), "chats/bee_sam/messages"), { ...card, senderId: "stranger" }));
   });

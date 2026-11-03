@@ -102,6 +102,8 @@
     <!-- Sharing, copying and suggesting limits (#93) -->
     <string name="limit_card_shared">Shared limit</string>
     <string name="limit_card_suggested">Suggested limit</string>
+    <string name="limit_card_shared_words">Shared a limit for %1$s</string>
+    <string name="limit_card_suggested_words">Suggested a limit for %1$s</string>
     <string name="limit_menu_hint">Tap a limit for more</string>
     <string name="limit_menu_open">More for %1$s</string>
     <string name="limit_menu_copy">Copy this limit</string>

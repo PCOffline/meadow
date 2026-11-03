@@ -115,7 +115,11 @@ private fun ShareCommitmentSheet(text: String, limit: AppLimit?, onDismiss: () -
                 action.run(successMessage = sent, onSuccess = onDismiss) {
                     val chatId = ChatRepository.chatIdFor(uid, person.uid)
                     // In Meadow, a limit goes as a card they can copy; other apps get the words.
-                    if (limit != null) AppGraph.chats.sendLimit(chatId, limit, LimitCardMode.SHARED) else AppGraph.chats.send(chatId, text)
+                    if (limit != null) {
+                        AppGraph.chats.sendLimit(chatId, limit, LimitCardMode.SHARED, context.getString(R.string.limit_card_shared_words, limit.appName))
+                    } else {
+                        AppGraph.chats.send(chatId, text)
+                    }
                 }
             },
             onOtherApps = {

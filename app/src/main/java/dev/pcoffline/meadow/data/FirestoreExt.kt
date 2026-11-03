@@ -248,7 +248,7 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
         "request" -> MessageKind.REQUEST
         "system" -> MessageKind.SYSTEM
         "image" -> MessageKind.IMAGE
-        // A card this version can't read shows as plain words (none), not as a broken card.
+        // A card this version can't read shows its words ("Shared a limit for …"), not a broken card.
         "limit" -> if (LimitCardMode.fromWire(getString("mode")) != null && limitOrNull(get("limit")) != null) MessageKind.LIMIT else MessageKind.TEXT
         else -> MessageKind.TEXT
     },

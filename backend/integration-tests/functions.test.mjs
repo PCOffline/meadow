@@ -1278,7 +1278,7 @@ describe("every callable is safe to call wrongly", () => {
   const CALLABLES = [
     "createProfile", "createInviteLink", "previewInviteLink", "acceptInviteLink", "sendInvite", "inviteFromChat", "respondInvite", "cancelInvite",
     "removeApprover", "cancelRemoval", "stepDown", "createRequest", "decideRequest", "cancelRequest", "saveLimit",
-    "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush",
+    "emergencyUnlock", "exportMyData", "deleteAccount", "sendTestPush", "applyLimitSuggestion",
   ];
 
   test("nothing works without signing in", async () => {
@@ -1383,6 +1383,54 @@ describe("suggested limits", () => {
   test("a limit card pushes which app it is for", async () => {
     const { sam, bee } = await circle();
     await card(bee, sam, "suggested", looser);
-    await eventually(async () => assert.ok((await outbox(sam.uid, "chat")).some((p) => String(p.body ?? p.text ?? JSON.stringify(p)).includes("Instagram"))));
+    await eventually(async () => assert.ok((await outbox(sam.uid, "chat")).some((p) => String(p.body).includes("Instagram"))));
+  });
+
+  test("the whole limit is saved as it was sent: hours, days and caps", async () => {
+    const { sam, bee } = await circle();
+    const full = {
+      ...looser,
+      schedule: { 1: [{ from: 540, to: 1260 }], 6: [{ from: 600, to: 1380 }] },
+      dayMinutes: { 6: 120 },
+      caps: [{ days: [1, 2, 3, 4, 5], from: 1020, to: 1320, minutes: 30 }],
+    };
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", full));
+    const saved = await read(`users/${sam.uid}/limits/com.insta`);
+    assert.deepEqual(
+      { dailyMinutes: saved.dailyMinutes, weeklyMinutes: saved.weeklyMinutes, schedule: saved.schedule, dayMinutes: saved.dayMinutes, caps: saved.caps },
+      { dailyMinutes: 90, weeklyMinutes: 0, schedule: full.schedule, dayMinutes: full.dayMinutes, caps: full.caps },
+    );
+  });
+
+  test("a suggestion is an approval once: it can't be applied again", async () => {
+    const { sam, bee } = await circle();
+    const sent = await card(bee, sam, "suggested", looser);
+    await sam.call("applyLimitSuggestion", sent);
+    // Sam tightens the limit again; the old suggestion can't undo that.
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}/limits/com.insta`), { dailyMinutes: 30 }));
+    await rejects(sam.call("applyLimitSuggestion", sent), "failed-precondition", /already applied/);
+    assert.equal((await read(`users/${sam.uid}/limits/com.insta`)).dailyMinutes, 30);
+  });
+
+  test("a suggestion more than a week old no longer applies", async () => {
+    const { sam, bee } = await circle();
+    const ref = await admin((db) => addDoc(collection(db, `chats/${chatIdOf(bee, sam)}/messages`), {
+      senderId: bee.uid, kind: "limit", mode: "suggested", limit: looser, createdAt: Timestamp.fromMillis(Date.now() - 8 * 24 * 60 * 60_000),
+    }));
+    await rejects(sam.call("applyLimitSuggestion", { chatId: chatIdOf(bee, sam), messageId: ref.id }), "failed-precondition", /week old/);
+  });
+
+  test("a closed chat, or someone who is no longer my Bumblebee, can't approve", async () => {
+    const { sam, bee } = await circle();
+    const closedCard = await card(bee, sam, "suggested", looser);
+    await admin((db) => updateDoc(doc(db, `chats/${closedCard.chatId}`), { closed: true }));
+    await rejects(sam.call("applyLimitSuggestion", closedCard), "failed-precondition");
+
+    const other = await circle();
+    const sent = await card(other.bee, other.sam, "suggested", looser);
+    // Bee stops being Sam's Bumblebee, but the chat stays open.
+    await admin((db) => updateDoc(doc(db, `users/${other.sam.uid}/private/account`), { approverIds: [] }));
+    await rejects(other.sam.call("applyLimitSuggestion", sent), "permission-denied");
+    assert.equal((await read(`users/${other.sam.uid}/limits/com.insta`)).dailyMinutes, 60);
   });
 });

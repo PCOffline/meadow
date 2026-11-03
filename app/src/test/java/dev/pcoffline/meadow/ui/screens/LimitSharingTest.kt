@@ -7,6 +7,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,6 +31,7 @@ import dev.pcoffline.meadow.ui.limits.LimitMenuActions
 import dev.pcoffline.meadow.ui.limitText
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -108,7 +111,7 @@ class LimitSharingTest : ScreenTest() {
         node(R.string.limit_apply).performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasText(text(R.string.limit_apply_not_on_phone, "Elsewhere"))).fetchSemanticsNodes().isNotEmpty() }
         node(R.string.limit_apply_title).assertDoesNotExist()
-        assertEquals(emptyList<AppLimit>(), AppGraph.store.limits.value)
+        assertAccessible(requireHeading = false)
     }
 
     private val usage = listOf(SharedAppUsage("demo.youtube", "YouTube", 50), SharedAppUsage("demo.reader", "Reader", 20))
@@ -129,10 +132,12 @@ class LimitSharingTest : ScreenTest() {
         page(LimitMenuActions(onCopy = { copied += it }, onSuggest = { p, n, c -> suggested += Triple(p, n, c) }))
         node(R.string.limit_menu_hint).assertExists()
         // On their limits card (the last of YouTube's two rows).
-        compose.onAllNodes(opensMenu("YouTube"))[1].performClick()
+        // YouTube is in their top apps and in their limits; this is its row in the limits card.
+        compose.onAllNodes(opensMenu("YouTube")).onLast().performClick()
+        assertAccessible()
         node(R.string.limit_menu_copy).performClick()
         assertEquals(listOf(theirLimit), copied)
-        compose.onAllNodes(opensMenu("YouTube"))[1].performClick()
+        compose.onAllNodes(opensMenu("YouTube")).onLast().performClick()
         node(R.string.limit_menu_suggest_change).performClick()
         assertEquals(listOf(Triple("demo.youtube", "YouTube", theirLimit)), suggested)
         assertAccessible()
@@ -165,8 +170,23 @@ class LimitSharingTest : ScreenTest() {
         }
         node(R.string.limit_copy_replaces, "Instagram").assertExists()
         node(R.string.limit_copy_other_app).assertExists()
-        compose.onAllNodes(hasText("45m")).fetchSemanticsNodes().let { assert(it.isNotEmpty()) { "starts at 45m" } }
+        assertTrue("starts at 45m", compose.onAllNodes(hasText("45m")).fetchSemanticsNodes().isNotEmpty())
         node(R.string.action_save).performScrollTo().assertIsEnabled()
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `a copy for an app that isn't on this phone says so, and can't be saved until another app is chosen`() {
+        val elsewhere = AppLimit("com.not.installed", "Elsewhere", 30, 0)
+        show {
+            LimitEditor(
+                elsewhere.packageName, LimitEditorState(appName = "Elsewhere", loaded = true), onDone = {},
+                start = elsewhere, onChangeApp = {}, notHere = true,
+            )
+        }
+        node(R.string.limit_apply_not_on_phone, "Elsewhere").assertExists()
+        node(R.string.limit_copy_other_app).assertExists()
+        node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
         assertAccessible(requireHeading = false)
     }
 

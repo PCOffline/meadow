@@ -2,6 +2,8 @@ package dev.pcoffline.meadow
 
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -16,10 +18,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * End to end, limits in a chat (#93): Kai (on this phone) has Sam as a Bumblebee. Sam suggests a
- * looser limit; Kai applies it after seeing what changes, and no question goes to Sam, because
- * Sam's suggestion is the approval. Sam then shares a limit; Kai copies it, and the editor says it
- * replaces Kai's limit.
+ * End to end, limits in a chat (#93): Kai (on this phone) and Sam look after each other.
+ * - Sam suggests a looser limit; Kai applies it after seeing what changes, and no question goes to
+ *   Sam, because Sam's suggestion is the approval.
+ * - Sam shares a limit; Kai copies it, and the editor says it replaces Kai's limit.
+ * - Kai shares a limit from the share sheet, and suggests one from Sam's page: both reach the chat
+ *   as cards.
  */
 @RunWith(AndroidJUnit4::class)
 class LimitSharingJourneyTest : EndToEndTest() {
@@ -39,6 +43,11 @@ class LimitSharingJourneyTest : EndToEndTest() {
         val sam = EmulatorFriend.create(app, "Sam", "🌻").also(people::add)
         val token = kai.call("createInviteLink")!!["token"] as String
         sam.call("acceptInviteLink", mapOf("token" to token))
+        // Kai looks after Sam too, and Sam shares limits: Kai can suggest from Sam's page.
+        await(sam.db.document("users/${sam.uid}/limits/$pebbles").set(mapOf("packageName" to pebbles, "appName" to "Pebbles", "dailyMinutes" to 45, "weeklyMinutes" to 0)))
+        await(sam.db.document("users/${sam.uid}/private/account").update("privacy.shareLimits", true))
+        val back = sam.call("createInviteLink")!!["token"] as String
+        kai.call("acceptInviteLink", mapOf("token" to back))
         signInAs(kai)
         val limit = "users/${kai.uid}/limits/$pebbles"
         val chat = ChatRepository.chatIdFor(kai.uid, sam.uid)
@@ -51,8 +60,7 @@ class LimitSharingJourneyTest : EndToEndTest() {
 
             // Sam suggests an hour and a half: looser, yet it needs no question to Sam.
             sam.sendLimit(chat, mapOf("packageName" to pebbles, "appName" to "Pebbles", "dailyMinutes" to 90, "weeklyMinutes" to 0), "suggested")
-            tab(R.string.tab_people).performClick()
-            compose.onNode(hasText("Sam") and hasClickAction()).performClick()
+            openChatWith("Sam")
             waitFor(R.string.limit_card_suggested)
             node(R.string.limit_apply).performScrollTo().performClick()
             // What changes, before anything is saved.
@@ -71,6 +79,27 @@ class LimitSharingJourneyTest : EndToEndTest() {
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.limit_editor_updated)
             waitForBackend(limit) { it.int("dailyMinutes") == 20 }
+
+            // Kai shares the saved limit with Sam, from the note that says it's saved: the share
+            // sheet sends a shared card to the chat.
+            node(R.string.share_title).performClick()
+            waitFor(R.string.share_commitment_in_meadow)
+            compose.onNode(hasText("Sam") and hasClickAction()).performClick()
+            waitForBackendDocs("chats/$chat/messages") { messages ->
+                messages.any { it.optString("kind") == "limit" && it.optString("mode") == "shared" && it.optString("senderId") == kai.uid }
+            }
+
+            // Kai suggests a change from Sam's page: the limit menu, the editor, then Send.
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+            openGardenOf("Sam")
+            waitFor(R.string.limit_menu_hint)
+            compose.onAllNodes(hasClickAction() and hasText("Pebbles", substring = true)).onLast().performScrollTo().performClick()
+            node(R.string.limit_menu_suggest_change).performClick()
+            waitFor(R.string.limit_suggest_title)
+            node(R.string.limit_suggest_send).performScrollTo().performClick()
+            waitForBackendDocs("chats/$chat/messages") { messages ->
+                messages.any { it.optString("kind") == "limit" && it.optString("mode") == "suggested" && it.optString("senderId") == kai.uid }
+            }
         }
     }
 }
