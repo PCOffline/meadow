@@ -56,6 +56,7 @@ import dev.pcoffline.meadow.usage.UsageHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.hasAnyDescendant
 import org.junit.Test
@@ -252,36 +253,21 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `a long press on a message copies it whole or opens it to select part of it`() {
+    fun `a long press on a message copies it, with no menu`() {
         show { ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, requestCard = { id, _ -> Text("Request $id") }) }
-        compose.onNodeWithText("Thank you! 💛").performTouchInput { longClick() }
-        node(R.string.chat_copy).performClick()
         val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
+        compose.onNodeWithText("Thank you! 💛").performTouchInput { longClick() }
         compose.waitUntil(5_000) { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "Thank you! 💛" }
-
-        // As a screen reader's long-press does it.
-        compose.onNode(SemanticsMatcher("has message options") {
-            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
-        } and hasAnyDescendant(hasText("Thank you! 💛"))).performSemanticsAction(SemanticsActions.OnLongClick)
-        node(R.string.chat_select_text).performClick()
-        // The message itself turns selectable in place, with no dialog over it (#79).
+        // No menu or dialog to pick from (#79).
+        compose.onNode(isPopup()).assertDoesNotExist()
         compose.onNode(isDialog()).assertDoesNotExist()
-        val done = text(R.string.chat_select_done)
-        val selecting = SemanticsMatcher("can end selecting") { n ->
-            n.config.getOrNull(SemanticsActions.CustomActions)?.any { it.label == done } == true
-        }
-        compose.onNode(selecting).assertExists()
-        // While selecting, a long-press is for picking words: the message has no menu on it.
-        val menuOnThanks = SemanticsMatcher("has message options") {
-            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
-        } and hasAnyDescendant(hasText("Thank you! 💛"))
-        compose.onNode(menuOnThanks).assertDoesNotExist()
+
+        // A screen reader's long-press copies too, and names what it does.
+        compose.onNode(SemanticsMatcher("copies the message") {
+            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_copy_message)
+        } and hasAnyDescendant(hasText("How's the reading going? 📚"))).performSemanticsAction(SemanticsActions.OnLongClick)
+        compose.waitUntil(5_000) { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "How's the reading going? 📚" }
         assertAccessible(requireHeading = false)
-        // Done, as a screen reader offers it: the message is plain again, and a long-press opens the menu.
-        val end = compose.onNode(selecting).fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == done }
-        compose.runOnIdle { end.action() }
-        compose.onNode(selecting).assertDoesNotExist()
-        compose.onNode(menuOnThanks).assertExists()
     }
 
     @Test

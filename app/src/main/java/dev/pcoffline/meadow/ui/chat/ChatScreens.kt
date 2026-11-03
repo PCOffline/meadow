@@ -50,8 +50,6 @@ import android.content.ClipData
 import android.os.Build
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -98,10 +96,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -469,59 +463,37 @@ private fun PictureViewer(picture: ViewedPicture, onDismiss: () -> Unit) {
 
 @Composable
 private fun Bubble(message: ChatMessage, mine: Boolean) {
-    var options by remember { mutableStateOf(false) }
-    var selecting by remember { mutableStateOf(false) }
-    val optionsLabel = stringResource(R.string.chat_message_options)
-    val doneLabel = stringResource(R.string.chat_select_done)
-    // Back ends selecting, as the dialog's Close did.
-    BackHandler(enabled = selecting) { selecting = false }
+    val copy = rememberCopyMessage(message.text)
+    val copyLabel = stringResource(R.string.chat_copy_message)
     Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
-        Box {
-            Column(
-                Modifier.widthIn(max = 300.dp)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 20.dp, topEnd = 20.dp,
-                            bottomStart = if (mine) 20.dp else 6.dp,
-                            bottomEnd = if (mine) 6.dp else 20.dp,
-                        ),
-                    )
-                    .background(if (mine) MaterialTheme.colorScheme.primaryContainer else Garden.colors.cardTint)
-                    .then(
-                        if (selecting) {
-                            // While selecting, a long-press picks words; a screen reader offers Done.
-                            Modifier.semantics {
-                                customActions = listOf(CustomAccessibilityAction(doneLabel) { selecting = false; true })
-                            }
-                        } else {
-                            // Long-press, or a screen reader's long-press action, for copying and selecting.
-                            Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { options = true }) }
-                                .semantics {
-                                    onLongClick(optionsLabel) {
-                                        options = true
-                                        true
-                                    }
-                                }
-                        },
-                    )
-                    .padding(horizontal = 14.dp, vertical = 9.dp)
-                    .alpha(if (message.pending) 0.6f else 1f),
-            ) {
-                if (selecting) {
-                    // Android's own selection, in place: long-press a word, drag the handles, then
-                    // Copy or Share from its bar.
-                    SelectionContainer { Text(message.text, style = MaterialTheme.typography.bodyLarge) }
-                } else {
-                    Text(message.text, style = MaterialTheme.typography.bodyLarge)
-                }
-                Text(
-                    if (message.pending) stringResource(R.string.chat_sending) else relativeTime(message.createdAtMillis),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.End),
+        Column(
+            Modifier.widthIn(max = 300.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 20.dp, topEnd = 20.dp,
+                        bottomStart = if (mine) 20.dp else 6.dp,
+                        bottomEnd = if (mine) 6.dp else 20.dp,
+                    ),
                 )
-            }
-            MessageOptions(message.text, expanded = options, onDismiss = { options = false }, onSelect = { selecting = true })
+                .background(if (mine) MaterialTheme.colorScheme.primaryContainer else Garden.colors.cardTint)
+                // A long-press, or a screen reader's long-press action, copies the whole message.
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { copy() }) }
+                .semantics {
+                    onLongClick(copyLabel) {
+                        copy()
+                        true
+                    }
+                }
+                .padding(horizontal = 14.dp, vertical = 9.dp)
+                .alpha(if (message.pending) 0.6f else 1f),
+        ) {
+            Text(message.text, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (message.pending) stringResource(R.string.chat_sending) else relativeTime(message.createdAtMillis),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.End),
+            )
         }
     }
 }
@@ -640,34 +612,19 @@ private fun PersonActions(uid: String, name: String, profile: UserProfile, onOpe
     }
 }
 
-/** Copy the whole message, or open it to select part of it. */
+/** Copies [text] to the clipboard, and says so where Android doesn't. */
 @Composable
-private fun MessageOptions(text: String, expanded: Boolean, onDismiss: () -> Unit, onSelect: () -> Unit) {
+private fun rememberCopyMessage(text: String): () -> Unit {
     val clipboard = LocalClipboard.current
     val snackbar = LocalSnackbar.current
     val scope = rememberCoroutineScope()
     val copied = stringResource(R.string.chat_copied)
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.chat_copy)) },
-            leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
-            onClick = {
-                onDismiss()
-                scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(copied, text)))
-                    // Android 13 and later confirm a copy themselves.
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) snackbar.showSnackbar(copied)
-                }
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.chat_select_text)) },
-            leadingIcon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
-            onClick = {
-                onDismiss()
-                onSelect()
-            },
-        )
+    return {
+        scope.launch {
+            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(copied, text)))
+            // Android 13 and later confirm a copy themselves.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) snackbar.showSnackbar(copied)
+        }
     }
 }
 
