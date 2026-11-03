@@ -50,7 +50,6 @@ import android.content.ClipData
 import android.os.Build
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
@@ -99,12 +98,10 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -475,6 +472,9 @@ private fun Bubble(message: ChatMessage, mine: Boolean) {
     var options by remember { mutableStateOf(false) }
     var selecting by remember { mutableStateOf(false) }
     val optionsLabel = stringResource(R.string.chat_message_options)
+    val doneLabel = stringResource(R.string.chat_select_done)
+    // Back ends selecting, as the dialog's Close did.
+    BackHandler(enabled = selecting) { selecting = false }
     Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         Box {
             Column(
@@ -487,19 +487,30 @@ private fun Bubble(message: ChatMessage, mine: Boolean) {
                         ),
                     )
                     .background(if (mine) MaterialTheme.colorScheme.primaryContainer else Garden.colors.cardTint)
-                    // Long-press, or a screen reader's long-press action, for copying and selecting.
-                    .pointerInput(Unit) { detectTapGestures(onLongPress = { options = true }) }
-                    .semantics {
-                        onLongClick(optionsLabel) {
-                            options = true
-                            true
-                        }
-                    }
+                    .then(
+                        if (selecting) {
+                            // While selecting, a long-press picks words; a screen reader offers Done.
+                            Modifier.semantics {
+                                customActions = listOf(CustomAccessibilityAction(doneLabel) { selecting = false; true })
+                            }
+                        } else {
+                            // Long-press, or a screen reader's long-press action, for copying and selecting.
+                            Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { options = true }) }
+                                .semantics {
+                                    onLongClick(optionsLabel) {
+                                        options = true
+                                        true
+                                    }
+                                }
+                        },
+                    )
                     .padding(horizontal = 14.dp, vertical = 9.dp)
                     .alpha(if (message.pending) 0.6f else 1f),
             ) {
                 if (selecting) {
-                    SelectableMessage(message.text, onDone = { selecting = false })
+                    // Android's own selection, in place: long-press a word, drag the handles, then
+                    // Copy or Share from its bar.
+                    SelectionContainer { Text(message.text, style = MaterialTheme.typography.bodyLarge) }
                 } else {
                     Text(message.text, style = MaterialTheme.typography.bodyLarge)
                 }
@@ -658,30 +669,6 @@ private fun MessageOptions(text: String, expanded: Boolean, onDismiss: () -> Uni
             },
         )
     }
-}
-
-/**
- * The message in place, with all of its words picked: the handles change what is picked, and
- * Android's own bar copies or shares it. Leaving it (a tap elsewhere) ends the selection.
- */
-@Composable
-private fun SelectableMessage(text: String, onDone: () -> Unit) {
-    var value by remember(text) { mutableStateOf(TextFieldValue(text, TextRange(0, text.length))) }
-    val focus = remember { FocusRequester() }
-    var focused by remember { mutableStateOf(false) }
-    val style = MaterialTheme.typography.bodyLarge.copy(color = LocalContentColor.current)
-    BasicTextField(
-        value = value,
-        // Read only: only the selection can change.
-        onValueChange = { value = it.copy(text = text) },
-        readOnly = true,
-        textStyle = style,
-        modifier = Modifier.focusRequester(focus).onFocusChanged {
-            if (focused && !it.isFocused) onDone()
-            focused = it.isFocused
-        },
-    )
-    LaunchedEffect(Unit) { focus.requestFocus() }
 }
 
 @Composable

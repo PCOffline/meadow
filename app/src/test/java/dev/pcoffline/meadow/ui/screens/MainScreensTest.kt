@@ -57,7 +57,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.test.hasAnyDescendant
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -260,19 +260,28 @@ class MainScreensTest : ScreenTest() {
         compose.waitUntil(5_000) { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "Thank you! 💛" }
 
         // As a screen reader's long-press does it.
-        compose.onAllNodes(SemanticsMatcher("has message options") {
+        compose.onNode(SemanticsMatcher("has message options") {
             it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
-        }).onFirst().performSemanticsAction(SemanticsActions.OnLongClick)
+        } and hasAnyDescendant(hasText("Thank you! 💛"))).performSemanticsAction(SemanticsActions.OnLongClick)
         node(R.string.chat_select_text).performClick()
-        // The message itself turns selectable, all of it picked, with no dialog over it (#79).
+        // The message itself turns selectable in place, with no dialog over it (#79).
         compose.onNode(isDialog()).assertDoesNotExist()
-        node(R.string.action_close).assertDoesNotExist()
-        // The one text field with words in it: the message box below is empty.
-        val field = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)).fetchSemanticsNodes()
-            .map { it.config }.single { it[SemanticsProperties.EditableText].text.isNotEmpty() }
-        val whole = field[SemanticsProperties.EditableText].text
-        assertEquals(TextRange(0, whole.length), field[SemanticsProperties.TextSelectionRange])
+        val done = text(R.string.chat_select_done)
+        val selecting = SemanticsMatcher("can end selecting") { n ->
+            n.config.getOrNull(SemanticsActions.CustomActions)?.any { it.label == done } == true
+        }
+        compose.onNode(selecting).assertExists()
+        // While selecting, a long-press is for picking words: the message has no menu on it.
+        val menuOnThanks = SemanticsMatcher("has message options") {
+            it.config.getOrNull(SemanticsActions.OnLongClick)?.label == text(R.string.chat_message_options)
+        } and hasAnyDescendant(hasText("Thank you! 💛"))
+        compose.onNode(menuOnThanks).assertDoesNotExist()
         assertAccessible(requireHeading = false)
+        // Done, as a screen reader offers it: the message is plain again, and a long-press opens the menu.
+        val end = compose.onNode(selecting).fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == done }
+        compose.runOnIdle { end.action() }
+        compose.onNode(selecting).assertDoesNotExist()
+        compose.onNode(menuOnThanks).assertExists()
     }
 
     @Test
