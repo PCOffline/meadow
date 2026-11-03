@@ -40,32 +40,37 @@ Put them in the Summary and the Evidence.
 
 ### Story
 
-The story shows the change as a person meets it. Put pictures first, and text under them.
+The story shows the change as a person meets it: pictures first, and text under them. The
+**Pictures** workflow makes the pictures on an emulator. It writes them in the pull request's
+description, under **Pictures**, and replaces them on each push.
 
-- Show each step in the order that a person does it. Give each step a screenshot or a video,
-  and one short line under it.
-- Show the before and the after next to each other.
-- Use a video or a GIF for motion, gestures, animations and anything that changes over time.
-- Show each state that the change touches. For example: empty, loading, waiting, error,
-  offline and done.
-- Show each look that the change touches: light and dark, each theme, large text and a narrow
-  phone.
-- Show the small details: spacing, alignment, wrapping, text that doesn't fit, touch feedback,
-  and what a screen reader says.
+- **Stories:** for each change that people see or do, write a story. It's a class in
+  `app/src/androidTest/java/dev/pcoffline/meadow/pictures/stories` that extends `Story`. Each
+  step does one thing that a person does, in order, and has one short caption. The workflow takes
+  a screenshot of each step and a video of the whole story. When the base has the same story, it
+  shows the base's steps next to them.
+- **Screens:** the workflow draws each state of each screen in the debug gallery (`Scenarios` in
+  `app/src/debug/.../showcase/Gallery.kt`). It draws them in light, dark, large text, on a narrow
+  phone and in each theme. It shows each picture that changed, before and after.
 
-To make the pictures, use **Meadow screens** in a debug build (CONTRIBUTING.md). On an emulator,
-`adb exec-out screencap -p > shot.png` takes a screenshot. `adb shell screenrecord
-/sdcard/demo.mp4` records a video, and `adb pull /sdcard/demo.mp4` copies it to your computer.
-Attach the pictures to the pull request. Don't commit them.
+Make the pictures show each detail of the change:
 
-If you can't make a picture, list it under **Missing pictures** in the pull request. A person
-adds each one before the merge.
+- Add a gallery state for each state that the change touches. For example: empty, loading,
+  waiting, error, offline and done.
+- Give the story a step for each small detail: spacing, alignment, wrapping, text that doesn't
+  fit, and touch feedback.
+- Write the description's Summary and Evidence around the pictures. Leave the **Pictures** part
+  to the workflow.
+
+A pull request from a fork gets its pictures in the workflow run's artifact. Attach the ones that
+the story needs to the description.
 
 ### Spec
 
 The spec says exactly what the change does, so that a reviewer can check the pictures against it.
 
 - State each rule, limit and edge case.
+- State what a screen reader says.
 - State what doesn't change.
 - Write it as plain statements in a vertical list, with no story in it.
 

@@ -336,6 +336,7 @@ proposes updates each week.
 | **Build** (`build.yml`) | Each pull request and each push to `main`. For a different branch, start it from the Actions tab | Builds the app and runs unit tests and lint. Tests the functions, security rules and hosting pages. Runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON`, it builds for your backend. Without it, it builds the "Meadow can't start" version |
 | **Deliver** (`deliver.yml`) | After Build passes on `main` (when on, see 7.5 and 7.6), when you push a tag like `v0.4.0`, or by hand | Deploys the backend to Firebase. Then it tests, builds and signs the release APK, and publishes it on the Releases page of your fork | The five secrets in 7.4 to release. The Google Cloud access in 7.6 to deploy |
 | **Screenshots** (`screenshots.yml`) | Pushes to `main` that change the app's screens, or by hand | Makes the README images again, commits them to the branch, and runs Build on that commit | None |
+| **Pictures** (`pictures.yml`) | Each pull request that changes the app's screens | Draws the pull request's stories and each screen of the debug gallery on an Android emulator, for the pull request and its base. Publishes them on the branch `pictures/pr-<number>` and puts them in the pull request's description | None |
 
 Until you turn on automatic deploys (7.6), deploy the backend from your computer (step 4) each
 time `backend/` changes.
