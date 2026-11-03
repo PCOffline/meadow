@@ -33,6 +33,9 @@ import dev.pcoffline.meadow.ui.theme.colorSchemeFor
 import dev.pcoffline.meadow.ui.theme.gardenColorsFor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import dev.pcoffline.meadow.ui.components.StalkBarChart
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.assertCountEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -77,7 +80,8 @@ class StatsTest : ScreenTest() {
         val days = s.days.mapIndexed { i, (day, _) -> day to if (i == 0) null else 60 * min }
         show { StatsContent(week.copy(stats = s.copy(days = days, totalMs = 360 * min, previousTotalMs = null))) }
         compose.onNodeWithText(app.resources.getQuantityString(R.plurals.stats_missing_days, 1, 1)).assertExists()
-        compose.onNodeWithText("1h").assertExists()
+        // The average, and the top of the graph's scale.
+        compose.onAllNodesWithText("1h").assertCountEquals(2)
         assertTrue(compose.onAllNodes(hasText("than", substring = true)).fetchSemanticsNodes().isEmpty())
         assertEquals(60 * min, s.copy(days = days).dailyAverageMs(s.to))
     }
@@ -160,4 +164,13 @@ class StatsTest : ScreenTest() {
         assertEquals(Selection(Period.DAY, 0), Selection.ofDay(today, today))
         assertEquals(Selection(Period.DAY, 0), Selection.ofDay(today.plusDays(2), today))
     }
+
+    @Test
+    fun `the time graph says its unit, with its top in hours and its base`() {
+        show { StalkBarChart(values = listOf(30f, 200f, 95f), labels = listOf("Mon", "Tue", "Wed")) }
+        compose.onNodeWithText("4h").assertExists()
+        compose.onNodeWithText("0").assertExists()
+        compose.onNodeWithContentDescription(text(R.string.chart_axis_description, "4h"), substring = true).assertExists()
+    }
+
 }
