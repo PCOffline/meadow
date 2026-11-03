@@ -5,6 +5,7 @@
 #
 # - "meadow-functions" runs every Cloud Function (backend/functions/src/index.ts names it).
 # - Cloud Storage's own account may read Firestore, which storage.rules does.
+# - The schedules call their functions as "meadow-functions" too.
 # - The Compute Engine default account only builds the functions. Its old roles for running them
 #   are removed once no function runs as it any more: run this again after the next deploy.
 #
@@ -87,6 +88,15 @@ if gcloud artifacts repositories describe gcf-artifacts --location "$REGION" --p
   gcloud artifacts repositories add-iam-policy-binding gcf-artifacts --location "$REGION" --project "$PROJECT" \
     --member "serviceAccount:$BUILDER" --role roles/artifactregistry.writer > /dev/null
 fi
+
+# `firebase deploy` changes a schedule's job only when its timing changes, so a job made before the
+# move keeps calling its function as the Compute Engine default account. Move those jobs here.
+for job in $(gcloud scheduler jobs list --location "$REGION" --project "$PROJECT" --quiet \
+  --filter "httpTarget.oidcToken.serviceAccountEmail=$BUILDER" --format 'value(name.basename())' 2> /dev/null); do
+  echo "Letting the $job schedule call its function as $RUNTIME_NAME"
+  gcloud scheduler jobs update http "$job" --location "$REGION" --project "$PROJECT" \
+    --oidc-service-account-email "$RUNTIME" > /dev/null
+done
 
 # A function still running as the Compute Engine default account needs its roles until the next
 # deploy moves it.

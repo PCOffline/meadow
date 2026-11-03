@@ -184,6 +184,8 @@ The script does these things:
   use Firestore, the files in the default bucket, Authentication (to delete accounts) and Cloud
   Messaging, and nothing more.
 - It lets the Storage rules read Firestore.
+- It lets the schedules call their functions as `meadow-functions`. `firebase deploy` doesn't
+  change this for a schedule that already exists.
 - It removes the roles that the Compute Engine default service account had to run the functions.
   That account only builds the functions now. It keeps its roles until no function runs as it,
   so run the script again after the next deploy.

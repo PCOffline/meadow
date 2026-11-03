@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase-admin/app";
 import { setGlobalOptions } from "firebase-functions/v2";
+import { projectId } from "./db";
 
 initializeApp();
 // Only while integration tests measure coverage: the emulator stops its workers with SIGTERM,
@@ -13,8 +14,11 @@ if (!region) throw new Error("Set MEADOW_REGION in backend/functions/.env, e.g. 
 // whole CPU), so far fewer calls wait for a new one to start. Billing is per request, so a small
 // group still stays inside the free allowance.
 // Every function runs as its own service account, which holds only what the functions use
-// (.github/scripts/setup-deploy-access.sh creates it). "name@" means name@<project>.iam.gserviceaccount.com.
-setGlobalOptions({ region, maxInstances: 10, cpu: 1, memory: "512MiB", concurrency: 80, serviceAccount: "meadow-functions@" });
+// (.github/scripts/setup-backend-accounts.sh creates it). The whole address, not "name@": the
+// Firebase CLI expands that short form for the functions but gives it to Cloud Scheduler as it is,
+// and Cloud Scheduler refuses it.
+const serviceAccount = `meadow-functions@${projectId()}.iam.gserviceaccount.com`;
+setGlobalOptions({ region, maxInstances: 10, cpu: 1, memory: "512MiB", concurrency: 80, serviceAccount });
 
 export {
   createProfile, createInviteLink, previewInviteLink, acceptInviteLink, sendInvite, inviteFromChat, respondInvite, cancelInvite,

@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.AppLimit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +45,7 @@ class SiteMeasureTest {
 
     @After
     fun tearDown() {
+        AppGraph.store.setLimits(emptyList())
         AppGraph.sites.left()
         BlockActivity.showing = null
         controller.destroy()
@@ -96,6 +98,42 @@ class SiteMeasureTest {
 
         assertFalse(service.measureSite(SITE))
         assertNull(AppGraph.sites.current())
+    }
+
+    @Test
+    fun `an address bar that can't be read yet is read again, so its site is still found`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        var reads = 0
+        service.readBar = { if (reads++ == 0) AddressBar.Unreadable else AddressBar.Shows("news.example.org/today") }
+
+        service.onForeground("com.android.chrome")
+
+        assertTrue("never read again", eventually { service.measureSite(SITE) })
+        assertEquals(2, reads)
+    }
+
+    @Test
+    fun `an address bar that stays unreadable is read only a few more times`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        var reads = 0
+        service.readBar = { reads++; AddressBar.Unreadable }
+
+        service.onForeground("com.android.chrome")
+
+        eventually(timeoutMs = 4_000) { false }
+        assertEquals(5, reads)
+        assertFalse(service.measureSite(SITE))
+    }
+
+    /** Runs the main looper until [done], as the service reads off the main thread; false at the timeout. */
+    private fun eventually(timeoutMs: Long = 3_000, done: () -> Boolean): Boolean {
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (done()) return true
+            Thread.sleep(50)
+        }
+        return false
     }
 
     @Test

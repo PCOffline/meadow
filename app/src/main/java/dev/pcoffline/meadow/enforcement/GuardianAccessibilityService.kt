@@ -61,6 +61,7 @@ class GuardianAccessibilityService : AccessibilityService() {
     private var siteJob: Job? = null
     private var siteTrailing: Job? = null
     private var siteRecheck = false
+    private var unreadableReads = 0
     private var lastSiteCheck = 0L
     private var lastLimitedLeft: String? = null
     private var lastLimitedLeftAt = 0L
@@ -121,6 +122,7 @@ class GuardianAccessibilityService : AccessibilityService() {
             lastLimitedLeftAt = SystemClock.elapsedRealtime()
         }
         currentPackage = pkg
+        unreadableReads = 0
         AppGraph.engine.setForeground(pkg)
         // A site stays open only while its browser does; back in a browser, its address is read again.
         setSite(null)
@@ -162,13 +164,16 @@ class GuardianAccessibilityService : AccessibilityService() {
         }
         lastSiteCheck = now
         siteJob = scope.launch {
-            val read = readAddressBar(bar)
+            val read = readBar(bar)
             withContext(Dispatchers.Main) {
                 // Gone to another app while reading: what was read no longer applies.
                 if (pkg == currentPackage) {
                     when (read) {
-                        AddressBar.Unreadable -> Unit
-                        is AddressBar.Shows -> setSite(Sites.match(read.text, domains)?.let(Sites::idFor))
+                        AddressBar.Unreadable -> readAgainSoon()
+                        is AddressBar.Shows -> {
+                            unreadableReads = 0
+                            setSite(Sites.match(read.text, domains)?.let(Sites::idFor))
+                        }
                     }
                 }
                 siteJob = null
@@ -179,6 +184,23 @@ class GuardianAccessibilityService : AccessibilityService() {
             }
         }
     }
+
+    /**
+     * Just after a browser comes to the front, its window may not be the active one yet, so its
+     * address bar can't be found. A browser that changes nothing after that sends no more events,
+     * so the bar is read again a few times instead of waiting for one.
+     */
+    private fun readAgainSoon() {
+        if (unreadableReads >= SITE_READ_RETRIES || siteTrailing?.isActive == true) return
+        unreadableReads++
+        siteTrailing = scope.launch {
+            delay(SITE_CHECK_MS)
+            withContext(Dispatchers.Main) { currentPackage?.let { checkSite(it, force = true) } }
+        }
+    }
+
+    /** Reads an address bar by its full view id. Tests give their own. */
+    internal var readBar: (String) -> AddressBar = { readAddressBar(it) }
 
     /**
      * Only the address bar is read, by its id: never the page. While someone is typing in it,
@@ -413,6 +435,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         private const val BLOCK_CHECK_MS = 1_000L
         private const val BLOCK_ATTEMPTS = 10
         private const val SITE_CHECK_MS = 500L
+        private const val SITE_READ_RETRIES = 4
         private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")
 
         val GUARDED_SYSTEM_PACKAGES = setOf(

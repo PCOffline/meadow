@@ -68,6 +68,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.input.ImeAction
@@ -235,7 +236,8 @@ private fun FriendsIllustration() {
 
 @Composable
 private fun GrowthIllustration() {
-    MeadowCard(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+    // An illustration with made-up numbers: screen readers skip it.
+    MeadowCard(Modifier.fillMaxWidth().padding(bottom = 12.dp).clearAndSetSemantics { }) {
         StalkBarChart(
             values = listOf(140f, 120f, 95f, 110f, 80f, 60f, 45f),
             labels = DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.NARROW, currentLocale()) },
