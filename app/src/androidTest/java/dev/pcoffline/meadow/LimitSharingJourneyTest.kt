@@ -2,6 +2,7 @@ package dev.pcoffline.meadow
 
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -34,6 +35,18 @@ class LimitSharingJourneyTest : EndToEndTest() {
         people.forEach { it.close() }
     }
 
+    /**
+     * Opens the chat with Sam. Kai and Sam look after each other, so People lists Sam twice, once
+     * for each role. Both rows open the same chat.
+     */
+    private fun openChatWithSam() {
+        tab(R.string.tab_people).performClick()
+        val sam = hasText("Sam") and hasClickAction()
+        eventually("Sam in People") { compose.onAllNodes(sam).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(sam).onFirst().performClick()
+        waitForText(text(R.string.chat_placeholder))
+    }
+
     private fun samsInbox(sam: EmulatorFriend): List<String> =
         await(sam.db.collection("users/${sam.uid}/inbox").get()).documents.map { it.id }
 
@@ -60,7 +73,7 @@ class LimitSharingJourneyTest : EndToEndTest() {
 
             // Sam suggests an hour and a half: looser, yet it needs no question to Sam.
             sam.sendLimit(chat, mapOf("packageName" to pebbles, "appName" to "Pebbles", "dailyMinutes" to 90, "weeklyMinutes" to 0), "suggested")
-            openChatWith("Sam")
+            openChatWithSam()
             waitFor(R.string.limit_card_suggested)
             node(R.string.limit_apply).performScrollTo().performClick()
             // What changes, before anything is saved.
@@ -91,7 +104,8 @@ class LimitSharingJourneyTest : EndToEndTest() {
 
             // Kai suggests a change from Sam's page: the limit menu, the editor, then Send.
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
-            openGardenOf("Sam")
+            openChatWithSam()
+            compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Sam")).performClick()
             waitFor(R.string.limit_menu_hint)
             compose.onAllNodes(hasClickAction() and hasText("Pebbles", substring = true)).onLast().performScrollTo().performClick()
             node(R.string.limit_menu_suggest_change).performClick()
