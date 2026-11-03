@@ -28,6 +28,12 @@ import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.limits.MinutesStepper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import dev.pcoffline.meadow.data.ChangeOutcome
+import dev.pcoffline.meadow.data.TimeCap
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
+import dev.pcoffline.meadow.data.Connectivity
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -159,4 +165,78 @@ class LimitPickersTest : ScreenTest() {
             .onFirst().performClick()
         node(R.string.limit_editor_share).performScrollTo().assertIsNotEnabled()
     }
+
+    private fun editorSaving(state: LimitEditorState, outcome: ChangeOutcome, onDone: () -> Unit) = show {
+        Column {
+            BackTopBar(text(R.string.limit_editor_existing), onBack = {})
+            LimitEditor(pkg, state.copy(appName = "Instagram", loaded = true), onDone = onDone, save = { _, _, _ -> outcome })
+        }
+    }
+
+    @Test
+    fun `a saved change to a limit keeps the editor open, so it can be shared`() {
+        var done = 0
+        editorSaving(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)), ChangeOutcome.APPLIED) { done++ }
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
+        node(R.string.action_save).performScrollTo().performClick()
+        compose.waitForIdle()
+        assertEquals("still open", 0, done)
+        node(R.string.limit_editor_share).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `a new limit goes back to the garden once planted`() {
+        var done = 0
+        editorSaving(LimitEditorState(), ChangeOutcome.APPLIED) { done++ }
+        node(R.string.limit_editor_plant).performScrollTo().performClick()
+        compose.waitUntil(5_000) { done == 1 }
+    }
+
+    @Test
+    fun `a question for a Bumblebee closes the editor`() {
+        // Asking needs a connection.
+        Connectivity.set(true)
+        var done = 0
+        editorSaving(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1, pendingKnown = true), ChangeOutcome.REQUESTED) { done++ }
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick()
+        node(R.string.limit_editor_ask).performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { done == 1 }
+    }
+
+    @Test
+    fun `the length picker is readable and reachable for everyone`() {
+        openPicker(value = 30)
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `the cap dialog is readable and reachable for everyone, empty and filled in`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 60, weeklyMinutes = 0)))
+        node(R.string.limit_editor_cap_add).performScrollTo().performClick()
+        // With no times yet, each time button says what it is for.
+        compose.onNodeWithContentDescription(text(R.string.cap_pick_start)).assertExists()
+        compose.onNodeWithContentDescription(text(R.string.cap_pick_end)).assertExists()
+        assertAccessible(requireHeading = false)
+        node(R.string.cap_template_weekdays).performClick()
+        node(R.string.cap_template_evenings).performClick()
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `a saved cap opens as it is, with its quick picks lit, and saves unchanged`() {
+        val first = dev.pcoffline.meadow.AppGraph.store.weekRule.value.first
+        val cap = TimeCap(CapTemplates.weekdays(first), 17 * 60, 22 * 60, 45)
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 60, 0, caps = listOf(cap))))
+        compose.onNode(SemanticsMatcher("edits a cap") { it.config.getOrNull(SemanticsActions.OnClick)?.label == text(R.string.limit_editor_cap_edit) }).performScrollTo().performClick()
+        node(R.string.cap_template_weekdays).assertIsSelected()
+        node(R.string.cap_template_evenings).assertIsSelected()
+        node(R.string.cap_template_mornings).assertIsNotSelected()
+        compose.onNodeWithText(dev.pcoffline.meadow.ui.clockText(17 * 60)).assertExists()
+        // In the cap's row behind the dialog, and in the dialog's own length.
+        compose.onAllNodesWithText("45m").assertCountEquals(2)
+        node(R.string.action_ok).assertIsEnabled().performClick()
+        // Unchanged, so there is nothing to save.
+        node(R.string.action_save).performScrollTo().assertIsNotEnabled()
+    }
+
 }

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -103,8 +104,11 @@ class LimitJourneyTest : EndToEndTest() {
             waitForBackend(limit) { it.int("weeklyMinutes") == 0 && it.int("dailyMinutes") == 45 }
             waitForSnackbarToGo(R.string.limit_editor_updated)
 
-            // Sharing the commitment hands its words to the share sheet.
-            compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
+            // The editor stays open after the save, and its Share turns on once the saved limit is
+            // back. Sharing the commitment hands its words to the share sheet.
+            eventually("Share on for the saved limit") {
+                compose.onAllNodes(hasText(text(R.string.limit_editor_share)) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+            }
             node(R.string.limit_editor_share).performScrollTo().performClick()
             waitFor(R.string.share_commitment_title)
             node(R.string.share_commitment_other_apps).performClick()

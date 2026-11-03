@@ -273,7 +273,13 @@ fun LimitEditorScreen(
 }
 
 @Composable
-internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: () -> Unit) {
+internal fun LimitEditor(
+    packageName: String,
+    state: LimitEditorState,
+    onDone: () -> Unit,
+    // Tests pass their own; the app saves through the limits repository.
+    save: suspend (limit: AppLimit, message: String, approverIds: List<String>?) -> ChangeOutcome = AppGraph.limits::save,
+) {
     val existing = state.existing
     var dailyOn by rememberSaveable { mutableStateOf(existing == null || existing.dailyMinutes > 0) }
     var daily by rememberSaveable { mutableIntStateOf(existing?.dailyMinutes?.takeIf { it > 0 } ?: 30) }
@@ -401,7 +407,7 @@ internal fun LimitEditor(packageName: String, state: LimitEditorState, onDone: (
             onClick = {
                 var closes = true
                 action.run(onSuccess = { if (closes) onDone() }) {
-                    val outcome = AppGraph.limits.save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
+                    val outcome = save(proposed, message, if (needsApproval) BeePicks.commit(picks.value) else null)
                     closes = closesAfterSave(existing, outcome)
                     if (outcome == ChangeOutcome.APPLIED) {
                         celebrate()
@@ -519,8 +525,8 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChang
 }
 
 /**
- * A length of time with − and + either side. With a [label], tapping the time opens a clock to
- * pick it straight away, for any length under a day.
+ * A length of time with − and + either side. With a [label], tapping the time opens a picker of
+ * hours and minutes, in steps of 5, for any length under a day.
  */
 @Composable
 internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: Boolean, label: String? = null, onChange: (Int) -> Unit) {
@@ -657,8 +663,8 @@ private val CHIP_PADDING = 24.dp
 
 /**
  * Whether the editor closes after a save. A change to a limit that applies at once keeps it open,
- * so the saved limit can be shared from it; a new limit goes back to the garden, and a question
- * for a Bumblebee closes too.
+ * so the saved limit can be shared from it. A new limit goes back to the garden. A question for a
+ * Bumblebee closes the editor too.
  */
 internal fun closesAfterSave(existing: AppLimit?, outcome: ChangeOutcome): Boolean =
     existing == null || outcome != ChangeOutcome.APPLIED

@@ -225,11 +225,19 @@ private fun CapDialog(initial: TimeCap?, firstDay: DayOfWeek, onDismiss: () -> U
                 }
                 DayChips(days, firstDay, enabled = true) { days = it }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val startText = start?.let(::clockText) ?: stringResource(R.string.cap_start)
-                    val endText = end?.let { clockText(it % TimeWindow.MINUTES_IN_DAY) } ?: stringResource(R.string.cap_end)
-                    TimeField(startText, stringResource(R.string.schedule_starts, startText), enabled = true) { clock = true }
+                    val startText = start?.let(::clockText)
+                    val endText = end?.let { clockText(it % TimeWindow.MINUTES_IN_DAY) }
+                    TimeField(
+                        startText ?: stringResource(R.string.cap_start),
+                        startText?.let { stringResource(R.string.schedule_starts, it) } ?: stringResource(R.string.cap_pick_start),
+                        enabled = true,
+                    ) { clock = true }
                     Text("–")
-                    TimeField(endText, stringResource(R.string.schedule_ends, endText), enabled = true) { clock = false }
+                    TimeField(
+                        endText ?: stringResource(R.string.cap_end),
+                        endText?.let { stringResource(R.string.schedule_ends, it) } ?: stringResource(R.string.cap_pick_end),
+                        enabled = true,
+                    ) { clock = false }
                 }
                 Text(stringResource(R.string.limit_editor_cap_minutes), style = MaterialTheme.typography.titleSmall)
                 MinutesStepper(minutes, step = 5, min = 5, max = 16 * 60, enabled = true, label = stringResource(R.string.limit_editor_cap_minutes)) { minutes = it }
@@ -245,7 +253,7 @@ private fun CapDialog(initial: TimeCap?, firstDay: DayOfWeek, onDismiss: () -> U
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
     clock?.let { isStart ->
-        TimeDialog(initialMinute = (if (isStart) from else to?.rem(TimeWindow.MINUTES_IN_DAY)) ?: CapTemplates.CLOCK_START, onDismiss = { clock = null }) { picked ->
+        TimeDialog(initialMinute = (if (isStart) from else to?.rem(TimeWindow.MINUTES_IN_DAY) ?: from?.let { (it + 60) % TimeWindow.MINUTES_IN_DAY }) ?: CapTemplates.CLOCK_START, onDismiss = { clock = null }) { picked ->
             clock = null
             // Midnight as an end means the end of the day.
             if (isStart) from = picked else to = if (picked == 0) TimeWindow.MINUTES_IN_DAY else picked

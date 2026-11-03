@@ -101,6 +101,8 @@
     <string name="limit_editor_cap_pick_hours">Choose the start and the end.</string>
     <string name="cap_start">Start</string>
     <string name="cap_end">End</string>
+    <string name="cap_pick_start">Choose when it starts</string>
+    <string name="cap_pick_end">Choose when it ends</string>
     <string name="cap_templates">Quick picks</string>
     <string name="cap_template_weekdays">Weekdays</string>
     <string name="cap_template_weekends">Weekends</string>

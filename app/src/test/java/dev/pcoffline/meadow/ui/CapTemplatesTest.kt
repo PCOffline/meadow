@@ -26,9 +26,9 @@ class CapTemplatesTest {
     }
 
     @Test
-    fun `the hour templates do not overlap and stay inside one day`() {
-        val windows = CapTemplates.HOURS.map { it.from to it.to }
-        assertEquals(listOf(6 * 60 to 12 * 60, 12 * 60 to 17 * 60, 17 * 60 to 22 * 60, 22 * 60 to 24 * 60), windows)
+    fun `the hour templates run in order, do not overlap and stay inside one day`() {
+        CapTemplates.HOURS.forEach { assertTrue("$it", it.from < it.to && it.to <= 24 * 60) }
+        CapTemplates.HOURS.zipWithNext().forEach { (a, b) -> assertTrue("$a then $b", a.to <= b.from) }
     }
 
     @Test
