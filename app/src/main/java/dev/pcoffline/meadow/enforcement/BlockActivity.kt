@@ -264,14 +264,27 @@ class RestViewModel(
     }.flowOn(Dispatchers.IO).stateWhileVisible(this, RestState())
 }
 
-/** A resting app gets a calm dusk sky with the moon out, whatever the hour. */
-private val RestingSky = SkyMood(
-    top = Color(0xFF3B3F63),
-    bottom = Color(0xFFB8A9C9),
-    night = true,
-    onSky = Color(0xFFF3EEE2),
-    greeting = R.string.greeting_night,
-)
+/**
+ * A resting app's calm sky, whatever the hour: a dusk sky with the moon out on a dark page, and a
+ * soft evening sky on a light one. It follows the chosen look, as every other sky does (#74).
+ */
+internal fun restingSky(dark: Boolean): SkyMood = if (dark) {
+    SkyMood(
+        top = Color(0xFF3B3F63),
+        bottom = Color(0xFFB8A9C9),
+        night = true,
+        onSky = Color(0xFFF3EEE2),
+        greeting = R.string.greeting_night,
+    )
+} else {
+    SkyMood(
+        top = Color(0xFFE6D3EC),
+        bottom = Color(0xFFF9E4D6),
+        night = false,
+        onSky = Color(0xFF3E3A32),
+        greeting = R.string.greeting_evening,
+    )
+}
 
 @Composable
 private fun RestScreen(pkg: String, onHome: () -> Unit, onOpen: (String) -> Unit) {
@@ -304,7 +317,7 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
 
     CompositionLocalProvider(LocalSnackbar provides snackbar) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            SkyScene(RestingSky, Modifier.fillMaxSize())
+            SkyScene(restingSky(dev.pcoffline.meadow.ui.theme.LocalDarkTheme.current), Modifier.fillMaxSize())
             FallingPetals(Modifier.fillMaxSize(), count = 8)
             // Centred when it fits; scrolls in landscape or with large text, so every button stays reachable.
             BoxWithConstraints(Modifier.fillMaxSize()) {

@@ -91,6 +91,7 @@ import dev.pcoffline.meadow.data.FlowerAvatars
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FallingPetals
+import dev.pcoffline.meadow.ui.components.EmojiText
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.SkyScene
@@ -524,7 +525,7 @@ fun FlowerPicker(selected: String, onSelect: (String) -> Unit) {
                         ) { onSelect(f) }
                         .semantics { this.selected = chosen },
                     contentAlignment = Alignment.Center,
-                ) { Text(f, fontSize = 24.sp) }
+                ) { EmojiText(f, 24.sp) }
             }
         }
     }

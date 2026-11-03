@@ -243,24 +243,50 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
             lineTo(w, h); lineTo(0f, h); close()
         }
         drawPath(front, frontColor)
-        val dots = listOf(0.08f to 0.82f, 0.21f to 0.72f, 0.37f to 0.80f, 0.63f to 0.86f, 0.78f to 0.74f, 0.91f to 0.80f)
         val unit = 1.dp.toPx()
-        dots.forEachIndexed { i, (x, down) ->
+        HILL_FLOWERS.forEachIndexed { i, f ->
             val color = garden.petals[i % garden.petals.size]
-            translate(w * x, y(down)) {
-                if (mushrooms) {
-                    tinyToadstool(color, unit)
-                } else {
-                    for (k in 0 until 5) {
-                        val a = Math.toRadians(72.0 * k).toFloat()
-                        drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
+            translate(w * f.x, y(f.down)) {
+                // A toadstool is wider than a flower, so it grows a little less, staying under a butterfly.
+                scale(if (mushrooms) f.scale * TOADSTOOL_SHARE else f.scale, pivot = Offset.Zero) {
+                    if (mushrooms) {
+                        tinyToadstool(color, unit)
+                    } else {
+                        for (k in 0 until 5) {
+                            val a = Math.toRadians(72.0 * k).toFloat()
+                            drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
+                        }
+                        drawCircle(garden.petalHoney, radius = 1.05f * unit, center = Offset.Zero)
                     }
-                    drawCircle(garden.petalHoney, radius = 1.05f * unit, center = Offset.Zero)
                 }
             }
         }
     }
 }
+
+/** A tiny flower on the hills: across ([x]) and down ([down]) as shares of the size, drawn [scale] times its base size. */
+internal data class HillFlower(val x: Float, val down: Float, val scale: Float)
+
+/**
+ * The hills' flowers, in turn on the back hill and the front one, so they fill the meadow from
+ * near to far. Those further back are a little smaller.
+ */
+internal val HILL_FLOWERS = listOf(
+    HillFlower(0.08f, 0.66f, 1.15f),
+    HillFlower(0.21f, 0.90f, 1.4f),
+    HillFlower(0.37f, 0.60f, 1.15f),
+    HillFlower(0.63f, 0.93f, 1.4f),
+    HillFlower(0.78f, 0.64f, 1.15f),
+    HillFlower(0.91f, 0.88f, 1.4f),
+)
+
+/** A flower's width before scaling: five petals 1.5 dp round, 1.7 dp from its middle. */
+private const val HILL_FLOWER_BASE_DP = 2 * (1.7f + 1.5f)
+
+private const val TOADSTOOL_SHARE = 0.85f
+
+/** How wide [flower] is drawn, in dp. */
+internal fun hillFlowerWidthDp(flower: HillFlower): Float = HILL_FLOWER_BASE_DP * flower.scale
 
 /** A toadstool a few dp tall, its cap [cap] with pale spots, standing on the origin's ground. */
 private fun DrawScope.tinyToadstool(cap: Color, unit: Float) {

@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -200,11 +202,15 @@ fun GardenContent(
             }
 
             items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
-                Row(Modifier.animateItem().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Both cards as tall as the taller one, so a line more on one doesn't stagger the row.
+                Row(
+                    Modifier.animateItem().padding(horizontal = 20.dp).height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     row.forEach { budget ->
                         FlowerTile(
                             budget,
-                            Modifier.weight(1f),
+                            Modifier.weight(1f).fillMaxHeight(),
                             onAsk = if (canAsk && !budget.emergency) ({ onAsk(budget.limit.packageName) }) else null,
                         ) { onOpenLimit(budget.limit.packageName) }
                     }
