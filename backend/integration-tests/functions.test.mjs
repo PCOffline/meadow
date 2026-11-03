@@ -1351,6 +1351,18 @@ describe("suggested limits", () => {
     assert.equal(asked, 0);
   });
 
+  test("applying a suggestion withdraws my open questions about the same limit", async () => {
+    const { sam, bee } = await circle();
+    const { requestId } = await sam.call("createRequest", { type: "change_limit", packageName: "com.insta", dailyMinutes: 120, weeklyMinutes: 0, dayKey: today() });
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.tiktok`), { packageName: "com.tiktok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 }));
+    const other = await sam.call("createRequest", { type: "change_limit", packageName: "com.tiktok", dailyMinutes: 40, weeklyMinutes: 0, dayKey: today() });
+    await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", looser));
+    assert.equal((await read(`requests/${requestId}`)).status, "cancelled");
+    assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).status, "cancelled");
+    // A question about another app stays open.
+    assert.equal((await read(`requests/${other.requestId}`)).status, "pending");
+  });
+
   test("a suggestion plants a limit for an app with none", async () => {
     const { sam, bee } = await circle();
     await sam.call("applyLimitSuggestion", await card(bee, sam, "suggested", { packageName: "com.tiktok", appName: "TikTok", dailyMinutes: 20, weeklyMinutes: 0 }));

@@ -80,8 +80,11 @@ class LimitSharingLogicTest {
     fun `a Bumblebee's suggestion goes to the backend as their approval`() = kotlinx.coroutines.runBlocking {
         val approvals = mutableListOf<Pair<String, String>>()
         val saved = mutableListOf<AppLimit>()
+        val withdrawn = mutableListOf<String>()
         val outcome = applySuggested("chat", suggested(full), fromBumblebee = true, myName = "Insta",
-            applyAsApproval = { c, m -> approvals += c to m }, save = { saved += it; ChangeOutcome.APPLIED })
+            applyAsApproval = { c, m -> approvals += c to m }, save = { saved += it; ChangeOutcome.APPLIED }, withdrawChanges = { withdrawn += it })
+        // The backend withdraws the other questions in the same step.
+        assertTrue(withdrawn.isEmpty())
         assertEquals(ChangeOutcome.APPLIED, outcome)
         assertEquals(listOf("chat" to "m1"), approvals)
         assertTrue(saved.isEmpty())
@@ -91,11 +94,23 @@ class LimitSharingLogicTest {
     fun `anyone else's suggestion is saved the usual way, under my name for the app`() = kotlinx.coroutines.runBlocking {
         val approvals = mutableListOf<Pair<String, String>>()
         val saved = mutableListOf<AppLimit>()
+        val withdrawn = mutableListOf<String>()
         val outcome = applySuggested("chat", suggested(full.copy(appName = "Calculator")), fromBumblebee = false, myName = "Instagram",
-            applyAsApproval = { c, m -> approvals += c to m }, save = { saved += it; ChangeOutcome.REQUESTED })
+            applyAsApproval = { c, m -> approvals += c to m }, save = { saved += it; ChangeOutcome.REQUESTED }, withdrawChanges = { withdrawn += it })
+        // Still a question: nothing is settled yet.
+        assertTrue(withdrawn.isEmpty())
         assertEquals(ChangeOutcome.REQUESTED, outcome)
         assertTrue(approvals.isEmpty())
         assertEquals(listOf(full), saved)
+    }
+
+
+    @Test
+    fun `once anyone else's suggestion applies at once, my other open questions about it are withdrawn`() = kotlinx.coroutines.runBlocking {
+        val withdrawn = mutableListOf<String>()
+        applySuggested("chat", suggested(full), fromBumblebee = false, myName = "Instagram",
+            applyAsApproval = { _, _ -> }, save = { ChangeOutcome.APPLIED }, withdrawChanges = { withdrawn += it })
+        assertEquals(listOf(full.packageName), withdrawn)
     }
 
 }

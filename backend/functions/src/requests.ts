@@ -414,7 +414,8 @@ export const SUGGESTION_TTL_MS = 7 * 24 * 60 * 60_000;
 /**
  * Applies a limit one of the caller's Bumblebees suggested in their chat, as it was sent. The
  * Bumblebee's suggestion is the approval a change needs, so it applies even when looser. Like an
- * approval, it applies once, and only for [SUGGESTION_TTL_MS] after it was sent. Any other
+ * approval, it applies once, and only for [SUGGESTION_TTL_MS] after it was sent. Open questions
+ * to change or remove the same limit are withdrawn, as what was applied settles them. Any other
  * suggestion goes through the phone's usual save, with the usual rules.
  */
 export const applyLimitSuggestion = onCall(async (call) => {
@@ -440,7 +441,15 @@ export const applyLimitSuggestion = onCall(async (call) => {
     if (!me.account.approverIds.includes(sender)) throw new HttpsError("permission-denied", errors.notYourBumblebee);
     const ref = users().doc(uid).collection("limits").doc(limit.data.packageName);
     const snap = await tx.get(ref);
+    // Other questions about this app's limit are settled by what was applied, so they're withdrawn.
+    const open = (await tx.get(requests().where("requesterId", "==", uid).where("status", "==", "pending"))).docs
+      .filter((d) => d.get("packageName") === limit.data.packageName && (d.get("type") === "change_limit" || d.get("type") === "remove_limit"));
+    const inboxes = await Promise.all(open.map((d) => existingInboxes(tx, d.id, (d.get("approverIds") as string[] | undefined) ?? [])));
     writeLimit(tx, ref, snap, limit.data);
+    open.forEach((d, i) => {
+      tx.update(d.ref, { status: "cancelled", decidedAt: FieldValue.serverTimestamp() });
+      updateInboxes(tx, d.id, inboxes[i] ?? [], "cancelled");
+    });
     tx.set(appliedRef, { chatId: input.chatId, messageId: input.messageId, by: sender, at: FieldValue.serverTimestamp() });
   });
   return { ok: true };

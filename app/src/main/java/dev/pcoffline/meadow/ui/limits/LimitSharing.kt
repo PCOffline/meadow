@@ -86,6 +86,7 @@ fun onThisPhone(packageName: String, installed: Set<String>): Boolean = Sites.is
 /**
  * Saves a suggested limit. From one of my Bumblebees ([fromBumblebee]), it is their approval, and the
  * backend saves it. From anyone else, it is saved as I would save it myself: a looser one asks.
+ * Once it applies, my other open questions to change or remove that limit are withdrawn.
  * Either way it keeps my name for the app ([myName]): the sender's name is only theirs.
  */
 suspend fun applySuggested(
@@ -95,13 +96,18 @@ suspend fun applySuggested(
     myName: String,
     applyAsApproval: suspend (chatId: String, messageId: String) -> Unit = { c, m -> AppGraph.limits.applySuggestion(c, m) },
     save: suspend (AppLimit) -> ChangeOutcome = { AppGraph.limits.save(it) },
+    withdrawChanges: suspend (packageName: String) -> Unit = { AppGraph.requests.withdrawChanges(it) },
 ): ChangeOutcome {
     val limit = message.limit ?: return ChangeOutcome.APPLIED
     if (fromBumblebee) {
+        // The backend also withdraws my other open questions about this limit.
         applyAsApproval(chatId, message.id)
         return ChangeOutcome.APPLIED
     }
-    return save(limit.copy(appName = myName))
+    val outcome = save(limit.copy(appName = myName))
+    // Applied at once: my other open questions about this limit are settled by it.
+    if (outcome == ChangeOutcome.APPLIED) withdrawChanges(limit.packageName)
+    return outcome
 }
 
 /** The name to show for [limit]'s app: this phone's own when the app is here, else the name it came with. */
