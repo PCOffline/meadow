@@ -61,6 +61,9 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          # With the default renderer (swiftshader_indirect), the emulator froze as a test ended and
+          # the home screen drew again. SwANGLE is the emulator's newer software renderer.
+          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -noaudio -no-boot-anim
           # Animations stay on: the recordings show them.
           disable-animations: false
           script: |
@@ -68,9 +71,7 @@ jobs:
             sleep 20
             mkdir -p build/showcase
             nohup adb logcat -v time > build/showcase/logcat.txt 2>&1 &
-            # The showcase draws only from DemoGarden, so the app's data stays between tests. Twice the
-            # emulator froze just as the app's data was cleared after a test.
-            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.clearPackageData=false -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
+            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.showcase=true -Pandroid.testInstrumentationRunnerArguments.class=dev.pcoffline.meadow.showcase.ShowcaseTest --stacktrace
             adb get-state > /dev/null 2>&1 || { echo "::error::The emulator stopped answering during ShowcaseTest."; exit 1; }
             adb pull /sdcard/Pictures/meadow build/showcase
       # Why the emulator stopped answering: the crashes and the last lines it logged.
