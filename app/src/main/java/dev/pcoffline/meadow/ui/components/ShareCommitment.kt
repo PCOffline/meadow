@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -104,6 +105,7 @@ private fun ShareCommitmentSheet(text: String, limit: AppLimit?, onDismiss: () -
     val me by viewModel.me.collectAsStateWithLifecycle()
     val action = rememberAction()
     val context = LocalContext.current
+    val res = LocalResources.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ShareCommitmentContent(
             text = text,
@@ -116,7 +118,7 @@ private fun ShareCommitmentSheet(text: String, limit: AppLimit?, onDismiss: () -
                     val chatId = ChatRepository.chatIdFor(uid, person.uid)
                     // In Meadow, a limit goes as a card they can copy; other apps get the words.
                     if (limit != null) {
-                        AppGraph.chats.sendLimit(chatId, limit, LimitCardMode.SHARED, context.getString(R.string.limit_card_shared_words, limit.appName))
+                        AppGraph.chats.sendLimit(chatId, limit, LimitCardMode.SHARED, res.getString(R.string.limit_card_shared_words, limit.appName))
                     } else {
                         AppGraph.chats.send(chatId, text)
                     }
