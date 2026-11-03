@@ -91,6 +91,8 @@ class ProfileAndPrivacyTest : ScreenTest() {
         node(R.string.settings_appearance_title).performScrollTo().assertExists()
         compose.onNode(hasText(text(GardenTheme.LAVENDER.label), substring = true) and hasClickAction()).performScrollTo().assertExists()
         node(R.string.dark_mode_dark).performScrollTo().assertExists()
+        // Day and night by the clock, apart from the phone's own setting (#83).
+        node(R.string.dark_mode_clock).performScrollTo().assertExists()
         assertAccessible()
     }
 

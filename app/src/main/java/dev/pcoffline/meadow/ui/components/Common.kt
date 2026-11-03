@@ -67,6 +67,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import dev.pcoffline.meadow.AppGraph
@@ -165,9 +169,28 @@ fun FlowerAvatar(flower: String, modifier: Modifier = Modifier, size: Dp = 44.dp
         modifier.size(size).clip(CircleShape).background(tint),
         contentAlignment = Alignment.Center,
     ) {
-        Text(flower, fontSize = (size.value * 0.5f).sp)
+        EmojiText(flower, (size.value * 0.5f).sp)
     }
 }
+
+/**
+ * An emoji centred by its own shape. The bundled emoji font has more room above its glyphs than
+ * below, so text centred by its line sits low and to one side in a circle (#70). The line is cut
+ * to the glyph's height, without the font's padding, and the glyph is centred in it.
+ */
+@Composable
+fun EmojiText(emoji: String, fontSize: TextUnit, modifier: Modifier = Modifier) {
+    Text(emoji, modifier, style = emojiStyle(fontSize))
+}
+
+/** The text style [EmojiText] draws with; see there. */
+internal fun emojiStyle(fontSize: TextUnit): TextStyle = TextStyle(
+    fontSize = fontSize,
+    lineHeight = fontSize,
+    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    textAlign = TextAlign.Center,
+)
 
 /** A person: their photo, or their emoji on the soft colour they picked. */
 @Composable
@@ -179,7 +202,7 @@ fun PersonAvatar(avatar: Avatar, modifier: Modifier = Modifier, size: Dp = 44.dp
     // A photo replaces the flower: it isn't drawn underneath, only shown if the photo can't load.
     var photoFailed by remember(photo) { mutableStateOf(false) }
     Box(modifier.size(size).clip(CircleShape).background(circle).then(semantics), contentAlignment = Alignment.Center) {
-        if (photo == null || photoFailed) Text(avatar.emoji, fontSize = (size.value * 0.5f).sp)
+        if (photo == null || photoFailed) EmojiText(avatar.emoji, (size.value * 0.5f).sp)
         if (photo != null && !photoFailed) {
             AsyncImage(
                 model = photo,

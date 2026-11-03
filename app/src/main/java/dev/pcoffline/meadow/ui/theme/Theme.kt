@@ -15,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -82,13 +83,40 @@ enum class GardenTheme(val key: String, @StringRes val label: Int, val emoji: St
 
 enum class DarkMode(val key: String, @StringRes val label: Int) {
     SYSTEM("system", R.string.dark_mode_system),
+    /** Day by day and night by night, by the clock, whatever the phone's own setting. */
+    CLOCK("clock", R.string.dark_mode_clock),
     LIGHT("light", R.string.dark_mode_light),
     DARK("dark", R.string.dark_mode_dark);
+
+    /** Whether the app is dark at [hour] (0 to 23), with the phone's own dark mode [systemDark]. */
+    fun isDarkAt(hour: Int, systemDark: Boolean): Boolean = when (this) {
+        SYSTEM -> systemDark
+        CLOCK -> isNightHour(hour)
+        LIGHT -> false
+        DARK -> true
+    }
 
     companion object {
         fun fromKey(key: String?) = entries.firstOrNull { it.key == key } ?: SYSTEM
     }
 }
+
+/** Night is from 21:00 to 5:00, the same night the sky shows. */
+fun isNightHour(hour: Int): Boolean = hour !in 5..20
+
+/** The hour of the day, kept up to date while it's on screen, so Clock changes over by itself. */
+@Composable
+private fun rememberHourOfDay(): Int {
+    val hour by produceState(java.time.LocalTime.now().hour) {
+        while (true) {
+            kotlinx.coroutines.delay(MINUTE_MS)
+            value = java.time.LocalTime.now().hour
+        }
+    }
+    return hour
+}
+
+private const val MINUTE_MS = 60_000L
 
 /** A handful of colours each theme is grown from; everything else is derived so themes stay consistent. */
 private data class Seed(
@@ -455,11 +483,8 @@ fun MeadowTheme(
     darkMode: DarkMode = DarkMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    val dark = when (darkMode) {
-        DarkMode.SYSTEM -> isSystemInDarkTheme()
-        DarkMode.LIGHT -> false
-        DarkMode.DARK -> true
-    }
+    val systemDark = isSystemInDarkTheme()
+    val dark = darkMode.isDarkAt(if (darkMode == DarkMode.CLOCK) rememberHourOfDay() else 0, systemDark)
     val seed = Seeds.getValue(theme)
     val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
     val garden = remember(theme, dark) { gardenColors(seed, dark) }
