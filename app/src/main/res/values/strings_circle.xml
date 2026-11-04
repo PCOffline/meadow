@@ -4,6 +4,7 @@
     <string name="people_waiting">Waiting for you</string>
     <string name="people_your_asks">Your asks</string>
     <string name="people_invite_more">Invite a Bumblebee</string>
+    <string name="people_welcome_body">A Bumblebee is a friend who looks after your garden. They answer when you ask for more time.</string>
     <string name="people_bees_empty">Nobody looks after your garden yet. Use the plus button to invite a Bumblebee.</string>
     <string name="people_gardens_empty">You don\'t look after a garden yet. Use the plus button to get your friend code.</string>
 

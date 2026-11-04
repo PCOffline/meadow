@@ -9,6 +9,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -177,10 +180,13 @@ fun PeopleContent(
     val (offers, asks) = people.outgoingInvites.partition { it.offer }
     val hasBees = profile.approverIds.isNotEmpty() || people.bumblebees.isNotEmpty() || asks.isNotEmpty()
     val hasGardens = profile.approveeIds.isNotEmpty() || people.lookingAfter.isNotEmpty() || offers.isNotEmpty()
+    val nobody = !hasBees && !hasGardens && people.incomingInvites.isEmpty()
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { TabTitle(stringResource(R.string.people_title)) }
+            // With nobody yet, a first Bumblebee is the one thing to do here.
+            if (nobody) item(key = "welcome") { WelcomeCard(Modifier.animateItem().padding(horizontal = 20.dp)) { adding = AddSheet.INVITE } }
 
             if (people.incomingInvites.isNotEmpty() || people.incomingRequests.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.people_waiting), Modifier.padding(horizontal = 20.dp)) }
@@ -220,13 +226,7 @@ fun PeopleContent(
             }
             items(offers, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
             // How I answer as a Bumblebee belongs with the gardens I answer for, under them.
-            if (hasGardens) {
-                item(key = "bee-stats") {
-                    TextButton(onClick = onOpenBeeStats, modifier = Modifier.animateItem().padding(horizontal = 8.dp)) {
-                        Text(stringResource(R.string.bee_stats_open))
-                    }
-                }
-            }
+            if (hasGardens) item(key = "bee-stats") { BeeStatsRow(Modifier.animateItem(), onOpenBeeStats) }
             item { Spacer(Modifier.height(if (profile.approverIds.isNotEmpty()) 88.dp else 24.dp)) }
         }
         // Asking for time is the one thing to do with Bumblebees from here; their chats hold the rest.
@@ -260,6 +260,30 @@ fun PeopleContent(
                 }
             }
         }
+    }
+}
+
+/** For someone with nobody yet: what a Bumblebee is, and a button that opens the invite. */
+@Composable
+private fun WelcomeCard(modifier: Modifier, onInvite: () -> Unit) {
+    MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.primaryContainer) {
+        Text(stringResource(R.string.invite_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
+        Text(stringResource(R.string.people_welcome_body), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp))
+        Button(onClick = onInvite, modifier = Modifier.padding(top = 14.dp).fillMaxWidth()) { Text(stringResource(R.string.people_invite_more)) }
+    }
+}
+
+/** How I answer as a Bumblebee, under the gardens I answer for: a row with a chart at its start. */
+@Composable
+private fun BeeStatsRow(modifier: Modifier, onOpen: () -> Unit) {
+    Row(
+        modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onOpen).padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.BarChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Text(stringResource(R.string.bee_stats_open), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

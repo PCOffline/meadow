@@ -182,17 +182,25 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `with nobody yet, each section says how to add someone, with no invite cards`() {
+    fun `with nobody yet, a welcome card invites a first Bumblebee, above both sections`() {
         show { PeopleContent(robin.copy(approverIds = emptyList(), approveeIds = emptyList()), People()) }
-        node(R.string.circle_your_bees).assertExists()
-        node(R.string.people_bees_empty).assertExists()
-        node(R.string.circle_looking_after).assertExists()
-        node(R.string.people_gardens_empty).assertExists()
-        node(R.string.invite_title).assertDoesNotExist()
+        val welcome = node(R.string.people_welcome_body).assertExists().getBoundsInRoot()
+        assertTrue(welcome.bottom <= node(R.string.circle_your_bees).getBoundsInRoot().top)
+        node(R.string.people_bees_empty).performScrollTo().assertExists()
+        node(R.string.people_gardens_empty).performScrollTo().assertExists()
         node(R.string.join_code_title).assertDoesNotExist()
         // No Bumblebees to ask.
         compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).assertDoesNotExist()
         assertAccessible()
+        // Its button opens the invite.
+        compose.onNode(hasText(text(R.string.people_invite_more)) and hasClickAction()).performClick()
+        node(R.string.invite_link_button).assertExists()
+    }
+
+    @Test
+    fun `with someone in the circle, there's no welcome card`() {
+        show { PeopleContent(robin, People(bumblebees = listOf(DemoGarden.maya))) }
+        node(R.string.people_welcome_body).assertDoesNotExist()
     }
 
     @Test
