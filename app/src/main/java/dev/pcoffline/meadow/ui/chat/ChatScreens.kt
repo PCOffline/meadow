@@ -216,19 +216,6 @@ fun ChatScreen(
     )
 }
 
-/**
- * A conversation, drawn from plain state (also used for previews and screenshots).
- * [onSend] gets the draft and a callback to run once it's sent, which clears the draft; until then
- * (and if sending fails, shown as [error]) the draft stays. Sending is off while [sending].
- * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
- * message (with whether you asked it); by default it follows the live request. Whichever way
- * round the two aren't yet each other's Bumblebee, [onAskBee] asks (or offers, when true) unless
- * that's already [invited]. [onSendPicture] gets photos or GIFs, picked or from the keyboard, and
- * [uploading] says how many are still on their way;
- * [pictureFile] fetches one to show (null once it's gone). Up top, [onOpenGarden] opens the garden
- * of someone I look after, and a Bumblebee of mine can be removed (or kept, while leaving).
- */
-@OptIn(ExperimentalFoundationApi::class)
 /** The line above the first message that's new since I last read the chat. */
 @Composable
 private fun NewLine(modifier: Modifier) {
@@ -248,6 +235,19 @@ private fun NewLine(modifier: Modifier) {
     }
 }
 
+/**
+ * A conversation, drawn from plain state (also used for previews and screenshots).
+ * [onSend] gets the draft and a callback to run once it's sent, which clears the draft; until then
+ * (and if sending fails, shown as [error]) the draft stays. Sending is off while [sending].
+ * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
+ * message (with whether you asked it); by default it follows the live request. Whichever way
+ * round the two aren't yet each other's Bumblebee, [onAskBee] asks (or offers, when true) unless
+ * that's already [invited]. [onSendPicture] gets photos or GIFs, picked or from the keyboard, and
+ * [uploading] says how many are still on their way;
+ * [pictureFile] fetches one to show (null once it's gone). Up top, [onOpenGarden] opens the garden
+ * of someone I look after, and a Bumblebee of mine can be removed (or kept, while leaving).
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatContent(
     profile: UserProfile,
