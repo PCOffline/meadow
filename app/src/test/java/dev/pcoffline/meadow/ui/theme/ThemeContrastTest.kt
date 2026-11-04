@@ -57,6 +57,18 @@ class ThemeContrastTest {
     )
 
     @Test
+    fun `every petal stands out from the page and the cards`() = assertNone(
+        failures { out, theme, dark ->
+            val garden = gardenColorsFor(theme, dark)
+            val page = colorSchemeFor(theme, dark).background
+            garden.petals.forEachIndexed { i, petal ->
+                out.require("${name(theme, dark)} petal $i on background", petal, page, PETAL_TARGET)
+                out.require("${name(theme, dark)} petal $i on cardTint", petal, garden.cardTint, PETAL_TARGET)
+            }
+        },
+    )
+
+    @Test
     fun `colours made for each other are readable together`() = assertNone(
         failures { out, theme, dark ->
             val s = colorSchemeFor(theme, dark)

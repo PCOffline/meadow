@@ -11,16 +11,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -170,10 +172,17 @@ private fun ThemeCard(theme: GardenTheme, selected: Boolean, modifier: Modifier,
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // The theme itself, small: its sky, sun, hills and a flower (a toadstool in the mushroom forest).
+        // The theme itself, small: its sky, sun, hills and three of the flowers the garden grows
+        // (toadstools in the mushroom forest), in the petals it gives apps.
         Box(Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(12.dp))) {
             SkyPreview(Modifier.matchParentSize())
-            BloomFlower(1f, Garden.colors.petalPink, Modifier.align(Alignment.BottomCenter).size(38.dp, 54.dp), sway = false, growIn = false)
+            val petals = Garden.colors.petals
+            // On a narrow phone the card is narrow too, so the flowers shrink to fit it.
+            Row(Modifier.align(Alignment.BottomCenter).widthIn(max = 90.dp).fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                for ((petal, share) in listOf(petals[2] to 0.7f, petals[0] to 1f, petals[3] to 0.7f)) {
+                    BloomFlower(1f, petal, Modifier.weight(share).aspectRatio(0.7f), sway = false, growIn = false)
+                }
+            }
         }
         Spacer(Modifier.height(6.dp))
         // Room for two lines on every card, so a long name doesn't make its card taller than the rest.
