@@ -38,8 +38,9 @@ import org.junit.runner.RunWith
 
 /**
  * Every state of every screen in the debug gallery ([Scenarios]), in each [Look], for the pull
- * request pictures. The Pictures workflow draws them for the pull request and for its base, and
- * shows the ones that changed. The sky, the weather and the motion are fixed, so two runs of the
+ * request pictures: each theme by day and by night, then large text and a narrow phone. The
+ * Pictures workflow draws them for the pull request and for its base, and shows the ones that
+ * changed, grouped by theme. The sky, the weather and the motion are fixed, so two runs of the
  * same code draw the same pixels.
  *
  * Skipped unless run with `-Pandroid.testInstrumentationRunnerArguments.pictures=true`.
@@ -48,21 +49,33 @@ import org.junit.runner.RunWith
 class GalleryPictures {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    /** One way to look at every screen. */
+    /**
+     * One way to look at every screen: its folder [name], what it is in its [group] ([label]), and
+     * the sky's [hour], 10:00 by day and 22:00 by night.
+     */
     private data class Look(
         val name: String,
+        val group: String,
+        val label: String,
         val theme: GardenTheme = GardenTheme.MEADOW,
         val mode: DarkMode = DarkMode.LIGHT,
+        val hour: Int = 10,
         val fontScale: Float = 1f,
         val narrow: Boolean = false,
     )
 
-    private val looks = listOf(
-        Look("light"),
-        Look("dark", mode = DarkMode.DARK),
-        Look("large-text", fontScale = 1.5f),
-        Look("narrow", narrow = true),
-    ) + GardenTheme.entries.filter { it != GardenTheme.MEADOW }.map { Look("theme-${it.key}", theme = it) }
+    private val looks by lazy {
+        GardenTheme.entries.flatMap { theme ->
+            val group = compose.activity.getString(theme.label)
+            listOf(
+                Look("${theme.key}-day", group, "Day", theme),
+                Look("${theme.key}-night", group, "Night", theme, DarkMode.DARK, hour = 22),
+            )
+        } + listOf(
+            Look("large-text", "Large text", "Day", fontScale = 1.5f),
+            Look("narrow", "Narrow phone", "Day", narrow = true),
+        )
+    }
 
     @Before
     fun setUp() {
@@ -80,7 +93,7 @@ class GalleryPictures {
             MeadowTheme(look.theme, look.mode) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(
-                    LocalSkyHour provides 10,
+                    LocalSkyHour provides look.hour,
                     LocalSkyWeather provides Weather.CLEAR,
                     LocalDensity provides Density(density.density, density.fontScale * look.fontScale),
                 ) {
@@ -108,7 +121,7 @@ class GalleryPictures {
                 Thread.sleep(SETTLE_MS)
                 val path = "${look.name}/${slug(scenario.screen)}--${slug(scenario.name)}.png"
                 Device.screenshot("gallery/$path")
-                index += listOf(path, scenario.screen, scenario.name, look.name).joinToString("\t")
+                index += listOf(path, scenario.screen, scenario.name, look.label, look.group).joinToString("\t")
             }
         }
         Device.write("gallery/index.tsv", index.joinToString("\n"))
