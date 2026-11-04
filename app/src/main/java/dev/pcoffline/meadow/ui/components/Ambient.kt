@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.components
 
+import dev.pcoffline.meadow.data.SunTimes
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -78,7 +79,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
-import dev.pcoffline.meadow.ui.theme.isNightHour
 import dev.pcoffline.meadow.ui.theme.butterfliesFor
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
@@ -178,6 +178,20 @@ private fun rememberLiveWeather(): Weather? {
 }
 
 /**
+ * Today's sunrise and sunset where the phone is: at the weather's place when the weather is on,
+ * else at the main place of the phone's time zone, else 5:00 and 19:00. A pinned sky hour
+ * (screenshots and tests) uses 5:00 and 19:00, so pictures don't change with the place.
+ */
+@Composable
+fun rememberSunTimes(): SunTimes {
+    if (LocalSkyHour.current != null) return SunTimes.DEFAULT
+    val context = LocalContext.current
+    val place by AppGraph.weather.place.collectAsStateWithLifecycle()
+    val date = rememberResumedNow().toLocalDate()
+    return remember(place, date) { SunTimes.today(context, place, date = date) }
+}
+
+/**
  * The sky follows the clock: peach mornings, pale-blue days, lavender evenings. On a dark page
  * it is a starry night at every hour (see [baseSky]).
  * With the weather on, clouds, rain and snow grey it a little.
@@ -196,12 +210,13 @@ fun rememberSkyMood(): SkyMood {
         in 17..21 -> R.string.greeting_evening
         else -> R.string.greeting_night
     }
-    val base = baseSky(hour, dark, greeting).under(weather)
+    val sun = rememberSunTimes()
+    val base = baseSky(hour, dark, greeting, sun).under(weather)
     // The sky takes on the theme's colour and fades into the page below it. By day that's the
     // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
-        progress = celestialProgress(hour, minute, base.night),
+        progress = celestialProgress(hour, minute, base.night, sun),
         top = if (base.night) {
             androidx.compose.ui.graphics.lerp(base.top, scheme.primary, 0.10f)
         } else {
@@ -216,31 +231,30 @@ fun rememberSkyMood(): SkyMood {
  * mode decides day or night, so the sky and the cards always agree (#74): a dark page has the
  * night sky; a light page has the morning, afternoon or evening sky, and the evening sky by night.
  */
-internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int): SkyMood {
+internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int, sun: SunTimes = SunTimes.DEFAULT): SkyMood {
     val ink = Color(0xFF3E3A32)
+    // Morning from sunrise to 11:00, afternoon until two hours before sunset, then evening.
+    val minute = hour * 60
     return when {
         dark -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
-        hour in 5..10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
-        hour in 11..16 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
+        minute >= sun.riseMinute && minute < 11 * 60 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
+        minute >= 11 * 60 && minute < sun.setMinute - 2 * 60 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
         else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
     }
 }
 
 /**
  * How far along its arc the sun or moon is. A night sky uses the moon's timing. A day sky after
- * 19:00 (a light page at night) keeps the sun set at the end of its arc, so it does not rise again.
+ * sunset (a light page at night) keeps the sun set at the end of its arc, so it does not rise again.
  */
-internal fun celestialProgress(hour: Int, minute: Int, night: Boolean): Float =
-    if (night || !isNightHour(hour)) skyProgress(hour, minute) else 1f
+internal fun celestialProgress(hour: Int, minute: Int, night: Boolean, sun: SunTimes = SunTimes.DEFAULT): Float =
+    if (night || !sun.isNight(hour * 60 + minute)) skyProgress(hour, minute, sun) else 1f
 
 /**
- * How far across the sky the sun is at [hour]:[minute], from 0 as it rises at 5:00 to 1 as it sets
- * at 19:00; by night, how far the moon is, from 0 at 19:00 to 1 at 5:00.
+ * How far across the sky the sun is at [hour]:[minute], from 0 as it rises to 1 as it sets; by
+ * night, how far the moon is, from 0 at sunset to 1 at sunrise ([sun]).
  */
-internal fun skyProgress(hour: Int, minute: Int): Float {
-    val t = hour + minute / 60f
-    return if (!isNightHour(hour)) (t - 5f) / 14f else ((t - 19f + 24f) % 24f) / 10f
-}
+internal fun skyProgress(hour: Int, minute: Int, sun: SunTimes = SunTimes.DEFAULT): Float = sun.progress(hour * 60 + minute)
 
 /**
  * Where the sun or moon is along its arc, [progress] across: x from 10% to 90% of the width, and
