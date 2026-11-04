@@ -83,7 +83,7 @@ class ThemeLooksTest : ScreenTest() {
     fun `each theme's preview grows three flowers`() {
         AppGraph.store.setAppearance(GardenTheme.MEADOW.key, DarkMode.LIGHT.key)
         show { AppearanceCard() }
-        val flowers = compose.onAllNodes(SemanticsMatcher.keyIsDefined(FlowerAsleep)).fetchSemanticsNodes().map { it.boundsInRoot }
+        val flowers = compose.onAllNodes(SemanticsMatcher.keyIsDefined(FlowerAsleep), useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
         GardenTheme.entries.forEach { theme ->
             val card = compose.onNode(hasText(text(theme.label), substring = true) and hasClickAction()).fetchSemanticsNode().boundsInRoot
             assertEquals("$theme", 3, flowers.count { card.contains(it.center) })
