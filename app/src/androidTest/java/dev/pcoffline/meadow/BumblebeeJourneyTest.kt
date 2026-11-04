@@ -117,7 +117,7 @@ class BumblebeeJourneyTest : EndToEndTest() {
             node(R.string.friend_step_down_confirm).performClick()
             waitFor(R.string.friend_stepped_down)
             // Sam's garden is gone from the circle.
-            eventually("Sam's garden gone") { !showing(text(R.string.circle_garden_role)) }
+            eventually("Sam's garden gone") { showing(text(R.string.people_gardens_empty)) }
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds").isEmpty() }
             waitForBackend("users/$me/private/account") { it.strings("approveeIds").isEmpty() }
         }

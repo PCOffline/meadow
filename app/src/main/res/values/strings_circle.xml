@@ -4,6 +4,8 @@
     <string name="people_waiting">Waiting for you</string>
     <string name="people_your_asks">Your asks</string>
     <string name="people_invite_more">Invite a Bumblebee</string>
+    <string name="people_bees_empty">Nobody looks after your garden yet. Use the plus button to invite a Bumblebee.</string>
+    <string name="people_gardens_empty">You don\'t look after a garden yet. Use the plus button to get your friend code.</string>
 
     <string name="invite_title">Invite a Bumblebee 🐝</string>
     <string name="invite_link_button">Share an invite link</string>
@@ -24,13 +26,13 @@
     <string name="circle_invite_sent_at">Invited %1$s</string>
 
     <string name="circle_your_bees">Your Bumblebees</string>
-    <string name="circle_bee_role">Looks after your garden</string>
     <string name="circle_remove_title">Remove %1$s?</string>
 
     <string name="circle_looking_after">Gardens you look after</string>
 
     <string name="circle_join_title">Be someone\'s Bumblebee</string>
     <string name="join_code_title">Your friend code</string>
+    <string name="join_code_body">Send your friend code to a friend. They use it to invite you.</string>
     <string name="join_code_copy">Copy your friend code</string>
     <string name="join_code_copied">Code copied</string>
     <string name="join_code_share">Share your friend code</string>
@@ -64,5 +66,4 @@
     <string name="circle_bee_kept">%1$s stays your Bumblebee 🐝</string>
     <string name="circle_bee_removing">%1$s stops being your Bumblebee in 24 hours</string>
     <string name="circle_remove_body_delayed">%1$s stops being your Bumblebee in 24 hours. You can cancel this until then.</string>
-    <string name="circle_garden_role">You\'re their Bumblebee</string>
 </resources>

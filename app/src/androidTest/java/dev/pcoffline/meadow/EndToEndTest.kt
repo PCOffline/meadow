@@ -317,8 +317,8 @@ abstract class EndToEndTest {
     }
 
     /**
-     * Becomes [friend]'s Bumblebee by pasting their invite link into People's friend code
-     * field (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
+     * Becomes [friend]'s Bumblebee by pasting their invite link into the friend code field
+     * behind People's plus button (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
      */
     protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
         val token = friend.call("createInviteLink")!!["token"] as String
@@ -326,7 +326,7 @@ abstract class EndToEndTest {
         tab(R.string.tab_people).performClick()
         waitFor(R.string.people_title)
         val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
+        compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
         typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
         node(R.string.invite_code_button).performClick()
         waitForText(text(R.string.accept_invite_title, friendName))

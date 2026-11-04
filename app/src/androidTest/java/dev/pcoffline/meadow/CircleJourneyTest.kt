@@ -110,8 +110,10 @@ class CircleJourneyTest : EndToEndTest() {
             tab(R.string.tab_people).performClick()
             waitFor(R.string.people_title)
             val code = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
+            val invite = { compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick() }
 
             // Kai invites Sam by code, then thinks better of it.
+            invite()
             typeInto(code, friendCodeOf(sam))
             node(R.string.invite_code_button).performClick()
             waitFor(R.string.invite_code_sent)
@@ -120,7 +122,7 @@ class CircleJourneyTest : EndToEndTest() {
             eventually("the invite cancelled") { !pendingInvite(kai, sam) }
 
             // Invited again, Sam says yes.
-            seeInCircle(code)
+            invite()
             typeInto(code, friendCodeOf(sam))
             node(R.string.invite_code_button).performClick()
             var inviteId = ""
@@ -160,6 +162,7 @@ class CircleJourneyTest : EndToEndTest() {
             waitFor(R.string.people_title)
 
             // Sharing a link makes one and hands it to the share sheet.
+            compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
             node(R.string.invite_link_button).performClick()
             waitForBackendDocs("inviteLinks") { links -> links.any { it.string("ownerUid") == kai.uid } }
             val shared = allOf(hasAction(Intent.ACTION_CHOOSER), hasExtra(Intent.EXTRA_INTENT, hasExtra(Intent.EXTRA_TEXT, containsString("/i/"))))
@@ -172,14 +175,14 @@ class CircleJourneyTest : EndToEndTest() {
             // Kai's own link, pasted into the friend code field, can't make Kai their own Bumblebee.
             val token = kai.call("createInviteLink")!!["token"] as String
             val field = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
-            compose.onNode(hasScrollToNodeAction()).performScrollToNode(field)
             typeInto(field, "https://${BuildConfig.LINK_HOST}/i/$token")
             node(R.string.invite_code_button).performClick()
             waitFor(R.string.accept_invite_own)
             inDialog(text(R.string.action_ok)).performClick()
             assertTrue(backendDoc("users/${kai.uid}/private/account")!!.strings("approverIds").isEmpty())
 
-            // The friend code can be copied to send another way.
+            // The friend code, behind the gardens' plus button, can be copied to send another way.
+            compose.onNodeWithContentDescription(text(R.string.circle_join_title)).performClick()
             compose.onNodeWithContentDescription(text(R.string.join_code_copy)).performClick()
             waitFor(R.string.join_code_copied)
         }
