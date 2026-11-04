@@ -1,6 +1,6 @@
 """Turns the Pictures workflow's two emulator runs into the pull request's pictures comment.
 
-Usage: pr_pictures.py <before dir> <after dir> <out dir> <url of out dir>
+Usage: pr_pictures.py <before dir> <after dir> <out dir> <url of out dir> [<url to browse it>]
        pr_pictures.py body <description file> <pictures.md>   (prints the new description)
 
 <before dir> and <after dir> hold what the phone tests wrote (GalleryPictures and the stories),
@@ -36,6 +36,13 @@ class Gallery:
     added: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
     unchanged: int = 0
+    # From each run's gallery/index.tsv: a path's screen, state and look, in the order drawn.
+    names: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # Whether the base drew a gallery at all. Without one, there's nothing to compare.
+    base: bool = True
+
+    def label(self, path: str) -> tuple[str, str]:
+        return self.names.get(path) or label(path)
 
 
 @dataclass
@@ -54,10 +61,18 @@ class StoryPictures:
     new: bool
 
 
-def compare(before: set[str], after: set[str], differs) -> Gallery:
-    """Sorts the pictures in [before] and [after]; [differs] says whether a picture in both changed."""
-    gallery = Gallery(added=sorted(after - before), removed=sorted(before - after))
-    for path in sorted(before & after):
+def compare(before: set[str], after: set[str], differs, order: list[str] | None = None) -> Gallery:
+    """
+    Sorts the pictures in [before] and [after]; [differs] says whether a picture in both changed.
+    Each list follows [order] (the order drawn), then the paths' own order.
+    """
+    rank = {path: i for i, path in enumerate(order or [])}
+
+    def ordered(paths: set[str]) -> list[str]:
+        return sorted(paths, key=lambda p: (rank.get(p, len(rank)), p))
+
+    gallery = Gallery(added=ordered(after - before), removed=ordered(before - after), base=bool(before))
+    for path in ordered(before & after):
         if differs(path):
             gallery.changed.append(path)
         else:
@@ -93,7 +108,7 @@ def story_section(story: StoryPictures, url: str) -> list[str]:
     return lines + [""]
 
 
-def section(stories: list[StoryPictures], gallery: Gallery, url: str) -> str:
+def section(stories: list[StoryPictures], gallery: Gallery, url: str, browse: str | None = None) -> str:
     """The pictures, in Markdown, cut to fit in a pull request's description."""
     lines = ["## Pictures", ""]
     if stories:
@@ -106,13 +121,19 @@ def section(stories: list[StoryPictures], gallery: Gallery, url: str) -> str:
             "",
         ]
     lines += ["### Screens", ""]
+    if not gallery.base and gallery.added:
+        where = f"[in the pictures' folder]({browse}/after/gallery)" if browse else "in the workflow run's artifact"
+        lines.append(
+            f"The base has no gallery pictures, so there's nothing to compare. All {len(gallery.added)} are {where}."
+        )
+        return "\n".join(lines)
     rows: list[str] = []
     for path in gallery.changed:
-        name, look = label(path)
+        name, look = gallery.label(path)
         before, after = (image(f"{url}/{side}/gallery/{path}", f"{side}: {name}, {look}") for side in ("before", "after"))
         rows.append(f"| {name} | {look} | {before} | {after} |")
     for path in gallery.added:
-        name, look = label(path)
+        name, look = gallery.label(path)
         rows.append(f"| {name} | {look} | New | {image(f'{url}/after/gallery/{path}', f'{name}, {look}')} |")
     if rows:
         lines += [
@@ -138,7 +159,7 @@ def section(stories: list[StoryPictures], gallery: Gallery, url: str) -> str:
     else:
         lines.append(f"No screen in the gallery changed ({gallery.unchanged} the same).")
     if gallery.removed:
-        lines += ["", "Gone from the gallery: " + ", ".join(f"{label(p)[0]} ({label(p)[1]})" for p in gallery.removed) + "."]
+        lines += ["", "Gone from the gallery: " + ", ".join("{} ({})".format(*gallery.label(p)) for p in gallery.removed) + "."]
     return "\n".join(lines)
 
 
@@ -150,6 +171,18 @@ def with_pictures(body: str | None, pictures: str) -> str:
     if start != -1 and end > start:
         return body[:start] + block + body[end + len(END):]
     return f"{body.rstrip()}\n\n{block}\n" if body.strip() else f"{block}\n"
+
+
+def names(root: Path) -> list[tuple[str, tuple[str, str]]]:
+    """A run's gallery/index.tsv: each path with its "Screen: state" and look, in the order drawn."""
+    index = root / "gallery" / "index.tsv"
+    if not index.exists():
+        return []
+    found = []
+    for line in index.read_text().splitlines():
+        path, screen, state, look = line.split("\t")
+        found.append((path, (f"{screen}: {state[:1].lower()}{state[1:]}", look)))
+    return found
 
 
 def pictures(root: Path, sub: str) -> set[str]:
@@ -214,17 +247,25 @@ def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
     return found
 
 
-def main(before: Path, after: Path, out: Path, url: str) -> None:
+def main(before: Path, after: Path, out: Path, url: str, browse: str | None = None) -> None:
     out.mkdir(parents=True, exist_ok=True)
+    named = names(after) + names(before)
     gallery = compare(
         pictures(before, "gallery"), pictures(after, "gallery"),
         lambda p: differs(before / "gallery" / p, after / "gallery" / p),
+        order=[path for path, _ in named],
     )
+    gallery.names = dict(reversed(named))
     for path in gallery.changed:
         smaller(before / "gallery" / path, out / "before" / "gallery" / path)
-    for path in gallery.changed + gallery.added:
+    # Without a base, the folder keeps every picture at full size, and the description shows none.
+    for path in gallery.changed + (gallery.added if gallery.base else []):
         smaller(after / "gallery" / path, out / "after" / "gallery" / path)
-    text = section(stories(before, after, out), gallery, url.rstrip("/"))
+    if not gallery.base:
+        for path in gallery.added:
+            (out / "after" / "gallery" / path).parent.mkdir(parents=True, exist_ok=True)
+            (out / "after" / "gallery" / path).write_bytes((after / "gallery" / path).read_bytes())
+    text = section(stories(before, after, out), gallery, url.rstrip("/"), browse and browse.rstrip("/"))
     (out / "pictures.md").write_text(text)
     print(f"{len(gallery.changed)} changed, {len(gallery.added)} new, {len(gallery.removed)} gone, {gallery.unchanged} the same")
 
@@ -233,4 +274,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "body":
         print(with_pictures(Path(sys.argv[2]).read_text(), Path(sys.argv[3]).read_text()), end="")
     else:
-        main(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4])
+        main(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4], (sys.argv[5:] or [None])[0])

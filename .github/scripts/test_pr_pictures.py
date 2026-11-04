@@ -12,6 +12,7 @@ from pr_pictures import (
     StoryPictures,
     compare,
     label,
+    names,
     section,
     stories,
     with_pictures,
@@ -33,6 +34,25 @@ class CompareTest(unittest.TestCase):
     def test_with_no_base_pictures_everything_is_new(self):
         gallery = compare(set(), {"light/a--x.png"}, differs=lambda p: self.fail("nothing to compare"))
         self.assertEqual(["light/a--x.png"], gallery.added)
+
+
+class OrderTest(unittest.TestCase):
+    def test_lists_pictures_in_the_order_drawn(self):
+        gallery = compare(set(), {"light/b.png", "dark/a.png", "light/z.png"}, lambda p: False, order=["light/b.png", "dark/a.png"])
+        self.assertEqual(["light/b.png", "dark/a.png", "light/z.png"], gallery.added)
+
+
+class NamesTest(unittest.TestCase):
+    def test_reads_the_real_names_from_the_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "gallery").mkdir()
+            (root / "gallery" / "index.tsv").write_text("dark/chats--a-message.png\tChats\tA message that didn't send\tdark")
+            self.assertEqual([("dark/chats--a-message.png", ("Chats: a message that didn't send", "dark"))], names(root))
+
+    def test_a_named_picture_shows_its_real_name(self):
+        gallery = Gallery(changed=["dark/x.png"], names={"dark/x.png": ("Chats: a friend's chat", "dark")})
+        self.assertIn("| Chats: a friend's chat | dark |", section([], gallery, URL))
 
 
 class LabelTest(unittest.TestCase):
@@ -74,6 +94,12 @@ class SectionTest(unittest.TestCase):
 
     def test_nothing_changed_says_so(self):
         self.assertIn("No screen in the gallery changed (5 the same).", section([], Gallery(unchanged=5), URL))
+
+    def test_without_base_pictures_points_to_the_folder_and_lists_none(self):
+        gallery = compare(set(), {f"light/s{i}.png" for i in range(414)}, lambda p: False)
+        text = section([], gallery, URL, browse="https://github.com/o/r/tree/pictures/pr-1/run")
+        self.assertIn("All 414 are [in the pictures' folder](https://github.com/o/r/tree/pictures/pr-1/run/after/gallery).", text)
+        self.assertNotIn("<img", text)
 
     def test_gone_screens_are_named(self):
         self.assertIn("Gone from the gallery: Garden: loading (light).", section([], Gallery(removed=["light/garden--loading.png"]), URL))

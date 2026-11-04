@@ -89,7 +89,8 @@ jobs:
           # Each run has a folder of its own, so a picture never comes from an older run's cache.
           echo "FOLDER=$RUN" >> "$GITHUB_ENV"
           python3 .github/scripts/pr_pictures.py build/pictures/before build/pictures/after build/pictures/site \
-            "https://raw.githubusercontent.com/$REPO/refs/heads/pictures/pr-$NUMBER/$RUN"
+            "https://raw.githubusercontent.com/$REPO/refs/heads/pictures/pr-$NUMBER/$RUN" \
+            "https://github.com/$REPO/tree/pictures/pr-$NUMBER/$RUN"
       - name: Publish the pictures
         if: env.SAME_REPO == 'true'
         run: |

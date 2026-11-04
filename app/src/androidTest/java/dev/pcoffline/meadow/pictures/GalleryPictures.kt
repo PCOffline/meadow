@@ -99,18 +99,19 @@ class GalleryPictures {
                 }
             }
         }
-        val names = mutableListOf<String>()
-        looks.forEach { look ->
-            Scenarios.all.forEachIndexed { i, scenario ->
+        // Each screen in each look in turn, and an index with their names, in this order.
+        val index = mutableListOf<String>()
+        Scenarios.all.forEachIndexed { i, scenario ->
+            looks.forEach { look ->
                 shown = look to i
                 compose.waitForIdle()
                 Thread.sleep(SETTLE_MS)
-                val name = "gallery/${look.name}/${slug(scenario.screen)}--${slug(scenario.name)}.png"
-                Device.screenshot(name)
-                names += name
+                val path = "${look.name}/${slug(scenario.screen)}--${slug(scenario.name)}.png"
+                Device.screenshot("gallery/$path")
+                index += listOf(path, scenario.screen, scenario.name, look.name).joinToString("\t")
             }
         }
-        Device.write("gallery/index.txt", names.joinToString("\n"))
+        Device.write("gallery/index.tsv", index.joinToString("\n"))
     }
 
     private companion object {
