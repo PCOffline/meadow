@@ -28,6 +28,7 @@
     <!-- Limit editor -->
     <string name="limit_editor_new">Plant a limit</string>
     <string name="limit_editor_existing">Change this limit</string>
+    <string name="limit_share">Share this limit</string>
     <string name="limit_editor_usage">%1$s today · %2$s this week</string>
     <string name="limit_editor_daily">Daily limit</string>
     <string name="limit_editor_weekly">Weekly limit</string>

@@ -48,6 +48,12 @@ import dev.pcoffline.meadow.ui.home.GardenState
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
+import dev.pcoffline.meadow.ui.limits.ShareLimitButton
+import dev.pcoffline.meadow.ui.components.ShareCommitment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.pcoffline.meadow.ui.minutesText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -77,6 +83,45 @@ class LimitFlowTest : ScreenTest() {
         message = "", status = RequestStatus.PENDING, approverIds = listOf("bee"), decidedByName = null,
         decisionNote = null, dayKey = "2026-10-25", createdAtMillis = System.currentTimeMillis(),
     )
+
+    /** The editor with its top bar's Share, wired as LimitEditorScreen wires them. */
+    private fun editorWithShare(saved: AppLimit?) = show {
+        var unsaved by remember { mutableStateOf(false) }
+        Column {
+            BackTopBar(text(R.string.limit_editor_existing), onBack = {}) { ShareLimitButton(saved, unsaved) }
+            LimitEditor(pkg, LimitEditorState(existing = saved, appName = "Instagram", loaded = true), onDone = {}, onUnsaved = { unsaved = it })
+        }
+    }
+
+    @Test
+    fun `a saved limit can be shared at any time, as saved`() {
+        val saved = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)
+        editorWithShare(saved)
+        try {
+            compose.onNodeWithContentDescription(text(R.string.limit_share)).assertIsEnabled().performClick()
+            assertEquals(saved, ShareCommitment.shared.value?.limit)
+            assertTrue(ShareCommitment.shared.value!!.text.contains("Instagram"))
+        } finally {
+            ShareCommitment.close()
+        }
+        assertAccessible()
+    }
+
+    @Test
+    fun `with unsaved changes, sharing waits until they're saved or undone`() {
+        editorWithShare(AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0))
+        val share = compose.onNodeWithContentDescription(text(R.string.limit_share))
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more)).onFirst().performClick()
+        share.assertIsNotEnabled()
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less)).onFirst().performClick()
+        share.assertIsEnabled()
+    }
+
+    @Test
+    fun `a new limit has nothing saved to share`() {
+        editorWithShare(null)
+        compose.onNodeWithContentDescription(text(R.string.limit_share)).assertDoesNotExist()
+    }
 
     @Test
     fun `a limit needs at least one part turned on, and says so`() {

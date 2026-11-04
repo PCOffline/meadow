@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -271,12 +272,30 @@ fun LimitEditorScreen(
     // another app is chosen.
     val notHere = start != null && remember(packageName) { !onThisPhone(packageName, AppGraph.catalog.launchablePackages()) }
     val state = if (notHere && start != null) loaded.copy(appName = start.appName) else loaded
+    var unsaved by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         BackTopBar(
             stringResource(if (state.existing == null) R.string.limit_editor_new else R.string.limit_editor_existing),
             onBack = onDone,
-        )
-        if (state.loaded) LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp, notHere = notHere) else Loading()
+        ) { if (start == null) ShareLimitButton(state.existing, unsaved) }
+        if (state.loaded) {
+            LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp, notHere = notHere, onUnsaved = { unsaved = it })
+        } else {
+            Loading()
+        }
+    }
+}
+
+/**
+ * Shares [saved], the limit as it is saved, at any time. While the fields have [unsaved] changes,
+ * it's off: what it would share isn't what they show. Save offers to share the new limit.
+ */
+@Composable
+internal fun ShareLimitButton(saved: AppLimit?, unsaved: Boolean) {
+    saved ?: return
+    val res = LocalResources.current
+    IconButton(onClick = { ShareCommitment.open(res.getString(R.string.share_limit, saved.appName, res.limitText(saved)), saved) }, enabled = !unsaved) {
+        Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.limit_share))
     }
 }
 
@@ -313,6 +332,8 @@ internal fun LimitEditor(
     notHere: Boolean = false,
     // Tests pass their own; the app saves through the limits repository.
     save: suspend (limit: AppLimit, message: String, approverIds: List<String>?) -> ChangeOutcome = AppGraph.limits::save,
+    // Told whether the fields differ from the saved limit, so sharing the saved one can wait.
+    onUnsaved: (Boolean) -> Unit = {},
 ) {
     val existing = state.existing
     val from = start ?: existing
@@ -347,6 +368,8 @@ internal fun LimitEditor(
         dayMinutes = if (dailyOn) groups.toDayMinutes() else emptyMap(),
         caps = caps,
     )
+    val unsaved = existing != null && proposed != existing
+    LaunchedEffect(unsaved) { onUnsaved(unsaved) }
     val needsApproval = existing != null && hasBees && LimitsRepository.isLooser(existing, proposed)
     val online by Connectivity.online.collectAsStateWithLifecycle()
     // Asking, and hours, days and caps with Bumblebees, go through the backend; the rest is saved offline too.
