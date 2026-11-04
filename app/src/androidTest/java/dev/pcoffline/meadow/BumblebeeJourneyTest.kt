@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -116,7 +117,8 @@ class BumblebeeJourneyTest : EndToEndTest() {
             compose.onNode(hasText(text(R.string.friend_step_down, "Sam"))).performScrollTo().performClick()
             node(R.string.friend_step_down_confirm).performClick()
             waitFor(R.string.friend_stepped_down)
-            // Sam's garden is gone from the circle.
+            // The closed chat stays open. Back in People, Sam's garden is gone from the circle.
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
             eventually("Sam's garden gone") { showing(text(R.string.people_gardens_empty)) }
             waitForBackend("users/${sam.uid}/private/account") { it.strings("approverIds").isEmpty() }
             waitForBackend("users/$me/private/account") { it.strings("approveeIds").isEmpty() }
