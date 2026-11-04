@@ -3,6 +3,10 @@ package dev.pcoffline.meadow.ui.screens
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -228,6 +232,28 @@ class LimitFlowTest : ScreenTest() {
         val rows = chips.groupBy { it.top }.values
         assertTrue("fewer than three in a row: ${rows.map { it.size }}", rows.all { it.size < 3 })
         assertEquals("still even columns", 1, chips.map { it.width }.distinct().size)
+    }
+
+    @Test
+    fun `at large text, each preset shows its whole length on one line`() {
+        var fontScale by mutableStateOf(1f)
+        show {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = fontScale)) {
+                LimitEditor(pkg, LimitEditorState(appName = "Instagram", loaded = true), onDone = {})
+            }
+        }
+        listOf(1.5f, 2f).forEach { scale ->
+            fontScale = scale
+            compose.waitForIdle()
+            listOf(15, 30, 45, 60, 90, 120).map { app.resources.minutesText(it) }.forEach { label ->
+                compose.onAllNodes(hasText(label), useUnmergedTree = true).fetchSemanticsNodes().forEach { node ->
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+                    assertEquals("\"$label\" at ${scale}x", label.length, layouts.single().getLineEnd(0))
+                }
+            }
+        }
     }
 
     @Test
