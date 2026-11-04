@@ -702,5 +702,8 @@ private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onS
 
 private const val PRESET_COLUMNS = 3
 
-/** A filter chip's padding either side of its label, with room to spare. */
-private val CHIP_PADDING = 24.dp
+/**
+ * The room a filter chip needs besides its label: its own padding and the label's, 8dp each on
+ * either side, and room to spare. With less, a length like "1h 30m" wraps to "1h" at large text.
+ */
+private val CHIP_PADDING = 40.dp
