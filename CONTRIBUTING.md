@@ -56,6 +56,12 @@ a label, each touch target is 48dp or more, and each screen has headings. The th
 each colour pair against WCAG AA contrast. Give each new screen a screen test that calls
 `assertAccessible`.
 
+## Pull request pictures
+
+The Pictures workflow draws each pull request's stories and gallery screens. Read **Pull
+requests** in [AGENTS.md](AGENTS.md) for what it shows. To draw them on your own emulator, run
+`.github/scripts/draw-pictures.sh . build/pictures/after`. Then open the folder.
+
 ## README images
 
 `ShowcaseTest` makes the screenshots and animations. The Screenshots workflow runs it on an

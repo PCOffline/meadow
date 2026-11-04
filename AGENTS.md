@@ -25,6 +25,55 @@ Each branch does one task. It changes only what the task needs, and the tests fo
 - Fix an unrelated problem on a branch and pull request of its own.
 - Keep the diff as small as the task permits.
 
+## Pull requests
+
+Give each pull request the shape of Matt Pocock's
+[`pr` skill](https://github.com/mattpocock/skills/blob/main/skills/engineering/pr/SKILL.md):
+
+1. **Summary**: the smallest diagram, diff sketch or tree that makes the change clear.
+2. **Evidence**: before and after. Use screenshots for a visual change, and test runs for the rest.
+3. **Merge danger**: a one-way or two-way door, and the blast radius.
+
+A pull request that changes what people see or do also has a **story** and a **spec**. This
+applies to screens, layouts, colours, text, motion, notifications, and new or changed behaviour.
+Put them in the Summary and the Evidence.
+
+### Story
+
+The story shows the change as a person meets it: pictures first, and text under them. The
+**Pictures** workflow makes the pictures on an emulator. It writes them in the pull request's
+description, under **Pictures**, and replaces them on each push.
+
+- **Stories:** for each change that people see or do, write a story. It's a class in
+  `app/src/androidTest/java/dev/pcoffline/meadow/pictures/stories` that extends `Story`. Each
+  step does one thing that a person does, in order, and has one short caption. The workflow takes
+  a screenshot of each step and a video of the whole story. When the base has the same story, it
+  shows the base's steps next to them.
+- **Screens:** the workflow draws each state of each screen in the debug gallery (`Scenarios` in
+  `app/src/debug/.../showcase/Gallery.kt`). It draws them in light, dark, large text, on a narrow
+  phone and in each theme. It shows each picture that changed, before and after.
+
+Make the pictures show each detail of the change:
+
+- Add a gallery state for each state that the change touches. For example: empty, loading,
+  waiting, error, offline and done.
+- Give the story a step for each small detail: spacing, alignment, wrapping, text that doesn't
+  fit, and touch feedback.
+- Write the description's Summary and Evidence around the pictures. Leave the **Pictures** part
+  to the workflow.
+
+A pull request from a fork gets its pictures in the workflow run's artifact. Attach the ones that
+the story needs to the description.
+
+### Spec
+
+The spec says exactly what the change does, so that a reviewer can check the pictures against it.
+
+- State each rule, limit and edge case.
+- State what a screen reader says.
+- State what doesn't change.
+- Write it as plain statements in a vertical list, with no story in it.
+
 ## Tests
 
 Each feature and each fix adds tests. Each test fails without the change.
