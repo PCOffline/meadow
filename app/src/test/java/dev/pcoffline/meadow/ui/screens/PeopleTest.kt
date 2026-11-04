@@ -84,6 +84,21 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
+    fun `someone with a photo has their emoji next to their name`() {
+        val maya = DemoGarden.maya.copy(avatar = DemoGarden.maya.avatar.copy(photoUrl = "https://example.invalid/maya.jpg"))
+        show { PeopleContent(robin, People(bumblebees = listOf(maya))) }
+        compose.onNodeWithText("Maya ${maya.avatar.emoji}").assertExists()
+    }
+
+    @Test
+    fun `a chat with someone with a photo has their emoji after their name at the top`() {
+        val photo = DemoGarden.chat.avatars.getValue(DemoGarden.maya.uid).copy(photoUrl = "https://example.invalid/maya.jpg")
+        val chat = DemoGarden.chat.copy(avatars = DemoGarden.chat.avatars + (DemoGarden.maya.uid to photo))
+        show { ChatContent(robin, chat, DemoGarden.messages, requestCard = { _, _ -> }) }
+        compose.onNodeWithText("Maya ${photo.emoji}").assertExists()
+    }
+
+    @Test
     fun `unread chats come first in each section, then everyone by name`() {
         val (maya, theo, ana) = listOf(DemoGarden.maya, DemoGarden.theo, DemoGarden.ana)
         val zoe = ana.copy(uid = "zoe", displayName = "Zoe", bio = "")

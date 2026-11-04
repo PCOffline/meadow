@@ -30,6 +30,12 @@ data class Grant(
 
 /** How someone looks: an emoji on a soft coloured circle, or their photo. */
 data class Avatar(val emoji: String, val color: String, val photoUrl: String?) {
+    /**
+     * [name] as it shows next to this picture: with a photo, the emoji follows it, so it still
+     * shows. Without one, the emoji is the picture itself.
+     */
+    fun nameWithEmoji(name: String): String = if (photoUrl != null) "$name $emoji" else name
+
     companion object {
         val Default = Avatar("🌼", "leaf", null)
     }
