@@ -1,9 +1,8 @@
 package dev.pcoffline.meadow.pictures.stories
 
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollTo
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
@@ -19,7 +18,7 @@ class EmojiWithPhotoStory : Story("Pick an emoji when you have a profile photo")
         val robin = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = "https://example.invalid/robin.jpg"))
         show(firstCaption = "A profile with a photo.") { ProfileScreen(robin, onBack = {}, onSave = {}) }
         step("The emoji is still a choice. It shows next to your name, and there's no circle colour.") {
-            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription(text(R.string.flower_picker_item, "🌻")))
+            compose.onNode(hasContentDescription(text(R.string.flower_picker_item, "🌻"))).performScrollTo()
         }
         step("Picking 🌻 keeps the photo.") {
             compose.onNode(hasContentDescription(text(R.string.flower_picker_item, "🌻"))).performClick()
