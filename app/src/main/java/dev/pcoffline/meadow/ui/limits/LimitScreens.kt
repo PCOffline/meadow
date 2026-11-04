@@ -627,8 +627,10 @@ internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: 
 private fun widestLabel(minutes: List<Int>, style: TextStyle): Dp {
     val measurer = rememberTextMeasurer()
     val labels = minutes.map { minutesText(it) }
-    val widest = remember(labels, style) { labels.maxOf { measurer.measure(it, style).size.width } }
-    return with(LocalDensity.current) { widest.toDp() }
+    // Measured again when the text size changes: the measurer keeps the density it was made with.
+    val density = LocalDensity.current
+    val widest = remember(labels, style, density) { labels.maxOf { measurer.measure(it, style, density = density).size.width } }
+    return with(density) { widest.toDp() }
 }
 
 /**
