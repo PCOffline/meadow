@@ -2,6 +2,8 @@
 
 package dev.pcoffline.meadow.ui.components
 
+import dev.pcoffline.meadow.ui.limitText
+import android.content.res.Resources
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -70,6 +72,11 @@ object ShareCommitment {
 
     fun open(text: String, limit: AppLimit? = null) {
         pending.value = Pending(text, limit)
+    }
+
+    /** Opens the share sheet for [limit], as saved: the same words and card as after Save. */
+    fun openLimit(res: Resources, limit: AppLimit) {
+        open(res.getString(R.string.share_limit, limit.appName, res.limitText(limit)), limit)
     }
 
     fun close() {

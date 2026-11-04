@@ -2,6 +2,9 @@
 
 package dev.pcoffline.meadow.ui.components
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.ripple
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -88,12 +91,31 @@ fun MeadowCard(
     modifier: Modifier = Modifier,
     tint: Color = Garden.colors.cardTint,
     onClick: (() -> Unit)? = null,
+    // A long press, for more choices; [onLongClickLabel] says what it does, for screen readers.
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CardDefaults.cardColors(containerColor = tint)
     val shape = RoundedCornerShape(24.dp)
     val border = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
-    if (onClick != null) {
+    if (onClick != null && onLongClick != null) {
+        val interaction = remember { MutableInteractionSource() }
+        Card(
+            modifier = modifier.pressBounce(interaction).then(border).clip(shape).combinedClickable(
+                interactionSource = interaction,
+                indication = ripple(),
+                role = Role.Button,
+                onLongClickLabel = onLongClickLabel,
+                onLongClick = onLongClick,
+                onClick = onClick,
+            ),
+            shape = shape,
+            colors = colors,
+        ) {
+            Column(Modifier.padding(18.dp), content = content)
+        }
+    } else if (onClick != null) {
         val interaction = remember { MutableInteractionSource() }
         Card(
             onClick = onClick,

@@ -97,7 +97,6 @@ import dev.pcoffline.meadow.ui.components.Loading
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.durationText
-import dev.pcoffline.meadow.ui.limitText
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.components.ShareCommitment
@@ -294,7 +293,7 @@ fun LimitEditorScreen(
 internal fun ShareLimitButton(saved: AppLimit?, unsaved: Boolean) {
     saved ?: return
     val res = LocalResources.current
-    IconButton(onClick = { ShareCommitment.open(res.getString(R.string.share_limit, saved.appName, res.limitText(saved)), saved) }, enabled = !unsaved) {
+    IconButton(onClick = { ShareCommitment.openLimit(res, saved) }, enabled = !unsaved) {
         Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.limit_share))
     }
 }
@@ -488,8 +487,7 @@ internal fun LimitEditor(
                         celebrate()
                         // A commitment just made is the one most worth telling someone about: the
                         // note that says it's saved offers to share it, as saved.
-                        val shared = res.getString(R.string.share_limit, proposed.appName, res.limitText(proposed))
-                        action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.open(shared, proposed) }
+                        action.toast(if (existing == null) planted else updated, shareLabel) { ShareCommitment.openLimit(res, proposed) }
                     } else {
                         action.toast(requested)
                     }

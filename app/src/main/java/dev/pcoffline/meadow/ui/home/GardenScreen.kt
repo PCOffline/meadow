@@ -1,5 +1,13 @@
 package dev.pcoffline.meadow.ui.home
 
+import dev.pcoffline.meadow.ui.components.ShareCommitment
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -347,7 +355,20 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
     val color = remember(budget.limit.packageName) {
         garden.petals[(budget.limit.packageName.hashCode() and 0x7fffffff) % garden.petals.size]
     }
-    MeadowCard(modifier, onClick = onClick) {
+    // A long press offers the limit's choices: share it as saved, or change it. A screen reader
+    // offers sharing as an action on the card.
+    var menu by remember { mutableStateOf(false) }
+    val res = LocalResources.current
+    val shareLabel = stringResource(R.string.limit_share)
+    Box(modifier) {
+    MeadowCard(
+        Modifier.fillMaxSize().semantics {
+            customActions = listOf(CustomAccessibilityAction(shareLabel) { ShareCommitment.openLimit(res, budget.limit); true })
+        },
+        onClick = onClick,
+        onLongClick = { menu = true },
+        onLongClickLabel = stringResource(R.string.garden_tile_options),
+    ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
             AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
@@ -394,6 +415,19 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
                 Text(stringResource(R.string.garden_tile_ask), style = MaterialTheme.typography.labelMedium)
             }
         }
+    }
+    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+        DropdownMenuItem(
+            text = { Text(shareLabel) },
+            leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
+            onClick = { menu = false; ShareCommitment.openLimit(res, budget.limit) },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.limit_editor_existing)) },
+            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+            onClick = { menu = false; onClick() },
+        )
+    }
     }
 }
 
