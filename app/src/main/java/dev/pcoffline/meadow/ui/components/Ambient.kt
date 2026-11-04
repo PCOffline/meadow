@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.components
 
+import dev.pcoffline.meadow.data.SunTimes
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -41,6 +42,12 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -72,7 +79,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.ui.theme.Garden
-import dev.pcoffline.meadow.ui.theme.isNightHour
 import dev.pcoffline.meadow.ui.theme.butterfliesFor
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import kotlin.math.PI
@@ -172,6 +178,20 @@ private fun rememberLiveWeather(): Weather? {
 }
 
 /**
+ * Today's sunrise and sunset where the phone is: at the weather's place when the weather is on,
+ * else at the main place of the phone's time zone, else 5:00 and 19:00. A pinned sky hour
+ * (screenshots and tests) uses 5:00 and 19:00, so pictures don't change with the place.
+ */
+@Composable
+fun rememberSunTimes(): SunTimes {
+    if (LocalSkyHour.current != null) return SunTimes.DEFAULT
+    val context = LocalContext.current
+    val place by AppGraph.weather.place.collectAsStateWithLifecycle()
+    val date = rememberResumedNow().toLocalDate()
+    return remember(place, date) { SunTimes.today(context, place, date = date) }
+}
+
+/**
  * The sky follows the clock: peach mornings, pale-blue days, lavender evenings. On a dark page
  * it is a starry night at every hour (see [baseSky]).
  * With the weather on, clouds, rain and snow grey it a little.
@@ -190,12 +210,13 @@ fun rememberSkyMood(): SkyMood {
         in 17..21 -> R.string.greeting_evening
         else -> R.string.greeting_night
     }
-    val base = baseSky(hour, dark, greeting).under(weather)
+    val sun = rememberSunTimes()
+    val base = baseSky(hour, dark, greeting, sun).under(weather)
     // The sky takes on the theme's colour and fades into the page below it. By day that's the
     // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
     return base.copy(
-        progress = celestialProgress(hour, minute, base.night),
+        progress = celestialProgress(hour, minute, base.night, sun),
         top = if (base.night) {
             androidx.compose.ui.graphics.lerp(base.top, scheme.primary, 0.10f)
         } else {
@@ -210,31 +231,30 @@ fun rememberSkyMood(): SkyMood {
  * mode decides day or night, so the sky and the cards always agree (#74): a dark page has the
  * night sky; a light page has the morning, afternoon or evening sky, and the evening sky by night.
  */
-internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int): SkyMood {
+internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int, sun: SunTimes = SunTimes.DEFAULT): SkyMood {
     val ink = Color(0xFF3E3A32)
+    // Morning from sunrise to 11:00, afternoon until two hours before sunset, then evening.
+    val minute = hour * 60
     return when {
         dark -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
-        hour in 5..10 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
-        hour in 11..16 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
+        minute >= sun.riseMinute && minute < 11 * 60 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
+        minute >= 11 * 60 && minute < sun.setMinute - 2 * 60 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
         else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
     }
 }
 
 /**
  * How far along its arc the sun or moon is. A night sky uses the moon's timing. A day sky after
- * 21:00 (a light page at night) keeps the sun set at the end of its arc, so it does not rise again.
+ * sunset (a light page at night) keeps the sun set at the end of its arc, so it does not rise again.
  */
-internal fun celestialProgress(hour: Int, minute: Int, night: Boolean): Float =
-    if (night || !isNightHour(hour)) skyProgress(hour, minute) else 1f
+internal fun celestialProgress(hour: Int, minute: Int, night: Boolean, sun: SunTimes = SunTimes.DEFAULT): Float =
+    if (night || !sun.isNight(hour * 60 + minute)) skyProgress(hour, minute, sun) else 1f
 
 /**
- * How far across the sky the sun is at [hour]:[minute], from 0 as it rises at 5:00 to 1 as it sets
- * at 21:00; by night, how far the moon is, from 0 at 21:00 to 1 at 5:00.
+ * How far across the sky the sun is at [hour]:[minute], from 0 as it rises to 1 as it sets; by
+ * night, how far the moon is, from 0 at sunset to 1 at sunrise ([sun]).
  */
-internal fun skyProgress(hour: Int, minute: Int): Float {
-    val t = hour + minute / 60f
-    return if (!isNightHour(hour)) (t - 5f) / 16f else ((t - 21f + 24f) % 24f) / 8f
-}
+internal fun skyProgress(hour: Int, minute: Int, sun: SunTimes = SunTimes.DEFAULT): Float = sun.progress(hour * 60 + minute)
 
 /**
  * Where the sun or moon is along its arc, [progress] across: x from 10% to 90% of the width, and
@@ -307,7 +327,7 @@ fun SkyScene(
                         drawCircle(Color.White.copy(alpha = twinkle * 0.85f), radius = if (i % 5 == 0) 2.4f else 1.5f, center = Offset(p.x * size.width, p.y * size.height))
                     }
                 }
-                if (clouds.celestialShows) moon(Offset(size.width * celestial.x, size.height * celestial.y), 22.dp.toPx(), mood.top)
+                if (clouds.celestialShows) moon(Offset(size.width * celestial.x, size.height * celestial.y), 22.dp.toPx())
             } else if (clouds.celestialShows) {
                 sun(Offset(size.width * (celestial.x + 0.02f), size.height * (celestial.y - 0.02f)), 20.dp.toPx(), t, garden.sun)
             }
@@ -363,7 +383,7 @@ private fun StillSky(modifier: Modifier) {
         Canvas(Modifier.fillMaxSize()) {
             drawRect(sky)
             val at = Offset(size.width * 0.76f, size.height * 0.3f)
-            if (mood.night) moon(at, 9.dp.toPx(), mood.top) else sun(at, 8.dp.toPx(), 0f, garden.sun)
+            if (mood.night) moon(at, 9.dp.toPx()) else sun(at, 8.dp.toPx(), 0f, garden.sun)
         }
         MeadowHills(Modifier.fillMaxSize(), sky = mood.bottom, text = mood.onSky)
     }
@@ -387,10 +407,22 @@ private fun DrawScope.sun(center: Offset, radius: Float, t: Float, color: Color)
     drawCircle(color, radius = radius, center = center)
 }
 
-private fun DrawScope.moon(center: Offset, radius: Float, sky: Color) {
-    drawCircle(Color(0xFFFFF6DC).copy(alpha = 0.15f), radius = radius * 1.8f, center = center)
-    drawCircle(Color(0xFFFFF6DC), radius = radius, center = center)
-    drawCircle(sky, radius = radius * 0.86f, center = center + Offset(radius * 0.45f, -radius * 0.25f))
+private val MoonLight = Color(0xFFFFF6DC)
+
+/** A glow, and the crescent itself: a disc with a bite cut out, so no second disc shows over the glow. */
+internal fun DrawScope.moon(center: Offset, radius: Float) {
+    drawCircle(MoonLight.copy(alpha = 0.15f), radius = radius * 1.8f, center = center)
+    translate(center.x, center.y) { drawPath(crescent(radius), MoonLight) }
+}
+
+/** Crescents and clouds by size, so they're shaped once rather than on every frame. */
+private val crescents = HashMap<Float, Path>()
+private val cloudShapes = HashMap<Float, Path>()
+
+private fun circle(center: Offset, radius: Float) = Path().apply { addOval(Rect(center, radius)) }
+
+private fun crescent(radius: Float): Path = crescents.getOrPut(radius) {
+    Path.combine(PathOperation.Difference, circle(Offset.Zero, radius), circle(Offset(radius * 0.45f, -radius * 0.25f), radius * 0.86f))
 }
 
 /** How the clouds look in each weather, and whether the sun, moon and stars get through. */
@@ -483,18 +515,18 @@ private fun DrawScope.lightning(t: Float, night: Boolean) {
     drawRect(Color.White.copy(alpha = (if (night) 0.14f else 0.22f) * glow))
 }
 
-private fun DrawScope.cloud(at: Offset, scale: Float, alpha: Float, color: Color = Color.White) {
-    val c = color.copy(alpha = alpha)
+/** A cloud: its puffs and flat base drawn as one shape, so where they overlap is no paler or whiter. */
+internal fun DrawScope.cloud(at: Offset, scale: Float, alpha: Float, color: Color = Color.White) {
     val r = 18f * scale * density / 2.5f
-    drawCircle(c, r * 1.4f, at)
-    drawCircle(c, r * 1.1f, at + Offset(-r * 1.5f, r * 0.35f))
-    drawCircle(c, r * 1.2f, at + Offset(r * 1.5f, r * 0.3f))
-    drawRoundRect(
-        c,
-        topLeft = at + Offset(-r * 2.4f, r * 0.2f),
-        size = Size(r * 4.8f, r * 1.25f),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(r * 0.62f),
-    )
+    translate(at.x, at.y) { drawPath(cloudShape(r), color.copy(alpha = alpha)) }
+}
+
+private fun cloudShape(r: Float): Path = cloudShapes.getOrPut(r) {
+    val base = Path().apply {
+        addRoundRect(RoundRect(Rect(-r * 2.4f, r * 0.2f, r * 2.4f, r * 1.45f), CornerRadius(r * 0.62f)))
+    }
+    listOf(circle(Offset.Zero, r * 1.4f), circle(Offset(-r * 1.5f, r * 0.35f), r * 1.1f), circle(Offset(r * 1.5f, r * 0.3f), r * 1.2f))
+        .fold(base) { shape, puff -> Path.combine(PathOperation.Union, shape, puff) }
 }
 
 private data class Petal(val x: Float, val speed: Float, val sway: Float, val phase: Float, val size: Float, val colorIndex: Int)

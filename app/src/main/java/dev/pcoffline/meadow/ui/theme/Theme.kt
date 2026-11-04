@@ -2,6 +2,7 @@
 
 package dev.pcoffline.meadow.ui.theme
 
+import dev.pcoffline.meadow.data.SunTimes
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
@@ -88,10 +89,13 @@ enum class DarkMode(val key: String, @StringRes val label: Int) {
     LIGHT("light", R.string.dark_mode_light),
     DARK("dark", R.string.dark_mode_dark);
 
-    /** Whether the app is dark at [hour] (0 to 23), with the phone's own dark mode [systemDark]. */
-    fun isDarkAt(hour: Int, systemDark: Boolean): Boolean = when (this) {
+    /**
+     * Whether the app is dark at [hour]:[minute], with the phone's own dark mode [systemDark].
+     * Clock is dark from sunset to sunrise ([sun]).
+     */
+    fun isDarkAt(hour: Int, systemDark: Boolean, minute: Int = 0, sun: SunTimes = SunTimes.DEFAULT): Boolean = when (this) {
         SYSTEM -> systemDark
-        CLOCK -> isNightHour(hour)
+        CLOCK -> sun.isNight(hour * 60 + minute)
         LIGHT -> false
         DARK -> true
     }
@@ -101,19 +105,23 @@ enum class DarkMode(val key: String, @StringRes val label: Int) {
     }
 }
 
-/** Night is from 21:00 to 5:00: the hours the moon is out on a dark page. */
-fun isNightHour(hour: Int): Boolean = hour !in 5..20
+/**
+ * Night is from sunset to sunrise: the hours the moon is out on a dark page. Without a place to
+ * work them out for, from 19:00 to 5:00 ([SunTimes.DEFAULT]).
+ */
+fun isNightHour(hour: Int, sun: SunTimes = SunTimes.DEFAULT): Boolean = sun.isNight(hour * 60)
 
-/** The hour of the day, kept up to date while it's on screen, so Clock changes over by itself. */
+/** The minute of the day, kept up to date while it's on screen, so Clock changes over by itself. */
 @Composable
-private fun rememberHourOfDay(): Int {
-    val hour by produceState(java.time.LocalTime.now().hour) {
+private fun rememberMinuteOfDay(): Int {
+    fun now() = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
+    val minute by produceState(now()) {
         while (true) {
             kotlinx.coroutines.delay(MINUTE_MS)
-            value = java.time.LocalTime.now().hour
+            value = now()
         }
     }
-    return hour
+    return minute
 }
 
 private const val MINUTE_MS = 60_000L
@@ -485,8 +493,9 @@ fun MeadowTheme(
 ) {
     val systemDark = isSystemInDarkTheme()
     // A pinned sky hour (screenshots and tests) also pins Clock's hour, so the two agree.
-    val hour = if (darkMode == DarkMode.CLOCK) dev.pcoffline.meadow.ui.components.LocalSkyHour.current ?: rememberHourOfDay() else 0
-    val dark = darkMode.isDarkAt(hour, systemDark)
+    val minute = if (darkMode == DarkMode.CLOCK) dev.pcoffline.meadow.ui.components.LocalSkyHour.current?.times(60) ?: rememberMinuteOfDay() else 0
+    val sun = if (darkMode == DarkMode.CLOCK) dev.pcoffline.meadow.ui.components.rememberSunTimes() else SunTimes.DEFAULT
+    val dark = darkMode.isDarkAt(minute / 60, systemDark, minute % 60, sun)
     val seed = Seeds.getValue(theme)
     val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
     val garden = remember(theme, dark) { gardenColors(seed, dark) }
