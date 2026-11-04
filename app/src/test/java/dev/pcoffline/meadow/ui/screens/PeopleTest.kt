@@ -3,22 +3,23 @@ package dev.pcoffline.meadow.ui.screens
 import android.app.Application
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
@@ -72,15 +73,20 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `someone with no bio shows what they are to you`() {
+    fun `someone with no bio shows only their name, since the section says who they are`() {
         show {
             PeopleContent(
                 robin,
                 People(bumblebees = listOf(DemoGarden.maya.copy(bio = "")), lookingAfter = listOf(DemoGarden.ana.copy(bio = "")), chats = listOf(chatWithMaya(read = false))),
             )
         }
-        node(R.string.circle_bee_role).performScrollTo().assertExists()
-        node(R.string.circle_garden_role).performScrollTo().assertExists()
+        for (name in listOf("Maya", "Ana")) {
+            val card = compose.onNode(hasText(name) and hasClickAction()).performScrollTo().fetchSemanticsNode()
+            // Their emoji picture, then their name, and no line about them.
+            val words = card.config.getOrElse(SemanticsProperties.Text) { emptyList() }.map { it.text }.filter { text -> text.any(Char::isLetter) }
+            assertEquals(listOf(name), words)
+        }
+        assertAccessible()
     }
 
     @Test
@@ -147,11 +153,20 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `gardens you look after lead to your answers as a Bumblebee`() {
+    fun `your answers as a Bumblebee are under the gardens you look after`() {
         var stats = 0
         show { PeopleContent(robin, People(lookingAfter = listOf(DemoGarden.ana)), onOpenBeeStats = { stats++ }) }
-        node(R.string.bee_stats_open).performScrollTo().performClick()
+        val ana = compose.onNode(hasText("Ana") and hasClickAction()).performScrollTo().getBoundsInRoot()
+        val link = node(R.string.bee_stats_open).performScrollTo()
+        assertTrue(link.getBoundsInRoot().top >= ana.bottom)
+        link.performClick()
         assertEquals(1, stats)
+    }
+
+    @Test
+    fun `with no gardens, there are no answers to see`() {
+        show { PeopleContent(robin.copy(approveeIds = emptyList()), People(bumblebees = listOf(DemoGarden.maya))) }
+        node(R.string.bee_stats_open).assertDoesNotExist()
     }
 
     @Test
@@ -167,24 +182,66 @@ class PeopleTest : ScreenTest() {
     }
 
     @Test
-    fun `with nobody yet, inviting comes first and there are no empty sections`() {
+    fun `with nobody yet, a welcome card invites a first Bumblebee, above both sections`() {
         show { PeopleContent(robin.copy(approverIds = emptyList(), approveeIds = emptyList()), People()) }
-        node(R.string.invite_title).assertExists()
-        node(R.string.invite_code_title).assertExists()
-        node(R.string.circle_your_bees).assertDoesNotExist()
-        node(R.string.circle_looking_after).assertDoesNotExist()
-        node(R.string.people_invite_more).assertDoesNotExist()
+        val welcome = node(R.string.people_welcome_body).assertExists().getBoundsInRoot()
+        assertTrue(welcome.bottom <= node(R.string.circle_your_bees).getBoundsInRoot().top)
+        node(R.string.people_bees_empty).performScrollTo().assertExists()
+        node(R.string.people_gardens_empty).performScrollTo().assertExists()
+        node(R.string.join_code_title).assertDoesNotExist()
         // No Bumblebees to ask.
         compose.onNodeWithContentDescription(text(R.string.requests_ask_button)).assertDoesNotExist()
         assertAccessible()
+        // Its button opens the invite.
+        compose.onNode(hasText(text(R.string.people_invite_more)) and hasClickAction()).performClick()
+        node(R.string.invite_link_button).assertExists()
+    }
+
+    @Test
+    fun `with someone in the circle, there's no welcome card`() {
+        show { PeopleContent(robin, People(bumblebees = listOf(DemoGarden.maya))) }
+        node(R.string.people_welcome_body).assertDoesNotExist()
+    }
+
+    @Test
+    fun `with people in a section, it has no empty note`() {
+        show { PeopleContent(robin, People(bumblebees = listOf(DemoGarden.maya), lookingAfter = listOf(DemoGarden.ana))) }
+        node(R.string.people_bees_empty).assertDoesNotExist()
+        node(R.string.people_gardens_empty).assertDoesNotExist()
+    }
+
+    @Test
+    fun `the plus by Your Bumblebees opens the invite, beside its section name`() {
+        show { PeopleContent(robin, People(bumblebees = listOf(DemoGarden.maya))) }
+        val title = node(R.string.circle_your_bees).getBoundsInRoot()
+        val plus = compose.onNodeWithContentDescription(text(R.string.people_invite_more))
+        val bounds = plus.getBoundsInRoot()
+        assertTrue(bounds.top < title.bottom && bounds.bottom > title.top)
+        // The icon is drawn smaller; what a finger can hit is 48dp.
+        plus.assertTouchWidthIsEqualTo(48.dp).assertTouchHeightIsEqualTo(48.dp)
+        plus.performClick()
+        node(R.string.invite_title).assertExists()
+        node(R.string.invite_link_button).assertExists()
+        node(R.string.invite_code_title).assertExists()
+        assertAccessible()
+    }
+
+    @Test
+    fun `the plus by gardens shows your friend code to share`() {
+        show { PeopleContent(robin, People(lookingAfter = listOf(DemoGarden.ana))) }
+        compose.onNodeWithContentDescription(text(R.string.circle_join_title)).performClick()
+        node(R.string.join_code_body).assertExists()
+        compose.onNodeWithText(robin.friendCode).assertExists()
+        compose.onNodeWithContentDescription(text(R.string.join_code_copy)).assertExists()
+        compose.onNodeWithContentDescription(text(R.string.join_code_share)).assertExists()
     }
 
     @Test
     fun `a friend code or a pasted invite link can be entered, and nothing else`() {
         show { PeopleContent(robin, People()) }
+        compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
         val field = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
         val invite = compose.onNode(hasText(text(R.string.invite_code_button)) and hasClickAction())
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(field)
         invite.assertIsNotEnabled()
         compose.onNode(field).performTextInput("see you at the park")
         invite.assertIsNotEnabled()

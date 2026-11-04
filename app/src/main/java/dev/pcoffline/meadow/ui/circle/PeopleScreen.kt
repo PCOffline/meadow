@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class, ExperimentalMaterial3Api::class)
 
 package dev.pcoffline.meadow.ui.circle
 
@@ -9,6 +9,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,15 +31,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -80,6 +86,7 @@ import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.FlowerAvatar
+import dev.pcoffline.meadow.ui.components.Hint
 import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.components.SectionTitle
@@ -148,7 +155,9 @@ fun PeopleScreen(
 /**
  * Everyone in one place, drawn from plain state (also used for tests and screenshots): what's
  * waiting for an answer first, then Bumblebees and gardens (unread chats first, then by name),
- * each opening their chat, where requests, their garden and Bumblebee choices are too.
+ * each opening their chat, where requests, their garden and Bumblebee choices are too. The
+ * section names say what each person is to me, so the cards don't repeat it. A plus button by
+ * each section name adds someone to it.
  */
 @Composable
 fun PeopleContent(
@@ -158,6 +167,7 @@ fun PeopleContent(
     onOpenBeeStats: () -> Unit = {},
 ) {
     var asking by rememberSaveable { mutableStateOf(false) }
+    var adding by rememberSaveable { mutableStateOf<AddSheet?>(null) }
     val chats = people.chats.associateBy { it.id }
     fun chatWith(uid: String) = ChatRepository.chatIdFor(profile.uid, uid)
     // News first, then by name, in each section.
@@ -175,8 +185,8 @@ fun PeopleContent(
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { TabTitle(stringResource(R.string.people_title)) }
-            // With nobody yet, inviting is the one thing to do here.
-            if (nobody) item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
+            // With nobody yet, a first Bumblebee is the one thing to do here.
+            if (nobody) item(key = "welcome") { WelcomeCard(Modifier.animateItem().padding(horizontal = 20.dp)) { adding = AddSheet.INVITE } }
 
             if (people.incomingInvites.isNotEmpty() || people.incomingRequests.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.people_waiting), Modifier.padding(horizontal = 20.dp)) }
@@ -192,36 +202,31 @@ fun PeopleContent(
                 }
             }
 
-            if (hasBees) item { SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(horizontal = 20.dp)) }
+            item {
+                SectionTitle(stringResource(R.string.circle_your_bees), Modifier.padding(start = 20.dp, end = 8.dp)) {
+                    AddButton(stringResource(R.string.people_invite_more)) { adding = AddSheet.INVITE }
+                }
+            }
+            if (!hasBees) item { Hint(stringResource(R.string.people_bees_empty), Modifier.padding(horizontal = 20.dp)) }
             items(people.bumblebees.inOrder(), key = { "bee-" + it.uid }) { bee ->
-                PersonRow(
-                    bee, chats[chatWith(bee.uid)], profile.uid, Modifier.animateItem(),
-                    role = stringResource(R.string.circle_bee_role),
-                    leavingAt = profile.pendingRemovals[bee.uid],
-                ) { onOpenChat(chatWith(bee.uid)) }
+                PersonRow(bee, chats[chatWith(bee.uid)], profile.uid, Modifier.animateItem(), leavingAt = profile.pendingRemovals[bee.uid]) {
+                    onOpenChat(chatWith(bee.uid))
+                }
             }
             items(asks, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
 
-            if (hasGardens) {
-                item {
-                    SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(start = 20.dp, end = 8.dp)) {
-                        TextButton(onClick = onOpenBeeStats) { Text(stringResource(R.string.bee_stats_open)) }
-                    }
+            item {
+                SectionTitle(stringResource(R.string.circle_looking_after), Modifier.padding(start = 20.dp, end = 8.dp)) {
+                    AddButton(stringResource(R.string.circle_join_title)) { adding = AddSheet.JOIN }
                 }
             }
+            if (!hasGardens) item { Hint(stringResource(R.string.people_gardens_empty), Modifier.padding(horizontal = 20.dp)) }
             items(people.lookingAfter.inOrder(), key = { "garden-" + it.uid }) { friend ->
-                PersonRow(friend, chats[chatWith(friend.uid)], profile.uid, Modifier.animateItem(), role = stringResource(R.string.circle_garden_role)) {
-                    onOpenChat(chatWith(friend.uid))
-                }
+                PersonRow(friend, chats[chatWith(friend.uid)], profile.uid, Modifier.animateItem()) { onOpenChat(chatWith(friend.uid)) }
             }
             items(offers, key = { it.id }) { OutgoingInvite(it, Modifier.animateItem()) }
-
-            if (!nobody) {
-                item { SectionTitle(stringResource(R.string.people_invite_more), Modifier.padding(horizontal = 20.dp)) }
-                item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
-            }
-            item { SectionTitle(stringResource(R.string.circle_join_title), Modifier.padding(horizontal = 20.dp)) }
-            item { JoinCard(profile, Modifier.padding(horizontal = 20.dp)) }
+            // How I answer as a Bumblebee belongs with the gardens I answer for, under them.
+            if (hasGardens) item(key = "bee-stats") { BeeStatsRow(Modifier.animateItem(), onOpenBeeStats) }
             item { Spacer(Modifier.height(if (profile.approverIds.isNotEmpty()) 88.dp else 24.dp)) }
         }
         // Asking for time is the one thing to do with Bumblebees from here; their chats hold the rest.
@@ -246,11 +251,54 @@ fun PeopleContent(
         }
     }
     if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })
+    adding?.let { sheet ->
+        ModalBottomSheet(onDismissRequest = { adding = null }) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+                when (sheet) {
+                    AddSheet.INVITE -> InviteSheet(onDone = { adding = null })
+                    AddSheet.JOIN -> JoinSheet(profile)
+                }
+            }
+        }
+    }
+}
+
+/** For someone with nobody yet: what a Bumblebee is, and a button that opens the invite. */
+@Composable
+private fun WelcomeCard(modifier: Modifier, onInvite: () -> Unit) {
+    MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.primaryContainer) {
+        Text(stringResource(R.string.invite_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
+        Text(stringResource(R.string.people_welcome_body), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp))
+        Button(onClick = onInvite, modifier = Modifier.padding(top = 14.dp).fillMaxWidth()) { Text(stringResource(R.string.people_invite_more)) }
+    }
+}
+
+/** How I answer as a Bumblebee, under the gardens I answer for: a row with a chart at its start. */
+@Composable
+private fun BeeStatsRow(modifier: Modifier, onOpen: () -> Unit) {
+    Row(
+        modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onOpen).padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.BarChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Text(stringResource(R.string.bee_stats_open), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** What a section's plus button opens: inviting a Bumblebee, or my friend code to look after a garden. */
+private enum class AddSheet { INVITE, JOIN }
+
+/** A plus button at the end of a section name; [label] says what it adds, for screen readers. */
+@Composable
+private fun AddButton(label: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick) { Icon(Icons.Outlined.Add, contentDescription = label, tint = MaterialTheme.colorScheme.primary) }
 }
 
 /**
- * Someone in my circle, opening our chat: their bio, or failing that what they are to me, and a
- * dot while the chat has news. A Bumblebee [leavingAt] some time says so, with a way to keep them.
+ * Someone in my circle, opening our chat: their bio, if they wrote one, and a dot while the chat
+ * has news. A Bumblebee [leavingAt] some time says so, with a way to keep them.
  */
 @Composable
 private fun PersonRow(
@@ -258,7 +306,6 @@ private fun PersonRow(
     chat: Chat?,
     myUid: String,
     modifier: Modifier,
-    role: String,
     leavingAt: Long? = null,
     onOpen: () -> Unit,
 ) {
@@ -271,7 +318,7 @@ private fun PersonRow(
         about = if (leavingAt != null) {
             stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
         } else {
-            person.bio.ifBlank { role }
+            person.bio.ifBlank { null }
         },
         aboutIsWarning = leavingAt != null,
         modifier = modifier,
@@ -297,10 +344,11 @@ private fun PersonRow(
 
 /**
  * Asks someone to be my Bumblebee: by a link to send them, or by their friend code. A pasted
- * invite link works here too, for when one opened in the browser instead of in Meadow.
+ * invite link works here too, for when one opened in the browser instead of in Meadow. Either
+ * closes the sheet with [onDone]: a code invite then waits under Your Bumblebees, and a link opens.
  */
 @Composable
-private fun InviteCard(modifier: Modifier) {
+private fun InviteSheet(onDone: () -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
     var code by rememberSaveable { mutableStateOf("") }
@@ -310,7 +358,7 @@ private fun InviteCard(modifier: Modifier) {
     val sent = stringResource(R.string.invite_code_sent)
     val pastedLink = InviteLinks.tokenFromText(code)
     val friendCode = code.uppercase().filter { it.isLetterOrDigit() }
-    MeadowCard(modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.primaryContainer) {
+    Column(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.invite_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
         Button(
             onClick = {
@@ -342,8 +390,9 @@ private fun InviteCard(modifier: Modifier) {
                     if (pastedLink != null) {
                         AppGraph.store.setPendingInvite(pastedLink)
                         code = ""
+                        onDone()
                     } else {
-                        codeAction.run(successMessage = sent, onSuccess = { code = "" }) { AppGraph.social.invite(friendCode) }
+                        codeAction.run(successMessage = sent, onSuccess = { code = ""; onDone() }) { AppGraph.social.invite(friendCode) }
                     }
                 },
                 enabled = (pastedLink != null || friendCode.length in 4..8) && !codeAction.busy,
@@ -355,12 +404,14 @@ private fun InviteCard(modifier: Modifier) {
 
 /** My friend code, for a friend who'd like me as their Bumblebee to invite me with. */
 @Composable
-private fun JoinCard(profile: UserProfile, modifier: Modifier) {
+private fun JoinSheet(profile: UserProfile) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val action = rememberAction()
     val copied = stringResource(R.string.join_code_copied)
-    MeadowCard(modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.circle_join_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading())
+        Hint(stringResource(R.string.join_code_body), Modifier.padding(top = 4.dp, bottom = 12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.join_code_title), style = MaterialTheme.typography.labelLarge)
@@ -434,13 +485,13 @@ private fun OutgoingInvite(invite: Invite, modifier: Modifier) {
 
 /**
  * One person in the circle, the same for Bumblebees and gardens: their picture and name, one line
- * about them, and [actions] at the end.
+ * about them if there is one, and [actions] at the end.
  */
 @Composable
 private fun PersonCard(
     avatar: Avatar,
     name: String,
-    about: String,
+    about: String?,
     modifier: Modifier,
     aboutIsWarning: Boolean = false,
     error: String? = null,
@@ -453,7 +504,7 @@ private fun PersonCard(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(name, style = MaterialTheme.typography.titleMedium)
-                Text(
+                if (about != null) Text(
                     about,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (aboutIsWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
