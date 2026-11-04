@@ -11,6 +11,11 @@ import dev.pcoffline.meadow.ui.limitText
 import androidx.compose.ui.text.TextLayoutResult
 import dev.pcoffline.meadow.ui.circle.FriendPage
 import android.app.Application
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
@@ -363,6 +368,24 @@ class MainScreensTest : ScreenTest() {
         compose.waitForIdle()
         compose.onNodeWithText("Message 301").assertIsDisplayed()
         assertEquals(2, seen)
+    }
+
+    @Test
+    fun `a chat stays at its latest message while pictures and cards above it load`() {
+        val texts = (1..40).map { i -> ChatMessage("m$i", DemoGarden.maya.uid, "Message $i", MessageKind.TEXT, null, i * 1_000L, pending = false) }
+        val card = ChatMessage("r", DemoGarden.maya.uid, "", MessageKind.REQUEST, "r1", 41_000L, pending = false)
+        val latest = ChatMessage("m42", DemoGarden.maya.uid, "The latest one", MessageKind.TEXT, null, 42_000L, pending = false)
+        var loaded by mutableStateOf(false)
+        show {
+            ChatContent(DemoGarden.robin, DemoGarden.chat, texts + card + latest, requestCard = { _, _ ->
+                // Like a request card or a picture: small at first, then as tall as it is.
+                Box(Modifier.fillMaxWidth().height(if (loaded) 600.dp else 40.dp))
+            })
+        }
+        compose.onNodeWithText("The latest one").assertIsDisplayed()
+        loaded = true
+        compose.waitForIdle()
+        compose.onNodeWithText("The latest one").assertIsDisplayed()
     }
 
     @Test

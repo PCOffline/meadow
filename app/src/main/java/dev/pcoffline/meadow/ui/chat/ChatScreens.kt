@@ -255,19 +255,13 @@ fun ChatContent(
     val latestId = messages.lastOrNull()?.id
     LaunchedEffect(latestId) { onSeen() }
 
-    // Opens at the latest message straight away. Later ones scroll into view only if you're
-    // already at the bottom or sent it yourself, so reading back isn't interrupted.
-    var opened by remember { mutableStateOf(false) }
+    // The list is held at its bottom, the latest message (item 0): it opens there, and pictures
+    // and cards that grow as they load push older messages up, not the latest ones away. A new
+    // message scrolls into view only if you're at the bottom already or sent it yourself, so
+    // reading back isn't interrupted.
     LaunchedEffect(latestId) {
         if (messages.isEmpty()) return@LaunchedEffect
-        val last = messages.size - 1 + if (chat == null && !loading) 1 else 0
-        if (!opened) {
-            listState.scrollToItem(last)
-            opened = true
-            return@LaunchedEffect
-        }
-        val seen = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: last
-        if (seen >= last - 2 || messages.last().senderId == profile.uid) listState.animateScrollToItem(last)
+        if (listState.firstVisibleItemIndex <= 2 || messages.last().senderId == profile.uid) listState.animateScrollToItem(0)
     }
 
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -276,11 +270,14 @@ fun ChatContent(
             if (chat != null) PersonActions(chat.otherId(profile.uid), title, profile, onOpenGarden)
         }
         if (chat != null) BeeAsks(chat, profile, invited, onAskBee)
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (chat == null && !loading) {
-                item { EmptyState("🕊️", stringResource(R.string.chat_closed_title)) }
-            }
-            items(messages, key = { it.id }) { message ->
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
+            reverseLayout = true,
+            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
+        ) {
+            // Newest first, drawn from the bottom up.
+            items(messages.asReversed(), key = { it.id }) { message ->
                 Box(Modifier.animateItem()) {
                     when (message.kind) {
                         MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
@@ -295,6 +292,10 @@ fun ChatContent(
                         }
                     }
                 }
+            }
+            // The last item, so it shows above the messages, as the chat's top.
+            if (chat == null && !loading) {
+                item { EmptyState("🕊️", stringResource(R.string.chat_closed_title)) }
             }
         }
         if (uploading > 0) {
