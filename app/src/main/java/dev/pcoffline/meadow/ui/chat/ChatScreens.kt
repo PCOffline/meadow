@@ -76,7 +76,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -223,6 +229,25 @@ fun ChatScreen(
  * of someone I look after, and a Bumblebee of mine can be removed (or kept, while leaving).
  */
 @OptIn(ExperimentalFoundationApi::class)
+/** The line above the first message that's new since I last read the chat. */
+@Composable
+private fun NewLine(modifier: Modifier) {
+    val spoken = stringResource(R.string.chat_new_line_spoken)
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clearAndSetSemantics { contentDescription = spoken },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+        Text(
+            stringResource(R.string.chat_new_line),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+    }
+}
+
 @Composable
 fun ChatContent(
     profile: UserProfile,
@@ -253,16 +278,51 @@ fun ChatContent(
     // Keyed on the newest message, not the count: only the latest 300 are loaded, so once a
     // chat has that many a new message leaves the count as it was.
     val latestId = messages.lastOrNull()?.id
-    LaunchedEffect(latestId) { onSeen() }
-
-    // The list is held at its bottom, the latest message (item 0): it opens there, and pictures
-    // and cards that grow as they load push older messages up, not the latest ones away. A new
-    // message scrolls into view only if you're at the bottom already or sent it yourself, so
-    // reading back isn't interrupted.
-    LaunchedEffect(latestId) {
-        if (messages.isEmpty()) return@LaunchedEffect
-        if (listState.firstVisibleItemIndex <= 2 || messages.last().senderId == profile.uid) listState.animateScrollToItem(0)
+    // When I last read the chat, as it opened: taken before this visit marks it read. The messages
+    // from the other person after it are new to me.
+    val readAt = remember(chat != null) { chat?.lastReadMillis?.get(profile.uid) ?: chat?.let { 0L } }
+    LaunchedEffect(latestId, readAt != null) { if (readAt != null) onSeen() }
+    // The first of them, fixed once the messages load, so later messages don't move the line.
+    val firstNewId = remember(readAt, messages.isNotEmpty()) {
+        readAt?.let { read -> messages.firstOrNull { it.senderId != profile.uid && it.createdAtMillis > read }?.id }
     }
+    val reversed = messages.asReversed()
+    // In the list, the "New" line comes right after its message, so it shows just above it.
+    val newLineIndex = firstNewId?.let { id -> reversed.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.plus(1) }
+
+    // The list is held at its bottom, the latest message (item 0). With new messages, it opens at
+    // the "New" line, near the top, instead. Pictures and cards that grow as they load push older
+    // messages up, not the ones in view away.
+    var opened by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    LaunchedEffect(messages.isNotEmpty() && readAt != null) {
+        if (opened || messages.isEmpty() || readAt == null) return@LaunchedEffect
+        opened = true
+        val line = newLineIndex ?: return@LaunchedEffect
+        listState.scrollToItem(line)
+        val info = listState.layoutInfo
+        val size = info.visibleItemsInfo.firstOrNull { it.index == line }?.size ?: 0
+        listState.scrollBy(-(info.viewportSize.height - size - with(density) { 16.dp.toPx() }))
+    }
+    // A new message comes into view only if you're at the bottom already or sent it yourself, so
+    // reading back isn't interrupted. Then a button offers the way down to it.
+    var newBelow by remember { mutableStateOf(false) }
+    val atBottom by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
+    LaunchedEffect(atBottom) { if (atBottom) newBelow = false }
+    val firstLatest = remember { mutableStateOf(true) }
+    LaunchedEffect(latestId) {
+        if (latestId == null) return@LaunchedEffect
+        if (firstLatest.value) {
+            firstLatest.value = false
+            return@LaunchedEffect
+        }
+        if (listState.firstVisibleItemIndex <= 2 || messages.last().senderId == profile.uid) {
+            listState.animateScrollToItem(0)
+        } else {
+            newBelow = true
+        }
+    }
+    val scope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize().imePadding()) {
         val title = chat?.otherName(profile.uid).orEmpty()
@@ -270,14 +330,16 @@ fun ChatContent(
             if (chat != null) PersonActions(chat.otherId(profile.uid), title, profile, onOpenGarden)
         }
         if (chat != null) BeeAsks(chat, profile, invited, onAskBee)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         LazyColumn(
-            Modifier.weight(1f).fillMaxWidth(),
+            Modifier.fillMaxSize(),
             state = listState,
             reverseLayout = true,
             verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
         ) {
             // Newest first, drawn from the bottom up.
-            items(messages.asReversed(), key = { it.id }) { message ->
+            reversed.forEach { message ->
+            item(key = message.id) {
                 Box(Modifier.animateItem()) {
                     when (message.kind) {
                         MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
@@ -293,10 +355,24 @@ fun ChatContent(
                     }
                 }
             }
+            if (message.id == firstNewId) item(key = "new-line") { NewLine(Modifier.animateItem()) }
+            }
             // The last item, so it shows above the messages, as the chat's top.
             if (chat == null && !loading) {
                 item { EmptyState("🕊️", stringResource(R.string.chat_closed_title)) }
             }
+        }
+        if (newBelow) {
+            val label = stringResource(R.string.chat_new_message_spoken)
+            FilledTonalButton(
+                onClick = { newBelow = false; scope.launch { listState.animateScrollToItem(0) } },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).semantics { contentDescription = label },
+            ) {
+                Text(stringResource(R.string.chat_new_message))
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+        }
         }
         if (uploading > 0) {
             Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
