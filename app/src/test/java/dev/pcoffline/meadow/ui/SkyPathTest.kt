@@ -13,7 +13,8 @@ class SkyPathTest {
     fun `the sun rises at five, is halfway at noon and sets at seven`() {
         assertEquals(0f, skyProgress(5, 0), 1e-4f)
         assertEquals(0.5f, skyProgress(12, 0), 1e-4f)
-        assertEquals(1f, skyProgress(18, 60), 1e-4f)
+        // The last minute of the day: 19:00 itself is the first minute of the night.
+        assertEquals(1f, skyProgress(18, 59), 1f / 840 + 1e-4f)
         assertTrue(skyProgress(9, 30) > skyProgress(9, 0))
     }
 
@@ -21,7 +22,9 @@ class SkyPathTest {
     fun `the moon rises at seven, is halfway at midnight and sets at five`() {
         assertEquals(0f, skyProgress(19, 0), 1e-4f)
         assertEquals(0.5f, skyProgress(0, 0), 1e-4f)
-        assertEquals(1f, skyProgress(4, 60), 1e-4f)
+        assertEquals(1f, skyProgress(4, 59), 1f / 600 + 1e-4f)
+        // At 5:00 the day starts again, with the sun at the start of its arc.
+        assertEquals(0f, skyProgress(5, 0), 1e-4f)
         assertTrue(skyProgress(23, 0) < skyProgress(0, 30))
     }
 
