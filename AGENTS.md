@@ -47,11 +47,12 @@ description, under **Pictures**, and replaces them on each push.
 - **Stories:** for each change that people see or do, write a story. It's a class in
   `app/src/androidTest/java/dev/pcoffline/meadow/pictures/stories` that extends `Story`. Each
   step does one thing that a person does, in order, and has one short caption. The workflow takes
-  a screenshot of each step and a video of the whole story. When the base has the same story, it
-  shows the base's steps next to them.
+  a screenshot of each step and a video of the whole story. It shows only the stories that are
+  new or that changed. When the base has the same story, it shows the base's steps next to them.
 - **Screens:** the workflow draws each state of each screen in the debug gallery (`Scenarios` in
-  `app/src/debug/.../showcase/Gallery.kt`). It draws them in light, dark, large text, on a narrow
-  phone and in each theme. It shows each picture that changed, before and after.
+  `app/src/debug/.../showcase/Gallery.kt`). It draws them in each theme by day and by night, in
+  large text and on a narrow phone. It shows each picture that changed, before and after, grouped
+  by theme.
 
 Make the pictures show each detail of the change:
 
