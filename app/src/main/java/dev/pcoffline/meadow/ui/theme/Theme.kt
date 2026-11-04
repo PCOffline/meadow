@@ -101,8 +101,8 @@ enum class DarkMode(val key: String, @StringRes val label: Int) {
     }
 }
 
-/** Night is from 21:00 to 5:00: the hours the moon is out on a dark page. */
-fun isNightHour(hour: Int): Boolean = hour !in 5..20
+/** Night is from 19:00 to 5:00: the hours the moon is out on a dark page. */
+fun isNightHour(hour: Int): Boolean = hour !in 5..18
 
 /** The hour of the day, kept up to date while it's on screen, so Clock changes over by itself. */
 @Composable

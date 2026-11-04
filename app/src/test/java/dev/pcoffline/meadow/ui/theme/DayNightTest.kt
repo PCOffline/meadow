@@ -14,7 +14,9 @@ class DayNightTest {
     fun `Clock is light by day and dark by night, whatever the phone says`() {
         assertFalse(DarkMode.CLOCK.isDarkAt(hour = 12, systemDark = true))
         assertFalse(DarkMode.CLOCK.isDarkAt(hour = 5, systemDark = true))
-        assertFalse(DarkMode.CLOCK.isDarkAt(hour = 20, systemDark = true))
+        assertFalse(DarkMode.CLOCK.isDarkAt(hour = 18, systemDark = true))
+        // Night falls at 19:00, not 21:00.
+        assertTrue(DarkMode.CLOCK.isDarkAt(hour = 19, systemDark = false))
         assertTrue(DarkMode.CLOCK.isDarkAt(hour = 21, systemDark = false))
         assertTrue(DarkMode.CLOCK.isDarkAt(hour = 0, systemDark = false))
         assertTrue(DarkMode.CLOCK.isDarkAt(hour = 4, systemDark = false))
@@ -48,15 +50,15 @@ class DayNightTest {
 
     @Test
     fun `on a light page at night the sun stays set, rather than rising again`() {
-        // At 20:59 the sun is about to set; after 21:00 it stays down at the end of its arc.
-        listOf(21, 23, 1, 4).forEach { h -> assertEquals("at $h:00", 1f, celestialProgress(h, 0, night = false), 0f) }
+        // At 18:59 the sun is about to set; after 19:00 it stays down at the end of its arc.
+        listOf(19, 21, 23, 1, 4).forEach { h -> assertEquals("at $h:00", 1f, celestialProgress(h, 0, night = false), 0f) }
         assertTrue(celestialProgress(12, 0, night = false) < 1f)
     }
 
     @Test
     fun `on a dark page the moon keeps its own timing`() {
-        assertEquals(0f, celestialProgress(21, 0, night = true), 0.001f)
-        assertEquals(0.5f, celestialProgress(1, 0, night = true), 0.001f)
+        assertEquals(0f, celestialProgress(19, 0, night = true), 0.001f)
+        assertEquals(0.5f, celestialProgress(0, 0, night = true), 0.001f)
     }
 
 
