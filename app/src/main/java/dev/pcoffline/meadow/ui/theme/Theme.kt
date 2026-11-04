@@ -40,6 +40,8 @@ data class GardenColors(
     val petalHoney: Color,
     val petalPeach: Color,
     val petalSky: Color,
+    /** The centre of every flower, apart from every petal colour (see [HEART_TARGET]). */
+    val heart: Color,
     val leaf: Color,
     val leafDark: Color,
     val stem: Color,
@@ -126,45 +128,62 @@ private data class Seed(
     val background: Color,
     /** Flower colours, the theme's own flower first. */
     val petals: List<Color>,
+    /** The centre of every flower: a colour of its own, apart from every petal. */
+    val heart: Color,
     val leaf: Color,
     /** A pale tint for the daytime sky, so it takes on the theme without going grey. */
     val sky: Color,
 )
 
 // Each page is lightly tinted with its theme's own colour, as cherry blossom's is pink, and its
-// flowers are picked to sit together. Each petal stands out from the page by [PETAL_TARGET], so
-// no app's flower looks washed out next to the others.
+// flowers are picked to sit together: shades next to each other on the colour wheel, with one
+// petal from the opposite side for contrast. Each petal stands out from the page by
+// [PETAL_TARGET], so no app's flower looks washed out next to the others. Each theme's heart is
+// darker or lighter than all its petals, by [HEART_TARGET].
 /** How far each petal stands out from the page and the cards, as a contrast ratio. */
 internal const val PETAL_TARGET = 1.45f
+
+/** How far each flower's centre stands out from each petal, as a contrast ratio. */
+internal const val HEART_TARGET = 1.6f
 
 private val Seeds = mapOf(
     GardenTheme.MEADOW to Seed(
         Color(0xFF4F7F4C), Color(0xFFB4646C), Color(0xFF6B7FB8), Color(0xFFF3F6EA),
-        listOf(Color(0xFFEFA3B0), Color(0xFFB9A9E0), Color(0xFFF2C24F), Color(0xFFF5B48A), Color(0xFF93C1E6)),
+        listOf(Color(0xFFF2A0B8), Color(0xFFB9A3E8), Color(0xFFF0BC38), Color(0xFFF6A887), Color(0xFF8DBDEB)),
+        // A chestnut heart, as a coneflower's.
+        Color(0xFF8A5525),
         Color(0xFF86B56F),
         Color(0xFFCDE8F2),
     ),
     GardenTheme.BLOSSOM to Seed(
         Color(0xFFB5577A), Color(0xFF7F8F5A), Color(0xFF8E6FB0), Color(0xFFFCEBEE),
-        listOf(Color(0xFFF4B6C8), Color(0xFFEBA6C6), Color(0xFFE8A0A6), Color(0xFFD7B6E0), Color(0xFFF3BC5C)),
+        listOf(Color(0xFFF3AEC4), Color(0xFFE3A3D2), Color(0xFFEFA49B), Color(0xFFC9B0E8), Color(0xFFEFB950)),
+        // A raspberry heart, as a cherry blossom's.
+        Color(0xFFA8385E),
         Color(0xFF9DB57E),
         Color(0xFFF0B4C8),
     ),
     GardenTheme.LAVENDER to Seed(
         Color(0xFF6B57A8), Color(0xFFA0607E), Color(0xFF5E8C7A), Color(0xFFF5F2FB),
-        listOf(Color(0xFFB7A6E4), Color(0xFFC9B8EE), Color(0xFF9C88D2), Color(0xFFF1B5C8), Color(0xFFEDC460)),
+        listOf(Color(0xFFB4A2E8), Color(0xFFA9B3EE), Color(0xFF9D86D6), Color(0xFFEDB0D0), Color(0xFFECBC4E)),
+        // A deep indigo heart, the gold petal's complement.
+        Color(0xFF4F3C8C),
         Color(0xFF97B39A),
         Color(0xFFD9CCF2),
     ),
     GardenTheme.SUNFLOWER to Seed(
         Color(0xFF9A6412), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFFF8E8),
-        listOf(Color(0xFFF4C13E), Color(0xFFF2C855), Color(0xFFEC9F35), Color(0xFFF0B184), Color(0xFFD98E5F)),
+        listOf(Color(0xFFF5C033), Color(0xFFF2A93B), Color(0xFFF5B98A), Color(0xFF9DB4E4), Color(0xFFE38D63)),
+        // A cocoa heart, as a sunflower's; the blue is the oranges' complement.
+        Color(0xFF5A3A1E),
         Color(0xFF92B45E),
         Color(0xFFFBE3A6),
     ),
     GardenTheme.POND to Seed(
         Color(0xFF2E7A80), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFECF6F4),
-        listOf(Color(0xFFF2B2C4), Color(0xFF98CBE0), Color(0xFF8ECFBD), Color(0xFFEBC462), Color(0xFFC8B8EA)),
+        listOf(Color(0xFFF3ADC4), Color(0xFF8DCBE3), Color(0xFF86D0BA), Color(0xFFB1B8EE), Color(0xFFF4AE91)),
+        // A gold heart, as a water lily's.
+        Color(0xFFB87A14),
         Color(0xFF72B39A),
         Color(0xFFBFE6E3),
     ),
@@ -172,6 +191,8 @@ private val Seeds = mapOf(
         // A woodland floor: toadstool red, chanterelle, tan and brown caps, and moss.
         Color(0xFF9B3F2E), Color(0xFF5E7A45), Color(0xFF8A6D4E), Color(0xFFF5F1E8),
         listOf(Color(0xFFD4573F), Color(0xFFE59B52), Color(0xFFBF9670), Color(0xFF9E6B4A), Color(0xFFC7A2D8)),
+        // A cream heart, as a toadstool's spots.
+        Color(0xFFF7EDD6),
         Color(0xFF7FA05F),
         Color(0xFFEEC49A),
     ),
@@ -384,6 +405,7 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         petalHoney = p[2],
         petalPeach = p[3],
         petalSky = p[4],
+        heart = s.heart,
         leaf = leaf,
         leafDark = if (dark) lerp(s.leaf, Color.White, 0.25f) else lerp(s.leaf, Color.Black, 0.3f),
         stem = lerp(s.leaf, Color.Black, 0.18f),
