@@ -1,9 +1,14 @@
 package dev.pcoffline.meadow.pictures.stories
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import dev.pcoffline.meadow.data.Weather
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
@@ -21,11 +26,13 @@ class EveningSkyStory : Story("Night falls at 7 PM, with smooth clouds and a cle
     @Test
     fun story() {
         show(firstCaption = "18:00 with Clock: still day, the sun low on the right.") {
-            // Clock's look for the hour shown: dark from 19:00.
-            val mode = if (hour >= 19 || hour < 5) DarkMode.DARK else DarkMode.LIGHT
-            MeadowTheme(GardenTheme.MEADOW, mode) {
-                CompositionLocalProvider(LocalSkyHour provides hour, LocalSkyWeather provides Weather.PARTLY_CLOUDY) {
-                    GardenContent(DemoGarden.robin, DemoGarden.garden)
+            // The pinned hour also pins Clock's hour. The page draws its own background, as the
+            // app's Scaffold does, so the night page is dark below the sky too.
+            CompositionLocalProvider(LocalSkyHour provides hour, LocalSkyWeather provides Weather.PARTLY_CLOUDY) {
+                MeadowTheme(GardenTheme.MEADOW, DarkMode.CLOCK) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        GardenContent(DemoGarden.robin, DemoGarden.garden)
+                    }
                 }
             }
         }
