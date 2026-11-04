@@ -178,6 +178,16 @@ abstract class EndToEndTest {
         compose.waitForIdle()
     }
 
+    /**
+     * Types into a field in a bottom sheet. As in [typeIntoDialog], the keyboard stays up: it
+     * belongs to the sheet's window, which [hideKeyboard] doesn't watch. It closes with the sheet.
+     */
+    protected fun typeIntoSheet(field: SemanticsMatcher, value: String) {
+        eventually("the sheet's field") { compose.onAllNodes(field).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(field).performTextInput(value)
+        compose.waitForIdle()
+    }
+
     private fun hideKeyboard() {
         val ime = WindowInsetsCompat.Type.ime()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -327,7 +337,7 @@ abstract class EndToEndTest {
         waitFor(R.string.people_title)
         val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
         compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
-        typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
+        typeIntoSheet(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
         node(R.string.invite_code_button).performClick()
         waitForText(text(R.string.accept_invite_title, friendName))
         compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()

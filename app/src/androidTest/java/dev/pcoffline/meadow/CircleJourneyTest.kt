@@ -114,7 +114,7 @@ class CircleJourneyTest : EndToEndTest() {
 
             // Kai invites Sam by code, then thinks better of it.
             invite()
-            typeInto(code, friendCodeOf(sam))
+            typeIntoSheet(code, friendCodeOf(sam))
             node(R.string.invite_code_button).performClick()
             waitFor(R.string.invite_code_sent)
             assertTrue(pendingInvite(kai, sam))
@@ -123,7 +123,7 @@ class CircleJourneyTest : EndToEndTest() {
 
             // Invited again, Sam says yes.
             invite()
-            typeInto(code, friendCodeOf(sam))
+            typeIntoSheet(code, friendCodeOf(sam))
             node(R.string.invite_code_button).performClick()
             var inviteId = ""
             eventually("the invite reaching Sam") {
@@ -175,7 +175,7 @@ class CircleJourneyTest : EndToEndTest() {
             // Kai's own link, pasted into the friend code field, can't make Kai their own Bumblebee.
             val token = kai.call("createInviteLink")!!["token"] as String
             val field = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
-            typeInto(field, "https://${BuildConfig.LINK_HOST}/i/$token")
+            typeIntoSheet(field, "https://${BuildConfig.LINK_HOST}/i/$token")
             node(R.string.invite_code_button).performClick()
             waitFor(R.string.accept_invite_own)
             inDialog(text(R.string.action_ok)).performClick()
