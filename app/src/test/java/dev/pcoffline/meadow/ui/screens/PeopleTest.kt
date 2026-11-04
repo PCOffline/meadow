@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -22,7 +24,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
-import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Chat
@@ -81,7 +82,9 @@ class PeopleTest : ScreenTest() {
         }
         for (name in listOf("Maya", "Ana")) {
             val card = compose.onNode(hasText(name) and hasClickAction()).performScrollTo().fetchSemanticsNode()
-            assertEquals(listOf(name), card.config.getOrElse(SemanticsProperties.Text) { emptyList() }.map { it.text })
+            // Their emoji picture, then their name, and no line about them.
+            val words = card.config.getOrElse(SemanticsProperties.Text) { emptyList() }.map { it.text }.filter { text -> text.any(Char::isLetter) }
+            assertEquals(listOf(name), words)
         }
         assertAccessible()
     }
@@ -206,7 +209,8 @@ class PeopleTest : ScreenTest() {
         val plus = compose.onNodeWithContentDescription(text(R.string.people_invite_more))
         val bounds = plus.getBoundsInRoot()
         assertTrue(bounds.top < title.bottom && bounds.bottom > title.top)
-        assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+        // The icon is drawn smaller; what a finger can hit is 48dp.
+        plus.assertTouchWidthIsEqualTo(48.dp).assertTouchHeightIsEqualTo(48.dp)
         plus.performClick()
         node(R.string.invite_title).assertExists()
         node(R.string.invite_link_button).assertExists()
