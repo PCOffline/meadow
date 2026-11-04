@@ -272,7 +272,8 @@ fun ChatContent(
 
     Column(Modifier.fillMaxSize().imePadding()) {
         val title = chat?.otherName(profile.uid).orEmpty()
-        BackTopBar(title, onBack = onBack) {
+        // With a photo, the emoji follows the name, so it still shows.
+        BackTopBar(chat?.otherAvatar(profile.uid)?.nameWithEmoji(title) ?: title, onBack = onBack) {
             if (chat != null) PersonActions(chat.otherId(profile.uid), title, profile, onOpenGarden)
         }
         if (chat != null) BeeAsks(chat, profile, invited, onAskBee)

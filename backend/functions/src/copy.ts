@@ -8,13 +8,13 @@ import { capitalize } from "./format";
 
 interface Person {
   displayName: string;
+  /** Their emoji. It leads their name, with a photo too. */
   flower: string;
-  /** Someone with a photo goes by it, so their flower isn't put in front of their name. */
   photoUrl?: string | null;
 }
 
-/** The flower that leads someone's name, or nothing once they use a photo. */
-const lead = (p: Person): string => (p.photoUrl ? "" : `${p.flower} `);
+/** The emoji that leads someone's name. */
+const lead = (p: Person): string => `${p.flower} `;
 
 export const errors = {
   signIn: "Sign in first.",

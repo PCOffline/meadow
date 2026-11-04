@@ -267,7 +267,7 @@ private fun PersonRow(
     val unread = chat?.isUnread(myUid) == true
     PersonCard(
         avatar = person.avatar,
-        name = person.displayName,
+        name = person.avatar.nameWithEmoji(person.displayName),
         about = if (leavingAt != null) {
             stringResource(R.string.circle_bee_leaving, durationText(leavingAt - System.currentTimeMillis()))
         } else {
