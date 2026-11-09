@@ -283,6 +283,8 @@ jobs:
         with:
           path: /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
           key: system-image-34-google_apis-x86_64-v1
+      # When a journey fails, the log shows which journeys ran before it on this phone, in order,
+      # and which activities started, so one that leaves the phone changed can be found.
       - name: End-to-end tests (Android emulator against Firebase emulators)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -293,7 +295,7 @@ jobs:
           # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
+          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time TestRunner:I ActivityTaskManager:I '*:S' | grep -E 'started:|finished:|failed:|START u0|Displayed' | tail -n 150; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
       - name: Save the system image
         if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
