@@ -183,11 +183,21 @@ jobs:
           path: backend/coverage/
           if-no-files-found: ignore
 
-  e2e:
+  # The journeys take most of the build's time, so they run in shards, side by side. Each shard
+  # has its own phone and backend emulators, and AndroidJUnitRunner gives it a share of the tests.
+  e2e-shard:
+    name: e2e (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    env:
+      SHARD: ${{ matrix.shard }}
+      SHARDS: 3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -235,7 +245,7 @@ jobs:
           # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
+          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
       - name: Show end-to-end results
         if: failure()
         run: |
@@ -244,8 +254,23 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: e2e-reports
+          name: e2e-reports-${{ matrix.shard }}
           path: |
             app/build/reports/androidTests/
             backend/emulators.log
           if-no-files-found: ignore
+
+  # One check named e2e, as before, that passes only when every shard did.
+  e2e:
+    if: always()
+    needs: e2e-shard
+    runs-on: ubuntu-latest
+    permissions: {}
+    timeout-minutes: 5
+    steps:
+      - name: Every shard passed
+        env:
+          RESULT: ${{ needs.e2e-shard.result }}
+        run: |
+          echo "The shards: $RESULT"
+          test "$RESULT" = success
