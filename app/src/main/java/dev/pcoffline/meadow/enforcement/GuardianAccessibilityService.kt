@@ -25,6 +25,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,6 +77,23 @@ class GuardianAccessibilityService : AccessibilityService() {
         running = true
         GuardianService.start(this)
         AppGraph.protection.check()
+        // Every app's content changes are only read in strict mode and in a browser while a site is
+        // limited. Other times Meadow doesn't ask Android for them: a video feed or a media player
+        // sends them all the time (#106).
+        scope.launch {
+            combine(AppGraph.store.strictMode, AppGraph.store.limits) { strict, limits ->
+                eventTypesFor(strict, sitesLimited = limits.any { Sites.domainOf(it.packageName) != null })
+            }.distinctUntilChanged().collect { withContext(Dispatchers.Main) { listenFor(it) } }
+        }
+    }
+
+    /** Asks Android for the [types] of events Meadow reads, if it isn't sending those already. */
+    @MainThread
+    private fun listenFor(types: Int) {
+        val info = runCatching { serviceInfo }.getOrNull() ?: return
+        if (info.eventTypes == types) return
+        info.eventTypes = types
+        runCatching { serviceInfo = info }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -429,6 +448,15 @@ class GuardianAccessibilityService : AccessibilityService() {
     companion object {
         @Volatile var running = false
             private set
+
+        /**
+         * The events Meadow reads: which windows and apps are on screen, always. Content changes
+         * only in [strict] mode (to read Settings) or while [sitesLimited] (to read address bars).
+         */
+        internal fun eventTypesFor(strict: Boolean, sitesLimited: Boolean): Int {
+            val windows = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
+            return if (strict || sitesLimited) windows or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED else windows
+        }
 
         private const val SETTINGS = "com.android.settings"
         // Long enough to outlast the few seconds Android holds screens back after Home.
