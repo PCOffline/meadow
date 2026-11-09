@@ -175,8 +175,9 @@ fun PeopleContent(
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { TabTitle(stringResource(R.string.people_title)) }
-            // With nobody yet, inviting is the one thing to do here.
-            if (nobody) item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
+            // With nobody yet, inviting is the one thing to do here. The card keeps one key where it
+            // goes, so a code typed into it stays when the list changes around it.
+            if (nobody) item(key = INVITE_CARD) { InviteCard(Modifier.padding(horizontal = 20.dp)) }
 
             if (people.incomingInvites.isNotEmpty() || people.incomingRequests.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.people_waiting), Modifier.padding(horizontal = 20.dp)) }
@@ -218,7 +219,7 @@ fun PeopleContent(
 
             if (!nobody) {
                 item { SectionTitle(stringResource(R.string.people_invite_more), Modifier.padding(horizontal = 20.dp)) }
-                item { InviteCard(Modifier.padding(horizontal = 20.dp)) }
+                item(key = INVITE_CARD) { InviteCard(Modifier.padding(horizontal = 20.dp)) }
             }
             item { SectionTitle(stringResource(R.string.circle_join_title), Modifier.padding(horizontal = 20.dp)) }
             item { JoinCard(profile, Modifier.padding(horizontal = 20.dp)) }
@@ -294,6 +295,8 @@ private fun PersonRow(
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+private const val INVITE_CARD = "invite"
 
 /**
  * Asks someone to be my Bumblebee: by a link to send them, or by their friend code. A pasted
