@@ -67,16 +67,12 @@ jobs:
           ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
           # The base may not build, or may have no pictures yet: then every picture is new.
           (cd ../base && ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace) || echo "The base didn't build"
-      - name: Restore the emulator
-        # The system image and a booted phone's snapshot, which the Build workflow saves on main.
-        id: avd
+      - name: Restore the system image
+        # The emulator's Android 14 image, which the Build workflow saves on main.
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-            /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
-          key: avd-34-google_apis-x86_64-pixel_6-v1
+          path: /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: system-image-34-google_apis-x86_64-v1
       - name: Draw on an emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -84,8 +80,6 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           # The tests turn the motion off for the gallery and on for the stories.
           disable-animations: false
           script: |

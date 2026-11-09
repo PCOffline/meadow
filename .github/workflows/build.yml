@@ -325,39 +325,13 @@ jobs:
           exit 1
       - name: Build the test app
         run: ./gradlew assembleDebug assembleDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
-      - name: Restore the emulator
-        # The system image and a booted phone's snapshot. With them, the phone boots in seconds,
-        # and nothing is downloaded.
+      - name: Restore the system image
+        # The emulator's Android 14 image, so a run doesn't download it again. Runs on main save it.
         id: avd
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-            /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
-          key: avd-34-google_apis-x86_64-pixel_6-v1
-      - name: Make the emulator's snapshot
-        # Only main saves the emulator: a pull request's cache is its own, and this one is large.
-        if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "The snapshot is made"
-      - name: Save the emulator
-        if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-            /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
-          key: avd-34-google_apis-x86_64-pixel_6-v1
+          path: /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: system-image-34-google_apis-x86_64-v1
       - name: End-to-end tests (Android emulator against Firebase emulators)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -367,10 +341,14 @@ jobs:
           # A phone's screen, not the default AVD's low density: text contrast is measured from
           # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
           profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
+      - name: Save the system image
+        if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: system-image-34-google_apis-x86_64-v1
       - name: Show end-to-end results
         if: failure()
         run: |
