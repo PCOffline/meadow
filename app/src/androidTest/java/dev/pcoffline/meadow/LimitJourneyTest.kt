@@ -28,7 +28,6 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.LocalTime
 
 /**
  * End to end, with no Bumblebees yet: a limit is planted for an app found in the picker, with a
@@ -76,12 +75,12 @@ class LimitJourneyTest : EndToEndTest() {
             eventually("planting turned off") { runCatching { node(R.string.limit_editor_plant).assertIsNotEnabled() }.isSuccess }
             toggle(R.string.limit_editor_daily)
 
-            // 45 minutes a day, 5 hours a week, and allowed hours that include now.
+            // 45 minutes a day, 5 hours a week, and only between 10:00 and 16:00.
             chip(app.resources.minutesText(45))
             toggle(R.string.limit_editor_weekly)
             chip(app.resources.minutesText(300))
             toggle(R.string.limit_editor_hours)
-            chip(hoursPresetForNow())
+            chip(text(R.string.schedule_window, clockText(10 * 60), clockText(16 * 60)))
             node(R.string.limit_editor_plant).performScrollTo().performClick()
             waitFor(R.string.limit_editor_planted)
             waitForBackend(limit) { it.int("dailyMinutes") == 45 && it.int("weeklyMinutes") == 300 && it.has("schedule") }
@@ -122,19 +121,6 @@ class LimitJourneyTest : EndToEndTest() {
             waitFor(R.string.limit_editor_removed)
             waitUntilGone(limit)
             waitFor(R.string.garden_empty_title)
-        }
-    }
-
-    /**
-     * An allowed-hours preset that includes now, with half an hour to spare. Pebbles is the test
-     * app itself: outside its allowed hours, Meadow would cover the test while it runs.
-     */
-    private fun hoursPresetForNow(): String {
-        val minute = LocalTime.now().let { it.hour * 60 + it.minute }
-        return when {
-            minute in 10 * 60 until 16 * 60 - 30 -> text(R.string.schedule_window, clockText(10 * 60), clockText(16 * 60))
-            minute < 9 * 60 -> text(R.string.schedule_preset_until, clockText(22 * 60))
-            else -> text(R.string.schedule_preset_from, clockText(9 * 60))
         }
     }
 
