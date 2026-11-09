@@ -37,6 +37,7 @@ import java.time.LocalDateTime
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -293,7 +294,8 @@ fun SkyScene(
     val sky = remember(mood.top, mood.bottom) { Brush.verticalGradient(listOf(mood.top, mood.bottom)) }
     val weather = mood.weather
     val clouds = remember(weather, mood.night) { Clouds.of(weather, mood.night) }
-    Box(modifier) {
+    // Clouds, rain and snow enter and leave past the edges. The scene keeps them inside it.
+    Box(modifier.clipToBounds()) {
         // Each animated layer redraws on its own, without redrawing the still hills between them.
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
             val t = clock.value
