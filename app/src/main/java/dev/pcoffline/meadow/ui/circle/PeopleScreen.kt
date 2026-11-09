@@ -2,6 +2,9 @@
 
 package dev.pcoffline.meadow.ui.circle
 
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.content.ClipData
@@ -9,9 +12,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -252,7 +253,8 @@ fun PeopleContent(
     }
     if (asking) AskForTimeDialog(packageName = null, onDismiss = { asking = false })
     adding?.let { sheet ->
-        ModalBottomSheet(onDismissRequest = { adding = null }) {
+        // Open all the way: the invite has a field to type in, which the keyboard would cover.
+        ModalBottomSheet(onDismissRequest = { adding = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
                 when (sheet) {
                     AddSheet.INVITE -> InviteSheet(onDone = { adding = null })
