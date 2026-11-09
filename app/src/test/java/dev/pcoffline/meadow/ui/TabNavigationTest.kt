@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui
 
+import android.app.Application
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -20,9 +21,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 /** The tab bar and notification links, on a navigation graph shaped like the app's. */
 @RunWith(AndroidJUnit4::class)
+@Config(application = Application::class)
 class TabNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var nav: NavHostController
