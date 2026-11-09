@@ -18,7 +18,9 @@ concurrency:
 permissions: {}
 
 jobs:
-  android:
+  # The app's build and its unit tests each take minutes, so they run side by side.
+  android-build:
+    name: android (build and lint)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,11 +46,39 @@ jobs:
           fi
       - name: Static analysis (detekt, likely bugs only)
         run: .github/scripts/detekt.sh
-      - name: Build, unit test and lint
-        run: ./gradlew assembleDebug assembleRelease createDebugUnitTestCoverageReport lintDebug --stacktrace
+      - name: Build and lint
+        run: ./gradlew assembleDebug assembleRelease lintDebug --stacktrace
       - name: Lint findings
         if: always()
         run: cat app/build/reports/lint-results-debug.txt 2>/dev/null || echo "No lint report"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meadow-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: android-lint
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  android-tests:
+    name: android (unit tests)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Unit test with coverage
+        run: ./gradlew createDebugUnitTestCoverageReport --stacktrace
       - name: Unit test coverage floor
         # Just under what the tests reach today (47.6% of lines, 32.8% of branches): it can only
         # go up. Raise it as coverage grows.
@@ -59,18 +89,29 @@ jobs:
         if: failure()
         run: python3 .github/scripts/failed_tests.py app/build/test-results
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: meadow-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: android-reports
           path: |
-            app/build/reports/lint-results-debug.html
             app/build/reports/tests/
             app/build/reports/coverage/
           if-no-files-found: ignore
+
+  # One check named android, as before, that passes only when the build and the tests did.
+  android:
+    if: always()
+    needs: [android-build, android-tests]
+    runs-on: ubuntu-latest
+    permissions: {}
+    timeout-minutes: 5
+    steps:
+      - name: The build and the tests passed
+        env:
+          BUILD: ${{ needs.android-build.result }}
+          TESTS: ${{ needs.android-tests.result }}
+        run: |
+          echo "Build: $BUILD. Tests: $TESTS."
+          test "$BUILD" = success && test "$TESTS" = success
 
   # Workflows and scripts: mistakes here only show up when a release or deploy runs.
   scripts:
@@ -235,6 +276,39 @@ jobs:
           exit 1
       - name: Build the test app
         run: ./gradlew assembleDebug assembleDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 --stacktrace
+      - name: Restore the emulator
+        # The system image and a booted phone's snapshot. With them, the phone boots in seconds,
+        # and nothing is downloaded.
+        id: avd
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: avd-34-google_apis-x86_64-pixel_6-v1
+      - name: Make the emulator's snapshot
+        # Only main saves the emulator: a pull request's cache is its own, and this one is large.
+        if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "The snapshot is made"
+      - name: Save the emulator
+        if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: avd-34-google_apis-x86_64-pixel_6-v1
       - name: End-to-end tests (Android emulator against Firebase emulators)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -244,6 +318,8 @@ jobs:
           # A phone's screen, not the default AVD's low density: text contrast is measured from
           # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
           profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
       - name: Show end-to-end results
