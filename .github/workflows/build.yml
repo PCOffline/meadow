@@ -18,9 +18,47 @@ concurrency:
 permissions: {}
 
 jobs:
+  # Which parts the change touches, so a change to the docs alone doesn't build the app. A push
+  # to main, or a run by hand, builds everything. If this job fails, the jobs below run anyway.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    outputs:
+      app: ${{ steps.paths.outputs.app }}
+      backend: ${{ steps.paths.outputs.backend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its first parent, the base: their difference is the change.
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Find what changed
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only HEAD^1 HEAD)
+          echo "$files"
+          # The app is built from app/, the legal documents, detekt's config and Gradle's files.
+          app='^(app/|legal/|config/|gradle/|build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|\.github/workflows/build\.yml|\.github/scripts/(detekt\.sh|coverage_floor\.py|failed_tests\.py))'
+          # The backend tests cover backend/ and the hosted legal pages.
+          backend='^(backend/|legal/|\.github/workflows/build\.yml|\.github/scripts/failed_tests\.py)'
+          if grep -qE "$app" <<< "$files"; then echo "app=true"; else echo "app=false"; fi >> "$GITHUB_OUTPUT"
+          if grep -qE "$backend" <<< "$files"; then echo "backend=true"; else echo "backend=false"; fi >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   # The app's build and its unit tests each take minutes, so they run side by side.
   android-build:
     name: android (build and lint)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,6 +102,8 @@ jobs:
 
   android-tests:
     name: android (unit tests)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -105,13 +145,14 @@ jobs:
     permissions: {}
     timeout-minutes: 5
     steps:
+      # Skipped means the change doesn't touch the app.
       - name: The build and the tests passed
         env:
           BUILD: ${{ needs.android-build.result }}
           TESTS: ${{ needs.android-tests.result }}
         run: |
           echo "Build: $BUILD. Tests: $TESTS."
-          test "$BUILD" = success && test "$TESTS" = success
+          [[ "$BUILD" =~ ^(success|skipped)$ && "$TESTS" =~ ^(success|skipped)$ ]]
 
   # Workflows and scripts: mistakes here only show up when a release or deploy runs.
   scripts:
@@ -137,6 +178,8 @@ jobs:
           python3 -B -m unittest discover -s .github/scripts -p 'test_*.py' -v
 
   functions:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.backend != 'false' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -160,6 +203,8 @@ jobs:
         run: npm test
 
   rules:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.backend != 'false' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -191,6 +236,8 @@ jobs:
         run: npm run test:deploy
 
   integration:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.backend != 'false' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -228,6 +275,8 @@ jobs:
   # has its own phone and backend emulators, and AndroidJUnitRunner gives it a share of the tests.
   e2e-shard:
     name: e2e (shard ${{ matrix.shard }})
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.outputs.app != 'false' || needs.changes.outputs.backend != 'false') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -344,9 +393,10 @@ jobs:
     permissions: {}
     timeout-minutes: 5
     steps:
+      # Skipped means the change touches neither the app nor the backend.
       - name: Every shard passed
         env:
           RESULT: ${{ needs.e2e-shard.result }}
         run: |
           echo "The shards: $RESULT"
-          test "$RESULT" = success
+          [[ "$RESULT" =~ ^(success|skipped)$ ]]
