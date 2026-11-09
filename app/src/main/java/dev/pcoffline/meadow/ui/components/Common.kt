@@ -2,17 +2,17 @@
 
 package dev.pcoffline.meadow.ui.components
 
-import androidx.compose.ui.semantics.Role
-import androidx.compose.material3.ripple
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ripple
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.R

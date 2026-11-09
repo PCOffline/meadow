@@ -2,7 +2,6 @@
 
 package dev.pcoffline.meadow.ui.components
 
-import dev.pcoffline.meadow.ui.limitText
 import android.content.res.Resources
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +45,7 @@ import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.LimitCardMode
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.UserProfile
+import dev.pcoffline.meadow.ui.limitText
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.stateWhileVisible
 import kotlinx.coroutines.ExperimentalCoroutinesApi

@@ -118,6 +118,14 @@ class LimitFlowTest : ScreenTest() {
     }
 
     @Test
+    fun `a saved limit the editor puts in its own terms can still be shared`() {
+        // Hours given as two windows that touch: the editor shows them as one.
+        val hours = Schedule(mapOf(1 to listOf(TimeWindow(540, 720), TimeWindow(720, 1020))))
+        editorWithShare(AppLimit(pkg, "Instagram", dailyMinutes = 0, weeklyMinutes = 120, schedule = hours))
+        compose.onNodeWithContentDescription(text(R.string.limit_share)).assertIsEnabled()
+    }
+
+    @Test
     fun `a new limit has nothing saved to share`() {
         editorWithShare(null)
         compose.onNodeWithContentDescription(text(R.string.limit_share)).assertDoesNotExist()

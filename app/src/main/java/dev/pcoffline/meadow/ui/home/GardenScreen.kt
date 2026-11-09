@@ -1,20 +1,19 @@
 package dev.pcoffline.meadow.ui.home
 
-import dev.pcoffline.meadow.ui.components.ShareCommitment
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -64,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.ShareCommitment
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.enforcement.AppBudget
@@ -361,73 +361,73 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
     val res = LocalResources.current
     val shareLabel = stringResource(R.string.limit_share)
     Box(modifier) {
-    MeadowCard(
-        Modifier.fillMaxSize().semantics {
-            customActions = listOf(CustomAccessibilityAction(shareLabel) { ShareCommitment.openLimit(res, budget.limit); true })
-        },
-        onClick = onClick,
-        onLongClick = { menu = true },
-        onLongClickLabel = stringResource(R.string.garden_tile_options),
-    ) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
-            AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
-            if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
-        }
-        Text(
-            budget.limit.appName,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            when {
-                budget.emergency -> stringResource(R.string.garden_tile_emergency)
-                budget.sleeping -> budget.wakesInMs
-                    ?.let { stringResource(R.string.garden_tile_resting_until, opensAtText(it)) }
-                    ?: stringResource(R.string.garden_tile_resting_hours)
-                budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)
-                budget.exhausted -> stringResource(R.string.garden_tile_resting_today)
-                // Only hours limit it: when it closes says more than a countdown of hours.
-                budget.allowedTodayMs == null && budget.untilScheduleChangeMs != null ->
-                    stringResource(R.string.garden_tile_open_until, opensAtText(budget.untilScheduleChangeMs))
-                budget.weeklyIsTighter -> stringResource(R.string.garden_tile_left_week, durationText(budget.remainingMs))
-                else -> stringResource(R.string.garden_tile_left_today, durationText(budget.remainingMs))
+        MeadowCard(
+            Modifier.fillMaxSize().semantics {
+                customActions = listOf(CustomAccessibilityAction(shareLabel) { ShareCommitment.openLimit(res, budget.limit); true })
             },
-            style = MaterialTheme.typography.bodySmall,
-            color = if (budget.exhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-        )
-        if (budget.bonusTodayMinutes > 0) {
+            onClick = onClick,
+            onLongClick = { menu = true },
+            onLongClickLabel = stringResource(R.string.garden_tile_options),
+        ) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
+                AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
+                if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
+            }
             Text(
-                stringResource(R.string.garden_tile_extra, minutesText(budget.bonusTodayMinutes)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
+                budget.limit.appName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
             )
-        }
-        if (onAsk != null) {
-            TextButton(onClick = onAsk, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text(stringResource(R.string.garden_tile_ask), style = MaterialTheme.typography.labelMedium)
+            Text(
+                when {
+                    budget.emergency -> stringResource(R.string.garden_tile_emergency)
+                    budget.sleeping -> budget.wakesInMs
+                        ?.let { stringResource(R.string.garden_tile_resting_until, opensAtText(it)) }
+                        ?: stringResource(R.string.garden_tile_resting_hours)
+                    budget.exhausted && budget.weeklyIsTighter -> stringResource(R.string.garden_tile_resting_week)
+                    budget.exhausted -> stringResource(R.string.garden_tile_resting_today)
+                    // Only hours limit it: when it closes says more than a countdown of hours.
+                    budget.allowedTodayMs == null && budget.untilScheduleChangeMs != null ->
+                        stringResource(R.string.garden_tile_open_until, opensAtText(budget.untilScheduleChangeMs))
+                    budget.weeklyIsTighter -> stringResource(R.string.garden_tile_left_week, durationText(budget.remainingMs))
+                    else -> stringResource(R.string.garden_tile_left_today, durationText(budget.remainingMs))
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (budget.exhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+            if (budget.bonusTodayMinutes > 0) {
+                Text(
+                    stringResource(R.string.garden_tile_extra, minutesText(budget.bonusTodayMinutes)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (onAsk != null) {
+                TextButton(onClick = onAsk, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text(stringResource(R.string.garden_tile_ask), style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
-    }
-    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-        DropdownMenuItem(
-            text = { Text(shareLabel) },
-            leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
-            onClick = { menu = false; ShareCommitment.openLimit(res, budget.limit) },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.limit_editor_existing)) },
-            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-            onClick = { menu = false; onClick() },
-        )
-    }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text(shareLabel) },
+                leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
+                onClick = { menu = false; ShareCommitment.openLimit(res, budget.limit) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.limit_editor_existing)) },
+                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                onClick = { menu = false; onClick() },
+            )
+        }
     }
 }
 

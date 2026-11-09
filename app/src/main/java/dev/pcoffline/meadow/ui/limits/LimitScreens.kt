@@ -367,7 +367,10 @@ internal fun LimitEditor(
         dayMinutes = if (dailyOn) groups.toDayMinutes() else emptyMap(),
         caps = caps,
     )
-    val unsaved = existing != null && proposed != existing
+    // What the fields made of the saved limit as they opened: changes count against that, so a
+    // limit the editor puts in its own terms (merged hours, a default it fills in) isn't "unsaved".
+    val opened = remember(existing) { proposed }
+    val unsaved = existing != null && proposed != opened
     LaunchedEffect(unsaved) { onUnsaved(unsaved) }
     val needsApproval = existing != null && hasBees && LimitsRepository.isLooser(existing, proposed)
     val online by Connectivity.online.collectAsStateWithLifecycle()
