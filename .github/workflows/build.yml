@@ -99,7 +99,7 @@ jobs:
 
   # One check named android, as before, that passes only when the build and the tests did.
   android:
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [android-build, android-tests]
     runs-on: ubuntu-latest
     permissions: {}
@@ -338,7 +338,7 @@ jobs:
 
   # One check named e2e, as before, that passes only when every shard did.
   e2e:
-    if: always()
+    if: ${{ !cancelled() }}
     needs: e2e-shard
     runs-on: ubuntu-latest
     permissions: {}
