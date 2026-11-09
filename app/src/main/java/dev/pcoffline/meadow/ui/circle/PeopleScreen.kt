@@ -76,6 +76,7 @@ import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.UserProfile
 import java.text.Collator
+import dev.pcoffline.meadow.ui.ActionState
 import dev.pcoffline.meadow.ui.LocalCelebrate
 import dev.pcoffline.meadow.ui.LocalSnackbarClearance
 import dev.pcoffline.meadow.ui.components.ErrorNote
@@ -158,9 +159,10 @@ fun PeopleContent(
     onOpenBeeStats: () -> Unit = {},
 ) {
     var asking by rememberSaveable { mutableStateOf(false) }
-    // The invite card is at the top or the bottom, as the circle fills. The code typed into it
-    // lives here, so it stays when the card moves.
+    // The invite card is at the top or the bottom, as the circle fills. The code typed into it,
+    // and the invite it sends, live here: they stay when the card moves, and a sent code clears.
     var inviteCode by rememberSaveable { mutableStateOf("") }
+    val inviteAction = rememberAction()
     val chats = people.chats.associateBy { it.id }
     fun chatWith(uid: String) = ChatRepository.chatIdFor(profile.uid, uid)
     // News first, then by name, in each section.
@@ -179,7 +181,7 @@ fun PeopleContent(
         LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { TabTitle(stringResource(R.string.people_title)) }
             // With nobody yet, inviting is the one thing to do here.
-            if (nobody) item { InviteCard(inviteCode, { inviteCode = it }, Modifier.padding(horizontal = 20.dp)) }
+            if (nobody) item { InviteCard(inviteCode, { inviteCode = it }, inviteAction, Modifier.padding(horizontal = 20.dp)) }
 
             if (people.incomingInvites.isNotEmpty() || people.incomingRequests.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.people_waiting), Modifier.padding(horizontal = 20.dp)) }
@@ -221,7 +223,7 @@ fun PeopleContent(
 
             if (!nobody) {
                 item { SectionTitle(stringResource(R.string.people_invite_more), Modifier.padding(horizontal = 20.dp)) }
-                item { InviteCard(inviteCode, { inviteCode = it }, Modifier.padding(horizontal = 20.dp)) }
+                item { InviteCard(inviteCode, { inviteCode = it }, inviteAction, Modifier.padding(horizontal = 20.dp)) }
             }
             item { SectionTitle(stringResource(R.string.circle_join_title), Modifier.padding(horizontal = 20.dp)) }
             item { JoinCard(profile, Modifier.padding(horizontal = 20.dp)) }
@@ -303,11 +305,10 @@ private fun PersonRow(
  * invite link works here too, for when one opened in the browser instead of in Meadow.
  */
 @Composable
-private fun InviteCard(code: String, onCode: (String) -> Unit, modifier: Modifier) {
+private fun InviteCard(code: String, onCode: (String) -> Unit, codeAction: ActionState, modifier: Modifier) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val linkAction = rememberAction()
-    val codeAction = rememberAction()
     val shareTitle = stringResource(R.string.invite_share_title)
     val sent = stringResource(R.string.invite_code_sent)
     val pastedLink = InviteLinks.tokenFromText(code)
