@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,9 +25,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 /** The weather stays inside the scene: no rain, snow or clouds on the page around it. */
 @RunWith(AndroidJUnit4::class)
+@Config(application = Application::class)
 class WeatherInSceneTest {
     @get:Rule val compose = createComposeRule()
 
