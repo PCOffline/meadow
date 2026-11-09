@@ -227,6 +227,9 @@ jobs:
         if: steps.plan.outputs.ship == 'true' # zizmor: ignore[cache-poisoning]
         # Caches speed up the release build. Runs here are on main, which can only read caches saved by
         # main's own runs (GitHub scopes caches by branch), never ones a pull request saved.
+        with:
+          # The MIT-licensed cache, not the default proprietary one.
+          cache-provider: basic
       - name: Add Firebase config
         if: steps.plan.outputs.ship == 'true'
         env:
