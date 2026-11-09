@@ -2,7 +2,6 @@
 
 package dev.pcoffline.meadow.ui.profile
 
-import dev.pcoffline.meadow.ui.components.Hint
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
@@ -53,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.Hint
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Avatar
 import dev.pcoffline.meadow.data.FlowerAvatars
@@ -182,19 +182,19 @@ fun ProfileScreen(
                 }
                 // A colour is only for the emoji's circle, so a photo has none to choose.
                 if (!usePhoto) {
-                Text(stringResource(R.string.profile_avatar_color), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
-                FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AvatarColor.entries.forEach { option ->
-                        val swatch = if (LocalDarkTheme.current) option.dark else option.light
-                        Choice(
-                            selected = option.key == color,
-                            label = stringResource(option.label),
-                            onClick = { color = option.key },
-                        ) {
-                            Box(Modifier.size(36.dp).clip(CircleShape).background(swatch))
+                    Text(stringResource(R.string.profile_avatar_color), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
+                    FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        AvatarColor.entries.forEach { option ->
+                            val swatch = if (LocalDarkTheme.current) option.dark else option.light
+                            Choice(
+                                selected = option.key == color,
+                                label = stringResource(option.label),
+                                onClick = { color = option.key },
+                            ) {
+                                Box(Modifier.size(36.dp).clip(CircleShape).background(swatch))
+                            }
                         }
                     }
-                }
                 }
             }
 
