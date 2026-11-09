@@ -3,7 +3,7 @@ package dev.pcoffline.meadow.ui.screens
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 
 /** In landscape, a cutout or the navigation bar takes a side: the sky reaches under it, the words don't. */
 @RunWith(AndroidJUnit4::class)
-@Config(application = Application::class, qualifiers = "w800dp-h400dp-land")
+@Config(application = Application::class, qualifiers = "w720dp-h380dp-land")
 class GardenSidesTest : ScreenTest() {
     private val side = 48.dp
     private val width = 720.dp
@@ -35,7 +35,8 @@ class GardenSidesTest : ScreenTest() {
 
     private fun showWithSides() = show {
         page = MaterialTheme.colorScheme.background
-        Box(Modifier.size(width, 380.dp)) {
+        // The garden fills the screen, as in the app: the screen is [width] wide.
+        Box(Modifier.fillMaxSize()) {
             GardenContent(DemoGarden.robin, DemoGarden.garden, sides = PaddingValues(horizontal = side))
         }
     }
