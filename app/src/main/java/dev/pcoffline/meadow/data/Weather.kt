@@ -1,7 +1,5 @@
 package dev.pcoffline.meadow.data
 
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -13,7 +11,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import dev.pcoffline.meadow.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

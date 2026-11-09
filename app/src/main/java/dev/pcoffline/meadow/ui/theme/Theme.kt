@@ -2,7 +2,6 @@
 
 package dev.pcoffline.meadow.ui.theme
 
-import dev.pcoffline.meadow.data.SunTimes
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.SunTimes
 
 /** Garden palette beyond Material's roles: petals, leaves and soil for drawings and charts. */
 @Immutable
