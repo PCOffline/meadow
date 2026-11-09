@@ -35,8 +35,8 @@ import java.util.zip.ZipFile
 /**
  * End to end: someone makes their profile their own (name, critter, colour, a photo with a
  * critter next to their name, then removed), picks the app's theme and night mode in Settings,
- * and downloads all their data. Android's photo picker and file saver are stood in for, answering with files the test made; the rest is the real app
- * against the emulators, checked in the backend.
+ * and downloads all their data. Android's photo picker and file saver are stood in for, answering
+ * with files the test made; the rest is the real app against the emulators, checked in the backend.
  */
 @RunWith(AndroidJUnit4::class)
 class ProfileJourneyTest : EndToEndTest() {
