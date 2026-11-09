@@ -40,10 +40,10 @@ class ChatNewMessagesJourneyTest : EndToEndTest() {
             val me = acceptInviteFrom(sam, "Sam")
             val chatId = ChatRepository.chatIdFor(me, sam.uid)
 
-            // A long chat, read to its end.
+            // A long chat, never read: all of it is new, so it opens at its start. Opening it marks it read.
             repeat(OLD) { sam.send(chatId, "Earlier $it") }
             openChatWith("Sam")
-            eventually("the latest earlier message") { shown("Earlier ${OLD - 1}") }
+            eventually("the first message") { shown("Earlier 0") }
             // Read: the chat keeps when, so the next visit knows what's new.
             waitForBackend("chats/$chatId") { it.optJSONObject("lastRead")?.optJSONObject("mapValue")?.optJSONObject("fields")?.has(me) == true }
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
