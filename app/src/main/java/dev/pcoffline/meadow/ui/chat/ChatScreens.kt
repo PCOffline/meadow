@@ -300,9 +300,14 @@ fun ChatContent(
         opened = true
         val line = newLineIndex ?: return@LaunchedEffect
         listState.scrollToItem(line)
+        // The line now sits at the bottom, unless the chat's start stopped it higher: with few
+        // older messages above it, it's already at the top. Moved by what's left, it ends 16dp
+        // below the top, with the new messages under it, and no further.
         val info = listState.layoutInfo
-        val size = info.visibleItemsInfo.firstOrNull { it.index == line }?.size ?: 0
-        listState.scrollBy(-(info.viewportSize.height - size - with(density) { 16.dp.toPx() }))
+        val item = info.visibleItemsInfo.firstOrNull { it.index == line } ?: return@LaunchedEffect
+        val top = info.viewportSize.height - item.size - with(density) { 16.dp.toPx() }
+        val left = top - item.offset
+        if (left > 0) listState.scrollBy(-left)
     }
     // A new message comes into view only if you're at the bottom already or sent it yourself, so
     // reading back isn't interrupted. Then a button offers the way down to it.

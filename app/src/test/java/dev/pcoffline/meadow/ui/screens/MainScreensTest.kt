@@ -404,6 +404,16 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
+    fun `a chat never read opens at its first message, under the New line`() {
+        // Nothing read: every message is new, and the line sits above the very first one, where
+        // the chat's start stops the list.
+        val chat = DemoGarden.chat.copy(lastReadMillis = emptyMap())
+        show { ChatContent(DemoGarden.robin, chat, texts(40)) }
+        compose.onNodeWithContentDescription(text(R.string.chat_new_line_spoken)).assertIsDisplayed()
+        compose.onNodeWithText("Message 1").assertIsDisplayed()
+    }
+
+    @Test
     fun `a chat with nothing new has no New line`() {
         show { ChatContent(DemoGarden.robin, DemoGarden.chat, texts(40)) }
         compose.onNodeWithText("Message 40").assertIsDisplayed()
