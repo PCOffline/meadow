@@ -202,7 +202,8 @@ jobs:
           REASON: ${{ steps.plan.outputs.reason }}
         run: echo "::notice::No release, because $REASON"
       # Every install updates to a release, so only commits that are on main and passed Build
-      # are released. Automatic runs start from a passing Build on main already.
+      # are released. Automatic runs start from a passing Build on main already. Build ran the
+      # tests, so the release doesn't run them again, and no test code runs beside the key.
       - name: Only release what passed Build on main
         if: steps.plan.outputs.ship == 'true' && github.event_name != 'workflow_run'
         env:
@@ -237,10 +238,6 @@ jobs:
             exit 1
           fi
           echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
-      # Tests run before the signing key is on the runner, so test code never sees it.
-      - name: Test
-        if: steps.plan.outputs.ship == 'true'
-        run: ./gradlew testDebugUnitTest --stacktrace
       - name: Add signing key
         if: steps.plan.outputs.ship == 'true'
         env:
