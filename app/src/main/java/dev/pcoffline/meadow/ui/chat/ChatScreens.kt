@@ -1,5 +1,10 @@
 package dev.pcoffline.meadow.ui.chat
 
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.content.Context
@@ -35,6 +40,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
@@ -76,13 +83,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -331,48 +331,48 @@ fun ChatContent(
         }
         if (chat != null) BeeAsks(chat, profile, invited, onAskBee)
         Box(Modifier.weight(1f).fillMaxWidth()) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            state = listState,
-            reverseLayout = true,
-            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
-        ) {
-            // Newest first, drawn from the bottom up.
-            reversed.forEach { message ->
-            item(key = message.id) {
-                Box(Modifier.animateItem()) {
-                    when (message.kind) {
-                        MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
-                        MessageKind.SYSTEM -> SystemMessage(message)
-                        MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
-                        MessageKind.IMAGE -> PictureBubble(message, mine = message.senderId == profile.uid, pictureFile) { viewing = it }
-                        MessageKind.LIMIT -> chat?.let {
-                            LimitCardMessage(
-                                it.id, message, mine = message.senderId == profile.uid,
-                                fromBumblebee = message.senderId in profile.approverIds, onCopy = onCopyLimit,
-                            )
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                state = listState,
+                reverseLayout = true,
+                verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
+            ) {
+                // Newest first, drawn from the bottom up.
+                reversed.forEach { message ->
+                    item(key = message.id) {
+                        Box(Modifier.animateItem()) {
+                            when (message.kind) {
+                                MessageKind.REQUEST -> message.requestId?.let { requestCard(it, message.senderId == profile.uid) }
+                                MessageKind.SYSTEM -> SystemMessage(message)
+                                MessageKind.TEXT -> Bubble(message, mine = message.senderId == profile.uid)
+                                MessageKind.IMAGE -> PictureBubble(message, mine = message.senderId == profile.uid, pictureFile) { viewing = it }
+                                MessageKind.LIMIT -> chat?.let {
+                                    LimitCardMessage(
+                                        it.id, message, mine = message.senderId == profile.uid,
+                                        fromBumblebee = message.senderId in profile.approverIds, onCopy = onCopyLimit,
+                                    )
+                                }
+                            }
                         }
                     }
+                    if (message.id == firstNewId) item(key = "new-line") { NewLine(Modifier.animateItem()) }
+                }
+                // The last item, so it shows above the messages, as the chat's top.
+                if (chat == null && !loading) {
+                    item { EmptyState("🕊️", stringResource(R.string.chat_closed_title)) }
                 }
             }
-            if (message.id == firstNewId) item(key = "new-line") { NewLine(Modifier.animateItem()) }
+            if (newBelow) {
+                val label = stringResource(R.string.chat_new_message_spoken)
+                FilledTonalButton(
+                    onClick = { newBelow = false; scope.launch { listState.animateScrollToItem(0) } },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).semantics { contentDescription = label },
+                ) {
+                    Text(stringResource(R.string.chat_new_message))
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
             }
-            // The last item, so it shows above the messages, as the chat's top.
-            if (chat == null && !loading) {
-                item { EmptyState("🕊️", stringResource(R.string.chat_closed_title)) }
-            }
-        }
-        if (newBelow) {
-            val label = stringResource(R.string.chat_new_message_spoken)
-            FilledTonalButton(
-                onClick = { newBelow = false; scope.launch { listState.animateScrollToItem(0) } },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).semantics { contentDescription = label },
-            ) {
-                Text(stringResource(R.string.chat_new_message))
-                Spacer(Modifier.width(6.dp))
-                Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
-        }
         }
         if (uploading > 0) {
             Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
