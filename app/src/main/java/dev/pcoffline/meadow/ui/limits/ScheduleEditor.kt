@@ -10,9 +10,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -42,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.foundation.selection.toggleable
@@ -270,10 +270,14 @@ internal fun TimeField(time: String, description: String, enabled: Boolean, onCl
     ) { Text(time, style = MaterialTheme.typography.titleSmall) }
 }
 
+/** The shortest hours "Add hours" adds, in minutes: a few minutes between two windows aren't worth it. */
+internal const val MIN_NEW_WINDOW = 15
+
 /**
  * A sensible next window: all day when there's none; else an hour, an hour after the last window;
- * else in the largest free time of the day. Null when no free time is left. It never touches
- * another window, since touching windows join into one and nothing would be added.
+ * else in the largest free time of the day. Null when no free time is left for [MIN_NEW_WINDOW]
+ * minutes. It never touches another window, since touching windows join into one and nothing
+ * would be added.
  */
 internal fun nextWindow(windows: List<TimeWindow>): TimeWindow? {
     if (windows.isEmpty()) return TimeWindow.ALL_DAY
@@ -292,7 +296,7 @@ internal fun nextWindow(windows: List<TimeWindow>): TimeWindow? {
         val margin = minOf(60, (end - start) / 3)
         val from = if (start == 0) 0 else start + margin
         val to = minOf(from + 60, if (end == day) day else end - margin)
-        return if (margin > 0 && from < to) TimeWindow(from, to) else null
+        return if (margin > 0 && to - from >= MIN_NEW_WINDOW) TimeWindow(from, to) else null
     }
     val afterLast = free.lastOrNull()?.takeIf { it.second == day && it.first > 0 }
     return afterLast?.let(::inside) ?: free.sortedByDescending { it.second - it.first }.firstNotNullOfOrNull(::inside)

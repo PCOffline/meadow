@@ -30,4 +30,12 @@ class NextWindowTest {
         assertNull(nextWindow(listOf(TimeWindow.ALL_DAY)))
         assertNull(nextWindow(listOf(TimeWindow(0, 720), TimeWindow(721, TimeWindow.MINUTES_IN_DAY))))
     }
+
+    @Test
+    fun `a few free minutes between windows aren't offered`() {
+        // 20 minutes free: a window kept clear of both sides would be under 15 minutes.
+        assertNull(nextWindow(listOf(TimeWindow(0, 600), TimeWindow(620, TimeWindow.MINUTES_IN_DAY))))
+        // 45 minutes free: 15 minutes, 15 from each side.
+        assertEquals(TimeWindow(615, 630), nextWindow(listOf(TimeWindow(0, 600), TimeWindow(645, TimeWindow.MINUTES_IN_DAY))))
+    }
 }
