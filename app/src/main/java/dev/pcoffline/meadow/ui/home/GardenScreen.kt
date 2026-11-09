@@ -44,6 +44,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -153,22 +161,28 @@ fun GardenContent(
     onOpenLimit: (String) -> Unit = {},
     onOpenTroubleshoot: () -> Unit = {},
     onAsk: (String) -> Unit = {},
+    sides: PaddingValues = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues(),
 ) {
     val canAsk = profile.approverIds.isNotEmpty()
+    // In landscape, a camera cutout or the navigation bar can take a side of the screen. The sky
+    // reaches under it; the words, cards and buttons keep clear of it.
+    val direction = LocalLayoutDirection.current
+    val clear = Modifier.padding(start = sides.calculateStartPadding(direction), end = sides.calculateEndPadding(direction))
     Box(Modifier.fillMaxSize()) {
         // Room at the bottom so the last flowers can scroll clear of the Plant button.
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 // One item, so no gap is left when there's no emergency unlock to show.
                 Column {
-                    GardenHeader(profile, state, onOpenSettings, onOpenProfile)
-                    EmergencyBanner(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp))
+                    GardenHeader(profile, state, onOpenSettings, onOpenProfile, clear)
+                    EmergencyBanner(clear.padding(start = 20.dp, end = 20.dp, top = 12.dp))
                 }
             }
 
             if (!state.essentialsReady) {
-                item {
+                item(contentType = "notice") {
                     Notice(
+                        clear,
                         emoji = "🍂",
                         text = stringResource(R.string.garden_notice_setup),
                         action = stringResource(R.string.garden_notice_setup_action),
@@ -177,8 +191,9 @@ fun GardenContent(
                 }
             }
             if (state.essentialsReady && state.batteryRestricted) {
-                item {
+                item(contentType = "notice") {
                     Notice(
+                        clear,
                         emoji = "🔋",
                         text = stringResource(R.string.garden_notice_battery),
                         action = stringResource(R.string.trouble_button),
@@ -187,11 +202,11 @@ fun GardenContent(
                 }
             }
 
-            item { SectionTitle(stringResource(R.string.garden_title), Modifier.padding(horizontal = 20.dp)) }
+            item { SectionTitle(stringResource(R.string.garden_title), clear.padding(horizontal = 20.dp)) }
 
             if (state.loaded && state.budgets.isEmpty()) {
                 item {
-                    MeadowCard(Modifier.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onPlantLimit) {
+                    MeadowCard(clear.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onPlantLimit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             BloomFlower(0.2f, Garden.colors.petalPink, Modifier.size(56.dp, 84.dp), sway = false)
                             Spacer(Modifier.width(12.dp))
@@ -204,7 +219,7 @@ fun GardenContent(
             items(state.budgets.chunked(2), key = { row -> row.joinToString { it.limit.packageName } }) { row ->
                 // Both cards as tall as the taller one, so a line more on one doesn't stagger the row.
                 Row(
-                    Modifier.animateItem().padding(horizontal = 20.dp).height(IntrinsicSize.Min),
+                    Modifier.animateItem().then(clear).padding(horizontal = 20.dp).height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     row.forEach { budget ->
@@ -231,6 +246,7 @@ fun GardenContent(
             // Material keeps the label's text from screen readers, so the button names itself.
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .then(clear)
                 .padding(16.dp)
                 .onSizeChanged { clearance.height = with(density) { it.height.toDp() } + 16.dp }
                 .semantics { contentDescription = plant },
@@ -239,7 +255,13 @@ fun GardenContent(
 }
 
 @Composable
-private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSettings: () -> Unit, onOpenProfile: () -> Unit) {
+private fun GardenHeader(
+    profile: UserProfile,
+    state: GardenState,
+    onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
+    clear: Modifier = Modifier,
+) {
     val mood = rememberSkyMood()
     val minutes by animateIntAsState((state.todayTotalMs / 60_000L).toInt(), tween(1100), label = "todayMinutes")
     val now = rememberResumedNow()
@@ -279,7 +301,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
             clearAbove = if (h == 0f) 0f else rowEnds / h,
             horizon = if (h == 0f) 0f else totalStarts / h,
         )
-        Column(Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp)) {
+        Column(Modifier.statusBarsPadding().then(clear).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.onGloballyPositioned { layout.row = it; measure() },
@@ -398,9 +420,9 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
 }
 
 @Composable
-private fun Notice(emoji: String, text: String, action: String, onClick: () -> Unit) {
+private fun Notice(modifier: Modifier, emoji: String, text: String, action: String, onClick: () -> Unit) {
     MeadowCard(
-        Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+        modifier.padding(horizontal = 20.dp).fillMaxWidth(),
         tint = MaterialTheme.colorScheme.secondaryContainer,
     ) {
         Row(verticalAlignment = Alignment.Top) {
