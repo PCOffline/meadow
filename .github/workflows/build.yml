@@ -344,7 +344,11 @@ jobs:
           # pixels, and at mdpi thin strokes are all anti-aliased edge (real phones are ~420dpi).
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time TestRunner:I ActivityTaskManager:I '*:S' | grep -E 'started:|finished:|failed:|START u0|Displayed' | tail -n 150; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
+          # The launcher can stop answering on a busy emulator. Its "not responding" dialog takes
+          # focus from the journey on screen, as in Pictures and Screenshots, so it stays hidden.
+          script: |
+            adb shell settings put global hide_error_dialogs 1
+            ./gradlew connectedDebugAndroidTest -Pmeadow.emulatorHost=10.0.2.2 -Pandroid.testInstrumentationRunnerArguments.numShards="$SHARDS" -Pandroid.testInstrumentationRunnerArguments.shardIndex="$SHARD" --stacktrace || (adb pull /data/local/tmp/meadow-contrast app/build/reports/androidTests/ || true; adb logcat -d -v time TestRunner:I ActivityTaskManager:I '*:S' | grep -E 'started:|finished:|failed:|START u0|Displayed' | tail -n 150; adb logcat -d -v time Meadow:V MeadowSync:V MeadowBackend:V MeadowFirestore:V MeadowSocial:V MeadowListener:V MeadowGuardian:V FirebaseAuth:V FirebaseFunctions:V Firestore:W System.err:W AndroidRuntime:E ActivityManager:E '*:S' | tail -n 200; exit 1)
       - name: Save the system image
         if: steps.avd.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && matrix.shard == 0
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

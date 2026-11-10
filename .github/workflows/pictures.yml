@@ -67,12 +67,6 @@ jobs:
           ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
           # The base may not build, or may have no pictures yet: then every picture is new.
           (cd ../base && ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace) || echo "The base didn't build"
-      - name: Restore the system image
-        # The emulator's Android 14 image, which the Build workflow saves on main.
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
-          key: system-image-34-google_apis-x86_64-v1
       - name: Draw on an emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
