@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -29,6 +30,7 @@ import dev.pcoffline.meadow.ui.navigation.GardenRoute
 import dev.pcoffline.meadow.ui.navigation.PeopleRoute
 import dev.pcoffline.meadow.ui.navigation.StatsRoute
 import dev.pcoffline.meadow.ui.openLink
+import dev.pcoffline.meadow.ui.requests.RequestCard
 import dev.pcoffline.meadow.ui.switchTab
 import org.junit.Test
 
@@ -55,7 +57,12 @@ class GardenTabAfterNotificationStory : Story("The Garden tab opens the garden a
                         composable<GardenRoute> { GardenContent(DemoGarden.robin, DemoGarden.garden) }
                         composable<PeopleRoute> { PeopleContent(DemoGarden.robin, DemoGarden.people) }
                         composable<StatsRoute> { }
-                        composable<ChatRoute> { ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onBack = { nav.popBackStack() }) }
+                        composable<ChatRoute> {
+                            // The demo request's card, as in the gallery: the chat's own card reads the request from the backend.
+                            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onBack = { nav.popBackStack() }, requestCard = { _, _ ->
+                                RequestCard(DemoGarden.request, DemoGarden.robin.uid, Modifier.padding(horizontal = 12.dp), compact = true)
+                            })
+                        }
                     }
                 }
             }
