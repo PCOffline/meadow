@@ -144,6 +144,18 @@ class BlockScreenLaunchTest {
     }
 
     @Test
+    fun `an app opened again just after its block screen showed is covered again at once`() {
+        service.block(APP)
+        // The screen showed, and the person left it and opened the app again within a second,
+        // before the first cover finished its work.
+        BlockActivity.markShown(APP)
+        service.block(APP)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(listOf(APP, APP), blockScreensOpened())
+    }
+
+    @Test
     fun `a cover that has ended lets the app be covered again`() {
         service.block(APP)
         BlockActivity.markShown(APP)

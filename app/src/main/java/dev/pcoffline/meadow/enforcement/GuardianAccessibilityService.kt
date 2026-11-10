@@ -77,6 +77,7 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     /** The cover under way for each resting app: one at a time, however often it's asked for. */
     private val covering = java.util.concurrent.ConcurrentHashMap<String, Job>()
+    private val coverStarted = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     /** When each floating window was first seen (elapsed realtime), by its id. */
     private val pipFirstSeen = HashMap<Int, Long>()
@@ -340,9 +341,16 @@ class GuardianAccessibilityService : AccessibilityService() {
         // One cover at a time for each app. The one under way opens the screen again if Android
         // held it back; asking again would open it over itself, and read every notification and
         // media session once more, as often as the windows change (#106).
-        if (covering[pkg]?.isActive == true) return
+        covering[pkg]?.takeIf { it.isActive }?.let { underWay ->
+            // Unless its screen has shown and gone: then the app was opened again, and this is a
+            // new visit to cover.
+            val openedAgain = !BlockActivity.isShowingFor(pkg) && BlockActivity.shownSince(pkg, coverStarted[pkg] ?: since)
+            if (!openedAgain) return
+            underWay.cancel()
+        }
         val browser = if (Sites.isSite(pkg)) browserInFront() else null
         BlockActivity.launch(this, pkg, browser)
+        coverStarted[pkg] = since
         covering[pkg] = scope.launch {
             // Hiding its notifications and pausing its media asks the system for every
             // notification and session, so it's done here, off the main thread, once for the cover.
