@@ -92,7 +92,7 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
-            scanWindows()
+            scanWindowsSoon()
             return
         }
         val pkg = event.packageName?.toString() ?: return
@@ -245,9 +245,35 @@ class GuardianAccessibilityService : AccessibilityService() {
         updateWatchers()
     }
 
+    /** Lists the windows on screen. Tests give their own. */
+    internal var listWindows: () -> List<AccessibilityWindowInfo>? = { runCatching { windows }.getOrNull() }
+
+    /** How often the windows are listed after they change, at most. Tests give their own. */
+    internal var windowScanMs = WINDOW_SCAN_MS
+    private var windowsScannedAt = -WINDOW_SCAN_MS
+    private var windowScanPending: Job? = null
+
+    /**
+     * Looks at the windows after they changed, at most once in [windowScanMs]. Windows change
+     * several times a second while a video plays, and listing them asks Android for every window
+     * on screen (#106). A change in between is looked at when the time is up, so the last one is
+     * never missed.
+     */
+    @MainThread
+    private fun scanWindowsSoon() {
+        val wait = windowsScannedAt + windowScanMs - SystemClock.elapsedRealtime()
+        if (wait <= 0) return scanWindows()
+        if (windowScanPending?.isActive == true) return
+        windowScanPending = scope.launch {
+            delay(wait)
+            withContext(Dispatchers.Main) { scanWindows() }
+        }
+    }
+
     /** Finds limited apps in other windows: split screen and picture-in-picture. */
     private fun scanWindows() {
-        val all = runCatching { windows }.getOrNull() ?: return
+        windowsScannedAt = SystemClock.elapsedRealtime()
+        val all = listWindows() ?: return
         val pip = ArrayList<AccessibilityWindowInfo>()
         val apps = ArrayList<AccessibilityWindowInfo>()
         for (w in all) {
@@ -477,6 +503,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         // How soon a resting app still on screen is looked at again.
         private const val BLOCKED_RECHECK_MS = 2_000L
         private const val PIP_DISMISS_MS = 1_000L
+        private const val WINDOW_SCAN_MS = 1_000L
         private const val SITE_CHECK_MS = 500L
         private const val SITE_READ_RETRIES = 4
         private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")

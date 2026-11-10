@@ -126,6 +126,8 @@ class BlockScreenLaunchTest {
         AppGraph.store.setGrants(emptyList())
         AppGraph.store.setEmergency(null)
         AppGraph.store.setLimits(listOf(AppLimit(APP, "Reels", 30, 0, schedule = hoursAwayFromNow())))
+        // Each change is looked at, to test the watcher by itself.
+        service.windowScanMs = 0
         try {
             service.onForeground(APP)
             // Half a second of window changes, as a video feed with a floating player makes them.
@@ -141,6 +143,27 @@ class BlockScreenLaunchTest {
         } finally {
             AppGraph.store.setLimits(emptyList())
         }
+    }
+
+    @Test
+    fun `however often the windows change, they are listed about once a second`() {
+        var listed = 0
+        service.listWindows = { listed++; emptyList() }
+        val main = shadowOf(Looper.getMainLooper())
+
+        // Half a second of window changes, as a video feed with a floating player makes them.
+        repeat(25) {
+            service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
+            main.idle()
+            Thread.sleep(20)
+        }
+        assertEquals(1, listed)
+
+        // The changes since are looked at once the second is up: the last one is never missed.
+        waitUntil { listed == 2 }
+        Thread.sleep(300)
+        main.idle()
+        assertEquals(2, listed)
     }
 
     @Test
