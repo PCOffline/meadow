@@ -129,11 +129,13 @@ abstract class EndToEndTest {
 
     /**
      * The app's latest failed action with its cause, from the log. A screen that shows "Something
-     * went wrong" hides the cause from people; a failed test needs it.
+     * went wrong" hides the cause from people; a failed test needs it. All of Meadow's warnings
+     * are read: a count of the latest lines counts every app's lines, and after a wait of a
+     * minute the failure is no longer among them.
      */
     protected fun failedActions(): String = runCatching {
         val log = ParcelFileDescriptor.AutoCloseInputStream(
-            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("logcat -d -v time -t 300 -s Meadow:W"),
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("logcat -d -v time -s Meadow:W"),
         ).use { it.readBytes().decodeToString() }
         val lines = log.lines()
         val last = lines.indexOfLast { "Action failed" in it }
