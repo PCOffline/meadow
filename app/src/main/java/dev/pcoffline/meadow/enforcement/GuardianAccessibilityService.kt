@@ -35,6 +35,11 @@ import kotlinx.coroutines.withContext
  * notifications and media stop and its process is ended once in the background. In strict mode
  * it also keeps the settings pages that could switch Meadow off out of reach.
  *
+ * Each of those steps asks Android for something heavy (opening a screen, the day's usage log,
+ * every notification, every media session, ending a process). So each happens once for a cover,
+ * and an app still on screen is looked at again every couple of seconds, however often its
+ * windows change (#106).
+ *
  * For limited websites, it reads the address bar of the browser in front (only in the browsers in
  * [Browsers], and only while a website is limited), compares it with the limited sites and lets
  * go of it: no address is kept or sent. A limited site in front is watched like an app.
@@ -69,6 +74,13 @@ class GuardianAccessibilityService : AccessibilityService() {
     private val windowPackages = WindowPackages()
     private val pipWindows = WindowPackages()
     private val homeGuard = HomeGuard()
+
+    /** The cover under way for each resting app: one at a time, however often it's asked for. */
+    private val covering = java.util.concurrent.ConcurrentHashMap<String, Job>()
+
+    /** When each floating window was first seen (elapsed realtime), by its id. */
+    private val pipFirstSeen = HashMap<Int, Long>()
+    private var pipDismissedAt = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -243,15 +255,19 @@ class GuardianAccessibilityService : AccessibilityService() {
         }
         // Reading a window's root asks its app, so each window is only asked once.
         val side = HashSet<String>()
-        for (pkg in windowPackages.of(apps, { it.id }) { w -> runCatching { w.root?.packageName?.toString() }.getOrNull() }) {
+        for (pkg in windowPackages.of(apps, { it.id }, SystemClock.elapsedRealtime()) { w -> runCatching { w.root?.packageName?.toString() }.getOrNull() }) {
             if (pkg != currentPackage && pkg != packageName && AppGraph.engine.limitFor(pkg) != null) side += pkg
         }
-        // Each floating window is attributed once, when it appears.
-        pipPackage = pipWindows.of(pip, { it.id }) { w ->
+        // Each floating window is attributed once, by when it appeared. A window that was there
+        // before a limited app was left (another app's video call) is never that app's, however
+        // long Android can't tell whose it is.
+        val now = SystemClock.elapsedRealtime()
+        pipFirstSeen.keys.retainAll(pip.mapTo(HashSet()) { it.id })
+        pipPackage = pipWindows.of(pip, { it.id }, now) { w ->
             PipOwner.of(
                 windowPackage = runCatching { w.root?.packageName?.toString() }.getOrNull(),
                 lastLimitedLeft = lastLimitedLeft,
-                leftAgoMs = SystemClock.elapsedRealtime() - lastLimitedLeftAt,
+                leftAgoMs = pipFirstSeen.getOrPut(w.id) { now } - lastLimitedLeftAt,
             )
         }.firstOrNull { it != packageName && AppGraph.engine.limitFor(it) != null }
         sidePackages = side
@@ -286,7 +302,11 @@ class GuardianAccessibilityService : AccessibilityService() {
             first = false
             if (budget.exhausted) {
                 withContext(Dispatchers.Main) { block(pkg) }
-                return
+                // The watcher stays, and looks again in a while, for as long as the app is on
+                // screen. Ending here had every window change start a new watcher at once, each
+                // with a fresh read of the usage log and another block (#106).
+                delay(BLOCKED_RECHECK_MS)
+                continue
             }
             if (budget.emergency) {
                 // Wake up when the emergency unlock ends, or sooner if it's ended early.
@@ -308,17 +328,29 @@ class GuardianAccessibilityService : AccessibilityService() {
         if (pkg == sitePackage) setSite(null)
         // Already covered: opening the screen again, or going Home, would only make it flicker.
         if (BlockActivity.isShowingFor(pkg) && pkg !in sidePackages && pkg != pipPackage) return
+        val since = SystemClock.elapsedRealtime()
         if (pkg == pipPackage) {
-            dismissPictureInPicture()
+            // At most once a second: a window that can't be closed is asked again, not hammered.
+            if (since - pipDismissedAt >= PIP_DISMISS_MS) {
+                pipDismissedAt = since
+                dismissPictureInPicture()
+            }
             pipPackage = null
         }
-        val since = SystemClock.elapsedRealtime()
+        // One cover at a time for each app. The one under way opens the screen again if Android
+        // held it back; asking again would open it over itself, and read every notification and
+        // media session once more, as often as the windows change (#106).
+        if (covering[pkg]?.isActive == true) return
         val browser = if (Sites.isSite(pkg)) browserInFront() else null
         BlockActivity.launch(this, pkg, browser)
-        MeadowNotificationListener.rest(this, pkg)
-        // A website's sound plays in its browser, which the rest screen covers along with it.
-        browser?.let { MeadowNotificationListener.pauseMedia(this, setOf(it)) }
-        scope.launch { makeSureBlocked(pkg, since, browser) }
+        covering[pkg] = scope.launch {
+            // Hiding its notifications and pausing its media asks the system for every
+            // notification and session, so it's done here, off the main thread, once for the cover.
+            MeadowNotificationListener.rest(this@GuardianAccessibilityService, pkg)
+            // A website's sound plays in its browser, which the rest screen covers along with it.
+            browser?.let { MeadowNotificationListener.pauseMedia(this@GuardianAccessibilityService, setOf(it)) }
+            makeSureBlocked(pkg, since, browser)
+        }
     }
 
     /**
@@ -434,6 +466,9 @@ class GuardianAccessibilityService : AccessibilityService() {
         // Long enough to outlast the few seconds Android holds screens back after Home.
         private const val BLOCK_CHECK_MS = 1_000L
         private const val BLOCK_ATTEMPTS = 10
+        // How soon a resting app still on screen is looked at again.
+        private const val BLOCKED_RECHECK_MS = 2_000L
+        private const val PIP_DISMISS_MS = 1_000L
         private const val SITE_CHECK_MS = 500L
         private const val SITE_READ_RETRIES = 4
         private val SETTINGS_STRINGS = listOf("force_stop", "uninstall_text", "clear_user_data_text", "disable_text")
@@ -480,32 +515,62 @@ object StrictModeRules {
 internal class WindowPackages {
     private var known: Map<Int, String> = emptyMap()
 
+    /** Windows whose app couldn't be told: how often they were asked, and when to ask next. */
+    private var unknown: Map<Int, Pair<Int, Long>> = emptyMap()
+
     /**
      * The apps of [windows], identified by [id]. [lookup] is only asked about windows not seen in
      * the previous call, or whose app it couldn't tell then; windows no longer listed are forgotten.
+     * Asking reaches into the window's app, so a window that stays untold is asked less and less
+     * often as time ([now], elapsed realtime) passes: at once, then after [FIRST_WAIT_MS], twice
+     * that, and so on up to [LONGEST_WAIT_MS].
      */
-    fun <W> of(windows: List<W>, id: (W) -> Int, lookup: (W) -> String?): List<String> {
+    fun <W> of(windows: List<W>, id: (W) -> Int, now: Long = 0L, lookup: (W) -> String?): List<String> {
         val next = HashMap<Int, String>(windows.size)
+        val nextUnknown = HashMap<Int, Pair<Int, Long>>()
         val packages = windows.mapNotNull { w ->
             val key = id(w)
-            (known[key] ?: lookup(w))?.also { next[key] = it }
+            known[key]?.let { return@mapNotNull it.also { pkg -> next[key] = pkg } }
+            val missed = unknown[key]
+            if (missed != null && now < missed.second) {
+                nextUnknown[key] = missed
+                return@mapNotNull null
+            }
+            lookup(w)?.also { next[key] = it } ?: run {
+                val asked = (missed?.first ?: 0) + 1
+                val wait = (FIRST_WAIT_MS shl (asked - 1).coerceAtMost(MAX_DOUBLINGS)).coerceAtMost(LONGEST_WAIT_MS)
+                nextUnknown[key] = asked to now + wait
+                null
+            }
         }
         known = next
+        unknown = nextUnknown
         return packages
+    }
+
+    companion object {
+        const val FIRST_WAIT_MS = 250L
+        const val LONGEST_WAIT_MS = 10_000L
+        private const val MAX_DOUBLINGS = 10
     }
 }
 
 /**
  * Which app a picture-in-picture window belongs to. Its own [windowPackage] when Android tells;
- * otherwise the limited app left a moment before it appeared ([leftAgoMs]), since picture-in-picture
- * starts as its app is left. Any other floating window, such as another app's video, isn't
- * blamed on a resting app, or the block screen would keep sending the phone Home.
+ * otherwise the limited app left just as it appeared ([leftAgoMs]), since picture-in-picture
+ * starts as its app is left. Any other floating window, such as another app's video call that was
+ * there all along, isn't blamed on a resting app, or the block screen would keep opening over it
+ * and sending the phone Home.
  */
 internal object PipOwner {
     const val JUST_LEFT_MS = 3_000L
 
+    /** A window can be reported a moment before its app is reported as left. */
+    const val JUST_BEFORE_MS = 1_000L
+
+    /** [leftAgoMs] is how long after [lastLimitedLeft] was left the window appeared. */
     fun of(windowPackage: String?, lastLimitedLeft: String?, leftAgoMs: Long): String? =
-        windowPackage ?: lastLimitedLeft?.takeIf { leftAgoMs in 0..JUST_LEFT_MS }
+        windowPackage ?: lastLimitedLeft?.takeIf { leftAgoMs in -JUST_BEFORE_MS..JUST_LEFT_MS }
 }
 
 /**

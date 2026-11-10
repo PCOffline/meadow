@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.enforcement
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Each window's app is asked for once, not on every window change. */
@@ -10,8 +11,10 @@ class WindowPackagesTest {
     private val packages = WindowPackages()
     private val asked = ArrayList<Int>()
 
+    private var now = 0L
+
     private fun scan(vararg windows: Window): List<String> =
-        packages.of(windows.toList(), { it.id }) { w -> asked += w.id; w.pkg }
+        packages.of(windows.toList(), { it.id }, now) { w -> asked += w.id; w.pkg }
 
     @Test
     fun `windows already seen are not asked again`() {
@@ -34,10 +37,35 @@ class WindowPackagesTest {
     }
 
     @Test
-    fun `a window whose app couldn't be told is asked again`() {
+    fun `a window whose app couldn't be told is asked again, after a moment`() {
         assertEquals(emptyList<String>(), scan(Window(1, null)))
         asked.clear()
 
+        now += WindowPackages.FIRST_WAIT_MS
+        assertEquals(listOf("app.a"), scan(Window(1, "app.a")))
+        assertEquals(listOf(1), asked)
+    }
+
+    @Test
+    fun `a window that stays untold isn't asked at every look`() {
+        // Windows change several times a second while a video plays. Each ask reaches into the
+        // window's app, so 40 looks in two seconds ask only a few times.
+        repeat(40) {
+            scan(Window(1, null))
+            now += 50
+        }
+        assertTrue("asked ${asked.size} times", asked.size in 2..4)
+    }
+
+    @Test
+    fun `a window untold for long is still asked now and then`() {
+        repeat(200) {
+            scan(Window(1, null))
+            now += 1_000
+        }
+        asked.clear()
+
+        now += WindowPackages.LONGEST_WAIT_MS
         assertEquals(listOf("app.a"), scan(Window(1, "app.a")))
         assertEquals(listOf(1), asked)
     }
