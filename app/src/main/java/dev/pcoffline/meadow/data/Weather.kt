@@ -104,9 +104,10 @@ class WeatherRepository(
         store.setWeatherOn(true)
     }
 
-    /** Off, and the last reading is forgotten with it. */
+    /** Off, and the last reading and its place are forgotten with it. */
     fun turnOff() {
         store.setWeatherOn(false)
+        lastPlace.value = null
     }
 
     /**
@@ -119,6 +120,8 @@ class WeatherRepository(
         val last = store.weather.value
         if (last != null && now() - last.atMillis in 0 until REFRESH_AFTER_MS) return@withLock
         val location = runCatching { locate() }.getOrNull() ?: return@withLock
+        // Turned off while the phone was being found: the place isn't kept either.
+        if (!store.weatherOn.value) return@withLock
         lastPlace.value = Place(OpenMeteo.round(location.latitude), OpenMeteo.round(location.longitude))
         val body = runCatching { fetch(OpenMeteo.url(location.latitude, location.longitude)) }.getOrNull() ?: return@withLock
         val weather = OpenMeteo.parse(body) ?: return@withLock

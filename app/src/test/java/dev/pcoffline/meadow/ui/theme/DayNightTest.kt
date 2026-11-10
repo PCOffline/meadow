@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.ui.theme
 
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.SunTimes
 import dev.pcoffline.meadow.ui.components.baseSky
 import dev.pcoffline.meadow.ui.components.celestialProgress
 import org.junit.Assert.assertEquals
@@ -53,6 +54,27 @@ class DayNightTest {
         // At 18:59 the sun is about to set; after 19:00 it stays down at the end of its arc.
         listOf(19, 21, 23, 1, 4).forEach { h -> assertEquals("at $h:00", 1f, celestialProgress(h, 0, night = false), 0f) }
         assertTrue(celestialProgress(12, 0, night = false) < 1f)
+    }
+
+    @Test
+    fun `the morning sky starts at sunrise, to the minute`() {
+        val sun = SunTimes(riseMinute = 6 * 60 + 43, setMinute = 20 * 60)
+        val morning = baseSky(8, dark = false, greeting = R.string.greeting_morning, sun = sun)
+        assertEquals(morning, baseSky(6, dark = false, greeting = R.string.greeting_morning, sun = sun, minute = 43))
+        // A minute before sunrise, a light page still has the evening sky.
+        val evening = baseSky(22, dark = false, greeting = R.string.greeting_morning, sun = sun)
+        assertEquals(evening, baseSky(6, dark = false, greeting = R.string.greeting_morning, sun = sun, minute = 42))
+    }
+
+    @Test
+    fun `with a sunset after midnight, the afternoon keeps its sky`() {
+        // Far in the north in summer: up at 02:30, down at 00:30 the next day.
+        val sun = SunTimes(riseMinute = 2 * 60 + 30, setMinute = 30)
+        val afternoon = baseSky(13, dark = false, greeting = R.string.greeting_afternoon)
+        assertEquals(afternoon, baseSky(15, dark = false, greeting = R.string.greeting_afternoon, sun = sun))
+        val evening = baseSky(22, dark = false, greeting = R.string.greeting_afternoon)
+        assertEquals(evening, baseSky(23, dark = false, greeting = R.string.greeting_afternoon, sun = sun))
+        assertEquals(evening, baseSky(0, dark = false, greeting = R.string.greeting_afternoon, sun = sun, minute = 10))
     }
 
     @Test

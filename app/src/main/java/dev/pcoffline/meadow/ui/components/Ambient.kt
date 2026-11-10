@@ -211,7 +211,7 @@ fun rememberSkyMood(): SkyMood {
         else -> R.string.greeting_night
     }
     val sun = rememberSunTimes()
-    val base = baseSky(hour, dark, greeting, sun).under(weather)
+    val base = baseSky(hour, dark, greeting, sun, minute).under(weather)
     // The sky takes on the theme's colour and fades into the page below it. By day that's the
     // theme's own pale sky tint: its main colour mixed into a blue sky would turn it grey.
     val scheme = MaterialTheme.colorScheme
@@ -231,14 +231,17 @@ fun rememberSkyMood(): SkyMood {
  * mode decides day or night, so the sky and the cards always agree (#74): a dark page has the
  * night sky; a light page has the morning, afternoon or evening sky, and the evening sky by night.
  */
-internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int, sun: SunTimes = SunTimes.DEFAULT): SkyMood {
+internal fun baseSky(hour: Int, dark: Boolean, @StringRes greeting: Int, sun: SunTimes = SunTimes.DEFAULT, minute: Int = 0): SkyMood {
     val ink = Color(0xFF3E3A32)
-    // Morning from sunrise to 11:00, afternoon until two hours before sunset, then evening.
-    val minute = hour * 60
+    // Morning from sunrise to 11:00, afternoon until two hours before sunset, then evening. To the
+    // minute, so the sky turns with the page at sunrise. A sunset after midnight, far in the north
+    // in summer, counts as late today.
+    val now = hour * 60 + minute
+    val sunset = if (sun.setMinute < sun.riseMinute) sun.setMinute + SunTimes.DAY else sun.setMinute
     return when {
         dark -> SkyMood(Color(0xFF26304A), Color(0xFF3A4658), true, Color(0xFFF3EEE2), greeting)
-        minute >= sun.riseMinute && minute < 11 * 60 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
-        minute >= 11 * 60 && minute < sun.setMinute - 2 * 60 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
+        now >= sun.riseMinute && now < 11 * 60 -> SkyMood(Color(0xFFFCE1CC), Color(0xFFFBF3E6), false, ink, greeting)
+        now >= 11 * 60 && now < sunset - 2 * 60 -> SkyMood(AfternoonSky, Color(0xFFF8F4E8), false, ink, greeting)
         else -> SkyMood(Color(0xFFE6D3EC), Color(0xFFF9E4D6), false, ink, greeting)
     }
 }

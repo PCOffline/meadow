@@ -89,7 +89,25 @@ data class Place(val latitude: Double, val longitude: Double)
 object ZonePlaces {
     @Volatile private var places: Map<String, Place>? = null
 
-    fun of(context: Context, zone: String): Place? = load(context)[zone]
+    /**
+     * The main place of [zone]. A phone can name its zone by an older name ("Asia/Calcutta" for
+     * "Asia/Kolkata"): then it is the place of the zone that Android says is the same one.
+     */
+    fun of(context: Context, zone: String): Place? {
+        val all = load(context)
+        all[zone]?.let { return it }
+        return renamed.getOrPut(zone) {
+            val same = canonical(zone) ?: return@getOrPut NONE
+            all[same] ?: all.entries.firstOrNull { canonical(it.key) == same }?.value ?: NONE
+        }.takeIf { it !== NONE }
+    }
+
+    /** Zones looked up by another name, so the table is searched once for each. */
+    private val renamed = java.util.concurrent.ConcurrentHashMap<String, Place>()
+    private val NONE = Place(Double.NaN, Double.NaN)
+
+    private fun canonical(zone: String): String? =
+        runCatching { android.icu.util.TimeZone.getCanonicalID(zone) }.getOrNull()?.takeIf { it.isNotEmpty() }
 
     private fun load(context: Context): Map<String, Place> = places ?: runCatching {
         context.resources.openRawResource(R.raw.zone_places).bufferedReader().useLines { lines ->

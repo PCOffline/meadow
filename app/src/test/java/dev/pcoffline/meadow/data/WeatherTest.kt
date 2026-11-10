@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -145,6 +146,26 @@ class WeatherTest {
         assertFalse(store.weatherOn.value)
         assertNull(store.weather.value)
         assertNull(LocalStore(app).weather.value)
+    }
+
+    @Test
+    fun `turning it off forgets where the weather was for`() = runBlocking {
+        val weather = repository()
+        weather.turnOn()
+        weather.refreshIfStale()
+        assertNotNull(weather.place.value)
+        weather.turnOff()
+        assertNull(weather.place.value)
+    }
+
+    @Test
+    fun `turned off while the phone is being found, the place isn't kept`() = runBlocking {
+        lateinit var weather: WeatherRepository
+        weather = WeatherRepository(app, store, locate = { weather.turnOff(); here }, fetch = { answer }, now = { clock })
+        weather.turnOn()
+        weather.refreshIfStale()
+        assertNull(weather.place.value)
+        assertNull(store.weather.value)
     }
 
     @Test

@@ -71,6 +71,19 @@ class SunTimesTest {
     }
 
     @Test
+    fun `a time zone under an older name uses the same place`() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val date = LocalDate.of(2026, 6, 21)
+        val kolkata = SunTimes.today(context, null, ZoneId.of("Asia/Kolkata"), date)
+        assertNotEquals(SunTimes.DEFAULT, kolkata)
+        assertEquals(kolkata, SunTimes.today(context, null, ZoneId.of("Asia/Calcutta"), date))
+        assertEquals(
+            SunTimes.today(context, null, ZoneId.of("Europe/Kyiv"), date),
+            SunTimes.today(context, null, ZoneId.of("Europe/Kiev"), date),
+        )
+    }
+
+    @Test
     fun `the weather's place comes before the time zone's`() {
         val context = ApplicationProvider.getApplicationContext<Application>()
         // Edinburgh, in London's time zone, has a later summer sunset.
