@@ -28,14 +28,6 @@ class GardenTilesTest : ScreenTest() {
         .performScrollTo().fetchSemanticsNode().boundsInRoot.height
 
     @Test
-    fun `a card with more to say is no taller than the one beside it`() {
-        // Extra time adds a line to the first card only.
-        val budgets = listOf(budget("demo.reader", "Reader", bonus = 15), budget("demo.tiktok", "TikTok"))
-        show { GardenContent(DemoGarden.robin, GardenState(budgets = budgets, loaded = true)) }
-        assertEquals(height("Reader"), height("TikTok"), 0.5f)
-    }
-
-    @Test
     fun `with a photo, the greeting ends with your emoji`() {
         val robin = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = "https://example.invalid/robin.jpg"))
         show { GardenContent(robin, GardenState(loaded = true)) }
@@ -46,5 +38,13 @@ class GardenTilesTest : ScreenTest() {
     fun `without a photo, the greeting has only your name`() {
         show { GardenContent(DemoGarden.robin, GardenState(loaded = true)) }
         compose.onNode(hasText("${DemoGarden.robin.displayName} ${DemoGarden.robin.avatar.emoji}", substring = true)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a card with more to say is no taller than the one beside it`() {
+        // Extra time adds a line to the first card only.
+        val budgets = listOf(budget("demo.reader", "Reader", bonus = 15), budget("demo.tiktok", "TikTok"))
+        show { GardenContent(DemoGarden.robin, GardenState(budgets = budgets, loaded = true)) }
+        assertEquals(height("Reader"), height("TikTok"), 0.5f)
     }
 }
