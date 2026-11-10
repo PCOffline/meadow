@@ -2,6 +2,8 @@ package dev.pcoffline.meadow.pictures
 
 import android.os.ParcelFileDescriptor
 import androidx.test.platform.app.InstrumentationRegistry
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import org.junit.Assume.assumeTrue
 
 /**
@@ -13,6 +15,12 @@ internal object Device {
     const val DIR = "/sdcard/Pictures/meadow-pictures"
 
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
+
+    /**
+     * The time that the screens count from in a picture: the status bar's 9:41, on a Monday. A time
+     * that a screen names, such as when a resting app opens, is then the same on every run.
+     */
+    val now: ZonedDateTime = ZonedDateTime.of(2026, 1, 5, 9, 41, 0, 0, ZoneId.systemDefault())
 
     /** Skips the test unless the Pictures workflow runs it (`pictures=true`). */
     fun requirePictures() {
