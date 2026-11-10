@@ -50,8 +50,10 @@ sealed interface UpdateState {
 /**
  * Keeps Meadow up to date from its GitHub releases.
  *
- * Checks read the public releases API (no account or token). Downloads are verified against
- * GitHub's published SHA-256 and must be signed with the same key as the installed app;
+ * Checks read the public releases API (no account or token). A download comes only from the
+ * repository's own release files on github.com, and stops at the size the release gives.
+ * Downloads are verified against GitHub's published SHA-256 and must be signed with the same key
+ * as the installed app;
  * Android's installer enforces the signature too. An update only installs after a tap on Update
  * in Settings; Android asks to confirm too, unless (from Android 12) Meadow installed the version
  * it replaces itself.
@@ -194,7 +196,7 @@ class Updater(
             return when (connection.responseCode) {
                 HttpURLConnection.HTTP_OK -> {
                     val body = connection.inputStream.bufferedReader().use { it.readText() }
-                    Releases.updateFrom(Releases.parse(body), currentVersion)
+                    Releases.updateFrom(Releases.parse(body), currentVersion, BuildConfig.UPDATE_REPO)
                 }
                 HttpURLConnection.HTTP_NOT_FOUND -> null // No releases yet.
                 else -> throw IOException("GitHub answered ${connection.responseCode}")
@@ -217,16 +219,11 @@ class Updater(
             if (connection.responseCode != HttpURLConnection.HTTP_OK) throw IOException("Download answered ${connection.responseCode}")
             val total = connection.contentLengthLong.takeIf { it > 0 } ?: update.sizeBytes
             _state.value = UpdateState.Downloading(update, 0f)
+            val context = currentCoroutineContext()
             connection.inputStream.use { input ->
                 file.outputStream().use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    var copied = 0L
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        copied += read
+                    copyUpTo(input, output, maxBytes(update)) { copied ->
+                        context.ensureActive()
                         if (total > 0) _state.value = UpdateState.Downloading(update, (copied.toFloat() / total).coerceIn(0f, 1f))
                     }
                 }
@@ -296,6 +293,30 @@ class Updater(
     companion object {
         /** Long enough to read and answer Android's confirmation. */
         const val INSTALL_TIMEOUT_MS = 2 * 60_000L
+
+        /** The most an update may be when its release doesn't say: several times Meadow's size. */
+        const val MAX_APK_BYTES = 300L * 1024 * 1024
+
+        /** The most to download for [update]: the size its release gives, or [MAX_APK_BYTES]. */
+        internal fun maxBytes(update: AvailableUpdate): Long = update.sizeBytes.takeIf { it > 0 } ?: MAX_APK_BYTES
+
+        /**
+         * Copies [input] to [output], and stops with an error after [limit] bytes: a download that
+         * is larger than its release says is not the release's file, and must not fill the phone.
+         * [onProgress] gets the bytes copied so far, before each read.
+         */
+        internal fun copyUpTo(input: java.io.InputStream, output: java.io.OutputStream, limit: Long, onProgress: (Long) -> Unit = {}): Long {
+            val buffer = ByteArray(64 * 1024)
+            var copied = 0L
+            while (true) {
+                onProgress(copied)
+                val read = input.read(buffer)
+                if (read < 0) return copied
+                copied += read
+                if (copied > limit) throw FriendlyException(R.string.update_failed_checksum)
+                output.write(buffer, 0, read)
+            }
+        }
 
         fun sha256(file: File): String {
             val digest = MessageDigest.getInstance("SHA-256")

@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.update
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -42,6 +44,34 @@ class ReleasesTest {
         assertEquals("abc123", update.sha256)
         assertEquals("New petals", update.notes)
         assertEquals(42L, update.sizeBytes)
+    }
+
+    @Test
+    fun `an update comes only from the repository's own release files`() {
+        val repo = "PCOffline/meadow"
+        assertTrue(Releases.fromRepo("https://github.com/PCOffline/meadow/releases/download/v1.2.0/meadow-1.2.0.apk", repo))
+        // GitHub answers with the repository's own spelling, whatever the build was given.
+        assertTrue(Releases.fromRepo("https://github.com/pcoffline/Meadow/releases/download/v1.2.0/meadow.apk", repo))
+        listOf(
+            "http://github.com/PCOffline/meadow/releases/download/v1.2.0/meadow.apk",
+            "https://github.com.evil.example/PCOffline/meadow/releases/download/v1.2.0/meadow.apk",
+            "https://evil.example/PCOffline/meadow/releases/download/v1.2.0/meadow.apk",
+            "https://github.com/someone/else/releases/download/v1.2.0/meadow.apk",
+            "https://github.com/PCOffline/meadow-fork/releases/download/v1.2.0/meadow.apk",
+            "https://user@github.com/PCOffline/meadow/releases/download/v1.2.0/meadow.apk",
+            "https://github.com:8443/PCOffline/meadow/releases/download/v1.2.0/meadow.apk",
+            "https://github.com/PCOffline/meadow/archive/main.zip",
+            "not a url",
+            "",
+        ).forEach { assertFalse(it, Releases.fromRepo(it, repo)) }
+    }
+
+    @Test
+    fun `a release whose apk is somewhere else offers nothing`() {
+        val elsewhere = """[{"name":"meadow.apk","browser_download_url":"https://evil.example/meadow.apk","size":42}]"""
+        assertNull(Releases.updateFrom(release(assets = elsewhere), "1.0.0", repo = "PCOffline/meadow"))
+        val ours = """[{"name":"meadow.apk","browser_download_url":"https://github.com/PCOffline/meadow/releases/download/v1.2.0/meadow.apk","size":42}]"""
+        assertNotNull(Releases.updateFrom(release(assets = ours), "1.0.0", repo = "PCOffline/meadow"))
     }
 
     @Test
