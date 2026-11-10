@@ -47,6 +47,30 @@ class ReleasesTest {
     }
 
     @Test
+    fun `nothing is offered when current, older, unparseable, draft or pre-release`() {
+        assertNull(Releases.updateFrom(release(), current = "1.2.0"))
+        assertNull(Releases.updateFrom(release(), current = "1.3.0"))
+        assertNull(Releases.updateFrom(release(tag = "nightly"), current = "1.0.0"))
+        assertNull(Releases.updateFrom(release(), current = "dev"))
+        assertNull(Releases.updateFrom(release(draft = true), current = "1.0.0"))
+        assertNull(Releases.updateFrom(release(prerelease = true), current = "1.0.0"))
+    }
+
+    @Test
+    fun `releases without an apk are skipped, and meadow apks are preferred`() {
+        assertNull(Releases.updateFrom(release(assets = """[{"name":"notes.txt","browser_download_url":"u"}]"""), "1.0.0"))
+        val update = Releases.updateFrom(
+            release(
+                assets = """[{"name":"other.apk","browser_download_url":"https://x/other"},
+                    {"name":"Meadow-1.2.0.apk","browser_download_url":"https://x/meadow"}]""",
+            ),
+            "1.0.0",
+        )
+        assertEquals("https://x/meadow", update?.apkUrl)
+        assertNull(update?.sha256)
+    }
+
+    @Test
     fun `an update comes only from the repository's own release files`() {
         val repo = "PCOffline/meadow"
         assertTrue(Releases.fromRepo("https://github.com/PCOffline/meadow/releases/download/v1.2.0/meadow-1.2.0.apk", repo))
@@ -72,30 +96,6 @@ class ReleasesTest {
         assertNull(Releases.updateFrom(release(assets = elsewhere), "1.0.0", repo = "PCOffline/meadow"))
         val ours = """[{"name":"meadow.apk","browser_download_url":"https://github.com/PCOffline/meadow/releases/download/v1.2.0/meadow.apk","size":42}]"""
         assertNotNull(Releases.updateFrom(release(assets = ours), "1.0.0", repo = "PCOffline/meadow"))
-    }
-
-    @Test
-    fun `nothing is offered when current, older, unparseable, draft or pre-release`() {
-        assertNull(Releases.updateFrom(release(), current = "1.2.0"))
-        assertNull(Releases.updateFrom(release(), current = "1.3.0"))
-        assertNull(Releases.updateFrom(release(tag = "nightly"), current = "1.0.0"))
-        assertNull(Releases.updateFrom(release(), current = "dev"))
-        assertNull(Releases.updateFrom(release(draft = true), current = "1.0.0"))
-        assertNull(Releases.updateFrom(release(prerelease = true), current = "1.0.0"))
-    }
-
-    @Test
-    fun `releases without an apk are skipped, and meadow apks are preferred`() {
-        assertNull(Releases.updateFrom(release(assets = """[{"name":"notes.txt","browser_download_url":"u"}]"""), "1.0.0"))
-        val update = Releases.updateFrom(
-            release(
-                assets = """[{"name":"other.apk","browser_download_url":"https://x/other"},
-                    {"name":"Meadow-1.2.0.apk","browser_download_url":"https://x/meadow"}]""",
-            ),
-            "1.0.0",
-        )
-        assertEquals("https://x/meadow", update?.apkUrl)
-        assertNull(update?.sha256)
     }
 
     @Test
