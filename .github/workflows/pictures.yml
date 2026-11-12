@@ -4,12 +4,18 @@ name: Pictures
 # story step by step with a video, and every screen of the debug gallery in each look that
 # changed, before and after. Read "Pull requests" in AGENTS.md. The pictures are published on the
 # branch pictures/pr-<number>. A pull request from a fork gets them in the run's artifact only.
+#
+# Two jobs: "pictures" builds and runs the pull request's code with a read-only token, and
+# "publish" holds the write token and runs no code from the pull request, only the base's.
 on:
   pull_request:
     paths:
       - 'app/src/**'
       - '!app/src/test/**'
       - '!app/src/testDebug/**'
+      # The end-to-end journeys draw nothing; the stories and the gallery's tests do.
+      - '!app/src/androidTest/**'
+      - 'app/src/androidTest/**/pictures/**'
       - 'app/build.gradle.kts'
       - 'gradle/libs.versions.toml'
       - '.github/scripts/pr_pictures.py'
@@ -27,20 +33,18 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
-      contents: write # publishes the pictures on their own branch
-      pull-requests: write # puts them in the pull request's description
+      contents: read
     timeout-minutes: 90
+    outputs:
+      folder: ${{ steps.prepare.outputs.folder }}
     env:
       NUMBER: ${{ github.event.pull_request.number }}
       BASE_REF: ${{ github.event.pull_request.base.ref }}
-      # A fork's pull request gets a token that can't publish.
-      SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          # The publish step pushes the pictures' branch with these credentials.
-          persist-credentials: true
+          persist-credentials: false
       - name: Check out the base
         run: |
           base="$(git merge-base "origin/$BASE_REF" HEAD)"
@@ -82,37 +86,20 @@ jobs:
             .github/scripts/draw-pictures.sh ../base build/pictures/before || echo "The base drew no pictures, or not all of them"
             .github/scripts/draw-pictures.sh . build/pictures/after
       - name: Prepare the pictures
+        id: prepare
         env:
           REPO: ${{ github.repository }}
           RUN: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           # Each run has a folder of its own, so a picture never comes from an older run's cache.
-          echo "FOLDER=$RUN" >> "$GITHUB_ENV"
+          echo "folder=$RUN" >> "$GITHUB_OUTPUT"
           python3 .github/scripts/pr_pictures.py build/pictures/before build/pictures/after build/pictures/site \
             "https://raw.githubusercontent.com/$REPO/refs/heads/pictures/pr-$NUMBER/$RUN" \
             "https://github.com/$REPO/tree/pictures/pr-$NUMBER/$RUN"
-      - name: Publish the pictures
-        if: env.SAME_REPO == 'true'
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Only this run's pictures: the branch has one commit, replaced on each run.
-          git worktree add --orphan -b "pictures/pr-$NUMBER" ../publish
-          mkdir -p "../publish/$FOLDER"
-          cp -r build/pictures/site/. "../publish/$FOLDER/"
-          cd ../publish
-          git add .
-          git commit -q -m "Pictures for pull request #$NUMBER"
-          git push --force origin "HEAD:refs/heads/pictures/pr-$NUMBER"
-      - name: Put them in the description
-        if: env.SAME_REPO == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          gh api "repos/$REPO/pulls/$NUMBER" --jq '.body // ""' > build/pictures/body.md
-          python3 .github/scripts/pr_pictures.py body build/pictures/body.md build/pictures/site/pictures.md > build/pictures/new-body.md
-          gh api -X PATCH "repos/$REPO/pulls/$NUMBER" -F body=@build/pictures/new-body.md > /dev/null
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pictures-site
+          path: build/pictures/site/
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -121,3 +108,59 @@ jobs:
             build/pictures/
             app/build/reports/androidTests/
           if-no-files-found: ignore
+
+  # Publishes what "pictures" drew. It runs no code from the pull request: its scripts come from
+  # the base, and the pictures are only files to push and text for the description.
+  publish:
+    needs: pictures
+    # A fork's pull request gets a token that can't publish.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: pictures-publish-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # publishes the pictures on their own branch
+      pull-requests: write # puts them in the pull request's description
+    timeout-minutes: 10
+    env:
+      NUMBER: ${{ github.event.pull_request.number }}
+      FOLDER: ${{ needs.pictures.outputs.folder }}
+    steps:
+      - name: Check the folder's name
+        # It comes from the job that ran the pull request's code, so it is checked before use.
+        run: |
+          if ! [[ "$FOLDER" =~ ^[0-9]+-[0-9]+$ ]]; then echo "::error::Not a run's folder: $FOLDER"; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base, not the pull request: its scripts are the ones this job runs.
+          ref: ${{ github.event.pull_request.base.sha }}
+          # The publish step pushes the pictures' branch with these credentials.
+          persist-credentials: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pictures-site
+          path: ${{ runner.temp }}/site
+      - name: Publish the pictures
+        env:
+          SITE: ${{ runner.temp }}/site
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only this run's pictures: the branch has one commit, replaced on each run.
+          git worktree add --orphan -b "pictures/pr-$NUMBER" ../publish
+          mkdir -p "../publish/$FOLDER"
+          cp -r "$SITE/." "../publish/$FOLDER/"
+          cd ../publish
+          git add .
+          git commit -q -m "Pictures for pull request #$NUMBER"
+          git push --force origin "HEAD:refs/heads/pictures/pr-$NUMBER"
+      - name: Put them in the description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SITE: ${{ runner.temp }}/site
+        run: |
+          gh api "repos/$REPO/pulls/$NUMBER" --jq '.body // ""' > "$RUNNER_TEMP/body.md"
+          python3 .github/scripts/pr_pictures.py body "$RUNNER_TEMP/body.md" "$SITE/pictures.md" > "$RUNNER_TEMP/new-body.md"
+          gh api -X PATCH "repos/$REPO/pulls/$NUMBER" -F body=@"$RUNNER_TEMP/new-body.md" > /dev/null
