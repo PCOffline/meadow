@@ -126,6 +126,8 @@ class CircleRepositoriesTest : EmulatorTest() {
             assertEquals("Robin", asked.requesterName)
             assertEquals(asked, requests.observeInbox(bee.uid, id).firstWhere { it != null })
             requests.decide(id, approve = true, note = " Enjoy ", minutes = 10)
+            // The Bumblebee's copy says what they gave.
+            assertEquals(10, requests.observeInbox(bee.uid, id).firstWhere { it?.status == RequestStatus.APPROVED }!!.grantedMinutes)
         }
 
         signInAs(robin)
@@ -133,7 +135,8 @@ class CircleRepositoriesTest : EmulatorTest() {
             val answered = requests.observe(id).firstWhere { it?.status == RequestStatus.APPROVED }!!
             assertEquals("Bee", answered.decidedByName)
             assertEquals("Enjoy", answered.decisionNote)
-            assertEquals(10, answered.grantedMinutes)
+            // Less than asked for: the request now holds what was given.
+            assertEquals(10, answered.minutes)
         }
     }
 
