@@ -60,6 +60,42 @@ data class AvailableUpdate(
 object Releases {
     private val json = Json { ignoreUnknownKeys = true }
 
+    // "feat(chat)!: open at what's new": the kind of change, and what it says.
+    private val titled = Regex("""^(\w+)(?:\([^)]*\))?!?:\s+(.+)$""")
+
+    // GitHub ends each line of its notes with who made the change, and where.
+    private val credit = Regex("""\s+by @\S+ in \S+$""")
+    private val bullet = Regex("""^[*-]\s+""")
+
+    /** The kinds of change that people see or feel. The rest (build, ci, docs, test…) is left out. */
+    private val forPeople = setOf("feat", "fix", "perf")
+
+    /**
+     * A release's notes as people read them in Settings. GitHub writes them for developers: a
+     * heading, each change with its kind and author, and a link to the full list. This keeps what
+     * changed for people, a line each, and leaves out the rest. Empty when nothing is left.
+     */
+    fun notesForPeople(body: String): String = body.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("**") && !it.startsWith("<!--") }
+        .map { it.replace(bullet, "").replace(credit, "") }
+        // "@sam made their first contribution in …"
+        .filterNot { it.startsWith("@") }
+        .mapNotNull { line ->
+            val match = titled.matchEntire(line) ?: return@mapNotNull line
+            val (kind, summary) = match.destructured
+            // A plain title with a colon ("Rest screen: read the usage log once") isn't a kind.
+            when {
+                kind.lowercase() in forPeople -> summary
+                kind.lowercase() in notForPeople -> null
+                else -> line
+            }
+        }
+        .map { "• " + it.replaceFirstChar(Char::uppercase) }
+        .joinToString("\n")
+
+    private val notForPeople = setOf("build", "ci", "chore", "docs", "test", "refactor", "style", "revert")
+
     fun parse(body: String): GitHubRelease = json.decodeFromString(GitHubRelease.serializer(), body)
 
     /** The update [release] offers over [current], or null if it isn't newer or has no APK. */
@@ -74,7 +110,7 @@ object Releases {
             ?: return null
         return AvailableUpdate(
             version = offered,
-            notes = release.body.orEmpty().trim(),
+            notes = notesForPeople(release.body.orEmpty()),
             apkUrl = apk.url,
             sizeBytes = apk.size,
             sha256 = apk.digest?.takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:")?.lowercase(),
