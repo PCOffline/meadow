@@ -83,7 +83,7 @@ abstract class EmulatorTest {
         backend.requireUid()
     }
 
-    /** The sign-in links that the Auth emulator would have emailed to [email], oldest first. */
+    /** The sign-in links that the Auth emulator would have emailed to [email]. */
     protected fun emailedLinks(email: String): List<String> {
         val url = URL("http://$host:9099/emulator/v1/projects/${Emulators.PROJECT}/oobCodes")
         val body = (url.openConnection() as HttpURLConnection).inputStream.bufferedReader().use { it.readText() }

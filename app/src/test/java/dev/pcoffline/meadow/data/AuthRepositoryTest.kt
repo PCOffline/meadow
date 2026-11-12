@@ -23,6 +23,13 @@ import org.robolectric.annotation.Config
 class AuthRepositoryTest : EmulatorTest() {
     private val auth by lazy { AuthRepository(backend, store) }
 
+    /** The one link that [send] emailed to [email]. */
+    private suspend fun linkFrom(email: String, send: suspend () -> Unit): String {
+        val before = emailedLinks(email).toSet()
+        send()
+        return emailedLinks(email).single { it !in before }
+    }
+
     private fun profile(uid: String) = onBackend { backend.user(uid).get().await() }
 
     @Test
@@ -32,8 +39,9 @@ class AuthRepositoryTest : EmulatorTest() {
         val doc = profile(uid)
         assertEquals("Robin", doc.getString("displayName"))
         assertEquals("🌼", doc.getString("flower"))
-        // The backend gave the garden its friend code.
-        assertFalse(doc.getString("friendCode").isNullOrBlank())
+        // The backend gave the garden its friend code, in the owner-only account.
+        val account = onBackend { backend.account(uid).get().await() }
+        assertFalse(account.getString("friendCode").isNullOrBlank())
     }
 
     @Test
@@ -86,9 +94,8 @@ class AuthRepositoryTest : EmulatorTest() {
         val uid = backend.uid
         backend.auth.signOut()
 
-        auth.sendSignInLink(" $email ")
+        val link = linkFrom(email) { auth.sendSignInLink(" $email ") }
         assertEquals(email, auth.linkEmail)
-        val link = emailedLinks(email).last()
         assertFalse(auth.receiveLink("https://example.com/not-a-sign-in-link"))
         assertTrue(auth.receiveLink(link))
         assertEquals(link, auth.incomingLink.value)
@@ -106,8 +113,7 @@ class AuthRepositoryTest : EmulatorTest() {
     fun `a sign-in link attaches its address to a garden started without one`() = onBackend {
         val uid = newGarden("Robin")
         val email = newEmail()
-        auth.sendSignInLink(email)
-        auth.finishSignInLink(emailedLinks(email).last(), email)
+        auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email)
 
         assertEquals(uid, backend.uid)
         assertFalse(backend.auth.currentUser!!.isAnonymous)
@@ -123,16 +129,14 @@ class AuthRepositoryTest : EmulatorTest() {
 
         // A new start with a garden of its own can't take the address: it would lose that garden.
         newGarden("Sam")
-        auth.sendSignInLink(email)
-        val link = emailedLinks(email).last()
+        val link = linkFrom(email) { auth.sendSignInLink(email) }
         assertThrows(FirebaseAuthUserCollisionException::class.java) { onBackend { auth.finishSignInLink(link, email) } }
         assertNotEquals(owner, backend.uid)
 
         // A start without a garden yet has nothing to lose, so the link signs in to the address's account.
         backend.auth.signOut()
         backend.auth.signInAnonymously().await()
-        auth.sendSignInLink(email)
-        auth.finishSignInLink(emailedLinks(email).last(), email)
+        auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email)
         assertEquals(owner, backend.uid)
     }
 
