@@ -10,6 +10,7 @@ import android.os.Process
 class UsageTracker(private val context: Context) {
     private val usm = context.getSystemService(UsageStatsManager::class.java)
     private val recent = RecentEvents(::readEvents)
+    private val openAt = OpenAt(::readEvents)
 
     fun hasPermission(): Boolean {
         val appOps = context.getSystemService(AppOpsManager::class.java)
@@ -29,7 +30,8 @@ class UsageTracker(private val context: Context) {
         // Look back a little so an app that was already open at `start` is counted from `start`.
         // A stretch that ends now, as today so far does, is kept between reads ([RecentEvents]).
         val from = start - LOOKBACK_MS
-        val events = recent.between(from, clippedEnd, now) ?: readEvents(from, clippedEnd)
+        // An app on screen since before `from` has no event after it ([OpenAt]).
+        val events = openAt.withOpenApp(from, clippedEnd, now, recent.between(from, clippedEnd, now) ?: readEvents(from, clippedEnd))
         // The log covers the whole stretch when it's recent, or when it reaches back past its start:
         // then a quiet log means nothing was used.
         if (start >= now - LOG_KEPT_MS || events.firstOrNull()?.let { it.time < start } == true) {
