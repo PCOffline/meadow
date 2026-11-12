@@ -276,7 +276,7 @@ class LimitEngine(
     private fun refresh(force: Boolean) {
         val now = System.currentTimeMillis()
         val key = Days.todayKey()
-        if (!force && key == todayKey && now - measuredAt < REFRESH_MS) return
+        if (key == todayKey && freshEnough(now - measuredAt, force)) return
         val today = Days.today()
         todayUsage = tracker.usageBetween(Days.startMillis(today), now).orEmpty()
         todayKey = key
@@ -293,7 +293,17 @@ class LimitEngine(
     private inline fun List<Grant>.bonus(pkg: String, dayMatches: (String) -> Boolean): Int =
         filter { it.packageName == pkg && dayMatches(it.dayKey) }.sumOf { it.minutes }
 
-    private companion object {
+    companion object {
         const val REFRESH_MS = 20_000L
+        const val FORCED_REFRESH_MS = 1_000L
+
+        /**
+         * Whether usage measured [ageMs] ago still serves. A forced read is fresh enough for a
+         * moment too: reading the day's whole usage log is heavy for the phone, and several askers
+         * can each want it "now" at once (#106). A clock set back makes the age negative, and then
+         * usage is measured again.
+         */
+        internal fun freshEnough(ageMs: Long, force: Boolean): Boolean =
+            ageMs in 0 until (if (force) FORCED_REFRESH_MS else REFRESH_MS)
     }
 }
