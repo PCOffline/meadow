@@ -60,7 +60,10 @@ class ChatRepositoryTest : EmulatorTest() {
         onBackend {
             chats.sendLimit(chatId, limit, LimitCardMode.SUGGESTED, "Suggested a limit for Pebbles")
             chats.sendPicture(chatId, picture)
-            val messages = chats.messages(chatId).firstWhere { list -> list.count { !it.pending && it.senderId == bee.uid } == 2 }
+            // Bee's chat also holds the backend's note that they became a Bumblebee: wait for each kind.
+            val messages = chats.messages(chatId).firstWhere { list ->
+                listOf(MessageKind.LIMIT, MessageKind.IMAGE).all { kind -> list.any { it.kind == kind && !it.pending } }
+            }
             val card = messages.single { it.kind == MessageKind.LIMIT }
             assertEquals(LimitCardMode.SUGGESTED, card.limitMode)
             assertEquals(30, card.limit?.dailyMinutes)
