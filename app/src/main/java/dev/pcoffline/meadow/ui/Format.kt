@@ -2,6 +2,8 @@ package dev.pcoffline.meadow.ui
 
 import android.content.res.Resources
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalResources
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
@@ -105,8 +107,19 @@ fun Resources.scheduleText(schedule: Schedule): String =
         getString(R.string.schedule_by_day)
     }
 
+/**
+ * The time that a screen counts from when it names a time of day. It is the phone's clock. The
+ * pull request pictures pin it, so a time on a screen is the same in two drawings.
+ */
+val LocalNow = staticCompositionLocalOf<() -> ZonedDateTime> { { ZonedDateTime.now() } }
+
+/** When something [inMillis] from now opens, as a screen says it: counted from [LocalNow]. */
+@Composable
+@ReadOnlyComposable
+fun opensAtText(inMillis: Long): String = opensAtText(inMillis, LocalNow.current())
+
 /** "10:00", or "Mon 10:00" when it's not today. */
-fun opensAtText(inMillis: Long, now: ZonedDateTime = ZonedDateTime.now()): String {
+fun opensAtText(inMillis: Long, now: ZonedDateTime): String {
     val at = now.plus(java.time.Duration.ofMillis(inMillis))
     val time = at.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
     return if (at.toLocalDate() == now.toLocalDate()) time

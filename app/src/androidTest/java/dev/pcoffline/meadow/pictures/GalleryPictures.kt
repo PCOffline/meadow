@@ -25,6 +25,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.Weather
 import dev.pcoffline.meadow.showcase.Scenarios
 import dev.pcoffline.meadow.ui.SnackbarScope
+import dev.pcoffline.meadow.ui.LocalNow
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.components.LocalSkyWeather
 import dev.pcoffline.meadow.ui.components.OfflineBar
@@ -83,6 +84,7 @@ class GalleryPictures {
                     LocalSkyHour provides 10,
                     LocalSkyWeather provides Weather.CLEAR,
                     LocalDensity provides Density(density.density, density.fontScale * look.fontScale),
+                    LocalNow provides { Device.now },
                 ) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         // A narrow phone's width, in the middle of this one.
