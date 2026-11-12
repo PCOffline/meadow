@@ -70,7 +70,8 @@ jobs:
       - name: Draw on an emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 34
+          # Android 15: the newest phones' behaviour, such as edge to edge and how emoji draw.
+          api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_6
