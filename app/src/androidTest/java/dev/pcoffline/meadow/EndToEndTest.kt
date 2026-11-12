@@ -43,6 +43,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
+import androidx.test.espresso.base.DefaultFailureHandler
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -71,6 +73,31 @@ abstract class EndToEndTest {
         assumeTrue("Build with -Pmeadow.emulatorHost to run end-to-end tests", BuildConfig.EMULATOR_HOST.isNotEmpty())
     }
 
+    /** An Espresso failure also says which window had focus at that moment, before the activity closes. */
+    @Before
+    fun reportFocusOnFailure() {
+        val default = DefaultFailureHandler(app)
+        Espresso.setFailureHandler { error, matcher ->
+            try {
+                default.handle(error, matcher)
+            } catch (e: Throwable) {
+                throw AssertionError("${e.javaClass.simpleName}: ${e.message?.lineSequence()?.first()}${focus()}", e)
+            }
+        }
+    }
+
+    /**
+     * Which window has focus, the windows on screen from the top, and whether the screen is awake.
+     * A journey that loses focus with no activity started needs this to tell what took it.
+     */
+    protected fun focus(): String = runCatching {
+        val windows = shell("dumpsys window windows").lines().map { it.trim() }
+        val shown = windows.filter { it.startsWith("Window #") }.map { it.substringAfter("u0 ").substringBefore('}') }.take(8)
+        val focused = windows.filter { it.startsWith("mCurrentFocus") || it.startsWith("mFocusedApp") }
+        val awake = shell("dumpsys power").lines().map { it.trim() }.firstOrNull { it.startsWith("mWakefulness=") }
+        " Focus: ${focused.joinToString("; ")}; windows: ${shown.joinToString(", ")}; $awake"
+    }.getOrElse { " (couldn't read the focus: $it)" }
+
     protected fun text(@StringRes id: Int, vararg args: Any) = app.getString(id, *args)
     protected fun node(@StringRes id: Int): SemanticsNodeInteraction = compose.onNodeWithText(text(id))
 
@@ -93,7 +120,7 @@ abstract class EndToEndTest {
         try {
             compose.waitUntil(timeout) { runCatching(check).getOrDefault(false) }
         } catch (e: ComposeTimeoutException) {
-            throw AssertionError("Never saw $what. On screen: ${screenText()}${failedActions()}", e)
+            throw AssertionError("Never saw $what. On screen: ${screenText()}${failedActions()}${focus()}", e)
         }
     }
 
@@ -101,7 +128,7 @@ abstract class EndToEndTest {
     protected fun poll(what: String, timeout: Long = 20_000, check: () -> Boolean) {
         val end = System.currentTimeMillis() + timeout
         while (!runCatching(check).getOrDefault(false)) {
-            if (System.currentTimeMillis() > end) throw AssertionError("Never saw $what. On screen: ${screenText()}${failedActions()}")
+            if (System.currentTimeMillis() > end) throw AssertionError("Never saw $what. On screen: ${screenText()}${failedActions()}${focus()}")
             Thread.sleep(250)
         }
     }
@@ -113,7 +140,7 @@ abstract class EndToEndTest {
             compose.waitUntil(timeout) { runCatching { showing(value, substring) }.getOrDefault(false) }
         } catch (e: ComposeTimeoutException) {
             // One line, so CI logs show where it stopped and what was on screen instead.
-            throw AssertionError("Never saw \"$value\". On screen: ${screenText()}${failedActions()}", e)
+            throw AssertionError("Never saw \"$value\". On screen: ${screenText()}${failedActions()}${focus()}", e)
         }
     }
 
