@@ -56,10 +56,10 @@ class ChatJourneyTest : EndToEndTest() {
             val chatId = ChatRepository.chatIdFor(me, sam.uid)
             sam.send(chatId, "Thanks for looking after me")
 
-            // People shows Sam with what they are to this person and an unread mark, not the
-            // message itself, and opens the chat.
+            // People shows Sam among the gardens with an unread mark, not the message itself,
+            // and opens the chat.
             tab(R.string.tab_people).performClick()
-            waitForText(text(R.string.circle_garden_role))
+            waitForText("Sam")
             compose.waitUntil(20_000) {
                 compose.onAllNodesWithContentDescription(text(R.string.chats_unread), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
             }

@@ -306,6 +306,14 @@ internal object Scenarios {
             }
         },
         Scenario("People", "Nobody yet") { WithTabs(Tab.PEOPLE) { PeopleContent(nobody, People()) } },
+        Scenario("People", "Bumblebees, no gardens yet") {
+            WithTabs(Tab.PEOPLE) { PeopleContent(d.robin.copy(approveeIds = emptyList()), People(bumblebees = d.people.bumblebees, chats = d.people.chats)) }
+        },
+        Scenario("People", "Nobody wrote a bio") {
+            WithTabs(Tab.PEOPLE) {
+                PeopleContent(d.robin, People(bumblebees = d.people.bumblebees.map { it.copy(bio = "") }, lookingAfter = d.people.lookingAfter.map { it.copy(bio = "") }))
+            }
+        },
         Scenario("People", "Your answers as a Bumblebee") { Page { BeeStatsContent(d.beeStats) } },
         Scenario("People", "Your answers, none yet") { Page { BeeStatsContent(Demo.noAnswers) } },
         Scenario("People", "A friend's garden, all shared") { FriendDemo(d.anaPage) },
