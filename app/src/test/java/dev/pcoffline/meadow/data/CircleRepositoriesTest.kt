@@ -3,11 +3,7 @@ package dev.pcoffline.meadow.data
 import android.app.Application
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
-import dev.pcoffline.meadow.ui.legal.LegalDoc
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -22,44 +18,11 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class)
 class CircleRepositoriesTest : EmulatorTest() {
-    private data class Person(val uid: String, val email: String, val friendCode: String)
-
     private val social by lazy { SocialRepository(backend) }
     private val requests by lazy { RequestRepository(backend) { null } }
 
-    /** A new person with a garden, signed in. */
-    private fun person(name: String): Person = onBackend {
-        backend.auth.signOut()
-        val email = newEmail()
-        val auth = AuthRepository(backend, store)
-        auth.signUp(email, PASSWORD)
-        auth.createProfile(name, "🌼", LegalDoc.CURRENT_VERSION)
-        val uid = backend.requireUid()
-        Person(uid, email, account(uid).getString("friendCode")!!)
-    }
-
-    private fun signInAs(person: Person) = onBackend {
-        backend.auth.signOut()
-        backend.auth.signInWithEmailAndPassword(person.email, PASSWORD).await()
-    }
-
-    private suspend fun account(uid: String) = backend.account(uid).get().await()
-
     @Suppress("UNCHECKED_CAST")
     private suspend fun approvers(uid: String) = account(uid).get("approverIds") as List<String>
-
-    private suspend fun <T> Flow<T>.firstWhere(predicate: (T) -> Boolean): T = withTimeout(WAIT_MS) { first(predicate) }
-
-    /** [bee] becomes [owner]'s Bumblebee, by the owner's invite and the bee's yes. */
-    private fun makeBumblebee(owner: Person, bee: Person) {
-        signInAs(owner)
-        onBackend { social.invite(bee.friendCode) }
-        signInAs(bee)
-        onBackend {
-            val invite = social.incomingInvites(bee.uid).firstWhere { it.isNotEmpty() }.single()
-            social.respond(invite.id, accept = true)
-        }
-    }
 
     @Test
     fun `an invite by friend code is seen by both, and a yes makes a Bumblebee`() {
@@ -218,8 +181,6 @@ class CircleRepositoriesTest : EmulatorTest() {
     }
 
     private companion object {
-        const val PASSWORD = "longenough"
         const val APP = "com.example.pebbles"
-        const val WAIT_MS = 20_000L
     }
 }

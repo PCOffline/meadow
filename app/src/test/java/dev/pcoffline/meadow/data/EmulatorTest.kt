@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
@@ -15,7 +16,11 @@ import dev.pcoffline.meadow.ui.legal.LegalDoc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -83,6 +88,43 @@ abstract class EmulatorTest {
         backend.requireUid()
     }
 
+    /** Someone with a garden and a password, as other people find them. */
+    protected data class Person(val uid: String, val email: String, val friendCode: String)
+
+    /** A new person with a garden, signed in. */
+    protected fun person(name: String): Person = onBackend {
+        backend.auth.signOut()
+        val email = newEmail()
+        val auth = AuthRepository(backend, store)
+        auth.signUp(email, PASSWORD)
+        auth.createProfile(name, "🌼", LegalDoc.CURRENT_VERSION)
+        val uid = backend.requireUid()
+        Person(uid, email, account(uid).getString("friendCode")!!)
+    }
+
+    protected fun signInAs(person: Person) = onBackend {
+        backend.auth.signOut()
+        backend.auth.signInWithEmailAndPassword(person.email, PASSWORD).await()
+    }
+
+    /** [uid]'s private account document. Only its owner can read it. */
+    protected suspend fun account(uid: String): DocumentSnapshot = backend.account(uid).get().await()
+
+    /** The first value of this flow that matches [predicate]; fails when none comes in time. */
+    protected suspend fun <T> Flow<T>.firstWhere(predicate: (T) -> Boolean): T = withTimeout(WAIT_MS) { first(predicate) }
+
+    /** [bee] becomes [owner]'s Bumblebee, by the owner's invite and the bee's yes. [bee] stays signed in. */
+    protected fun makeBumblebee(owner: Person, bee: Person) {
+        val social = SocialRepository(backend)
+        signInAs(owner)
+        onBackend { social.invite(bee.friendCode) }
+        signInAs(bee)
+        onBackend {
+            val invite = social.incomingInvites(bee.uid).firstWhere { it.isNotEmpty() }.single()
+            social.respond(invite.id, accept = true)
+        }
+    }
+
     /** The sign-in links that the Auth emulator would have emailed to [email]. */
     protected fun emailedLinks(email: String): List<String> {
         val url = URL("http://$host:9099/emulator/v1/projects/${Emulators.PROJECT}/oobCodes")
@@ -93,8 +135,10 @@ abstract class EmulatorTest {
             .mapNotNull { it["oobLink"]?.jsonPrimitive?.content }
     }
 
-    private companion object {
-        const val TIMEOUT_MS = 60_000L
+    protected companion object {
+        const val PASSWORD = "longenough"
+        const val WAIT_MS = 20_000L
+        private const val TIMEOUT_MS = 60_000L
     }
 }
 
