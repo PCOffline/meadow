@@ -117,7 +117,7 @@ fun BloomFlower(
             drawPath(stem, lerp(garden.stem, garden.wilted, wilt * 0.7f), style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
             leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
             leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
-            flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, garden.petalHoney, droops = 1f - sleep)
+            flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, garden.heart, droops = 1f - sleep)
         }
         }
         if (!mushroom && animatedBloom < 0.15f && sleep < 0.5f) {
@@ -191,7 +191,7 @@ private fun DrawScope.flowerHead(center: Offset, radius: Float, petals: Int, col
 
 /** A small flat daisy for decorating headers and empty states. */
 @Composable
-fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Color = Garden.colors.petalHoney) {
+fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Color = Garden.colors.heart) {
     Canvas(modifier) {
         val c = Offset(size.width / 2f, size.height / 2f)
         val r = size.minDimension / 2f
@@ -256,7 +256,7 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
                             val a = Math.toRadians(72.0 * k).toFloat()
                             drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
                         }
-                        drawCircle(garden.petalHoney, radius = 1.05f * unit, center = Offset.Zero)
+                        drawCircle(garden.heart, radius = 1.05f * unit, center = Offset.Zero)
                     }
                 }
             }

@@ -24,6 +24,8 @@ import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.gardenColorsFor
+import androidx.compose.ui.test.SemanticsMatcher
+import dev.pcoffline.meadow.ui.components.FlowerAsleep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -74,6 +76,17 @@ class ThemeLooksTest : ScreenTest() {
             val sun = gardenColorsFor(theme, dark = false).sun
             val inCard = shot.count(sun, card.left.toInt(), card.top.toInt(), card.right.toInt(), card.bottom.toInt())
             assertTrue("$theme: $inCard", inCard > 30)
+        }
+    }
+
+    @Test
+    fun `each theme's preview grows three flowers`() {
+        AppGraph.store.setAppearance(GardenTheme.MEADOW.key, DarkMode.LIGHT.key)
+        show { AppearanceCard() }
+        val flowers = compose.onAllNodes(SemanticsMatcher.keyIsDefined(FlowerAsleep), useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        GardenTheme.entries.forEach { theme ->
+            val card = compose.onNode(hasText(text(theme.label), substring = true) and hasClickAction()).fetchSemanticsNode().boundsInRoot
+            assertEquals("$theme", 3, flowers.count { card.contains(it.center) })
         }
     }
 
