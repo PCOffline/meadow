@@ -29,6 +29,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -351,7 +352,16 @@ abstract class EndToEndTest {
     /** Opens the garden of [name], whom this phone looks after: from People, through their chat. */
     protected fun openGardenOf(name: String) {
         openChatWith(name)
-        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
+        described(text(R.string.chat_see_garden, name)).performClick()
+    }
+
+    /**
+     * The node that a screen reader names [description], once it shows. A chat's own buttons wait
+     * for the circle to load, a moment after the chat opens.
+     */
+    protected fun described(description: String): SemanticsNodeInteraction {
+        eventually(description) { compose.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
+        return compose.onNodeWithContentDescription(description)
     }
 
     /** Taps the button [id] once it takes taps: asking, for one, waits to know no other question is open. */
@@ -431,6 +441,6 @@ abstract class EndToEndTest {
     protected fun reopenGardenOf(name: String) {
         compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
         waitForText(text(R.string.chat_placeholder))
-        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, name)).performClick()
+        described(text(R.string.chat_see_garden, name)).performClick()
     }
 }

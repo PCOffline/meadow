@@ -97,7 +97,7 @@ class CircleJourneyTest : EndToEndTest() {
             waitForSnackbarToGo(R.string.circle_invite_accepted, "Sam")
             // Sam opens their chat, and from there their page, with nothing planted yet to show.
             tapInCircle(hasText("Sam") and hasClickAction())
-            compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Sam")).performClick()
+            described(text(R.string.chat_see_garden, "Sam")).performClick()
             waitForText(text(R.string.friend_step_down, "Sam"))
         }
     }
@@ -136,7 +136,7 @@ class CircleJourneyTest : EndToEndTest() {
             // then, Kai can keep Sam, from People or the chat.
             tapInCircle(hasText("Sam") and hasClickAction())
             waitForText(text(R.string.chat_placeholder))
-            compose.onNodeWithContentDescription(text(R.string.action_more)).performClick()
+            described(text(R.string.action_more)).performClick()
             node(R.string.chat_remove_bee).performClick()
             inDialog(text(R.string.circle_remove_title, "Sam")).assertExists()
             inDialog(text(R.string.action_remove)).performClick()
