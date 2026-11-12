@@ -108,6 +108,6 @@ class ThemeLooksTest : ScreenTest() {
 
     @Test
     fun `the sun is on the right in the evening`() {
-        assertTrue(sunAt(19) > 0.7f)
+        assertTrue(sunAt(17) > 0.7f)
     }
 }
