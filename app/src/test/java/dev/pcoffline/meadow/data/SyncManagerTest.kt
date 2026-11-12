@@ -27,22 +27,37 @@ class SyncManagerTest : EmulatorTest() {
     fun stopSync() = scope.cancel()
 
     @Test
-    fun `signed out there is no profile, and signed in it is mirrored with the account's choices`() {
+    fun `signed out there is no profile, and signed in it is mirrored`() {
         onBackend { sync.profile.firstWhere { it == ProfileState.SignedOut } }
 
-        val robin = person("Robin")
+        person("Robin")
         onBackend {
-            backend.account(robin.uid).update(mapOf("theme" to "forest", "darkMode" to "dark")).await()
             val ready = sync.profile.firstWhere { it is ProfileState.Ready } as ProfileState.Ready
             assertEquals("Robin", ready.profile.displayName)
             assertEquals("Robin", sync.currentProfile?.displayName)
             sync.accountConfirmed.firstWhere { it }
-            store.theme.firstWhere { it == "forest" }
         }
 
         onBackend {
             backend.auth.signOut()
             sync.profile.firstWhere { it == ProfileState.SignedOut }
+        }
+    }
+
+    @Test
+    fun `the account's theme comes to the phone once, when sync starts`() {
+        val robin = person("Robin")
+        onBackend { backend.account(robin.uid).update(mapOf("theme" to "forest", "darkMode" to "dark")).await() }
+        onBackend {
+            sync.accountConfirmed.firstWhere { it }
+            store.theme.firstWhere { it == "forest" }
+            assertEquals("dark", store.darkMode.value)
+
+            // Later changes on the account don't override this phone's choice.
+            store.setAppearance("meadow", "light")
+            backend.account(robin.uid).update("theme", "dusk").await()
+            delay(SETTLE_MS)
+            assertEquals("meadow", store.theme.value)
         }
     }
 
