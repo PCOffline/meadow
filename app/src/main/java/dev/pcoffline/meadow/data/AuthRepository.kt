@@ -7,7 +7,6 @@ import com.google.firebase.auth.EmailAuthProvider
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
@@ -145,15 +144,16 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
             return
         }
         when {
-            user.isAnonymous -> try {
+            // An anonymous start without a garden yet has nothing to keep, so the link signs in.
+            // Attaching the address first would use up the link's one-time code when the address
+            // already has a garden, and the sign-in after it would then fail.
+            user.isAnonymous && !hasProfile(user.uid) -> backend.auth.signInWithCredential(credential).await()
+            // A garden started without an email keeps everything: the address is attached to it.
+            // If the address already has a garden of its own, this fails rather than lose either.
+            user.isAnonymous -> {
                 user.linkWithCredential(credential).await()
                 user.reload().await()
                 _anonymous.value = false
-            } catch (e: FirebaseAuthUserCollisionException) {
-                // The address already has a garden. An unused anonymous start (no profile yet)
-                // has nothing to lose, so sign in to that garden instead.
-                if (hasProfile(user.uid)) throw e
-                backend.auth.signInWithCredential(credential).await()
             }
             // Already signed in with this address: nothing to do.
             user.email.equals(email, ignoreCase = true) -> Unit
