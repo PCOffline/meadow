@@ -7,6 +7,7 @@
   <a href="https://github.com/PCOffline/meadow/actions/workflows/build.yml"><img src="https://github.com/PCOffline/meadow/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-5B7F55" alt="Licence: GPL-3.0"></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-5B7F55" alt="Android 8.0 or newer">
+  <a href="https://myslop.shop/badge/meadow.svg"><img src="https://myslop.shop/badge/meadow.svg" alt="Featured on My Slop" height="20"></a>
 </p>
 
 Meadow helps you spend less time on the apps that pull you in. Each app gets a set amount of

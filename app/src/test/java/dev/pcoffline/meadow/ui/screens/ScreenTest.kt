@@ -43,8 +43,15 @@ abstract class ScreenTest {
     @get:Rule val compose: ComposeContentTestRule = createComposeRule()
     protected val app: Application = ApplicationProvider.getApplicationContext()
 
+    /**
+     * The app graph, with a store as a fresh install has it. The store lives as long as the test
+     * JVM, so without this a test would start from what the tests before it left.
+     */
     @Before
-    fun initGraph() = AppGraph.init(app)
+    fun initGraph() {
+        AppGraph.init(app)
+        AppGraph.store.clearAll()
+    }
 
     protected fun text(@StringRes id: Int, vararg args: Any): String = app.getString(id, *args)
 
