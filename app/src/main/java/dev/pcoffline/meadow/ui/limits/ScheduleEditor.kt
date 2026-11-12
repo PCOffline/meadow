@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -39,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.foundation.selection.toggleable
@@ -186,21 +189,26 @@ private fun DayHours(day: Int, windows: List<TimeWindow>, enabled: Boolean, onPi
             .clickable(enabled = enabled, onClickLabel = stringResource(R.string.schedule_pick_day, name), role = Role.Button, onClick = onPick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        // The name keeps its width; several hours wrap beside it instead of squeezing it.
+        Text(name, style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.width(16.dp))
         Text(
             LocalResources.current.windowsText(windows).replaceFirstChar { it.uppercase() },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
         )
     }
 }
 
-/** A day's windows, and a button for one more while there's room. */
+/** A day's windows, and a button for one more while there's room for it, in the day and the list. */
 @Composable
 private fun HoursEditor(windows: List<TimeWindow>, enabled: Boolean, onChange: (List<TimeWindow>) -> Unit) {
     WindowList(windows, enabled, onChange)
-    if (windows.size < MAX_WINDOWS) {
-        TextButton(onClick = { onChange(Schedule.merge(windows + nextWindow(windows))) }, enabled = enabled) {
+    val next = nextWindow(windows)
+    if (windows.size < MAX_WINDOWS && next != null) {
+        TextButton(onClick = { onChange(Schedule.merge(windows + next)) }, enabled = enabled) {
             Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
             Text(stringResource(R.string.schedule_add_window))
         }
@@ -262,11 +270,36 @@ internal fun TimeField(time: String, description: String, enabled: Boolean, onCl
     ) { Text(time, style = MaterialTheme.typography.titleSmall) }
 }
 
-/** A sensible next window: an hour after the last one, or all day when there's none. */
-private fun nextWindow(windows: List<TimeWindow>): TimeWindow {
-    val last = windows.maxOfOrNull { it.to } ?: return TimeWindow.ALL_DAY
-    val from = (last + 60).coerceAtMost(TimeWindow.MINUTES_IN_DAY - 60)
-    return TimeWindow(from, (from + 60).coerceAtMost(TimeWindow.MINUTES_IN_DAY))
+/** The shortest hours "Add hours" adds, in minutes: a few minutes between two windows aren't worth it. */
+internal const val MIN_NEW_WINDOW = 15
+
+/**
+ * A sensible next window: all day when there's none; else an hour, an hour after the last window;
+ * else in the largest free time of the day. Null when no free time is left for [MIN_NEW_WINDOW]
+ * minutes. It never touches another window, since touching windows join into one and nothing
+ * would be added.
+ */
+internal fun nextWindow(windows: List<TimeWindow>): TimeWindow? {
+    if (windows.isEmpty()) return TimeWindow.ALL_DAY
+    val day = TimeWindow.MINUTES_IN_DAY
+    val free = buildList {
+        var at = 0
+        for (w in Schedule.merge(windows)) {
+            if (w.from > at) add(at to w.from)
+            at = maxOf(at, w.to)
+        }
+        if (at < day) add(at to day)
+    }
+    fun inside(gap: Pair<Int, Int>): TimeWindow? {
+        val (start, end) = gap
+        // Up to an hour from each window beside it; none from the start or end of the day.
+        val margin = minOf(60, (end - start) / 3)
+        val from = if (start == 0) 0 else start + margin
+        val to = minOf(from + 60, if (end == day) day else end - margin)
+        return if (margin > 0 && to - from >= MIN_NEW_WINDOW) TimeWindow(from, to) else null
+    }
+    val afterLast = free.lastOrNull()?.takeIf { it.second == day && it.first > 0 }
+    return afterLast?.let(::inside) ?: free.sortedByDescending { it.second - it.first }.firstNotNullOfOrNull(::inside)
 }
 
 /** [onPick] returns false when the time doesn't fit, which keeps the dialog open. */
