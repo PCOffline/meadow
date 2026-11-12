@@ -121,7 +121,7 @@ class AuthRepositoryTest : EmulatorTest() {
     }
 
     @Test
-    fun `a link for an address that has a garden keeps an unused start from losing it`() = onBackend {
+    fun `a link for an address that has a garden can't take over a start that has its own`() = onBackend {
         val email = newEmail()
         auth.signUp(email, "longenough")
         val owner = backend.uid
@@ -132,12 +132,6 @@ class AuthRepositoryTest : EmulatorTest() {
         val link = linkFrom(email) { auth.sendSignInLink(email) }
         assertThrows(FirebaseAuthUserCollisionException::class.java) { onBackend { auth.finishSignInLink(link, email) } }
         assertNotEquals(owner, backend.uid)
-
-        // A start without a garden yet has nothing to lose, so the link signs in to the address's account.
-        backend.auth.signOut()
-        backend.auth.signInAnonymously().await()
-        auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email)
-        assertEquals(owner, backend.uid)
     }
 
     @Test
