@@ -287,7 +287,7 @@ private fun GardenHeader(profile: UserProfile, state: GardenState, onOpenSetting
                 Column(Modifier.weight(1f)) {
                     Text(today, style = MaterialTheme.typography.labelLarge, color = mood.onSky)
                     Text(
-                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.displayName),
+                        stringResource(R.string.garden_greeting, stringResource(mood.greeting), profile.avatar.nameWithEmoji(profile.displayName)),
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.asHeading(),
                         color = mood.onSky,

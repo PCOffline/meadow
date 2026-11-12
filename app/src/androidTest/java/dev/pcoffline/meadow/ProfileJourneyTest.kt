@@ -33,10 +33,10 @@ import java.io.File
 import java.util.zip.ZipFile
 
 /**
- * End to end: someone makes their profile their own (name, critter, colour, a photo that's later
- * removed), picks the app's theme and night mode in Settings, and downloads all their data. Android's photo picker
- * and file saver are stood in for, answering with files the test made; the rest is the real app
- * against the emulators, checked in the backend.
+ * End to end: someone makes their profile their own (name, critter, colour, a photo with a
+ * critter next to their name, then removed), picks the app's theme and night mode in Settings,
+ * and downloads all their data. Android's photo picker and file saver are stood in for, answering
+ * with files the test made; the rest is the real app against the emulators, checked in the backend.
  */
 @RunWith(AndroidJUnit4::class)
 class ProfileJourneyTest : EndToEndTest() {
@@ -81,6 +81,20 @@ class ProfileJourneyTest : EndToEndTest() {
             waitForBackend("users/$uid") { it.photoUrl()?.contains(uid) == true }
             // The message covers the bottom of the screen, where the buttons below will be.
             waitForSnackbarToGo(R.string.profile_photo_saved)
+
+            // With the photo, a new critter keeps the photo: it shows next to the name (#115).
+            node(R.string.profile_emoji_with_photo).performScrollTo()
+            compose.onNode(hasContentDescription(text(R.string.flower_picker_item, "🦔"))).performScrollTo().performClick()
+            node(R.string.action_save).performScrollTo().performClick()
+            waitFor(R.string.profile_saved)
+            waitForBackend("users/$uid") { it.string("flower") == "🦔" && it.photoUrl()?.contains(uid) == true }
+            waitForSnackbarToGo(R.string.profile_saved)
+            compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
+            tab(R.string.tab_garden).performClick()
+            waitForText("Robin Hood 🦔", substring = true)
+            compose.onNodeWithContentDescription(text(R.string.profile_open)).performClick()
+            waitFor(R.string.profile_title)
+
             node(R.string.profile_photo_remove).performScrollTo().performClick()
             waitForBackend("users/$uid") { it.photoUrl() == null }
 

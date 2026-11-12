@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.components.Hint
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.data.Avatar
 import dev.pcoffline.meadow.data.FlowerAvatars
@@ -87,7 +88,8 @@ fun ProfileScreen(
     var emoji by rememberSaveable { mutableStateOf(profile.avatar.emoji) }
     var color by rememberSaveable { mutableStateOf(profile.avatar.color) }
     val hasPhoto = profile.avatar.photoUrl != null
-    // A photo, while there is one, until a flower or colour is picked instead.
+    // A photo, while there is one, until it's removed. The emoji stays a choice with a photo: it
+    // shows next to the name.
     var usePhoto by rememberSaveable(hasPhoto) { mutableStateOf(hasPhoto) }
     val save = rememberAction()
     val photo = rememberAction()
@@ -164,35 +166,33 @@ fun ProfileScreen(
 
             SectionTitle(stringResource(R.string.profile_avatar))
             MeadowCard(Modifier.fillMaxWidth()) {
-                // Picking a flower or a colour uses the flower instead of the photo, from Save on.
+                // With a photo, the emoji shows next to the name; without one, it's the picture.
                 Text(stringResource(R.string.profile_avatar_emoji), style = MaterialTheme.typography.labelLarge)
+                if (usePhoto) Hint(stringResource(R.string.profile_emoji_with_photo), Modifier.padding(top = 2.dp))
                 FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     FlowerAvatars.forEach { option ->
                         Choice(
-                            selected = !usePhoto && option == emoji,
+                            selected = option == emoji,
                             label = stringResource(R.string.flower_picker_item, option),
-                            onClick = {
-                                emoji = option
-                                usePhoto = false
-                            },
+                            onClick = { emoji = option },
                         ) {
                             PersonAvatar(Avatar(option, color, null), size = 44.dp)
                         }
                     }
                 }
-                Text(stringResource(R.string.profile_avatar_color), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
-                FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AvatarColor.entries.forEach { option ->
-                        val swatch = if (LocalDarkTheme.current) option.dark else option.light
-                        Choice(
-                            selected = !usePhoto && option.key == color,
-                            label = stringResource(option.label),
-                            onClick = {
-                                color = option.key
-                                usePhoto = false
-                            },
-                        ) {
-                            Box(Modifier.size(36.dp).clip(CircleShape).background(swatch))
+                // A colour is only for the emoji's circle, so a photo has none to choose.
+                if (!usePhoto) {
+                    Text(stringResource(R.string.profile_avatar_color), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
+                    FlowRow(Modifier.padding(top = 8.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        AvatarColor.entries.forEach { option ->
+                            val swatch = if (LocalDarkTheme.current) option.dark else option.light
+                            Choice(
+                                selected = option.key == color,
+                                label = stringResource(option.label),
+                                onClick = { color = option.key },
+                            ) {
+                                Box(Modifier.size(36.dp).clip(CircleShape).background(swatch))
+                            }
                         }
                     }
                 }

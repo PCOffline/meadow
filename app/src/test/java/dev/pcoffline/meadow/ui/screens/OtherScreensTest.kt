@@ -294,17 +294,26 @@ class OtherScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `picking a flower instead of the photo is saved, and the photo goes`() {
+    fun `with a photo, an emoji can still be picked, and the photo stays`() {
         val saves = mutableListOf<ProfileEdit>()
         show { ProfileScreen(withPhoto, onBack = {}, onSave = { saves += it }) }
+        node(R.string.profile_emoji_with_photo).performScrollTo().assertExists()
         val flower = compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.flower_picker_item, "🌻")))
         flower.performScrollTo().performClick()
         flower.assertIsSelected()
-        node(R.string.profile_photo_remove).assertDoesNotExist()
+        node(R.string.profile_photo_remove).assertExists()
         node(R.string.action_save).performScrollTo().assertIsEnabled().performClick()
         compose.waitUntil(5_000) { saves.isNotEmpty() }
         assertEquals("🌻", saves.single().emoji)
-        assertTrue(saves.single().removePhoto)
+        assertEquals(false, saves.single().removePhoto)
+        assertAccessible()
+    }
+
+    @Test
+    fun `with a photo, there's no circle colour to choose`() {
+        show { ProfileScreen(withPhoto, onBack = {}) }
+        node(R.string.profile_avatar_color).assertDoesNotExist()
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(text(R.string.avatar_color_honey))).assertDoesNotExist()
     }
 
     @Test
