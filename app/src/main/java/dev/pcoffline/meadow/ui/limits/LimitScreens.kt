@@ -627,8 +627,10 @@ internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: 
 private fun widestLabel(minutes: List<Int>, style: TextStyle): Dp {
     val measurer = rememberTextMeasurer()
     val labels = minutes.map { minutesText(it) }
-    val widest = remember(labels, style) { labels.maxOf { measurer.measure(it, style).size.width } }
-    return with(LocalDensity.current) { widest.toDp() }
+    // Measured again when the text size changes: the measurer keeps the density it was made with.
+    val density = LocalDensity.current
+    val widest = remember(labels, style, density) { labels.maxOf { measurer.measure(it, style, density = density).size.width } }
+    return with(density) { widest.toDp() }
 }
 
 /**
@@ -702,5 +704,8 @@ private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onS
 
 private const val PRESET_COLUMNS = 3
 
-/** A filter chip's padding either side of its label, with room to spare. */
-private val CHIP_PADDING = 24.dp
+/**
+ * The room a filter chip needs besides its label: its own padding and the label's, 8dp each on
+ * either side, and room to spare. With less, a length like "1h 30m" wraps to "1h" at large text.
+ */
+private val CHIP_PADDING = 40.dp
