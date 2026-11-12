@@ -153,7 +153,7 @@ class GuardianAccessibilityService : AccessibilityService() {
             if (siteTrailing?.isActive != true) {
                 siteTrailing = scope.launch {
                     delay(SITE_CHECK_MS)
-                    withContext(Dispatchers.Main) { currentPackage?.let { checkSite(it, force = true) } }
+                    withContext(Dispatchers.Main) { readAgain() }
                 }
             }
             return
@@ -195,8 +195,17 @@ class GuardianAccessibilityService : AccessibilityService() {
         unreadableReads++
         siteTrailing = scope.launch {
             delay(SITE_CHECK_MS)
-            withContext(Dispatchers.Main) { currentPackage?.let { checkSite(it, force = true) } }
+            withContext(Dispatchers.Main) { readAgain() }
         }
+    }
+
+    /**
+     * The read that [siteTrailing] waited for. It lets go of [siteTrailing] first: the read it
+     * starts can come back unreadable before this job ends, and must then be free to wait again.
+     */
+    private fun readAgain() {
+        siteTrailing = null
+        currentPackage?.let { checkSite(it, force = true) }
     }
 
     /** Reads an address bar by its full view id. Tests give their own. */
