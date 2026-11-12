@@ -62,14 +62,27 @@ object Releases {
 
     fun parse(body: String): GitHubRelease = json.decodeFromString(GitHubRelease.serializer(), body)
 
-    /** The update [release] offers over [current], or null if it isn't newer or has no APK. */
-    fun updateFrom(release: GitHubRelease, current: String): AvailableUpdate? {
+    /**
+     * Whether [url] is a file of a release of [repo] on GitHub, over HTTPS. The app only downloads
+     * an update from there, whatever a release's listing names.
+     */
+    fun fromRepo(url: String, repo: String): Boolean {
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+        return uri.scheme == "https" && uri.host == "github.com" && uri.userInfo == null && uri.port == -1 &&
+            uri.path.orEmpty().startsWith("/$repo/releases/download/", ignoreCase = true)
+    }
+
+    /**
+     * The update [release] offers over [current], or null if it isn't newer or has no APK. With
+     * [repo], an APK counts only when it is that repository's own release file ([fromRepo]).
+     */
+    fun updateFrom(release: GitHubRelease, current: String, repo: String? = null): AvailableUpdate? {
         if (release.draft || release.prerelease) return null
         val offered = Version.parse(release.tag) ?: return null
         val installed = Version.parse(current) ?: return null
         if (offered <= installed) return null
         val apk = release.assets
-            .filter { it.name.endsWith(".apk", ignoreCase = true) }
+            .filter { it.name.endsWith(".apk", ignoreCase = true) && (repo == null || fromRepo(it.url, repo)) }
             .minByOrNull { if (it.name.startsWith("meadow", ignoreCase = true)) 0 else 1 }
             ?: return null
         return AvailableUpdate(
