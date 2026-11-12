@@ -48,7 +48,14 @@ class NamesTest(unittest.TestCase):
             root = Path(tmp)
             (root / "gallery").mkdir()
             (root / "gallery" / "index.tsv").write_text("dark/chats--a-message.png\tChats\tA message that didn't send\tdark")
-            self.assertEqual([("dark/chats--a-message.png", ("Chats: a message that didn't send", "dark"))], names(root))
+            self.assertEqual([("dark/chats--a-message.png", ("Chats: a message that didn't send", "dark"), "dark")], names(root))
+
+    def test_reads_each_looks_group(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "gallery").mkdir()
+            (root / "gallery" / "index.tsv").write_text("blossom-night/garden--rain.png\tGarden\tRain\tNight\tCherry blossom")
+            self.assertEqual([("blossom-night/garden--rain.png", ("Garden: rain", "Night"), "Cherry blossom")], names(root))
 
     def test_a_named_picture_shows_its_real_name(self):
         gallery = Gallery(changed=["dark/x.png"], names={"dark/x.png": ("Chats: a friend's chat", "dark")})
@@ -84,7 +91,30 @@ class SectionTest(unittest.TestCase):
         self.assertTrue(section([], Gallery(), URL).startswith("## Pictures"))
 
     def test_without_a_story_points_to_the_rule(self):
-        self.assertIn("No story", section([], Gallery(), URL))
+        self.assertIn("No new or changed story", section([], Gallery(), URL))
+
+    def test_a_story_the_same_as_on_the_base_is_only_named(self):
+        same = StoryPictures("W", "Set weekday hours", [], None, new=False, changed=False)
+        text = section([same], Gallery(), URL)
+        self.assertNotIn("#### Set weekday hours", text)
+        self.assertIn("The same as on the base: Set weekday hours.", text)
+        self.assertIn("No new or changed story", text)
+
+    def test_screens_are_grouped_by_theme_with_day_and_night_together(self):
+        paths = ["meadow-day/a.png", "meadow-night/a.png", "blossom-day/a.png", "blossom-night/a.png", "large-text/a.png"]
+        gallery = Gallery(
+            changed=paths,
+            names={p: ("Garden: rain", "Night" if "night" in p else "Day") for p in paths},
+            groups={p: g for p, g in zip(paths, ["Meadow", "Meadow", "Cherry blossom", "Cherry blossom", "Large text"])},
+        )
+        text = section([], gallery, URL)
+        self.assertEqual(3, text.count("| Screen | Look | Before | After |"))
+        meadow, blossom, large = (text.index(f"#### {g}") for g in ("Meadow", "Cherry blossom", "Large text"))
+        self.assertLess(meadow, blossom)
+        self.assertLess(blossom, large)
+        under_meadow = text[meadow:blossom]
+        self.assertIn("| Garden: rain | Day |", under_meadow)
+        self.assertIn("| Garden: rain | Night |", under_meadow)
 
     def test_a_changed_screen_shows_before_and_after(self):
         text = section([], Gallery(changed=["dark/garden--lived-in.png"], unchanged=3), URL)
@@ -143,9 +173,41 @@ class StoriesTest(unittest.TestCase):
             found = stories(root / "before", root / "after", root / "out")
             self.assertEqual(1, len(found))
             self.assertFalse(found[0].new)
+            self.assertTrue(found[0].changed)
             self.assertEqual("before/stories/HoursStory/01.png", found[0].steps[0].before)
             self.assertIsNone(found[0].steps[1].before)
             self.assertTrue((root / "out" / "after" / "stories" / "HoursStory" / "02.png").exists())
+
+    def test_a_story_drawn_the_same_on_the_base_has_no_pictures(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for side in ("before", "after"):
+                story = root / side / "stories" / "WeekdayHoursStory"
+                story.mkdir(parents=True)
+                Image.new("RGB", (108, 240), "white").save(story / "01.png")
+                (story / "story.json").write_text(json.dumps({"title": "Weekday hours", "steps": ["One."]}))
+            found = stories(root / "before", root / "after", root / "out")
+            self.assertFalse(found[0].changed)
+            self.assertEqual([], found[0].steps)
+            self.assertFalse((root / "out" / "after" / "stories" / "WeekdayHoursStory").exists())
+
+    def test_a_story_with_a_new_caption_has_changed(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for side, caption in (("before", "Old."), ("after", "New.")):
+                story = root / side / "stories" / "S"
+                story.mkdir(parents=True)
+                Image.new("RGB", (108, 240), "white").save(story / "01.png")
+                (story / "story.json").write_text(json.dumps({"title": "S", "steps": [caption]}))
+            self.assertTrue(stories(root / "before", root / "after", root / "out")[0].changed)
 
 
 if __name__ == "__main__":
