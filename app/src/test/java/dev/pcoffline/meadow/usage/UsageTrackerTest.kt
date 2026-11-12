@@ -59,6 +59,14 @@ class UsageTrackerTest {
     }
 
     @Test
+    fun `an app on screen since long before the stretch is counted from its start`() {
+        // #159: opened in the evening and still on screen an hour after midnight.
+        val stretchStart = System.currentTimeMillis() - hour
+        usm.addEvent("com.example.feed", stretchStart - 4 * hour, UsageEvents.Event.ACTIVITY_RESUMED)
+        assertEquals(mapOf("com.example.feed" to hour), tracker.usageBetween(stretchStart, stretchStart + hour))
+    }
+
+    @Test
     fun `a recent quiet day is known to be quiet`() {
         val recent = Days.today().minusDays(2)
         bucket(UsageStatsManager.INTERVAL_WEEKLY, Days.startMillis(recent) - 24 * hour, Days.endMillis(recent), 40 * hour)
