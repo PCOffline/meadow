@@ -138,6 +138,9 @@ android {
             it.maxParallelForks = 2
             // Conscrypt (Robolectric's TLS) loads a native library; JDK 24+ warns unless allowed.
             it.jvmArgs("--enable-native-access=ALL-UNNAMED")
+            // -Pmeadow.unitEmulatorHost=127.0.0.1 runs the tests that need the Firebase emulators
+            // (EmulatorTest); `just test-app` and CI start the emulators around the tests.
+            it.systemProperty("meadow.unitEmulatorHost", project.findProperty("meadow.unitEmulatorHost")?.toString().orEmpty())
             // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
             it.extensions.configure<JacocoTaskExtension> {
                 isIncludeNoLocationClasses = true
