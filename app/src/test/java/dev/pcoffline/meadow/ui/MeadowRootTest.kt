@@ -2,7 +2,10 @@ package dev.pcoffline.meadow.ui
 
 import androidx.activity.ComponentActivity
 import androidx.annotation.StringRes
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -56,8 +59,18 @@ class MeadowRootTest : EmulatorTest() {
 
     private fun waitForText(@StringRes id: Int) = waitForText(text(id))
 
-    private fun waitForText(value: String) {
-        compose.waitUntil(WAIT_MS) { compose.onAllNodes(hasText(value)).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitForText(value: String, unmerged: Boolean = false) =
+        waitFor("\"$value\"") { compose.onAllNodes(hasText(value), useUnmergedTree = unmerged).fetchSemanticsNodes().isNotEmpty() }
+
+    /** Waits for [condition]; if it never comes, the failure shows what was on screen. */
+    private fun waitFor(what: String, condition: () -> Boolean) {
+        try {
+            compose.waitUntil(WAIT_MS, condition)
+        } catch (e: ComposeTimeoutException) {
+            val roots = compose.onAllNodes(isRoot())
+            val screen = roots.fetchSemanticsNodes().indices.joinToString("\n") { roots[it].printToString() }
+            throw AssertionError("Waited ${WAIT_MS / 1000} s for $what. On screen:\n$screen", e)
+        }
     }
 
     private fun back() = compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
@@ -98,8 +111,8 @@ class MeadowRootTest : EmulatorTest() {
 
         compose.onNodeWithText(text(R.string.tab_people)).performClick()
         waitForText(R.string.people_title)
-        // The People tab counts the invite.
-        waitForText("1")
+        // The People tab counts the invite. The tab's label names it, so the count is only in the unmerged tree.
+        waitForText("1", unmerged = true)
     }
 
     @Test
@@ -108,7 +121,7 @@ class MeadowRootTest : EmulatorTest() {
         pending.value = DeepLinks.settings()
         showRoot()
         waitForText(R.string.action_settings)
-        compose.waitUntil(WAIT_MS) { pending.value == null }
+        waitFor("the link to be used") { pending.value == null }
         assertNull(pending.value)
     }
 
@@ -121,11 +134,14 @@ class MeadowRootTest : EmulatorTest() {
                 mapOf("version" to LegalDoc.CURRENT_VERSION - 1, "at" to FieldValue.serverTimestamp()),
             ).await()
         }
+        // This phone accepted the older terms too. (Sync only ever raises the phone's version, and it
+        // already saw the current one when the garden was planted.)
+        AppGraph.store.acceptedTermsVersion = LegalDoc.CURRENT_VERSION - 1
         showRoot()
         waitForText(R.string.legal_update_title)
         compose.onNodeWithText(text(R.string.legal_update_accept)).performClick()
-        compose.waitUntil(WAIT_MS) { compose.onAllNodes(hasText(text(R.string.legal_update_title))).fetchSemanticsNodes().isEmpty() }
-        compose.waitUntil(WAIT_MS) { AppGraph.store.acceptedTermsVersion == LegalDoc.CURRENT_VERSION }
+        waitFor("the offer to close") { compose.onAllNodes(hasText(text(R.string.legal_update_title))).fetchSemanticsNodes().isEmpty() }
+        waitFor("the current terms to be stored") { AppGraph.store.acceptedTermsVersion == LegalDoc.CURRENT_VERSION }
     }
 
     @Test
@@ -139,7 +155,7 @@ class MeadowRootTest : EmulatorTest() {
         waitForText(app.getString(R.string.accept_invite_title, "Robin"))
         compose.onNodeWithText(text(R.string.accept_invite_yes)).performClick()
 
-        compose.waitUntil(WAIT_MS) { AppGraph.store.pendingInvite.value == null }
+        waitFor("the invite to be accepted") { AppGraph.store.pendingInvite.value == null }
         onBackend {
             @Suppress("UNCHECKED_CAST")
             val approvees = account(bee.uid).get("approveeIds") as List<String>
@@ -156,7 +172,7 @@ class MeadowRootTest : EmulatorTest() {
 
         waitForText(R.string.accept_invite_own)
         compose.onNodeWithText(text(R.string.action_ok)).performClick()
-        compose.waitUntil(WAIT_MS) { AppGraph.store.pendingInvite.value == null }
+        waitFor("the invite to close") { AppGraph.store.pendingInvite.value == null }
     }
 
     private companion object {
