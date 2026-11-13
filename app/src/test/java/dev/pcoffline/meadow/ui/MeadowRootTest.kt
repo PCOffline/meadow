@@ -17,13 +17,14 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.EmulatorTest
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.SocialRepository
+import dev.pcoffline.meadow.data.stringList
 import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.tasks.await
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
@@ -167,14 +168,24 @@ class MeadowRootTest : EmulatorTest() {
         AppGraph.store.setPendingInvite(link.token)
         showRootFor(bee)
 
-        waitForText(app.getString(R.string.accept_invite_title, "Robin"))
+        val question = app.getString(R.string.accept_invite_title, "Robin")
+        waitForText(question)
         compose.onNodeWithText(text(R.string.accept_invite_yes)).performClick()
 
-        waitFor("the invite to be accepted") { AppGraph.store.pendingInvite.value == null }
+        // As the phone journeys check it: the backend makes Bee Robin's Bumblebee, the welcome
+        // shows, and the question closes.
         onBackend {
-            @Suppress("UNCHECKED_CAST")
-            val approvees = account(bee.uid).get("approveeIds") as List<String>
-            assertEquals(listOf(robin.uid), approvees)
+            waitUntilTrue("Bee to be Robin's Bumblebee") { account(bee.uid).stringList("approveeIds") == listOf(robin.uid) }
+        }
+        waitForText(app.getString(R.string.accept_invite_done, "Robin"))
+        waitFor("the question to close") { compose.onAllNodes(hasText(question)).fetchSemanticsNodes().isEmpty() }
+    }
+
+    private suspend fun waitUntilTrue(what: String, condition: suspend () -> Boolean) {
+        val until = System.currentTimeMillis() + WAIT_MS
+        while (!condition()) {
+            check(System.currentTimeMillis() < until) { "Waited ${WAIT_MS / 1000} s for $what" }
+            delay(200)
         }
     }
 
