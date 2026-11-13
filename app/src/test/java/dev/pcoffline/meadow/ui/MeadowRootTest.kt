@@ -3,9 +3,10 @@ package dev.pcoffline.meadow.ui
 import androidx.activity.ComponentActivity
 import androidx.annotation.StringRes
 import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isRoot
-import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -14,6 +15,7 @@ import com.google.firebase.firestore.FieldValue
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.EmulatorTest
+import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.SocialRepository
 import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
@@ -55,9 +57,21 @@ class MeadowRootTest : EmulatorTest() {
 
     private fun showRoot() = compose.setContent { MeadowTheme { MeadowRoot(pending) } }
 
+    /**
+     * Shows the root once sync holds [person]'s garden. Firebase hands sign-ins and sign-outs to
+     * the main thread, so one from making the people before could still be on its way; arriving
+     * while the screen shows, it would replace the garden on screen as a phone never does.
+     */
+    private fun showRootFor(person: Person) {
+        onBackend { AppGraph.sync.profile.firstWhere { (it as? ProfileState.Ready)?.profile?.uid == person.uid } }
+        showRoot()
+    }
+
     private fun text(@StringRes id: Int) = app.getString(id)
 
     private fun waitForText(@StringRes id: Int) = waitForText(text(id))
+
+    private fun hasAnyText() = SemanticsMatcher.keyIsDefined(SemanticsProperties.Text)
 
     private fun waitForText(value: String, unmerged: Boolean = false) =
         waitFor("\"$value\"") { compose.onAllNodes(hasText(value), useUnmergedTree = unmerged).fetchSemanticsNodes().isNotEmpty() }
@@ -67,9 +81,10 @@ class MeadowRootTest : EmulatorTest() {
         try {
             compose.waitUntil(WAIT_MS, condition)
         } catch (e: ComposeTimeoutException) {
-            val roots = compose.onAllNodes(isRoot())
-            val screen = roots.fetchSemanticsNodes().indices.joinToString("\n") { roots[it].printToString() }
-            throw AssertionError("Waited ${WAIT_MS / 1000} s for $what. On screen:\n$screen", e)
+            // Every text on screen, dialogs and snackbars included, short enough to read in a CI log.
+            val texts = compose.onAllNodes(hasAnyText(), useUnmergedTree = true).fetchSemanticsNodes()
+                .flatMap { node -> node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+            throw AssertionError("Waited ${WAIT_MS / 1000} s for $what. On screen: ${texts.joinToString(" | ")}", e)
         }
     }
 
@@ -102,7 +117,7 @@ class MeadowRootTest : EmulatorTest() {
         // Bee asks Robin to be their Bumblebee: one invite for Robin to answer.
         onBackend { SocialRepository(backend).invite(robin.friendCode) }
         signInAs(robin)
-        showRoot()
+        showRootFor(robin)
 
         // The phone isn't set up for Meadow, so setup opens over the garden, without the tabs.
         waitForText(R.string.setup_title)
@@ -117,9 +132,9 @@ class MeadowRootTest : EmulatorTest() {
 
     @Test
     fun `a link from a notification opens its screen once`() {
-        person("Robin")
+        val robin = person("Robin")
         pending.value = DeepLinks.settings()
-        showRoot()
+        showRootFor(robin)
         waitForText(R.string.action_settings)
         waitFor("the link to be used") { pending.value == null }
         assertNull(pending.value)
@@ -137,7 +152,7 @@ class MeadowRootTest : EmulatorTest() {
         // This phone accepted the older terms too. (Sync only ever raises the phone's version, and it
         // already saw the current one when the garden was planted.)
         AppGraph.store.acceptedTermsVersion = LegalDoc.CURRENT_VERSION - 1
-        showRoot()
+        showRootFor(robin)
         waitForText(R.string.legal_update_title)
         compose.onNodeWithText(text(R.string.legal_update_accept)).performClick()
         waitFor("the offer to close") { compose.onAllNodes(hasText(text(R.string.legal_update_title))).fetchSemanticsNodes().isEmpty() }
@@ -150,7 +165,7 @@ class MeadowRootTest : EmulatorTest() {
         val link = onBackend { SocialRepository(backend).createInviteLink() }
         val bee = person("Bee")
         AppGraph.store.setPendingInvite(link.token)
-        showRoot()
+        showRootFor(bee)
 
         waitForText(app.getString(R.string.accept_invite_title, "Robin"))
         compose.onNodeWithText(text(R.string.accept_invite_yes)).performClick()
@@ -165,10 +180,10 @@ class MeadowRootTest : EmulatorTest() {
 
     @Test
     fun `your own invite link says so, and OK closes it`() {
-        person("Robin")
+        val robin = person("Robin")
         val link = onBackend { SocialRepository(backend).createInviteLink() }
         AppGraph.store.setPendingInvite(link.token)
-        showRoot()
+        showRootFor(robin)
 
         waitForText(R.string.accept_invite_own)
         compose.onNodeWithText(text(R.string.action_ok)).performClick()
