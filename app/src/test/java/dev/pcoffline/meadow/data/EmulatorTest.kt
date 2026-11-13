@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.data
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import com.google.firebase.FirebaseApp
@@ -24,6 +26,7 @@ import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowNetworkCapabilities
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
@@ -46,9 +49,24 @@ abstract class EmulatorTest {
     fun connectToEmulators() {
         assumeTrue("Run with -Pmeadow.unitEmulatorHost to test against the Firebase emulators", host.isNotEmpty())
         Emulators.connect(app, host)
+        goOnline()
         backend = Backend()
         backend.auth.signOut()
         store = LocalStore(app)
+    }
+
+    /**
+     * Gives Robolectric's network the internet, and has the app read it again. Its network has
+     * none by default, and the app's connectivity check lives as long as the test JVM: a test
+     * before this one could have left it offline, and calls to the backend would then fail at once.
+     */
+    private fun goOnline() {
+        val connectivity = app.getSystemService(ConnectivityManager::class.java)
+        val capabilities = ShadowNetworkCapabilities.newInstance()
+        shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        shadowOf(connectivity).setNetworkCapabilities(connectivity.activeNetwork, capabilities)
+        Connectivity.watch(app)
     }
 
     @After
