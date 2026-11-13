@@ -229,9 +229,15 @@ class SharingRepositoriesTest : EmulatorTest() {
         store.pendingEmergency = null
     }
 
+    /**
+     * A network that has been checked to reach the internet, or one that hasn't (as on a hill
+     * with one bar). The emergency unlock goes offline without that check; the rest of the app
+     * still counts the network as there.
+     */
     private fun online(validated: Boolean) {
         val connectivity = app.getSystemService(ConnectivityManager::class.java)
         val capabilities = ShadowNetworkCapabilities.newInstance()
+        shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         if (validated) shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         shadowOf(connectivity).setNetworkCapabilities(connectivity.activeNetwork, capabilities)
     }
