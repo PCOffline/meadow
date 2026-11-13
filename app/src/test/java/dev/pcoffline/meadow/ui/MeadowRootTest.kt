@@ -18,6 +18,7 @@ import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.tasks.await
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
@@ -125,6 +126,37 @@ class MeadowRootTest : EmulatorTest() {
         compose.onNodeWithText(text(R.string.legal_update_accept)).performClick()
         compose.waitUntil(WAIT_MS) { compose.onAllNodes(hasText(text(R.string.legal_update_title))).fetchSemanticsNodes().isEmpty() }
         compose.waitUntil(WAIT_MS) { AppGraph.store.acceptedTermsVersion == LegalDoc.CURRENT_VERSION }
+    }
+
+    @Test
+    fun `an invite link asks whose Bumblebee to be, and yes makes one`() {
+        val robin = person("Robin")
+        val link = onBackend { SocialRepository(backend).createInviteLink() }
+        val bee = person("Bee")
+        AppGraph.store.setPendingInvite(link.token)
+        showRoot()
+
+        waitForText(app.getString(R.string.accept_invite_title, "Robin"))
+        compose.onNodeWithText(text(R.string.accept_invite_yes)).performClick()
+
+        compose.waitUntil(WAIT_MS) { AppGraph.store.pendingInvite.value == null }
+        onBackend {
+            @Suppress("UNCHECKED_CAST")
+            val approvees = account(bee.uid).get("approveeIds") as List<String>
+            assertEquals(listOf(robin.uid), approvees)
+        }
+    }
+
+    @Test
+    fun `your own invite link says so, and OK closes it`() {
+        person("Robin")
+        val link = onBackend { SocialRepository(backend).createInviteLink() }
+        AppGraph.store.setPendingInvite(link.token)
+        showRoot()
+
+        waitForText(R.string.accept_invite_own)
+        compose.onNodeWithText(text(R.string.action_ok)).performClick()
+        compose.waitUntil(WAIT_MS) { AppGraph.store.pendingInvite.value == null }
     }
 
     private companion object {
