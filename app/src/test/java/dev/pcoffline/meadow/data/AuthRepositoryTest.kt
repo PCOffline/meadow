@@ -135,6 +135,33 @@ class AuthRepositoryTest : EmulatorTest() {
     }
 
     @Test
+    fun `a link for an address that has a garden signs an unused start in to it`() = onBackend {
+        val email = newEmail()
+        auth.signUp(email, "longenough")
+        val owner = backend.uid
+        backend.auth.signOut()
+
+        // Signed in without a garden yet: say, its profile wasn't made because the phone was offline.
+        backend.auth.signInAnonymously().await()
+        auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email)
+        assertEquals(owner, backend.uid)
+        assertFalse(backend.auth.currentUser!!.isAnonymous)
+    }
+
+    @Test
+    fun `a link for a new address signs an unused start in with it`() = onBackend {
+        backend.auth.signInAnonymously().await()
+        val start = backend.uid
+        val email = newEmail()
+        auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email)
+
+        // The start had nothing to keep; the address is now its own account.
+        assertNotEquals(start, backend.uid)
+        assertEquals(email, backend.auth.currentUser!!.email)
+        assertFalse(backend.auth.currentUser!!.isAnonymous)
+    }
+
+    @Test
     fun `a password reset needs an address`() {
         val error = assertThrows(FriendlyException::class.java) { onBackend { auth.sendPasswordReset(" ") } }
         assertEquals(R.string.error_email_required, error.messageRes)
