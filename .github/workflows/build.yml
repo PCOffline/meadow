@@ -83,8 +83,23 @@ jobs:
         with:
           # The MIT-licensed cache, not the default proprietary one.
           cache-provider: basic
-      - name: Unit test with coverage
-        run: ./gradlew createDebugUnitTestCoverageReport --stacktrace
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            backend/functions/package-lock.json
+      - name: Build the Cloud Functions for the emulators
+        working-directory: backend
+        run: npm ci && npm --prefix functions ci && npm --prefix functions run build
+      # The repository tests (EmulatorTest) talk to the Auth, Firestore and Functions emulators,
+      # with the real rules and functions. The emulators stop when the tests end.
+      - name: Unit test with coverage (against the Firebase emulators)
+        working-directory: backend
+        run: >-
+          npx firebase emulators:exec --only auth,firestore,functions --project demo-meadow
+          "cd .. && ./gradlew createDebugUnitTestCoverageReport -Pmeadow.unitEmulatorHost=127.0.0.1 --stacktrace"
       - name: Unit test coverage floor
         # Just under what the tests reach today (47.6% of lines, 32.8% of branches): it can only
         # go up. Raise it as coverage grows.
