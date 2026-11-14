@@ -74,4 +74,24 @@ class UpdaterTest {
         updater.onInstallResult(false, "Update cancelled.")
         assertEquals(UpdateState.Failed("Update cancelled.", update), updater.state.value)
     }
+
+    @Test
+    fun `a download stops at the size its release gives`() {
+        val bytes = ByteArray(200_000) { 1 }
+        val whole = java.io.ByteArrayOutputStream()
+        assertEquals(200_000L, Updater.copyUpTo(bytes.inputStream(), whole, limit = 200_000))
+        assertEquals(200_000, whole.size())
+
+        val cut = java.io.ByteArrayOutputStream()
+        val failure = runCatching { Updater.copyUpTo(bytes.inputStream(), cut, limit = 100_000) }.exceptionOrNull()
+        assertTrue("$failure", failure is dev.pcoffline.meadow.data.FriendlyException)
+        // Nothing past the limit was written.
+        assertTrue("${cut.size()}", cut.size() <= 100_000)
+    }
+
+    @Test
+    fun `without a size, a download has a fixed limit`() {
+        assertEquals(42L, Updater.maxBytes(update.copy(sizeBytes = 42)))
+        assertEquals(Updater.MAX_APK_BYTES, Updater.maxBytes(update.copy(sizeBytes = 0)))
+    }
 }
