@@ -50,10 +50,9 @@ sealed interface UpdateState {
 /**
  * Keeps Meadow up to date from its GitHub releases.
  *
- * Checks read the public releases API (no account or token). A download comes only from the
- * repository's own release files on github.com, and stops at the size the release gives.
- * Downloads are verified against GitHub's published SHA-256 and must be signed with the same key
- * as the installed app;
+ * Checks read the public releases API (no account or token). A download stops at the size the
+ * release gives. Downloads are verified against GitHub's published SHA-256 and must be signed with
+ * the same key as the installed app;
  * Android's installer enforces the signature too. An update only installs after a tap on Update
  * in Settings; Android asks to confirm too, unless (from Android 12) Meadow installed the version
  * it replaces itself.
@@ -196,7 +195,7 @@ class Updater(
             return when (connection.responseCode) {
                 HttpURLConnection.HTTP_OK -> {
                     val body = connection.inputStream.bufferedReader().use { it.readText() }
-                    Releases.updateFrom(Releases.parse(body), currentVersion, BuildConfig.UPDATE_REPO)
+                    Releases.updateFrom(Releases.parse(body), currentVersion)
                 }
                 HttpURLConnection.HTTP_NOT_FOUND -> null // No releases yet.
                 else -> throw IOException("GitHub answered ${connection.responseCode}")
