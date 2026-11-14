@@ -9,6 +9,7 @@ import android.os.Process
 /** Reads the system usage log; the arithmetic lives in [ForegroundTime]. */
 class UsageTracker(private val context: Context) {
     private val usm = context.getSystemService(UsageStatsManager::class.java)
+    private val recent = RecentEvents(::readEvents)
 
     fun hasPermission(): Boolean {
         val appOps = context.getSystemService(AppOpsManager::class.java)
@@ -26,7 +27,9 @@ class UsageTracker(private val context: Context) {
         val now = System.currentTimeMillis()
         val clippedEnd = minOf(end, now)
         // Look back a little so an app that was already open at `start` is counted from `start`.
-        val events = readEvents(start - LOOKBACK_MS, clippedEnd)
+        // A stretch that ends now, as today so far does, is kept between reads ([RecentEvents]).
+        val from = start - LOOKBACK_MS
+        val events = recent.between(from, clippedEnd, now) ?: readEvents(from, clippedEnd)
         // The log covers the whole stretch when it's recent, or when it reaches back past its start:
         // then a quiet log means nothing was used.
         if (start >= now - LOG_KEPT_MS || events.firstOrNull()?.let { it.time < start } == true) {
