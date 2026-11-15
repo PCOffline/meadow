@@ -25,6 +25,7 @@ import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import org.junit.After
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.runner.RunWith
@@ -63,6 +64,8 @@ abstract class Story(private val title: String) {
     @Before
     fun setUpStory() {
         Device.requirePictures()
+        // An earlier emulator drew the whole story before it stopped.
+        assumeFalse("$dir was drawn by an earlier emulator", "$dir/story.json" in Device.drawn)
         Device.prepare(animations = true)
         compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
     }

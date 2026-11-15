@@ -116,8 +116,13 @@ internal object Device {
         ParcelFileDescriptor.AutoCloseInputStream(recording).use { it.readBytes() }
     }
 
-    fun shell(command: String) {
+    fun shell(command: String): String =
         // Reading to the end waits for the command to finish.
-        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
-    }
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes().decodeToString() }
+
+    /**
+     * What an earlier emulator already drew in this run, by path under [DIR] (draw-pictures.sh
+     * writes drawn.txt). A fresh emulator skips it and draws only the rest.
+     */
+    val drawn: Set<String> by lazy { shell("cat $DIR/drawn.txt").lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet() }
 }
