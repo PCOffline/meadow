@@ -15,7 +15,7 @@ checks for the parts you changed. `just check` runs most of them.
 
 | Part | Command |
 |---|---|
-| App unit, screen and accessibility tests | `./gradlew testDebugUnitTest` |
+| App unit, screen and accessibility tests | `just test-app`. It runs `./gradlew testDebugUnitTest` on the Firebase emulators, which the repository tests need. Without them, those tests are skipped. |
 | Lint | `./gradlew lintDebug`, `.github/scripts/detekt.sh`, and `npm run lint` in `backend/` and `backend/functions/` |
 | Cloud Functions unit tests | `cd backend/functions && npm test` |
 | Security rules (Firestore and Storage) | `cd backend && npm ci && npm run test:rules` |
