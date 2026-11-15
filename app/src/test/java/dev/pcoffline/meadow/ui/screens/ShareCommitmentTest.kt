@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class, qualifiers = "w411dp-h891dp-xxhdpi")
 class ShareCommitmentTest : ScreenTest() {
-    private val words = "I'm keeping Pebbles to 45m a day with Meadow 🌱"
+    private val words = "I'm keeping Pebbles to 45m a day with Meadow\u00A0🌱"
 
     @Test
     fun `the words are shown, and tapping someone sends them to their chat`() {

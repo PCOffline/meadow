@@ -33,11 +33,11 @@
     <string name="limit_editor_usage">%1$s today · %2$s this week</string>
     <string name="limit_editor_daily">Daily limit</string>
     <string name="limit_editor_weekly">Weekly limit</string>
-    <string name="limit_editor_pending_title">Waiting for your Bumblebees 💌</string>
+    <string name="limit_editor_pending_title">Waiting for your Bumblebees\u00A0💌</string>
     <string name="limit_editor_pending_body">%1$s is still waiting for an answer.</string>
     <string name="limit_editor_less">Less time</string>
     <string name="limit_editor_more">More time</string>
-    <string name="limit_editor_loosens_title">This makes your limit easier 💌</string>
+    <string name="limit_editor_loosens_title">This makes your limit easier\u00A0💌</string>
     <string name="limit_editor_locked_hint">To make it easier later, you need a Bumblebee\'s approval.</string>
     <string name="limit_editor_pick_one">Turn on at least one.</string>
     <string name="limit_editor_note">A note for them (optional)</string>
@@ -45,10 +45,10 @@
     <string name="limit_editor_ask">Ask my Bumblebees</string>
     <string name="limit_editor_remove">Remove this limit</string>
     <string name="limit_editor_ask_remove">Ask to remove this limit</string>
-    <string name="limit_editor_planted">Planted 🌱</string>
-    <string name="limit_editor_updated">Limit updated 🌿</string>
+    <string name="limit_editor_planted">Planted\u00A0🌱</string>
+    <string name="limit_editor_updated">Limit updated\u00A0🌿</string>
     <string name="limit_editor_removed">Limit removed</string>
-    <string name="limit_editor_requested">Asked your Bumblebees 💌</string>
+    <string name="limit_editor_requested">Asked your Bumblebees\u00A0💌</string>
     <string name="limit_remove_title">Remove the limit on %1$s?</string>
     <string name="limit_remove_body_ask">Meadow asks your Bumblebees first. The limit stays until one of them approves.</string>
     <string name="limit_remove_body_now">Meadow removes the limit now.</string>
@@ -128,7 +128,7 @@
     <string name="limit_copy_other_app">Choose another app</string>
     <string name="limit_suggest_title">Suggest a limit</string>
     <string name="limit_suggest_send">Send</string>
-    <string name="limit_suggest_sent">Suggestion sent 🌱</string>
+    <string name="limit_suggest_sent">Suggestion sent\u00A0🌱</string>
     <string name="limit_apply">Apply</string>
     <string name="limit_change">Change</string>
     <string name="limit_apply_title">Apply this limit?</string>

@@ -32,9 +32,10 @@ data class Grant(
 data class Avatar(val emoji: String, val color: String, val photoUrl: String?) {
     /**
      * [name] as it shows next to this picture: with a photo, the emoji follows it, so it still
-     * shows. Without one, the emoji is the picture itself.
+     * shows. Without one, the emoji is the picture itself. A no-break space keeps the emoji on
+     * the line of the name's last word.
      */
-    fun nameWithEmoji(name: String): String = if (photoUrl != null) "$name $emoji" else name
+    fun nameWithEmoji(name: String): String = if (photoUrl != null) "$name\u00A0$emoji" else name
 
     companion object {
         val Default = Avatar("🌼", "leaf", null)

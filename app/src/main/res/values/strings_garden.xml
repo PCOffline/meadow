@@ -13,10 +13,10 @@
     <string name="garden_empty_title">Plant your first limit</string>
     <string name="garden_tile_left_today">%1$s left today</string>
     <string name="garden_tile_left_week">%1$s left this week</string>
-    <string name="garden_tile_resting_today">Resting until tomorrow 🌙</string>
-    <string name="garden_tile_resting_week">Resting until next week 🌙</string>
-    <string name="garden_tile_emergency">Paused for an emergency 🚨</string>
-    <string name="garden_tile_extra">+%1$s more today 🌸</string>
+    <string name="garden_tile_resting_today">Resting until tomorrow\u00A0🌙</string>
+    <string name="garden_tile_resting_week">Resting until next week\u00A0🌙</string>
+    <string name="garden_tile_emergency">Paused for an emergency\u00A0🚨</string>
+    <string name="garden_tile_extra">+%1$s more today\u00A0🌸</string>
 
     <string name="garden_notice_battery">Android can stop Meadow in the background.</string>
     <string name="garden_tile_ask">Ask for more</string>
