@@ -59,6 +59,13 @@ exit 0
         self.assertIn("Has 1 pictures", result.stdout)
         self.assertFalse((out / ".complete").exists())
 
+    def test_isnt_complete_when_the_emulator_stopped_though_the_tests_passed(self):
+        # Gradle passed, but the emulator crashed partway, so the last copy fails.
+        result, out, _ = self.run_script("exit 1", listing="120 ./gallery/a.png\\n", gradle="sleep 1; exit 0")
+        self.assertEqual(1, result.returncode)
+        self.assertTrue((out / "gallery" / "a.png").exists(), result.stdout + result.stderr)
+        self.assertFalse((out / ".complete").exists())
+
     def test_tells_a_fresh_emulator_what_is_already_drawn(self):
         _, _, tmp = self.run_script('true', out_files=["gallery/meadow-day/a.png", "stories/HoursStory/story.json"])
         pushed = (tmp / "pushed.txt").read_text().split()
