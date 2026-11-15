@@ -180,6 +180,9 @@ jobs:
           disk-size: 6G
           # The tests turn the motion off for the gallery and on for the stories.
           disable-animations: false
+          # Without Vulkan: the emulator crashed partway through ("Failed to find ColorBuffer")
+          # with SwiftShader's Vulkan, the software graphics that runners have.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
           script: .github/scripts/draw-all.sh
       - name: Draw again on a fresh emulator
         id: redraw
@@ -197,13 +200,16 @@ jobs:
           ram-size: 4096M
           disk-size: 6G
           disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
           script: .github/scripts/draw-all.sh
       - name: Show why the emulator stopped
-        # The kernel stops the biggest process when memory runs out, and that's the emulator.
-        if: steps.draw.outcome == 'failure'
+        # Runs after a failed redraw too, which fails the job. The emulator writes a crash report
+        # when it crashes; the kernel logs it when it stops the emulator for lack of memory.
+        if: always() && steps.draw.outcome == 'failure'
         run: |
           free -m
-          sudo dmesg -T | grep -iE "out of memory|killed process|oom" | tail -20 || true
+          sudo dmesg -T | grep -iE "out of memory|killed process|oom|segfault|qemu" | tail -20 || true
+          find /tmp/android-runner -maxdepth 2 -newer "$GITHUB_EVENT_PATH" -ls 2>/dev/null | tail -20 || true
       - name: Check the drawing
         if: steps.draw.outcome == 'failure' && steps.redraw.outcome != 'success'
         run: |
