@@ -48,7 +48,15 @@ class EmulatorFriend private constructor(private val firebase: FirebaseApp, val 
         await(batch.commit())
     }
 
-    fun close() = firebase.delete()
+    /**
+     * Signs this person out and stops their database. Their Firebase instance stays: a function
+     * call starts an Installations task in the background, and deleting the instance under it
+     * throws on that task's thread ("FirebaseApp was deleted"), which stops the whole test run.
+     */
+    fun close() {
+        FirebaseAuth.getInstance(firebase).signOut()
+        db.terminate()
+    }
 
     companion object {
         const val PASSWORD = "petals-and-bees"

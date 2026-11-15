@@ -28,13 +28,12 @@ test("notifications use the Bumblebee wording", () => {
   }
 });
 
-test("someone with a photo goes by it, without their flower in front of their name", () => {
+test("someone's emoji leads their name, with a photo too", () => {
   const withPhoto = { ...sam, photoUrl: "https://example.test/sam.jpg" };
   assert.equal(pushes.chat(sam, "Hi").title, "🌻 Sam");
-  assert.equal(pushes.chat(withPhoto, "Hi").title, "Sam");
-  assert.equal(pushes.inviteAccepted(withPhoto).title, "Sam is your Bumblebee now");
-  assert.equal(chatNotes.newBumblebee(withPhoto, { displayName: "Maya", flower: "🌼" }), "Sam is now Maya's Bumblebee");
-  assert.equal(pushes.chat({ ...sam, photoUrl: null }, "Hi").title, "🌻 Sam");
+  assert.equal(pushes.chat(withPhoto, "Hi").title, "🌻 Sam");
+  assert.equal(pushes.inviteAccepted(withPhoto).title, "🌻 Sam is your Bumblebee now");
+  assert.equal(chatNotes.newBumblebee(withPhoto, { displayName: "Maya", flower: "🌼" }), "🌻 Sam is now Maya's Bumblebee");
 });
 
 test("a removed Bumblebee isn't told about anyone else", () => {
