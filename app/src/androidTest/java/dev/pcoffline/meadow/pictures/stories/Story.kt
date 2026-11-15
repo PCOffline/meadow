@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.Weather
 import dev.pcoffline.meadow.pictures.Device
+import dev.pcoffline.meadow.ui.LocalNow
 import dev.pcoffline.meadow.ui.SnackbarScope
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.components.LocalSkyWeather
@@ -64,7 +65,8 @@ abstract class Story(private val title: String) {
 
     /**
      * Shows [content] as the app does, in [theme] and [mode], with the sky at 10:00 under a clear
-     * sky, and starts the video. The first step's picture is the screen as [content] first draws it.
+     * sky and the clock at [Device.now], and starts the video. The first step's picture is the
+     * screen as [content] first draws it.
      */
     protected fun show(
         theme: GardenTheme = GardenTheme.MEADOW,
@@ -74,7 +76,7 @@ abstract class Story(private val title: String) {
     ) {
         compose.setContent {
             MeadowTheme(theme, mode) {
-                CompositionLocalProvider(LocalSkyHour provides 10, LocalSkyWeather provides Weather.CLEAR) {
+                CompositionLocalProvider(LocalSkyHour provides 10, LocalSkyWeather provides Weather.CLEAR, LocalNow provides { Device.now }) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { SnackbarScope(content) }
                 }
             }
