@@ -4,7 +4,6 @@ import unittest
 from pathlib import Path
 
 from pr_pictures import (
-    touched,
     END,
     MAX_CHARS,
     START,
@@ -18,6 +17,7 @@ from pr_pictures import (
     names,
     section,
     stories,
+    touched,
     with_pictures,
 )
 
