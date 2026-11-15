@@ -3,7 +3,7 @@
     <string name="profile_title">Your profile</string>
     <string name="profile_open">Edit your profile</string>
     <string name="profile_bio">A few words about you</string>
-    <string name="profile_bio_placeholder">Growing calmer days 🌱</string>
+    <string name="profile_bio_placeholder">Growing calmer days\u00A0🌱</string>
     <string name="profile_avatar">Your picture</string>
     <string name="profile_avatar_emoji">Pick a critter or flower</string>
     <string name="profile_emoji_with_photo">It shows next to your name.</string>
@@ -13,8 +13,8 @@
     <string name="profile_photo_change">Change photo</string>
     <string name="profile_photo_remove">Remove photo</string>
     <string name="profile_photo_description">Your profile picture</string>
-    <string name="profile_photo_saved">New photo set 📸</string>
-    <string name="profile_saved">Profile saved 🌼</string>
+    <string name="profile_photo_saved">New photo set\u00A0📸</string>
+    <string name="profile_saved">Profile saved\u00A0🌼</string>
 
     <string name="theme_meadow">Meadow</string>
     <string name="theme_blossom">Cherry blossom</string>

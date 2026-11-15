@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="rest_title">%1$s is resting 🌙</string>
-    <string name="rest_title_yes">Your Bumblebee approved 🌸</string>
-    <string name="rest_title_emergency">Emergency unlock is on 🚨</string>
+    <string name="rest_title">%1$s is resting\u00A0🌙</string>
+    <string name="rest_title_yes">Your Bumblebee approved\u00A0🌸</string>
+    <string name="rest_title_emergency">Emergency unlock is on\u00A0🚨</string>
     <string name="rest_body_today">You used the %1$s you set for today. It opens again tomorrow.</string>
     <string name="rest_body_week">You used the %1$s you set for this week. It opens again next week.</string>
     <string name="rest_body_generic">You used the time you set.</string>

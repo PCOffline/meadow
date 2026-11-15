@@ -93,7 +93,7 @@ class PeopleTest : ScreenTest() {
     fun `someone with a photo has their emoji next to their name`() {
         val maya = DemoGarden.maya.copy(avatar = DemoGarden.maya.avatar.copy(photoUrl = "https://example.invalid/maya.jpg"))
         show { PeopleContent(robin, People(bumblebees = listOf(maya))) }
-        compose.onNodeWithText("Maya ${maya.avatar.emoji}").assertExists()
+        compose.onNodeWithText("Maya\u00A0${maya.avatar.emoji}").assertExists()
     }
 
     @Test
@@ -101,7 +101,7 @@ class PeopleTest : ScreenTest() {
         val photo = DemoGarden.chat.avatars.getValue(DemoGarden.maya.uid).copy(photoUrl = "https://example.invalid/maya.jpg")
         val chat = DemoGarden.chat.copy(avatars = DemoGarden.chat.avatars + (DemoGarden.maya.uid to photo))
         show { ChatContent(robin, chat, DemoGarden.messages, requestCard = { _, _ -> }) }
-        compose.onNodeWithText("Maya ${photo.emoji}").assertExists()
+        compose.onNodeWithText("Maya\u00A0${photo.emoji}").assertExists()
     }
 
     @Test

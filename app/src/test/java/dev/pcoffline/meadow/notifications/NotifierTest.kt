@@ -63,7 +63,7 @@ class NotifierTest {
             manager.cancelAll()
         }
         assertEquals(
-            listOf("15m left on Demo 🌷", "10m left on Demo 🌷", "5m left on Demo 🌷", "2m left on Demo 🌷", "1m left on Demo 🌷", "30s left on Demo 🌷"),
+            listOf("15m left on Demo\u00A0🌷", "10m left on Demo\u00A0🌷", "5m left on Demo\u00A0🌷", "2m left on Demo\u00A0🌷", "1m left on Demo\u00A0🌷", "30s left on Demo\u00A0🌷"),
             titles,
         )
     }
