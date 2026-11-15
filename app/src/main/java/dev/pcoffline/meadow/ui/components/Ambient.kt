@@ -61,6 +61,7 @@ import androidx.core.content.ContextCompat
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Weather
+import dev.pcoffline.meadow.ui.LocalNow
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.graphics.lerp
 import dev.pcoffline.meadow.ui.theme.GardenColors
@@ -144,9 +145,11 @@ data class SkyMood(
  */
 @Composable
 fun rememberResumedNow(): LocalDateTime {
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    // The real clock in the app; pinned in the pull request pictures.
+    val clock = LocalNow.current
+    var now by remember { mutableStateOf(clock().toLocalDateTime()) }
     LifecycleResumeEffect(Unit) {
-        now = LocalDateTime.now()
+        now = clock().toLocalDateTime()
         onPauseOrDispose { }
     }
     return now

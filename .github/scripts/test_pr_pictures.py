@@ -11,7 +11,9 @@ from pr_pictures import (
     Step,
     StoryPictures,
     compare,
+    differs,
     label,
+    main,
     names,
     section,
     stories,
@@ -209,6 +211,77 @@ class StoriesTest(unittest.TestCase):
                 (story / "story.json").write_text(json.dumps({"title": "S", "steps": [caption]}))
             self.assertTrue(stories(root / "before", root / "after", root / "out")[0].changed)
 
+
+    def test_a_story_that_differs_only_in_the_status_bar_is_the_same(self):
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for side in ("before", "after"):
+                story = root / side / "stories" / "S"
+                story.mkdir(parents=True)
+                picture = Image.new("RGB", (108, 240), "white")
+                if side == "after":
+                    # Another signal icon in the status bar, 24 px tall.
+                    ImageDraw.Draw(picture).rectangle((60, 0, 107, 23), fill="black")
+                picture.save(story / "01.png")
+                (story / "story.json").write_text(json.dumps({"title": "S", "steps": ["One."]}))
+            (root / "after" / "stories" / "S" / "system-bars.txt").write_text("24 24")
+            self.assertFalse(stories(root / "before", root / "after", root / "out")[0].changed)
+
+    def test_a_story_that_differs_under_the_status_bar_has_changed(self):
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for side in ("before", "after"):
+                story = root / side / "stories" / "S"
+                story.mkdir(parents=True)
+                picture = Image.new("RGB", (108, 240), "white")
+                if side == "after":
+                    ImageDraw.Draw(picture).rectangle((60, 24, 107, 47), fill="black")
+                picture.save(story / "01.png")
+                (story / "story.json").write_text(json.dumps({"title": "S", "steps": ["One."]}))
+            (root / "after" / "stories" / "S" / "system-bars.txt").write_text("24 24")
+            self.assertTrue(stories(root / "before", root / "after", root / "out")[0].changed)
+
+    def test_a_picture_that_differs_only_in_the_navigation_bar_is_the_same(self):
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            Image.new("RGB", (108, 240), "white").save(root / "before.png")
+            after = Image.new("RGB", (108, 240), "white")
+            # The gesture handle drawn dark instead of light, in the bottom 24 px.
+            ImageDraw.Draw(after).rectangle((30, 220, 78, 230), fill="black")
+            after.save(root / "after.png")
+            self.assertTrue(differs(root / "before.png", root / "after.png"))
+            self.assertFalse(differs(root / "before.png", root / "after.png", (24, 24)))
+
+class MainTest(unittest.TestCase):
+    def test_a_look_left_out_on_purpose_is_not_gone(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for side, looks in (("before", ("meadow-day", "blossom-night")), ("after", ("meadow-day",))):
+                for look in looks:
+                    (root / side / "gallery" / look).mkdir(parents=True)
+                    Image.new("RGB", (108, 240), "white").save(root / side / "gallery" / look / "garden--lived-in.png")
+            # The pull request drew one theme by day, and said which pictures it left out.
+            (root / "after" / "gallery" / "skipped.tsv").write_text("blossom-night/garden--lived-in.png")
+            main(root / "before", root / "after", root / "out", URL)
+            text = (root / "out" / "pictures.md").read_text()
+            self.assertIn("No screen in the gallery changed (1 the same).", text)
+            self.assertNotIn("Gone", text)
 
 if __name__ == "__main__":
     unittest.main()
