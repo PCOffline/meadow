@@ -47,13 +47,19 @@ description, under **Pictures**, and replaces them on each push.
 - **Stories:** for each change that people see or do, write a story. It's a class in
   `app/src/androidTest/java/dev/pcoffline/meadow/pictures/stories` that extends `Story`. Each
   step does one thing that a person does, in order, and has one short caption. The workflow takes
-  a screenshot of each step and a video of the whole story. It shows only the stories that are
-  new or that changed. When the base has the same story, it shows the base's steps next to them.
+  a screenshot of each step and a video of the whole story. It shows only the stories that the
+  pull request adds or changes, and only when they look different from the base's. When the base
+  has the same story, it shows the base's steps next to them. A story that the pull request
+  doesn't touch never shows, even when its pictures differ.
 - **Screens:** the workflow draws each state of each screen in the debug gallery (`Scenarios` in
   `app/src/debug/.../showcase/Gallery.kt`). It draws them in the Meadow theme by day, in large
-  text and on a narrow phone. A pull request that changes the themes, the sky or the weather also
-  gets each theme by night and each weather (`.github/scripts/pictures_scope.py`). It shows each
-  picture that changed, before and after.
+  text and on a narrow phone. It adds only the looks that the change shows in
+  (`.github/scripts/pictures_scope.py`):
+  - each theme by day, for a change to the themes or the flowers;
+  - each theme by night, for a change to the night or the sky;
+  - each weather, for a change to the weather or the sky.
+
+  It shows each picture that changed, before and after.
 
 Make the pictures show each detail of the change:
 
