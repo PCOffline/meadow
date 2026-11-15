@@ -291,6 +291,12 @@ internal object Scenarios {
         Scenario("Garden", "Battery saver may stop Meadow") { WithTabs(Tab.GARDEN) { GardenContent(d.robin, d.garden.copy(batteryRestricted = true)) } },
         Scenario("Garden", "Emergency unlock on") { WithTabs(Tab.GARDEN) { GardenContent(d.robin, Demo.emergencyGarden) } },
         Scenario("Garden", "Loading") { WithTabs(Tab.GARDEN) { GardenContent(d.robin, GardenState()) } },
+    ) + Weather.entries.filter { it != Weather.CLEAR }.map { weather ->
+        // The sky in each weather, over the lived-in garden; the clear sky is the state above.
+        Scenario("Garden", "Weather: ${weather.name.lowercase().replace('_', ' ')}") {
+            CompositionLocalProvider(LocalSkyWeather provides weather) { WithTabs(Tab.GARDEN) { GardenContent(d.robin, d.garden) } }
+        }
+    } + listOf(
 
         Scenario("Growth", "Week (tap Day, Week, Month, or a day of the month)") { Growth(d.stats) },
         Scenario("Growth", "Month") { Growth(d.monthStats) },

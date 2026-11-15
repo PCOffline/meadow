@@ -6,7 +6,8 @@ Usage: pr_pictures.py <before dir> <after dir> <out dir> <url of out dir> [<url 
 <before dir> and <after dir> hold what the phone tests wrote (GalleryPictures and the stories),
 for the pull request's base and for the pull request. This writes, under <out dir>:
 - the pictures the comment shows, made smaller, and each story's video as an animated WebP,
-- pictures.md: the stories step by step, then each screen that changed, before and after.
+- pictures.md: each story that is new or changed, step by step, then each screen that changed,
+  before and after, grouped by theme (day and night) and by the large-text and narrow looks.
 The workflow publishes <out dir> at <url of out dir>, and puts pictures.md in the pull request's
 description (with_pictures). Needs Pillow, and ffmpeg for the videos.
 """
@@ -38,11 +39,16 @@ class Gallery:
     unchanged: int = 0
     # From each run's gallery/index.tsv: a path's screen, state and look, in the order drawn.
     names: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # The group a path's look belongs to, such as a theme: "Meadow" for its day and its night.
+    groups: dict[str, str] = field(default_factory=dict)
     # Whether the base drew a gallery at all. Without one, there's nothing to compare.
     base: bool = True
 
     def label(self, path: str) -> tuple[str, str]:
         return self.names.get(path) or label(path)
+
+    def group(self, path: str) -> str:
+        return self.groups.get(path) or self.label(path)[1]
 
 
 @dataclass
@@ -59,6 +65,8 @@ class StoryPictures:
     steps: list[Step]
     video: str | None
     new: bool
+    # Whether any step's picture or caption differs from the base's. A new story counts as changed.
+    changed: bool = True
 
 
 def compare(before: set[str], after: set[str], differs, order: list[str] | None = None) -> Gallery:
@@ -111,15 +119,19 @@ def story_section(story: StoryPictures, url: str) -> list[str]:
 def section(stories: list[StoryPictures], gallery: Gallery, url: str, browse: str | None = None) -> str:
     """The pictures, in Markdown, cut to fit in a pull request's description."""
     lines = ["## Pictures", ""]
-    if stories:
+    shown_stories = [story for story in stories if story.new or story.changed]
+    same = [story.title for story in stories if not (story.new or story.changed)]
+    if shown_stories:
         lines += ["### Stories", ""]
-        for story in stories:
+        for story in shown_stories:
             lines += story_section(story, url)
     else:
         lines += [
-            "No story. A change that people see or do needs one: read **Pull requests** in AGENTS.md.",
+            "No new or changed story. A change that people see or do needs one: read **Pull requests** in AGENTS.md.",
             "",
         ]
+    if same:
+        lines += [f"The same as on the base: {', '.join(same)}.", ""]
     lines += ["### Screens", ""]
     if not gallery.base and gallery.added:
         where = f"[in the pictures' folder]({browse}/after/gallery)" if browse else "in the workflow run's artifact"
@@ -127,33 +139,40 @@ def section(stories: list[StoryPictures], gallery: Gallery, url: str, browse: st
             f"The base has no gallery pictures, so there's nothing to compare. All {len(gallery.added)} are {where}."
         )
         return "\n".join(lines)
-    rows: list[str] = []
+    # Each group (a theme's day and night, large text, narrow) in a table of its own, in the order drawn.
+    groups: dict[str, list[str]] = {}
     for path in gallery.changed:
         name, look = gallery.label(path)
         before, after = (image(f"{url}/{side}/gallery/{path}", f"{side}: {name}, {look}") for side in ("before", "after"))
-        rows.append(f"| {name} | {look} | {before} | {after} |")
+        groups.setdefault(gallery.group(path), []).append(f"| {name} | {look} | {before} | {after} |")
     for path in gallery.added:
         name, look = gallery.label(path)
-        rows.append(f"| {name} | {look} | New | {image(f'{url}/after/gallery/{path}', f'{name}, {look}')} |")
-    if rows:
+        groups.setdefault(gallery.group(path), []).append(
+            f"| {name} | {look} | New | {image(f'{url}/after/gallery/{path}', f'{name}, {look}')} |"
+        )
+    total = sum(len(rows) for rows in groups.values())
+    if total:
         lines += [
             (
                 f"{len(gallery.changed)} changed, {len(gallery.added)} new, {len(gallery.removed)} gone, "
                 f"{gallery.unchanged} the same."
             ),
-            "",
-            "| Screen | Look | Before | After |",
-            "|---|---|---|---|",
         ]
         shown = 0
         size = len("\n".join(lines))
-        for row in rows[:MAX_ROWS]:
-            if size + len(row) + 1 > MAX_CHARS:
+        for group, rows in groups.items():
+            head = ["", f"#### {group}", "", "| Screen | Look | Before | After |", "|---|---|---|---|"]
+            if shown >= MAX_ROWS or size + len("\n".join(head)) + len(rows[0]) + 2 > MAX_CHARS:
                 break
-            lines.append(row)
-            size += len(row) + 1
-            shown += 1
-        left = len(rows) - shown
+            lines += head
+            size += len("\n".join(head)) + 1
+            for row in rows:
+                if shown >= MAX_ROWS or size + len(row) + 1 > MAX_CHARS:
+                    break
+                lines.append(row)
+                size += len(row) + 1
+                shown += 1
+        left = total - shown
         if left > 0:
             lines += ["", f"{left} more aren't shown here. The workflow run's artifact has all of them."]
     else:
@@ -173,15 +192,18 @@ def with_pictures(body: str | None, pictures: str) -> str:
     return f"{body.rstrip()}\n\n{block}\n" if body.strip() else f"{block}\n"
 
 
-def names(root: Path) -> list[tuple[str, tuple[str, str]]]:
-    """A run's gallery/index.tsv: each path with its "Screen: state" and look, in the order drawn."""
+def names(root: Path) -> list[tuple[str, tuple[str, str], str]]:
+    """
+    A run's gallery/index.tsv: each path with its "Screen: state" and look, and the look's group,
+    in the order drawn. An index without groups (an older base) groups each look on its own.
+    """
     index = root / "gallery" / "index.tsv"
     if not index.exists():
         return []
     found = []
     for line in index.read_text().splitlines():
-        path, screen, state, look = line.split("\t")
-        found.append((path, (f"{screen}: {state[:1].lower()}{state[1:]}", look)))
+        path, screen, state, look, *group = line.split("\t")
+        found.append((path, (f"{screen}: {state[:1].lower()}{state[1:]}", look), group[0] if group else look))
     return found
 
 
@@ -229,6 +251,14 @@ def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
         old = before / "stories" / name
         old_story = json.loads((old / "story.json").read_text()) if (old / "story.json").exists() else None
         old_count = len(old_story["steps"]) if old_story else 0
+        changed = old_story is None or old_story["steps"] != story["steps"] or any(
+            not (old / f"{i:02d}.png").exists() or differs(old / f"{i:02d}.png", meta.parent / f"{i:02d}.png")
+            for i in range(1, len(story["steps"]) + 1)
+        )
+        if not changed:
+            # The same as on the base: named, but with no pictures to publish.
+            found.append(StoryPictures(name, story["title"], [], None, new=False, changed=False))
+            continue
         steps = []
         for i, caption in enumerate(story["steps"], 1):
             shot = f"{i:02d}.png"
@@ -253,9 +283,10 @@ def main(before: Path, after: Path, out: Path, url: str, browse: str | None = No
     gallery = compare(
         pictures(before, "gallery"), pictures(after, "gallery"),
         lambda p: differs(before / "gallery" / p, after / "gallery" / p),
-        order=[path for path, _ in named],
+        order=[path for path, _, _ in named],
     )
-    gallery.names = dict(reversed(named))
+    gallery.names = {path: name for path, name, _ in reversed(named)}
+    gallery.groups = {path: group for path, _, group in reversed(named)}
     for path in gallery.changed:
         smaller(before / "gallery" / path, out / "before" / "gallery" / path)
     # Without a base, the folder keeps every picture at full size, and the description shows none.
