@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.pictures.stories
 
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -85,6 +86,7 @@ abstract class Story(private val title: String) {
             }
         }
         recording = Device.startRecording("$dir/story.mp4", seconds = MAX_SECONDS)
+        waitForWindow()
         settle()
         Device.writeSystemBars(dir, compose.activity)
         capture(firstCaption)
@@ -102,6 +104,20 @@ abstract class Story(private val title: String) {
         hideKeyboard()
         // Long enough for the motion that a tap starts to end, and for the video to show it.
         Thread.sleep(SETTLE_MS)
+    }
+
+    /**
+     * Waits until the story's window is on screen. Each story opens a new window, and a picture
+     * taken before it shows is blank.
+     */
+    private fun waitForWindow() {
+        val end = SystemClock.uptimeMillis() + WINDOW_MS
+        while (SystemClock.uptimeMillis() < end) {
+            var shown = false
+            compose.runOnUiThread { shown = compose.activity.hasWindowFocus() }
+            if (shown) return
+            Thread.sleep(POLL_MS)
+        }
     }
 
     /** Hides the keyboard. The text field keeps its focus and what was typed. */
@@ -127,6 +143,10 @@ abstract class Story(private val title: String) {
         /** The longest video Android records. */
         const val MAX_SECONDS = 180
         const val SETTLE_MS = 900L
+
+        /** The longest a story's window takes to show, and how often that is checked. */
+        const val WINDOW_MS = 5_000L
+        const val POLL_MS = 50L
 
         fun escape(text: String) = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
     }
