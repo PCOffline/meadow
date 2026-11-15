@@ -16,19 +16,19 @@
 
     <string name="channel_updates">Updates</string>
     <string name="channel_updates_description">When a new version of Meadow is ready.</string>
-    <string name="notify_update_title">Meadow %1$s is ready 🌱</string>
+    <string name="notify_update_title">Meadow %1$s is ready\u00A0🌱</string>
     <string name="notify_update_body">Tap to see what\'s new and update.</string>
-    <string name="notify_update_confirm_title">Your Meadow update is ready to install 🌱</string>
+    <string name="notify_update_confirm_title">Your Meadow update is ready to install\u00A0🌱</string>
     <string name="notify_update_confirm_body">Tap to let Android finish installing it.</string>
 
-    <string name="notify_warning_title">%1$s left on %2$s 🌷</string>
+    <string name="notify_warning_title">%1$s left on %2$s\u00A0🌷</string>
     <string name="notify_warning_body_today">Your %1$s time for today is almost used.</string>
     <string name="notify_warning_body_week">Your %1$s time for this week is almost used.</string>
-    <string name="notify_time_up_title">%1$s is resting now 🌙</string>
+    <string name="notify_time_up_title">%1$s is resting now\u00A0🌙</string>
     <string name="notify_time_up_body">You used the time you set. Tap to ask a Bumblebee for more time.</string>
 
-    <string name="guardian_starting">Looking after your garden 🌱</string>
-    <string name="guardian_no_limits">No limits yet. Plant one in Meadow. 🌱</string>
+    <string name="guardian_starting">Looking after your garden\u00A0🌱</string>
+    <string name="guardian_no_limits">No limits yet. Plant one in Meadow.\u00A0🌱</string>
     <string name="guardian_left">%1$s: %2$s left</string>
     <plurals name="guardian_resting">
         <item quantity="one">%1$d app resting</item>
@@ -36,7 +36,7 @@
     </plurals>
     <string name="guardian_joined">%1$s · %2$s</string>
     <string name="guardian_emergency">🚨 Emergency unlock: limits paused for %1$s</string>
-    <string name="strict_mode_blocked">Strict mode is on. Ask a Bumblebee to turn it off first. 🌿</string>
+    <string name="strict_mode_blocked">Strict mode is on. Ask a Bumblebee to turn it off first.\u00A0🌿</string>
     <string name="device_admin_disable_warning">If you turn this off, Meadow can be removed. Your Bumblebees get a message.</string>
 
     <string name="notify_warning_ask">Ask for more</string>

@@ -13,11 +13,11 @@
     <string name="request_withdraw">Withdraw</string>
     <string name="request_ask_again">Ask again</string>
     <string name="request_withdrawn">Request withdrawn</string>
-    <string name="request_sent_yes">Approved 🌸</string>
-    <string name="request_sent_no">Denied 🍃</string>
+    <string name="request_sent_yes">Approved\u00A0🌸</string>
+    <string name="request_sent_no">Denied\u00A0🍃</string>
     <string name="request_sending_answer">Sending your answer…</string>
     <string name="request_status_waiting">Waiting</string>
-    <string name="request_status_yes">Approved 🌸</string>
+    <string name="request_status_yes">Approved\u00A0🌸</string>
     <string name="request_status_no">Denied</string>
     <string name="request_status_withdrawn">Withdrawn</string>
     <string name="request_status_expired">Expired</string>
@@ -32,7 +32,7 @@
     <string name="ask_how_much">How much?</string>
     <string name="ask_why">Why?</string>
     <string name="ask_sending">Sending…</string>
-    <string name="ask_sent">Asked your Bumblebees 💌</string>
+    <string name="ask_sent">Asked your Bumblebees\u00A0💌</string>
 
     <string name="ask_who">Ask</string>
     <string name="request_answered_by_other">Another Bumblebee answered</string>
@@ -49,11 +49,11 @@
         <item quantity="other">Answer %1$d or more requests to see how you answer.</item>
     </plurals>
     <string name="bee_stats_leniency_score">Leniency %1$d of 100</string>
-    <string name="bee_leaning_very_strict">Very strict 🌵</string>
-    <string name="bee_leaning_strict">Strict 🌿</string>
-    <string name="bee_leaning_balanced">Balanced 🌼</string>
-    <string name="bee_leaning_gentle">Gentle 🌸</string>
-    <string name="bee_leaning_very_gentle">Very gentle 🌻</string>
+    <string name="bee_leaning_very_strict">Very strict\u00A0🌵</string>
+    <string name="bee_leaning_strict">Strict\u00A0🌿</string>
+    <string name="bee_leaning_balanced">Balanced\u00A0🌼</string>
+    <string name="bee_leaning_gentle">Gentle\u00A0🌸</string>
+    <string name="bee_leaning_very_gentle">Very gentle\u00A0🌻</string>
     <string name="bee_stats_overall">Overall</string>
     <string name="bee_stats_asked">Requests sent to you</string>
     <string name="bee_stats_yes">You approved</string>

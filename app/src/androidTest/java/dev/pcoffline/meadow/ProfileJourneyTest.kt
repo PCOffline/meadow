@@ -91,7 +91,7 @@ class ProfileJourneyTest : EndToEndTest() {
             waitForSnackbarToGo(R.string.profile_saved)
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
             tab(R.string.tab_garden).performClick()
-            waitForText("Robin Hood 🦔", substring = true)
+            waitForText("Robin Hood\u00A0🦔", substring = true)
             compose.onNodeWithContentDescription(text(R.string.profile_open)).performClick()
             waitFor(R.string.profile_title)
 

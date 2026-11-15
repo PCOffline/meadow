@@ -26,9 +26,9 @@
     <string name="chat_offer_title">Offer to be %1$s\'s Bumblebee?</string>
     <string name="chat_offer_body">If %1$s approves, you answer when they ask for more time.</string>
     <string name="chat_offer_confirm">Offer</string>
-    <string name="chat_ask_sent">Asked %1$s 💌</string>
-    <string name="chat_offer_sent">Offer sent to %1$s 💌</string>
-    <string name="chat_ask_waiting">Waiting for %1$s to answer 💌</string>
+    <string name="chat_ask_sent">Asked %1$s\u00A0💌</string>
+    <string name="chat_offer_sent">Offer sent to %1$s\u00A0💌</string>
+    <string name="chat_ask_waiting">Waiting for %1$s to answer\u00A0💌</string>
     <!-- Names a GIF in a chat; matches chatMedia in the backend's copy.ts, which notifications use. -->
     <string name="chat_gif">GIF</string>
     <string name="chat_add_picture">Send a photo or GIF</string>
