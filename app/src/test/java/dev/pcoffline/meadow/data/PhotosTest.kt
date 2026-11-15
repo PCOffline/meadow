@@ -1,6 +1,9 @@
 package dev.pcoffline.meadow.data
 
+import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,5 +30,22 @@ class PhotosTest {
         ).forEach { assertFalse(it, Photos.isOwnPhoto(it, bucket, origin)) }
         // Without a known bucket (no Firebase config), nothing loads.
         assertFalse(Photos.isOwnPhoto("$origin/v0/b//o/avatars%2Fsam", "", origin))
+    }
+
+    @After
+    fun forgetThePicturesPhoto() {
+        Photos.picturesPhotos.clear()
+    }
+
+    @Test
+    fun `the pull request pictures' photos load, and only those`() {
+        val photo = "file:///data/user/0/dev.pcoffline.meadow/cache/robin.png"
+        assertNull(Photos.safe(photo))
+
+        Photos.picturesPhotos += photo
+
+        assertEquals(photo, Photos.safe(photo))
+        assertNull(Photos.safe("file:///data/user/0/dev.pcoffline.meadow/cache/other.png"))
+        assertNull(Photos.safe("https://example.com/a.jpg"))
     }
 }

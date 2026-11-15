@@ -6,6 +6,7 @@
     <string name="profile_bio_placeholder">Growing calmer days 🌱</string>
     <string name="profile_avatar">Your picture</string>
     <string name="profile_avatar_emoji">Pick a critter or flower</string>
+    <string name="profile_emoji_with_photo">It shows next to your name.</string>
     <string name="profile_avatar_color">Background</string>
     <string name="profile_photo_choose">Use a photo</string>
     <string name="profile_photo_uploading">Uploading…</string>
