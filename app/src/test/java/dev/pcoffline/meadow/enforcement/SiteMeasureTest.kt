@@ -120,7 +120,10 @@ class SiteMeasureTest {
 
         service.onForeground("com.android.chrome")
 
-        eventually(timeoutMs = 4_000) { false }
+        // The retries come half a second apart, so a slow machine takes longer than a fast one to
+        // read five times. Wait for the fifth read, then long enough for a sixth to have come.
+        eventually(timeoutMs = 15_000) { reads >= 5 }
+        eventually(timeoutMs = 2_000) { false }
         assertEquals(5, reads)
         assertFalse(service.measureSite(SITE))
     }

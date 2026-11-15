@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -164,6 +165,21 @@ class PeopleTest : ScreenTest() {
         node(R.string.circle_looking_after).performScrollTo().assertExists()
         compose.onNodeWithText("Offered", substring = true).performScrollTo().assertExists()
         assertAccessible()
+    }
+
+    @Test
+    fun `a code typed to invite stays when the card moves`() {
+        val alone = robin.copy(approverIds = emptyList(), approveeIds = emptyList())
+        var people by mutableStateOf(People(outgoingInvites = listOf(DemoGarden.inviteFromRobin)))
+        show { PeopleContent(alone, people) }
+        val code = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(code)
+        compose.onNode(code).performTextInput("SAM123")
+
+        // The invite is cancelled: with nobody left, the card moves to the top.
+        people = People()
+        compose.onNode(hasSetTextAction()).assertTextContains("SAM123")
+        node(R.string.invite_code_button).assertIsEnabled()
     }
 
     @Test
