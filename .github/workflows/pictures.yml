@@ -258,14 +258,16 @@ jobs:
           sudo dmesg -T | grep -iE "out of memory|killed process|oom|segfault|qemu" | tail -20 || true
           find /tmp/android-runner -maxdepth 2 -newer "$GITHUB_EVENT_PATH" -ls 2>/dev/null | tail -20 || true
       - name: Check the drawing
-        # Each emulator keeps what it drew, so the drawing is done once both parts are complete.
+        # Each emulator keeps what it drew, so the drawing is done once this pull request's part is
+        # complete. The base is drawn once (draw-all.sh): what it lacks shows as new.
         if: always() && steps.draw.outcome == 'failure'
-        env:
-          DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
         run: |
-          if [ ! -e build/pictures/after/.complete ] || { [ "$DRAW_BASE" = true ] && [ ! -e build/pictures/before/.complete ]; }; then
+          if [ ! -e build/pictures/after/.complete ]; then
             echo "::error::The pictures weren't drawn. Read the drawing steps above."
             exit 1
+          fi
+          if [ -e build/pictures/before/.tried ] && [ ! -e build/pictures/before/.complete ]; then
+            echo "::warning::The base's emulator stopped partway, so some screens show as new."
           fi
       # On main, the pictures drawn are the "before" of the pull requests to come.
       - name: Keep main's pictures
