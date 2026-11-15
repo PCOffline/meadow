@@ -41,7 +41,8 @@ weather outside.
 ## Limits for your week
 
 Give each app a daily limit, a weekly limit, or both. Give some days more time, for example
-the weekend. Choose the hours an app can open. Limit websites the same way.
+the weekend. Choose the hours an app can open. Limit websites the same way. Share a limit with
+a friend, from its card in the garden or from the editor.
 
 <p align="center">
   <img src="docs/images/screen-limit.png" alt="The limit for YouTube: one hour each day, with the time used today" width="250">
@@ -90,8 +91,8 @@ data, or delete your account, at any time. Read the [privacy notice](legal/priva
 
 ## Make it yours
 
-Choose from six themes, by day or by night. Pick a critter, a flower or a photo for your
-picture.
+Choose from six themes, by day or by night. Pick a critter or a flower for your picture, and add
+a photo if you like. With a photo, your critter or flower shows next to your name.
 
 <p align="center">
   <img src="docs/images/themes.png" alt="The garden in all six themes through one day: Cherry blossom at dawn, Meadow, Lily pond at midday, Sunflower, Mushroom forest in the evening, and Lavender field at night" width="100%">
