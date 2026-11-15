@@ -34,15 +34,15 @@ class PhotosTest {
 
     @After
     fun forgetThePicturesPhoto() {
-        Photos.picturesPhoto = null
+        Photos.picturesPhotos.clear()
     }
 
     @Test
-    fun `the pull request pictures' photo loads, and only that one`() {
+    fun `the pull request pictures' photos load, and only those`() {
         val photo = "file:///data/user/0/dev.pcoffline.meadow/cache/robin.png"
         assertNull(Photos.safe(photo))
 
-        Photos.picturesPhoto = photo
+        Photos.picturesPhotos += photo
 
         assertEquals(photo, Photos.safe(photo))
         assertNull(Photos.safe("file:///data/user/0/dev.pcoffline.meadow/cache/other.png"))

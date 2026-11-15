@@ -15,14 +15,14 @@ object Photos {
         get() = BuildConfig.EMULATOR_HOST.takeIf { it.isNotEmpty() }?.let { "http://$it:9199" } ?: STORAGE_ORIGIN
 
     /**
-     * One more address that loads: a photo the pull request pictures draw on the phone. Those
-     * builds have no Storage, so no photo would show. It's null in the app.
+     * More addresses that load: photos the pull request pictures draw on the phone. Those builds
+     * have no Storage, so no photo would show. It's empty in the app.
      */
     @VisibleForTesting
-    internal var picturesPhoto: String? = null
+    internal val picturesPhotos = mutableSetOf<String>()
 
     /** [url] if it's safe to load, otherwise null (the emoji shows instead). */
-    fun safe(url: String?): String? = url?.takeIf { isOwnPhoto(it, bucket, origin) || it == picturesPhoto }
+    fun safe(url: String?): String? = url?.takeIf { isOwnPhoto(it, bucket, origin) || it in picturesPhotos }
 
     const val STORAGE_ORIGIN = "https://firebasestorage.googleapis.com"
 
