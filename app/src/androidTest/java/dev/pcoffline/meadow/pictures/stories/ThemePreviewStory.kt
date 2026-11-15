@@ -28,6 +28,15 @@ class ThemePreviewStory : Story("Each theme's preview shows the flowers its gard
     private var garden by mutableStateOf<GardenTheme?>(null)
     private var night by mutableStateOf(false)
 
+    /**
+     * Shows [theme]'s garden. It changes on the UI thread, so the step waits until the new garden
+     * is drawn: changed from the test thread, the first garden could miss its picture.
+     */
+    private fun onScreen(theme: GardenTheme, night: Boolean = false) = compose.runOnUiThread {
+        garden = theme
+        this.night = night
+    }
+
     @Test
     fun story() {
         show(theme = GardenTheme.POND, firstCaption = "Each preview has three flowers, in the petals that its garden gives apps.") {
@@ -43,26 +52,25 @@ class ThemePreviewStory : Story("Each theme's preview shows the flowers its gard
             }
         }
         step("Meadow: cosmos, aster, buttercup, poppy and forget-me-not. A nodding flower keeps its leaves on its stem.") {
-            garden = GardenTheme.MEADOW
+            onScreen(GardenTheme.MEADOW)
         }
         step("Cherry blossom: cherry, plum blossom, peony, wisteria and kerria.") {
-            garden = GardenTheme.BLOSSOM
+            onScreen(GardenTheme.BLOSSOM)
         }
         step("Lavender field: lavender, periwinkle, iris, sweet pea and a yellow pansy.") {
-            garden = GardenTheme.LAVENDER
+            onScreen(GardenTheme.LAVENDER)
         }
         step("Sunflower: sunflower, marigold, zinnia, cornflower and blanket flower.") {
-            garden = GardenTheme.SUNFLOWER
+            onScreen(GardenTheme.SUNFLOWER)
         }
         step("Lily pond: pink and blue water lilies, water hyacinth, flag iris and loosestrife.") {
-            garden = GardenTheme.POND
+            onScreen(GardenTheme.POND)
         }
         step("Mushroom forest: the caps are as before. A toadstool has no centre.") {
-            garden = GardenTheme.MUSHROOM
+            onScreen(GardenTheme.MUSHROOM)
         }
         step("Lily pond by night: each petal still stands out from the dark page.") {
-            garden = GardenTheme.POND
-            night = true
+            onScreen(GardenTheme.POND, night = true)
         }
     }
 }
