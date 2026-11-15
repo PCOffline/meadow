@@ -70,6 +70,8 @@ class ChatJourneyTest : EndToEndTest() {
 
             // Sam's garden is a tap away from the chat, and leads back to it.
             openGardenOf("Sam")
+            // The garden loads Sam's page first.
+            waitFor(R.string.action_chat)
             node(R.string.action_chat).performScrollTo().performClick()
             waitForText("Thanks for looking after me")
 
