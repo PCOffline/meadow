@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,6 +16,8 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -262,5 +265,24 @@ class EditorsTest : ScreenTest() {
         dayChip(DayOfWeek.MONDAY).performClick()
         node(R.string.schedule_pick_some).assertExists()
         node(R.string.schedule_days_allowed).assertDoesNotExist()
+    }
+
+    @Test
+    fun `hours that end at midnight can still get more hours`() {
+        var schedule by mutableStateOf(Schedule.everyDay(TimeWindow(22 * 60, TimeWindow.MINUTES_IN_DAY)))
+        showScrolling { ScheduleEditor(schedule) { schedule = it } }
+        node(R.string.schedule_add_window).performClick()
+        assertEquals(listOf(TimeWindow(0, 60), TimeWindow(22 * 60, TimeWindow.MINUTES_IN_DAY)), schedule.windowsOn(1))
+    }
+
+    @Test
+    fun `a day with several hours keeps its whole name on one line`() {
+        val hours = listOf(TimeWindow(60, 20 * 60), TimeWindow(21 * 60, 22 * 60), TimeWindow(23 * 60, TimeWindow.MINUTES_IN_DAY))
+        showScrolling { ScheduleEditor(Schedule((1..7).associateWith { if (it == 1) listOf(TimeWindow.ALL_DAY) else hours })) {} }
+        val name = dayName(DayOfWeek.WEDNESDAY)
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNode(hasText(name), useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(1, layouts.single().lineCount)
+        assertEquals(name.length, layouts.single().getLineEnd(0))
     }
 }
