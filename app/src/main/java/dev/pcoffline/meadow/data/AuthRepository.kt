@@ -58,18 +58,18 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
     }.distinctUntilChanged()
 
     suspend fun signIn(email: String, password: String) {
-        backend.auth.signInWithEmailAndPassword(email.trim(), password).await()
+        withFreshConnection { backend.auth.signInWithEmailAndPassword(email.trim(), password) }
     }
 
     suspend fun signUp(email: String, password: String) {
-        backend.auth.createUserWithEmailAndPassword(email.trim(), password).await()
+        withFreshConnection { backend.auth.createUserWithEmailAndPassword(email.trim(), password) }
     }
 
     /** Starts without an email: an anonymous account plus a profile. */
     suspend fun startWithoutEmail(displayName: String, flower: String, termsVersion: Int) {
         if (displayName.isBlank()) throw FriendlyException(R.string.error_name_required)
         _creatingProfile.value = true
-        if (backend.auth.currentUser == null) backend.auth.signInAnonymously().await()
+        if (backend.auth.currentUser == null) withFreshConnection { backend.auth.signInAnonymously() }
         createProfile(displayName, flower, termsVersion)
     }
 
@@ -80,8 +80,8 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
     suspend fun addEmail(email: String, password: String) {
         val user = backend.auth.currentUser ?: throw FriendlyException(R.string.error_sign_in_first)
         if (password.length < 6) throw FriendlyException(R.string.error_auth_weak_password)
-        user.linkWithCredential(EmailAuthProvider.getCredential(email.trim(), password)).await()
-        user.reload().await()
+        withFreshConnection { user.linkWithCredential(EmailAuthProvider.getCredential(email.trim(), password)) }
+        withFreshConnection { user.reload() }
         _anonymous.value = false
     }
 
@@ -98,7 +98,7 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
             .setHandleCodeInApp(true)
             .setAndroidPackageName(BuildConfig.APPLICATION_ID, false, null)
             .build()
-        backend.auth.sendSignInLinkToEmail(address, settings).await()
+        withFreshConnection { backend.auth.sendSignInLinkToEmail(address, settings) }
         store.pendingLinkEmail = address
     }
 
@@ -141,26 +141,26 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
     private suspend fun signInOrAttach(email: String, credential: AuthCredential) {
         val user = backend.auth.currentUser
         if (user == null) {
-            backend.auth.signInWithCredential(credential).await()
+            withFreshConnection { backend.auth.signInWithCredential(credential) }
             return
         }
         when {
             user.isAnonymous -> try {
-                user.linkWithCredential(credential).await()
-                user.reload().await()
+                withFreshConnection { user.linkWithCredential(credential) }
+                withFreshConnection { user.reload() }
                 _anonymous.value = false
             } catch (e: FirebaseAuthUserCollisionException) {
                 // The address already has a garden. An unused anonymous start (no profile yet)
                 // has nothing to lose, so sign in to that garden instead.
                 if (hasProfile(user.uid)) throw e
-                backend.auth.signInWithCredential(credential).await()
+                withFreshConnection { backend.auth.signInWithCredential(credential) }
             }
             // Already signed in with this address: nothing to do.
             user.email.equals(email, ignoreCase = true) -> Unit
             // Signed in as someone else: sign them out properly (push token included) first.
             else -> {
                 signOut()
-                backend.auth.signInWithCredential(credential).await()
+                withFreshConnection { backend.auth.signInWithCredential(credential) }
             }
         }
     }
@@ -170,7 +170,7 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
 
     suspend fun sendPasswordReset(email: String) {
         if (email.isBlank()) throw FriendlyException(R.string.error_email_required)
-        backend.auth.sendPasswordResetEmail(email.trim()).await()
+        withFreshConnection { backend.auth.sendPasswordResetEmail(email.trim()) }
     }
 
     /** Creates the Firestore profile and claims a unique friend code. */
