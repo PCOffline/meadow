@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.app.Application
 import android.content.Intent
 import android.os.Looper
+import android.view.accessibility.AccessibilityEvent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
@@ -126,6 +127,26 @@ class SiteMeasureTest {
         eventually(timeoutMs = 2_000) { false }
         assertEquals(5, reads)
         assertFalse(service.measureSite(SITE))
+    }
+
+    @Test
+    fun `a change in the browser after the retries are spent is read again until it can be`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        var reads = 0
+        service.readBar = { reads++; AddressBar.Unreadable }
+        service.onForeground("com.android.chrome")
+        eventually(timeoutMs = 15_000) { reads >= 5 }
+        eventually(timeoutMs = 2_000) { false }
+
+        // The browser goes to another address: one change, and the first read of it fails.
+        var readsAfterChange = 0
+        service.readBar = { if (readsAfterChange++ == 0) AddressBar.Unreadable else AddressBar.Shows("news.example.org/today") }
+        service.onAccessibilityEvent(
+            AccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply { packageName = "com.android.chrome" },
+        )
+
+        assertTrue("never read again", eventually { service.measureSite(SITE) })
+        assertEquals(2, readsAfterChange)
     }
 
     /** Runs the main looper until [done], as the service reads off the main thread; false at the timeout. */

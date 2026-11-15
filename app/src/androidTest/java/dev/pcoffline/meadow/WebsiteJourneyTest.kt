@@ -55,6 +55,7 @@ class WebsiteJourneyTest : EndToEndTest() {
             startAsGuest("Kai")
 
             // Typing an address offers the website; planting it saves it under its domain.
+            waitFor(R.string.garden_empty_title)
             node(R.string.garden_empty_title).performScrollTo().performClick()
             waitFor(R.string.picker_title)
             typeInto(hasSetTextAction(), "https://www.Example.org/news")

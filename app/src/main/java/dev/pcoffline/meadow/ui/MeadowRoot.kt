@@ -39,6 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -234,8 +240,12 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         LocalSnackbarClearance provides clearance,
         LocalAccount provides account,
     ) {
+        // The sides (a camera cutout or the navigation bar, in landscape) are left to each screen
+        // below, so the garden's scene can reach the edges of the screen.
+        val sides = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Vertical),
             snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = clearance.height)) },
             bottomBar = {
                 if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
@@ -243,8 +253,10 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         ) { padding ->
             // Consumed, so screens' own status bar and keyboard padding doesn't add the bars twice.
             Column(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                OfflineBar()
-                Box(Modifier.weight(1f)) {
+                OfflineBar(Modifier.windowInsetsPadding(sides))
+                // The garden keeps its own words and cards clear of the sides (GardenContent).
+                val edgeToEdge = destination?.hasRoute<GardenRoute>() == true
+                Box(Modifier.weight(1f).then(if (edgeToEdge) Modifier else Modifier.windowInsetsPadding(sides))) {
                     NavHost(
                         nav,
                         startDestination = GardenRoute,

@@ -40,8 +40,49 @@ class ReleasesTest {
         assertEquals(Version(1, 2, 0), update.version)
         assertEquals("https://x/meadow.apk", update.apkUrl)
         assertEquals("abc123", update.sha256)
-        assertEquals("New petals", update.notes)
+        assertEquals("• New petals", update.notes)
         assertEquals(42L, update.sizeBytes)
+    }
+
+    @Test
+    fun `the notes keep what changed for people, and leave out the rest`() {
+        val generated = """
+            ## What's Changed
+            * build(deps-dev): Bump oxlint from 1.89.0 to 1.90.0 in /backend/functions by @dependabot[bot] in https://github.com/PCOffline/meadow/pull/63
+            * feat(chat): open at what's new, and stay there while content loads by @PCOffline in https://github.com/PCOffline/meadow/pull/102
+            * fix(app)!: keep rain, snow and clouds inside the scene by @PCOffline in https://github.com/PCOffline/meadow/pull/127
+            * ci: run the e2e journeys in shards by @PCOffline in https://github.com/PCOffline/meadow/pull/132
+            * Rest screen: read the usage log afresh once per showing by @PCOffline in https://github.com/PCOffline/meadow/pull/92
+            * perf(enforcement): ask for content changes only while Meadow reads them by @PCOffline in https://github.com/PCOffline/meadow/pull/130
+
+            ## New Contributors
+            * @sam made their first contribution in https://github.com/PCOffline/meadow/pull/1
+
+            **Full Changelog**: https://github.com/PCOffline/meadow/compare/v0.5.1...v0.5.2
+        """.trimIndent()
+        assertEquals(
+            listOf(
+                "• Open at what's new, and stay there while content loads",
+                "• Keep rain, snow and clouds inside the scene",
+                "• Rest screen: read the usage log afresh once per showing",
+                "• Ask for content changes only while Meadow reads them",
+            ),
+            Releases.notesForPeople(generated).lines(),
+        )
+    }
+
+    @Test
+    fun `notes with nothing for people are empty, and notes written by hand are kept`() {
+        val onlyUpkeep = """
+            ## What's Changed
+            * build(deps): Bump gradle/actions/setup-gradle from 6.4.0 to 6.4.1 by @dependabot[bot] in https://github.com/PCOffline/meadow/pull/65
+            * docs: update README screenshots by @github-actions[bot] in https://github.com/PCOffline/meadow/pull/66
+
+            **Full Changelog**: https://github.com/PCOffline/meadow/compare/v0.5.0...v0.5.1
+        """.trimIndent()
+        assertEquals("", Releases.notesForPeople(onlyUpkeep))
+        assertEquals("", Releases.notesForPeople(""))
+        assertEquals("• New petals\n• A calmer sky", Releases.notesForPeople("New petals\n- a calmer sky"))
     }
 
     @Test
