@@ -2,8 +2,10 @@ package dev.pcoffline.meadow.pictures
 
 import android.app.Activity
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.emoji2.text.EmojiCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -16,6 +18,9 @@ import org.junit.Assume.assumeTrue
 internal object Device {
     /** Where the pictures go. It's shared storage, so clearing the app's data between tests keeps them. */
     const val DIR = "/sdcard/Pictures/meadow-pictures"
+
+    /** The longest Meadow's emoji font takes to load. */
+    private const val EMOJI_MS = 10_000L
 
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
 
@@ -52,6 +57,22 @@ internal object Device {
             "network -e mobile show -e datatype none -e level 4",
             "notifications -e visible false",
         ).forEach { shell("am broadcast -a com.android.systemui.demo -e command $it") }
+        waitForEmoji()
+    }
+
+    /**
+     * Waits, up to [EMOJI_MS], until Meadow's own emoji font has loaded. MeadowApp loads it in the
+     * background as the app starts. An emoji drawn before it has loaded takes the phone's glyph,
+     * which is a little wider, so the text after it moves from run to run.
+     */
+    private fun waitForEmoji() {
+        if (!EmojiCompat.isConfigured()) return
+        val end = SystemClock.uptimeMillis() + EMOJI_MS
+        while (SystemClock.uptimeMillis() < end) {
+            val state = EmojiCompat.get().loadState
+            if (state == EmojiCompat.LOAD_STATE_SUCCEEDED || state == EmojiCompat.LOAD_STATE_FAILED) return
+            Thread.sleep(50)
+        }
     }
 
     /** Saves the whole screen as [path], under [DIR]. */
