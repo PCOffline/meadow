@@ -291,6 +291,12 @@ internal object Scenarios {
         Scenario("Garden", "Battery saver may stop Meadow") { WithTabs(Tab.GARDEN) { GardenContent(d.robin, d.garden.copy(batteryRestricted = true)) } },
         Scenario("Garden", "Emergency unlock on") { WithTabs(Tab.GARDEN) { GardenContent(d.robin, Demo.emergencyGarden) } },
         Scenario("Garden", "Loading") { WithTabs(Tab.GARDEN) { GardenContent(d.robin, GardenState()) } },
+    ) + Weather.entries.filter { it != Weather.CLEAR }.map { weather ->
+        // The sky in each weather, over the lived-in garden; the clear sky is the state above.
+        Scenario("Garden", "Weather: ${weather.name.lowercase().replace('_', ' ')}") {
+            CompositionLocalProvider(LocalSkyWeather provides weather) { WithTabs(Tab.GARDEN) { GardenContent(d.robin, d.garden) } }
+        }
+    } + listOf(
 
         Scenario("Growth", "Week (tap Day, Week, Month, or a day of the month)") { Growth(d.stats) },
         Scenario("Growth", "Month") { Growth(d.monthStats) },
@@ -306,6 +312,14 @@ internal object Scenarios {
             }
         },
         Scenario("People", "Nobody yet") { WithTabs(Tab.PEOPLE) { PeopleContent(nobody, People()) } },
+        Scenario("People", "Bumblebees, no gardens yet") {
+            WithTabs(Tab.PEOPLE) { PeopleContent(d.robin.copy(approveeIds = emptyList()), People(bumblebees = d.people.bumblebees, chats = d.people.chats)) }
+        },
+        Scenario("People", "Nobody wrote a bio") {
+            WithTabs(Tab.PEOPLE) {
+                PeopleContent(d.robin, People(bumblebees = d.people.bumblebees.map { it.copy(bio = "") }, lookingAfter = d.people.lookingAfter.map { it.copy(bio = "") }))
+            }
+        },
         Scenario("People", "Your answers as a Bumblebee") { Page { BeeStatsContent(d.beeStats) } },
         Scenario("People", "Your answers, none yet") { Page { BeeStatsContent(Demo.noAnswers) } },
         Scenario("People", "A friend's garden, all shared") { FriendDemo(d.anaPage) },

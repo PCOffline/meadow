@@ -192,7 +192,7 @@ class ShowcaseTest {
             Triple(GardenTheme.MEADOW, DarkMode.LIGHT, 10),
             Triple(GardenTheme.POND, DarkMode.LIGHT, 13),
             Triple(GardenTheme.SUNFLOWER, DarkMode.LIGHT, 16),
-            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 19),
+            Triple(GardenTheme.MUSHROOM, DarkMode.LIGHT, 18),
             Triple(GardenTheme.LAVENDER, DarkMode.DARK, 22),
         )
         var look by mutableStateOf(looks.first())
