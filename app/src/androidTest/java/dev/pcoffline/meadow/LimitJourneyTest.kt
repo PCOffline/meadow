@@ -58,6 +58,7 @@ class LimitJourneyTest : EndToEndTest() {
             val limit = "users/$uid/limits/$pebbles"
 
             // From the empty garden to the picker; a search narrows the apps down.
+            waitFor(R.string.garden_empty_title)
             node(R.string.garden_empty_title).performScrollTo().performClick()
             waitFor(R.string.picker_title)
             // Pebbles may sit below the fold, so it's found by searching.

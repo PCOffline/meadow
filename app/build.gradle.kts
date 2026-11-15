@@ -61,7 +61,7 @@ android {
         versionCode = appVersionCode
         versionName = appVersion
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
-        testInstrumentationRunner = "dev.pcoffline.meadow.JourneyRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
         buildConfigField("String", "FUNCTIONS_REGION", "\"$functionsRegion\"")
         buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/meadow"}\"")
@@ -182,6 +182,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.work.testing)
     testImplementation(libs.jetbrains.markdown)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.ext.junit)
