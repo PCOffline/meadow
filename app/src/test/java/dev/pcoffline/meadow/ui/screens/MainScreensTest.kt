@@ -11,6 +11,11 @@ import dev.pcoffline.meadow.ui.limitText
 import androidx.compose.ui.text.TextLayoutResult
 import dev.pcoffline.meadow.ui.circle.FriendPage
 import android.app.Application
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
@@ -24,6 +29,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -363,6 +369,81 @@ class MainScreensTest : ScreenTest() {
         compose.waitForIdle()
         compose.onNodeWithText("Message 301").assertIsDisplayed()
         assertEquals(2, seen)
+    }
+
+    @Test
+    fun `a chat stays at its latest message while pictures and cards above it load`() {
+        val texts = (1..40).map { i -> ChatMessage("m$i", DemoGarden.maya.uid, "Message $i", MessageKind.TEXT, null, i * 1_000L, pending = false) }
+        val card = ChatMessage("r", DemoGarden.maya.uid, "", MessageKind.REQUEST, "r1", 41_000L, pending = false)
+        val latest = ChatMessage("m42", DemoGarden.maya.uid, "The latest one", MessageKind.TEXT, null, 42_000L, pending = false)
+        var loaded by mutableStateOf(false)
+        show {
+            ChatContent(DemoGarden.robin, DemoGarden.chat, texts + card + latest, requestCard = { _, _ ->
+                // Like a request card or a picture: small at first, then as tall as it is.
+                Box(Modifier.fillMaxWidth().height(if (loaded) 600.dp else 40.dp))
+            })
+        }
+        compose.onNodeWithText("The latest one").assertIsDisplayed()
+        loaded = true
+        compose.waitForIdle()
+        compose.onNodeWithText("The latest one").assertIsDisplayed()
+    }
+
+    private fun texts(count: Int) = (1..count).map { i -> ChatMessage("m$i", DemoGarden.maya.uid, "Message $i", MessageKind.TEXT, null, i * 1_000L, pending = false) }
+
+    @Test
+    fun `a chat with new messages opens at the first of them, under a New line`() {
+        // Read up to message 37 of 40.
+        val chat = DemoGarden.chat.copy(lastReadMillis = mapOf(DemoGarden.robin.uid to 37_500L))
+        show { ChatContent(DemoGarden.robin, chat, texts(40)) }
+        compose.onNodeWithContentDescription(text(R.string.chat_new_line_spoken)).assertIsDisplayed()
+        compose.onNodeWithText("Message 38").assertIsDisplayed()
+        val line = compose.onNodeWithContentDescription(text(R.string.chat_new_line_spoken)).getBoundsInRoot()
+        assertTrue(line.bottom <= compose.onNodeWithText("Message 38").getBoundsInRoot().top)
+        assertAccessible()
+    }
+
+    @Test
+    fun `a chat never read opens at its first message, under the New line`() {
+        // Nothing read: every message is new, and the line sits above the very first one, where
+        // the chat's start stops the list.
+        val chat = DemoGarden.chat.copy(lastReadMillis = emptyMap())
+        show { ChatContent(DemoGarden.robin, chat, texts(40)) }
+        compose.onNodeWithContentDescription(text(R.string.chat_new_line_spoken)).assertIsDisplayed()
+        compose.onNodeWithText("Message 1").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a chat with nothing new has no New line`() {
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, texts(40)) }
+        compose.onNodeWithText("Message 40").assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.chat_new_line_spoken)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a message that comes while you read back shows a button down to it`() {
+        var messages by mutableStateOf(texts(40))
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, messages) }
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Message 2"))
+        messages = texts(41)
+        compose.waitForIdle()
+        val button = compose.onNodeWithContentDescription(text(R.string.chat_new_message_spoken))
+        button.assertIsDisplayed()
+        compose.onNodeWithText("Message 2").assertIsDisplayed()
+        button.performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Message 41").assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.chat_new_message_spoken)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a message that comes while you're at the latest needs no button`() {
+        var messages by mutableStateOf(texts(40))
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, messages) }
+        messages = texts(41)
+        compose.waitForIdle()
+        compose.onNodeWithText("Message 41").assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.chat_new_message_spoken)).assertDoesNotExist()
     }
 
     @Test

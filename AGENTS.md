@@ -47,16 +47,20 @@ description, under **Pictures**, and replaces them on each push.
 - **Stories:** for each change that people see or do, write a story. It's a class in
   `app/src/androidTest/java/dev/pcoffline/meadow/pictures/stories` that extends `Story`. Each
   step does one thing that a person does, in order, and has one short caption. The workflow takes
-  a screenshot of each step and a video of the whole story. When the base has the same story, it
-  shows the base's steps next to them.
+  a screenshot of each step and a video of the whole story. It shows only the stories that are
+  new or that changed. When the base has the same story, it shows the base's steps next to them.
 - **Screens:** the workflow draws each state of each screen in the debug gallery (`Scenarios` in
-  `app/src/debug/.../showcase/Gallery.kt`). It draws them in light, dark, large text, on a narrow
-  phone and in each theme. It shows each picture that changed, before and after.
+  `app/src/debug/.../showcase/Gallery.kt`). It draws them in the Meadow theme by day, in large
+  text and on a narrow phone. A pull request that changes the themes, the sky or the weather also
+  gets each theme by night and each weather (`.github/scripts/pictures_scope.py`). It shows each
+  picture that changed, before and after.
 
 Make the pictures show each detail of the change:
 
 - Add a gallery state for each state that the change touches. For example: empty, loading,
   waiting, error, offline and done.
+- Give the story a step for each place where the change shows, and for each case of it. For
+  example: each screen that shows a new name, and the same screen with and without a photo.
 - Give the story a step for each small detail: spacing, alignment, wrapping, text that doesn't
   fit, and touch feedback.
 - Write the description's Summary and Evidence around the pictures. Leave the **Pictures** part

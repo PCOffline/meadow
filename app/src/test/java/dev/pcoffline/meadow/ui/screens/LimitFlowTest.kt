@@ -3,6 +3,10 @@ package dev.pcoffline.meadow.ui.screens
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -48,6 +52,12 @@ import dev.pcoffline.meadow.ui.home.GardenState
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
+import dev.pcoffline.meadow.ui.limits.ShareLimitButton
+import dev.pcoffline.meadow.ui.components.ShareCommitment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.pcoffline.meadow.ui.minutesText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -77,6 +87,53 @@ class LimitFlowTest : ScreenTest() {
         message = "", status = RequestStatus.PENDING, approverIds = listOf("bee"), decidedByName = null,
         decisionNote = null, dayKey = "2026-10-25", createdAtMillis = System.currentTimeMillis(),
     )
+
+    /** The editor with its top bar's Share, wired as LimitEditorScreen wires them. */
+    private fun editorWithShare(saved: AppLimit?) = show {
+        var unsaved by remember { mutableStateOf(false) }
+        Column {
+            BackTopBar(text(R.string.limit_editor_existing), onBack = {}) { ShareLimitButton(saved, unsaved) }
+            LimitEditor(pkg, LimitEditorState(existing = saved, appName = "Instagram", loaded = true), onDone = {}, onUnsaved = { unsaved = it })
+        }
+    }
+
+    @Test
+    fun `a saved limit can be shared at any time, as saved`() {
+        val saved = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)
+        editorWithShare(saved)
+        try {
+            compose.onNodeWithContentDescription(text(R.string.limit_share)).assertIsEnabled().performClick()
+            assertEquals(saved, ShareCommitment.shared.value?.limit)
+            assertTrue(ShareCommitment.shared.value!!.text.contains("Instagram"))
+        } finally {
+            ShareCommitment.close()
+        }
+        assertAccessible()
+    }
+
+    @Test
+    fun `with unsaved changes, sharing waits until they're saved or undone`() {
+        editorWithShare(AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0))
+        val share = compose.onNodeWithContentDescription(text(R.string.limit_share))
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more)).onFirst().performClick()
+        share.assertIsNotEnabled()
+        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less)).onFirst().performClick()
+        share.assertIsEnabled()
+    }
+
+    @Test
+    fun `a saved limit the editor puts in its own terms can still be shared`() {
+        // Hours given as two windows that touch: the editor shows them as one.
+        val hours = Schedule(mapOf(1 to listOf(TimeWindow(540, 720), TimeWindow(720, 1020))))
+        editorWithShare(AppLimit(pkg, "Instagram", dailyMinutes = 0, weeklyMinutes = 120, schedule = hours))
+        compose.onNodeWithContentDescription(text(R.string.limit_share)).assertIsEnabled()
+    }
+
+    @Test
+    fun `a new limit has nothing saved to share`() {
+        editorWithShare(null)
+        compose.onNodeWithContentDescription(text(R.string.limit_share)).assertDoesNotExist()
+    }
 
     @Test
     fun `a limit needs at least one part turned on, and says so`() {
@@ -228,6 +285,28 @@ class LimitFlowTest : ScreenTest() {
         val rows = chips.groupBy { it.top }.values
         assertTrue("fewer than three in a row: ${rows.map { it.size }}", rows.all { it.size < 3 })
         assertEquals("still even columns", 1, chips.map { it.width }.distinct().size)
+    }
+
+    @Test
+    fun `at large text, each preset shows its whole length on one line`() {
+        var fontScale by mutableStateOf(1f)
+        show {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = fontScale)) {
+                LimitEditor(pkg, LimitEditorState(appName = "Instagram", loaded = true), onDone = {})
+            }
+        }
+        listOf(1.5f, 2f).forEach { scale ->
+            fontScale = scale
+            compose.waitForIdle()
+            listOf(15, 30, 45, 60, 90, 120).map { app.resources.minutesText(it) }.forEach { label ->
+                compose.onAllNodes(hasText(label), useUnmergedTree = true).fetchSemanticsNodes().forEach { node ->
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+                    assertEquals("\"$label\" at ${scale}x", label.length, layouts.single().getLineEnd(0))
+                }
+            }
+        }
     }
 
     @Test

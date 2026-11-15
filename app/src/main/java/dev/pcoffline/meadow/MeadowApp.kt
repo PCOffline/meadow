@@ -21,9 +21,7 @@ import dev.pcoffline.meadow.work.SyncWorker
 class MeadowApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
-        // Meadow's own emoji font for every emoji, so flowers and icons look the same on every
-        // phone rather than each maker's own (or missing) version. Compose text picks it up.
-        EmojiCompat.init(BundledEmojiCompatConfig(this).setReplaceAll(true))
+        EmojiCompat.init(emojiConfig(this))
         AppGraph.init(this)
         AppGraph.notifier.createChannels()
         if (AppGraph.backendReady) AppGraph.sync.start()
@@ -31,6 +29,16 @@ class MeadowApp : Application(), SingletonImageLoader.Factory {
         UpdateCheckWorker.schedule(this)
         GuardianService.start(this)
         watchInstalledApps()
+    }
+
+    companion object {
+        /**
+         * Meadow's own emoji font for every emoji, so flowers and icons look the same on every
+         * phone rather than each maker's own (or missing) version. Compose text picks it up. On
+         * Android 15 and later, EmojiCompat leaves emoji to the phone's font unless told otherwise.
+         */
+        fun emojiConfig(context: Context): EmojiCompat.Config =
+            BundledEmojiCompatConfig(context).setReplaceAll(true).setUseAfterUpdatableSystemFonts(true)
     }
 
     /** Coil's images, with GIFs in chats that move. */

@@ -10,26 +10,29 @@ import org.junit.Test
 /** The sun crosses the sky with the day, and the moon with the night; clouds keep to the open sky. */
 class SkyPathTest {
     @Test
-    fun `the sun rises at five, is halfway at one and sets at nine`() {
+    fun `the sun rises at five, is halfway at noon and sets at seven`() {
         assertEquals(0f, skyProgress(5, 0), 1e-4f)
-        assertEquals(0.5f, skyProgress(13, 0), 1e-4f)
-        assertEquals(1f, skyProgress(20, 60), 1e-4f)
+        assertEquals(0.5f, skyProgress(12, 0), 1e-4f)
+        // The last minute of the day: 19:00 itself is the first minute of the night.
+        assertEquals(1f, skyProgress(18, 59), 1f / 840 + 1e-4f)
         assertTrue(skyProgress(9, 30) > skyProgress(9, 0))
     }
 
     @Test
-    fun `the moon rises at nine, is halfway at one and sets at five`() {
-        assertEquals(0f, skyProgress(21, 0), 1e-4f)
-        assertEquals(0.5f, skyProgress(1, 0), 1e-4f)
-        assertEquals(1f, skyProgress(4, 60), 1e-4f)
+    fun `the moon rises at seven, is halfway at midnight and sets at five`() {
+        assertEquals(0f, skyProgress(19, 0), 1e-4f)
+        assertEquals(0.5f, skyProgress(0, 0), 1e-4f)
+        assertEquals(1f, skyProgress(4, 59), 1f / 600 + 1e-4f)
+        // At 5:00 the day starts again, with the sun at the start of its arc.
+        assertEquals(0f, skyProgress(5, 0), 1e-4f)
         assertTrue(skyProgress(23, 0) < skyProgress(0, 30))
     }
 
     @Test
     fun `it climbs from the left, is highest in the middle, and sinks to the right`() {
         val morning = arcAt(skyProgress(7, 0))
-        val noon = arcAt(skyProgress(13, 0))
-        val evening = arcAt(skyProgress(19, 0))
+        val noon = arcAt(skyProgress(12, 0))
+        val evening = arcAt(skyProgress(17, 0))
         assertTrue(morning.x < noon.x && noon.x < evening.x)
         assertEquals(1f, noon.y, 1e-4f)
         assertTrue(morning.y < noon.y && evening.y < noon.y)

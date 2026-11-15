@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.pictures.stories
 
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -11,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.Weather
 import dev.pcoffline.meadow.pictures.Device
@@ -45,7 +48,8 @@ import org.junit.runner.RunWith
  * }
  * ```
  *
- * The motion is on, so the video shows animations. Skipped unless run with
+ * The motion is on, so the video shows animations. The keyboard is hidden before each picture:
+ * whether it has opened by then changes from run to run. Skipped unless run with
  * `-Pandroid.testInstrumentationRunnerArguments.pictures=true`.
  */
 @RunWith(AndroidJUnit4::class)
@@ -82,7 +86,9 @@ abstract class Story(private val title: String) {
             }
         }
         recording = Device.startRecording("$dir/story.mp4", seconds = MAX_SECONDS)
+        waitForWindow()
         settle()
+        Device.writeSystemBars(dir, compose.activity)
         capture(firstCaption)
     }
 
@@ -95,8 +101,29 @@ abstract class Story(private val title: String) {
 
     private fun settle() {
         compose.waitForIdle()
+        hideKeyboard()
         // Long enough for the motion that a tap starts to end, and for the video to show it.
         Thread.sleep(SETTLE_MS)
+    }
+
+    /**
+     * Waits until the story's window is on screen. Each story opens a new window, and a picture
+     * taken before it shows is blank.
+     */
+    private fun waitForWindow() {
+        val end = SystemClock.uptimeMillis() + WINDOW_MS
+        while (SystemClock.uptimeMillis() < end) {
+            var shown = false
+            compose.runOnUiThread { shown = compose.activity.hasWindowFocus() }
+            if (shown) return
+            Thread.sleep(POLL_MS)
+        }
+    }
+
+    /** Hides the keyboard. The text field keeps its focus and what was typed. */
+    private fun hideKeyboard() = compose.runOnUiThread {
+        val window = compose.activity.window
+        WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
     }
 
     private fun capture(caption: String) {
@@ -116,6 +143,10 @@ abstract class Story(private val title: String) {
         /** The longest video Android records. */
         const val MAX_SECONDS = 180
         const val SETTLE_MS = 900L
+
+        /** The longest a story's window takes to show, and how often that is checked. */
+        const val WINDOW_MS = 5_000L
+        const val POLL_MS = 50L
 
         fun escape(text: String) = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
     }

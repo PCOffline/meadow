@@ -62,10 +62,10 @@ check: lint test
 [group('test')]
 test: test-app test-functions test-rules test-integration test-hosting test-deploy
 
-# App unit, screen and accessibility tests
+# App unit, screen and accessibility tests, and the repository tests on the Firebase emulators
 [group('test')]
 test-app:
-    ./gradlew testDebugUnitTest
+    cd backend && node build-functions.cjs && {{ firebase }} emulators:exec --only auth,firestore,functions --project demo-meadow "cd .. && ./gradlew testDebugUnitTest -Pmeadow.unitEmulatorHost=127.0.0.1"
 
 # Android lint, detekt, and Biome and oxlint (type-aware) on the backend
 [group('test')]

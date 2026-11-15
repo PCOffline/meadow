@@ -124,7 +124,11 @@ class GuardianAccessibilityService : AccessibilityService() {
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 if (AppGraph.store.strictMode.value && pkg in GUARDED_SYSTEM_PACKAGES) checkStrict(pkg, force = false)
-                if (pkg == currentPackage) checkSite(pkg, force = false)
+                if (pkg == currentPackage) {
+                    // A change is a new address to find: it gets its own reads again.
+                    unreadableReads = 0
+                    checkSite(pkg, force = false)
+                }
             }
             else -> Unit // The service config only subscribes to the window events above.
         }
@@ -220,7 +224,8 @@ class GuardianAccessibilityService : AccessibilityService() {
     /**
      * Just after a browser comes to the front, its window may not be the active one yet, so its
      * address bar can't be found. A browser that changes nothing after that sends no more events,
-     * so the bar is read again a few times instead of waiting for one.
+     * so the bar is read again a few times instead of waiting for one. Each change in the browser
+     * (another address) gets the same few reads.
      */
     private fun readAgainSoon() {
         if (unreadableReads >= SITE_READ_RETRIES || siteTrailing?.isActive == true) return

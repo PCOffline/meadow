@@ -144,7 +144,8 @@ object DemoGarden {
         avatars = mapOf(maya.uid to maya.avatar, robin.uid to robin.avatar),
         lastMessageAtMillis = now - 2 * MIN,
         lastSenderId = robin.uid,
-        lastReadMillis = emptyMap(),
+        // Robin has read it all, so it opens at the latest message.
+        lastReadMillis = mapOf(robin.uid to now),
     )
 
     val request = LimitRequest(

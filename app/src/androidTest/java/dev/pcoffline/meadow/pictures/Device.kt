@@ -1,6 +1,9 @@
 package dev.pcoffline.meadow.pictures
 
+import android.app.Activity
 import android.os.ParcelFileDescriptor
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -55,6 +58,20 @@ internal object Device {
     fun screenshot(path: String) {
         shell("mkdir -p ${"$DIR/$path".substringBeforeLast('/')}")
         shell("screencap -p $DIR/$path")
+    }
+
+    /**
+     * Writes the heights of [activity]'s status bar and navigation bar in pixels to
+     * `system-bars.txt` in [dir]. The workflow leaves them out when it compares a picture with the
+     * base's: they are Android's, and their icons and colours change from run to run.
+     */
+    fun writeSystemBars(dir: String, activity: Activity) {
+        var bars = "0 0"
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val insets = ViewCompat.getRootWindowInsets(activity.window.decorView)?.getInsets(WindowInsetsCompat.Type.systemBars())
+            bars = "${insets?.top ?: 0} ${insets?.bottom ?: 0}"
+        }
+        write("$dir/system-bars.txt", bars)
     }
 
     /** Writes [text] to [path], under [DIR]. */

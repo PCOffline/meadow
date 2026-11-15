@@ -39,6 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -219,7 +225,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         }
         val target = DeepLinks.toRoute(l) ?: return@LaunchedEffect
         pendingRoute.value = null
-        nav.navigate(target) { launchSingleTop = true }
+        nav.openLink(target)
     }
     val pendingInvite by AppGraph.store.pendingInvite.collectAsStateWithLifecycle()
     val acceptedTerms by AppGraph.store.acceptedTerms.collectAsStateWithLifecycle()
@@ -234,8 +240,12 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         LocalSnackbarClearance provides clearance,
         LocalAccount provides account,
     ) {
+        // The sides (a camera cutout or the navigation bar, in landscape) are left to each screen
+        // below, so the garden's scene can reach the edges of the screen.
+        val sides = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Vertical),
             snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = clearance.height)) },
             bottomBar = {
                 if (currentTab != null) MeadowTabBar(currentTab, badges) { nav.switchTab(it.route) }
@@ -243,8 +253,10 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         ) { padding ->
             // Consumed, so screens' own status bar and keyboard padding doesn't add the bars twice.
             Column(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                OfflineBar()
-                Box(Modifier.weight(1f)) {
+                OfflineBar(Modifier.windowInsetsPadding(sides))
+                // The garden keeps its own words and cards clear of the sides (GardenContent).
+                val edgeToEdge = destination?.hasRoute<GardenRoute>() == true
+                Box(Modifier.weight(1f).then(if (edgeToEdge) Modifier else Modifier.windowInsetsPadding(sides))) {
                     NavHost(
                         nav,
                         startDestination = GardenRoute,
@@ -395,10 +407,37 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: Tab, select
     )
 }
 
+/**
+ * Opens [route]'s tab. Each tab keeps the screens opened on it, so going back to a tab shows them
+ * again. The garden is the first screen of all: its tab goes back to it, and keeps the other
+ * tab's screens for when that tab opens again.
+ */
 fun NavController.switchTab(route: Any) {
+    val start = graph.findStartDestination().id
+    if (route == GardenRoute) {
+        // Navigation would restore the screens last saved over the garden here, such as People
+        // when a notification opened it on top of the garden (#124).
+        popBackStack(start, inclusive = false, saveState = true)
+        return
+    }
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        popUpTo(start) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+/**
+ * Opens the screen a notification links to. A tab opens as a tab. A chat or a friend's garden
+ * opens on the People tab, so Back goes to People and the tab bar works as usual.
+ */
+fun NavController.openLink(route: Any) {
+    when (route) {
+        GardenRoute, PeopleRoute, StatsRoute -> switchTab(route)
+        is ChatRoute, is FriendRoute -> {
+            switchTab(PeopleRoute)
+            navigate(route) { launchSingleTop = true }
+        }
+        else -> navigate(route) { launchSingleTop = true }
     }
 }
