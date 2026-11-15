@@ -13,6 +13,7 @@ from pr_pictures import (
     compare,
     differs,
     label,
+    main,
     names,
     section,
     stories,
@@ -262,6 +263,25 @@ class StoriesTest(unittest.TestCase):
             after.save(root / "after.png")
             self.assertTrue(differs(root / "before.png", root / "after.png"))
             self.assertFalse(differs(root / "before.png", root / "after.png", (24, 24)))
+
+class MainTest(unittest.TestCase):
+    def test_a_look_left_out_on_purpose_is_not_gone(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for side, looks in (("before", ("meadow-day", "blossom-night")), ("after", ("meadow-day",))):
+                for look in looks:
+                    (root / side / "gallery" / look).mkdir(parents=True)
+                    Image.new("RGB", (108, 240), "white").save(root / side / "gallery" / look / "garden--lived-in.png")
+            # The pull request drew one theme by day, and said which pictures it left out.
+            (root / "after" / "gallery" / "skipped.tsv").write_text("blossom-night/garden--lived-in.png")
+            main(root / "before", root / "after", root / "out", URL)
+            text = (root / "out" / "pictures.md").read_text()
+            self.assertIn("No screen in the gallery changed (1 the same).", text)
+            self.assertNotIn("Gone", text)
 
 if __name__ == "__main__":
     unittest.main()

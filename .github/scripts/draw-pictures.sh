@@ -5,6 +5,8 @@
 #
 # Runs the phone tests in dev.pcoffline.meadow.pictures (the gallery and the stories) with
 # pictures=true. Used by the Pictures workflow, once for the pull request and once for its base.
+# LOOKS=all draws every look and weather in the gallery; the default, basic, draws one theme by day,
+# large text and a narrow phone (.github/scripts/pictures_scope.py).
 # Copies whatever was drawn, even when a test fails, and then exits with the tests' result. Fails
 # when nothing could be copied (the emulator stopped), so no empty result is published.
 set -uo pipefail
@@ -20,6 +22,7 @@ status=0
 (cd "$CHECKOUT" && ./gradlew connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.pictures=true \
   -Pandroid.testInstrumentationRunnerArguments.package=dev.pcoffline.meadow.pictures \
+  -Pandroid.testInstrumentationRunnerArguments.looks="${LOOKS:-basic}" \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   --stacktrace) || status=$?
 adb pull "$DIR/." "$OUT" || echo "Couldn't copy every picture from the emulator"

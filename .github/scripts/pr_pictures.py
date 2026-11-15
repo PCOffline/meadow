@@ -207,6 +207,12 @@ def names(root: Path) -> list[tuple[str, tuple[str, str], str]]:
     return found
 
 
+def skipped(root: Path) -> set[str]:
+    """The gallery pictures that a run left out on purpose (gallery/skipped.tsv): not drawn, not gone."""
+    listed = root / "gallery" / "skipped.tsv"
+    return {line for line in listed.read_text().splitlines() if line} if listed.exists() else set()
+
+
 def pictures(root: Path, sub: str) -> set[str]:
     base = root / sub
     return {str(p.relative_to(base)) for p in base.rglob("*.png")} if base.is_dir() else set()
@@ -300,7 +306,7 @@ def main(before: Path, after: Path, out: Path, url: str, browse: str | None = No
     named = names(after) + names(before)
     bars = system_bars(after / "gallery")
     gallery = compare(
-        pictures(before, "gallery"), pictures(after, "gallery"),
+        pictures(before, "gallery") - skipped(after), pictures(after, "gallery"),
         lambda p: differs(before / "gallery" / p, after / "gallery" / p, bars),
         order=[path for path, _, _ in named],
     )

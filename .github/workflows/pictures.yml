@@ -1,16 +1,18 @@
 name: Pictures
 
 # Draws a pull request's pictures on an Android emulator and puts them in its description: each
-# story step by step with a video, and every screen of the debug gallery in each look that
-# changed, before and after. Read "Pull requests" in AGENTS.md. The pictures are published on the
+# story that is new or changed, step by step with a video, and each screen of the debug gallery
+# that changed, before and after. A pull request draws one theme by day, large text and a narrow
+# phone, unless it changes the themes, the sky or the weather (.github/scripts/pictures_scope.py). Read "Pull requests" in AGENTS.md. The pictures are published on the
 # branch pictures/pr-<number>. A pull request from a fork gets them in the run's artifact only.
 #
 # Two jobs: "pictures" builds and runs the pull request's code with a read-only token, and
 # "publish" holds the write token and runs no code from the pull request, only the base's.
 #
 # A push to main draws main's pictures and keeps them in the Actions cache, under a key for what
-# they're drawn from (.github/scripts/pictures-key.sh). A pull request on main then takes its
-# "before" pictures from the cache, and builds and draws only its own.
+# they're drawn from (.github/scripts/pictures-key.sh), in every look. A pull request on main then
+# takes its "before" pictures from the cache, and builds and draws only its own. When the cache has
+# no pictures for its base, it draws the base too. An emulator that stops is replaced once.
 on:
   push:
     branches: [main]
@@ -28,6 +30,8 @@ on:
       - '.github/scripts/pr_pictures.py'
       - '.github/scripts/draw-pictures.sh'
       - '.github/scripts/pictures-key.sh'
+      - '.github/scripts/draw-all.sh'
+      - '.github/scripts/pictures_scope.py'
       - '.github/workflows/pictures.yml'
   pull_request:
     paths:
@@ -45,6 +49,8 @@ on:
       - '.github/scripts/pr_pictures.py'
       - '.github/scripts/draw-pictures.sh'
       - '.github/scripts/pictures-key.sh'
+      - '.github/scripts/draw-all.sh'
+      - '.github/scripts/pictures_scope.py'
       - '.github/workflows/pictures.yml'
 
 # Each job asks for only what it needs.
@@ -85,9 +91,27 @@ jobs:
         with:
           path: build/pictures/before
           key: ${{ steps.base.outputs.key }}
+      - name: Check the base's pictures
+        id: count
+        if: github.event_name == 'pull_request' && steps.cached.outputs.cache-hit == 'true'
+        run: |
+          # A base kept without pictures is no base: it's drawn again here.
+          if [ -z "$(find build/pictures/before/gallery -name '*.png' -print -quit 2>/dev/null)" ]; then
+            rm -rf build/pictures/before
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Choose the looks
+        id: looks
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+        run: |
+          # Main draws every look: it's the base of every pull request to come.
+          if [ "$GITHUB_EVENT_NAME" = push ]; then looks=all; else looks="$(python3 .github/scripts/pictures_scope.py "$BASE")"; fi
+          echo "Looks: $looks"
+          echo "looks=$looks" >> "$GITHUB_OUTPUT"
       - name: Check out the base
         id: draw-base
-        if: github.event_name == 'pull_request' && steps.cached.outputs.cache-hit != 'true'
+        if: github.event_name == 'pull_request' && (steps.cached.outputs.cache-hit != 'true' || steps.count.outputs.empty == 'true')
         env:
           BASE: ${{ steps.base.outputs.sha }}
         run: |
@@ -121,8 +145,12 @@ jobs:
             (cd ../base && ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace) || echo "The base didn't build"
           fi
       - name: Draw on an emulator
+        id: draw
+        # An emulator that stops partway is replaced once, in the next step.
+        continue-on-error: true
         env:
           DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
+          LOOKS: ${{ steps.looks.outputs.looks }}
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           # Android 15: the newest phones' behaviour, such as edge to edge and how emoji draw.
@@ -132,11 +160,27 @@ jobs:
           profile: pixel_6
           # The tests turn the motion off for the gallery and on for the stories.
           disable-animations: false
-          script: |
-            adb shell settings put global hide_error_dialogs 1
-            sleep 20
-            if [ "$DRAW_BASE" = true ]; then .github/scripts/draw-pictures.sh ../base build/pictures/before || echo "The base drew no pictures, or not all of them"; fi
-            .github/scripts/draw-pictures.sh . build/pictures/after
+          script: .github/scripts/draw-all.sh
+      - name: Draw again on a fresh emulator
+        id: redraw
+        # Only when the first emulator gave back no pictures: a test that failed fails again.
+        if: steps.draw.outcome == 'failure' && hashFiles('build/pictures/after/**/*.png') == ''
+        env:
+          DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
+          LOOKS: ${{ steps.looks.outputs.looks }}
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: false
+          script: .github/scripts/draw-all.sh
+      - name: Check the drawing
+        if: steps.draw.outcome == 'failure' && steps.redraw.outcome != 'success'
+        run: |
+          echo "::error::The pictures weren't drawn. Read the drawing steps above."
+          exit 1
       # On main, the pictures drawn are the "before" of the pull requests to come.
       - name: Keep main's pictures
         if: github.event_name == 'push'
