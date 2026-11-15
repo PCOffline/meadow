@@ -2,6 +2,7 @@ package dev.pcoffline.meadow
 
 import android.app.Application
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -49,9 +50,9 @@ object AppGraph {
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + logFailures)
 
-    /** False when the app was built without a google-services.json. */
+    /** False when the app was built without a google-services.json. Unit tests set it once they point Firebase at the emulators. */
     var backendReady = false
-        private set
+        @VisibleForTesting internal set
 
     val store by lazy { LocalStore(app) }
     val backend by lazy { Backend() }
