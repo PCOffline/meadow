@@ -144,6 +144,8 @@ class ProfileAndPrivacyTest : ScreenTest() {
 
     @Test
     fun `the week can start on Saturday, Sunday or Monday, and weekly limits follow when the week ends`() {
+        // The store lives as long as the test JVM: start from no week rule, not an earlier test's.
+        AppGraph.store.clearAll()
         AppGraph.store.setLimits(listOf(AppLimit("com.example.app", "Example", dailyMinutes = 0, weeklyMinutes = 300)))
         AppGraph.store.setWeekStart(DayOfWeek.MONDAY)
         show { WeekStartCard() }
