@@ -142,6 +142,11 @@ class GalleryPictures {
                     skipped += path
                     return@forEach
                 }
+                if ("gallery/$path" in Device.drawn) {
+                    // An earlier emulator drew it before it stopped.
+                    index += listOf(path, scenario.screen, scenario.name, look.label, look.group).joinToString("\t")
+                    return@forEach
+                }
                 shown = look to i
                 compose.waitForIdle()
                 Thread.sleep(SETTLE_MS)

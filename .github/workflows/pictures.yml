@@ -12,7 +12,8 @@ name: Pictures
 # A push to main draws main's pictures and keeps them in the Actions cache, under a key for what
 # they're drawn from (.github/scripts/pictures-key.sh), in every look. A pull request on main then
 # takes its "before" pictures from the cache, and builds and draws only its own. When the cache has
-# no pictures for its base, it draws the base too. An emulator that stops is replaced once.
+# no pictures for its base, it draws the base too. An emulator that stops keeps what it drew,
+# and a fresh one draws the rest, up to twice (draw-pictures.sh).
 on:
   push:
     branches: [main]
@@ -153,7 +154,8 @@ jobs:
           free -m
       - name: Draw on an emulator
         id: draw
-        # An emulator that stops partway is replaced once, in the next step.
+        # The emulator can crash partway (SwiftShader's "Failed to find ColorBuffer"). The pictures
+        # it drew are kept, and a fresh emulator draws the rest, up to twice, in the next steps.
         continue-on-error: true
         env:
           DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
@@ -175,10 +177,27 @@ jobs:
           # with SwiftShader's Vulkan, the software graphics that runners have.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
           script: .github/scripts/draw-all.sh
-      - name: Draw again on a fresh emulator
+      - name: Draw the rest on a fresh emulator
         id: redraw
-        # Only when the first emulator gave back no pictures: a test that failed fails again.
-        if: steps.draw.outcome == 'failure' && hashFiles('build/pictures/after/**/*.png') == ''
+        continue-on-error: true
+        if: steps.draw.outcome == 'failure'
+        env:
+          DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
+          LOOKS: ${{ steps.looks.outputs.looks }}
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
+          script: .github/scripts/draw-all.sh
+      - name: Draw the rest on another fresh emulator
+        id: redraw-again
+        if: steps.redraw.outcome == 'failure'
         env:
           DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
           LOOKS: ${{ steps.looks.outputs.looks }}
@@ -202,7 +221,7 @@ jobs:
           sudo dmesg -T | grep -iE "out of memory|killed process|oom|segfault|qemu" | tail -20 || true
           find /tmp/android-runner -maxdepth 2 -newer "$GITHUB_EVENT_PATH" -ls 2>/dev/null | tail -20 || true
       - name: Check the drawing
-        if: steps.draw.outcome == 'failure' && steps.redraw.outcome != 'success'
+        if: steps.draw.outcome == 'failure' && steps.redraw.outcome != 'success' && steps.redraw-again.outcome != 'success'
         run: |
           echo "::error::The pictures weren't drawn. Read the drawing steps above."
           exit 1
