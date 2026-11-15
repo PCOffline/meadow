@@ -11,7 +11,6 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.google.firebase.firestore.FieldValue
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.EmulatorTest
@@ -23,7 +22,6 @@ import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.tasks.await
 import org.junit.After
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -143,15 +141,10 @@ class MeadowRootTest : EmulatorTest() {
 
     @Test
     fun `newer terms are offered once the account is read, and accepting them closes the offer`() {
-        val robin = person("Robin")
-        onBackend {
-            backend.account(robin.uid).update(
-                "acceptedTerms",
-                mapOf("version" to LegalDoc.CURRENT_VERSION - 1, "at" to FieldValue.serverTimestamp()),
-            ).await()
-        }
-        // This phone accepted the older terms too. (Sync only ever raises the phone's version, and it
-        // already saw the current one when the garden was planted.)
+        // Robin's garden was planted under the older terms, so no copy of the account ever shows the
+        // current ones. (Sync only raises the phone's version: a late read of a newer version would
+        // take the offer away.)
+        val robin = person("Robin", termsVersion = LegalDoc.CURRENT_VERSION - 1)
         AppGraph.store.acceptedTermsVersion = LegalDoc.CURRENT_VERSION - 1
         showRootFor(robin)
         waitForText(R.string.legal_update_title)

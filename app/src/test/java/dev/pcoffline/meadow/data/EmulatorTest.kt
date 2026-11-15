@@ -111,12 +111,13 @@ abstract class EmulatorTest {
     protected data class Person(val uid: String, val email: String, val friendCode: String)
 
     /** A new person with a garden, signed in. */
-    protected fun person(name: String): Person = onBackend {
+    /** A new person with a garden, who accepted the terms in [termsVersion]. They stay signed in. */
+    protected fun person(name: String, termsVersion: Int = LegalDoc.CURRENT_VERSION): Person = onBackend {
         backend.auth.signOut()
         val email = newEmail()
         val auth = AuthRepository(backend, store)
         auth.signUp(email, PASSWORD)
-        auth.createProfile(name, "🌼", LegalDoc.CURRENT_VERSION)
+        auth.createProfile(name, "🌼", termsVersion)
         val uid = backend.requireUid()
         // The backend writes the friend code. A single read can come before the phone sees it.
         val code = backend.account(uid).snapshots().firstWhere { it.getString("friendCode") != null }.getString("friendCode")!!
