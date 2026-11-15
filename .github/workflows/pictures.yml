@@ -158,6 +158,10 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          # Room for every look's pictures and the stories' videos: the emulator has stopped
+          # partway through with the defaults.
+          ram-size: 4096M
+          disk-size: 6G
           # The tests turn the motion off for the gallery and on for the stories.
           disable-animations: false
           script: .github/scripts/draw-all.sh
@@ -174,6 +178,8 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
           disable-animations: false
           script: .github/scripts/draw-all.sh
       - name: Check the drawing
