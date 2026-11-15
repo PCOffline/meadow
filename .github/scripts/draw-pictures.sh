@@ -15,9 +15,12 @@ DIR=/sdcard/Pictures/meadow-pictures
 
 adb shell rm -rf "$DIR"
 status=0
+# The apps stay installed after the tests: the emulator has gone offline while Gradle removed them,
+# and the pictures it held were lost.
 (cd "$CHECKOUT" && ./gradlew connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.pictures=true \
   -Pandroid.testInstrumentationRunnerArguments.package=dev.pcoffline.meadow.pictures \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   --stacktrace) || status=$?
 adb pull "$DIR/." "$OUT" || echo "Couldn't copy every picture from the emulator"
 drawn=$(find "$OUT" -name '*.png' | wc -l)
