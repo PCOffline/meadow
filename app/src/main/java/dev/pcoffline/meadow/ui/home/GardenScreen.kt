@@ -374,7 +374,8 @@ private val SUN_ABOVE_TOTAL = 44.dp
 @Composable
 private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {
     val garden = Garden.colors
-    val color = remember(budget.limit.packageName) {
+    // Keyed by the theme's colours too: a new theme gives the app its petal in that theme.
+    val color = remember(budget.limit.packageName, garden) {
         garden.petals[(budget.limit.packageName.hashCode() and 0x7fffffff) % garden.petals.size]
     }
     // A long press offers the limit's choices: share it as saved, or change it. A screen reader

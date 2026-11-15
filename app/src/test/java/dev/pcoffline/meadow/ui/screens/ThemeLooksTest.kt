@@ -15,6 +15,13 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.compose.runtime.CompositionLocalProvider
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.enforcement.AppBudget
+import dev.pcoffline.meadow.ui.home.GardenState
+import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
@@ -130,6 +137,33 @@ class ThemeLooksTest : ScreenTest() {
             val card = compose.onNode(hasText(text(theme.label), substring = true) and hasClickAction()).fetchSemanticsNode().boundsInRoot
             assertEquals("$theme", 3, flowers.count { card.contains(it.center) })
         }
+    }
+
+    @Test
+    fun `a new theme gives each garden card that theme's petal`() {
+        var theme by mutableStateOf(GardenTheme.MEADOW)
+        // Apps with no time used yet: each flower is in full bloom, in its exact petal colour.
+        val fresh = GardenState(
+            budgets = listOf("com.example.notes", "com.example.photos", "com.example.music", "com.example.news").map {
+                AppBudget(AppLimit(it, it.substringAfterLast('.'), 60, 0), 0L, 0L, 0, 0)
+            },
+            loaded = true,
+        )
+        show { MeadowTheme(theme, DarkMode.LIGHT) { GardenContent(DemoGarden.robin, fresh) } }
+        val sunflower = gardenColorsFor(GardenTheme.SUNFLOWER, dark = false).petals
+        // Meadow's buttercup and Sunflower's sunflower are nearly the same yellow, so it isn't counted.
+        val meadowOnly = gardenColorsFor(GardenTheme.MEADOW, dark = false).petals.filter { m ->
+            sunflower.none { abs(it.red - m.red) + abs(it.green - m.green) + abs(it.blue - m.blue) < 0.1f }
+        }
+        fun shown(colours: List<Color>) = compose.onNode(isRoot()).captureToImage().toPixelMap().let { shot -> colours.sumOf { shot.count(it) } }
+        assertTrue("Meadow's petals on its garden", shown(meadowOnly) > 1000)
+
+        theme = GardenTheme.SUNFLOWER
+        compose.waitForIdle()
+
+        // A few edge pixels can match by chance; a card still in Meadow's petal has hundreds.
+        assertTrue("Meadow's petals left on Sunflower's garden: ${shown(meadowOnly)}", shown(meadowOnly) < 100)
+        assertTrue("Sunflower's petals on its garden", shown(sunflower) > 1000)
     }
 
     @Test
