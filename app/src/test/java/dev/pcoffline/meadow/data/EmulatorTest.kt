@@ -12,6 +12,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.firestore.snapshots
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
 import dev.pcoffline.meadow.ui.legal.LegalDoc
@@ -117,7 +118,9 @@ abstract class EmulatorTest {
         auth.signUp(email, PASSWORD)
         auth.createProfile(name, "🌼", LegalDoc.CURRENT_VERSION)
         val uid = backend.requireUid()
-        Person(uid, email, account(uid).getString("friendCode")!!)
+        // The backend writes the friend code. A single read can come before the phone sees it.
+        val code = backend.account(uid).snapshots().firstWhere { it.getString("friendCode") != null }.getString("friendCode")!!
+        Person(uid, email, code)
     }
 
     protected fun signInAs(person: Person) = onBackend {
