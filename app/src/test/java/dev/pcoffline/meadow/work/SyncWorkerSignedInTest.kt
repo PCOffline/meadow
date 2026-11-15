@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
+import com.google.firebase.firestore.snapshots
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.Days
 import dev.pcoffline.meadow.data.EmulatorTest
@@ -45,7 +46,9 @@ class SyncWorkerSignedInTest : EmulatorTest() {
         assertTrue(beat > 0)
         onBackend {
             val user = backend.user(robin.uid)
-            val today = user.collection(UsageShareRepository.TIME).document(UsageShareRepository.TODAY).get().await()
+            // The write can still be on its way when the worker returns, so this waits for it.
+            val today = user.collection(UsageShareRepository.TIME).document(UsageShareRepository.TODAY).snapshots()
+                .firstWhere { it.getString("dayKey") != null }
             assertEquals(Days.todayKey(), today.getString("dayKey"))
             // Today's top apps aren't shared, so they aren't sent.
             assertFalse(user.collection(UsageShareRepository.APPS).document(UsageShareRepository.TODAY).get().await().exists())
