@@ -10,7 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.unit.dp
+import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
@@ -29,12 +31,23 @@ class ThemePreviewStory : Story("Each theme's preview shows the flowers its gard
     private var night by mutableStateOf(false)
 
     /**
-     * Shows [theme]'s garden. It changes on the UI thread, so the step waits until the new garden
-     * is drawn: changed from the test thread, the first garden could miss its picture.
+     * Shows [theme]'s garden, and waits until it's on screen. The first garden after the previews
+     * takes longer to draw than the step waits, so its picture showed the previews.
      */
-    private fun onScreen(theme: GardenTheme, night: Boolean = false) = compose.runOnUiThread {
-        garden = theme
-        this.night = night
+    private fun onScreen(theme: GardenTheme, night: Boolean = false) {
+        val first = garden == null
+        compose.runOnUiThread {
+            garden = theme
+            this.night = night
+        }
+        val title = compose.activity.getString(R.string.garden_title)
+        compose.waitUntil(GARDEN_MS) { compose.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
+        // The emulator draws in software: the frame reaches the screen a moment after the tree.
+        if (first) Thread.sleep(GARDEN_MS / 5)
+    }
+
+    private companion object {
+        const val GARDEN_MS = 10_000L
     }
 
     @Test
