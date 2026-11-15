@@ -106,7 +106,8 @@ jobs:
   android-tests:
     name: android (unit tests)
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
+    # The emulator tests run the app's code against the backend's rules and functions.
+    if: ${{ !cancelled() && (needs.changes.outputs.app != 'false' || needs.changes.outputs.backend != 'false') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
