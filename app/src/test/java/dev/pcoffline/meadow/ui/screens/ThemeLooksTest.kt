@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
@@ -77,6 +78,47 @@ class ThemeLooksTest : ScreenTest() {
             val inCard = shot.count(sun, card.left.toInt(), card.top.toInt(), card.right.toInt(), card.bottom.toInt())
             assertTrue("$theme: $inCard", inCard > 30)
         }
+    }
+
+    /** Of the pixels in [leaf], the share that joins, through [leaf] and [stem] pixels, the stem's foot. */
+    private fun PixelMap.attached(leaf: Color, stem: Color): Float {
+        fun near(c: Color, to: Color) = abs(c.red - to.red) < 0.03f && abs(c.green - to.green) < 0.03f && abs(c.blue - to.blue) < 0.03f
+        val plant = Array(width) { x -> BooleanArray(height) { y -> near(this[x, y], leaf) || near(this[x, y], stem) } }
+        val foot = (height - 1 downTo 0).firstNotNullOf { y -> (0 until width).firstOrNull { x -> near(this[x, y], stem) }?.let { x -> x to y } }
+        val seen = Array(width) { BooleanArray(height) }
+        val queue = ArrayDeque(listOf(foot)).also { seen[foot.first][foot.second] = true }
+        while (queue.isNotEmpty()) {
+            val (x, y) = queue.removeFirst()
+            for ((nx, ny) in listOf(x - 1 to y, x + 1 to y, x to y - 1, x to y + 1)) {
+                if (nx in 0 until width && ny in 0 until height && plant[nx][ny] && !seen[nx][ny]) {
+                    seen[nx][ny] = true
+                    queue.add(nx to ny)
+                }
+            }
+        }
+        var leaves = 0
+        var joined = 0
+        for (x in 0 until width) for (y in 0 until height) if (near(this[x, y], leaf)) { leaves++; if (seen[x][y]) joined++ }
+        assertTrue("no leaf drawn", leaves > 50)
+        return joined.toFloat() / leaves
+    }
+
+    @Test
+    fun `a wilted flower's leaves stay on its stem as its head nods`() {
+        val garden = gardenColorsFor(GardenTheme.MEADOW, dark = false)
+        show { BloomFlower(0f, Color.Red, Modifier.size(90.dp, 120.dp), sway = false, growIn = false) }
+        val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
+        val share = shot.attached(leaf = lerp(garden.leaf, garden.wilted, 0.6f), stem = lerp(garden.stem, garden.wilted, 0.7f))
+        assertTrue("only ${(share * 100).toInt()}% of the leaves touch the stem", share > 0.95f)
+    }
+
+    @Test
+    fun `a flower's centre is the one that goes with its petals`() {
+        val garden = gardenColorsFor(GardenTheme.MEADOW, dark = false)
+        show { BloomFlower(1f, garden.petalPeach, Modifier.size(90.dp, 120.dp), sway = false, growIn = false) }
+        val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
+        assertTrue(shot.count(garden.heartOf(garden.petalPeach)) > 50)
+        assertEquals(0, shot.count(garden.heartOf(garden.petalPink)))
     }
 
     @Test

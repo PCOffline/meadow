@@ -111,13 +111,17 @@ fun BloomFlower(
                     lerp(garden.leaf, garden.wilted, wilt * 0.6f), open = shown, droop = wilt * (1f - sleep), path = stem, leafPath = leafPath)
                 return@rotate
             }
+            val bend = Offset(w / 2f - w * 0.06f, h * 0.62f)
             stem.reset()
             stem.moveTo(base.x, base.y)
-            stem.quadraticTo(w / 2f - w * 0.06f, h * 0.62f, head.x, head.y)
+            stem.quadraticTo(bend.x, bend.y, head.x, head.y)
             drawPath(stem, lerp(garden.stem, garden.wilted, wilt * 0.7f), style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
-            leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
-            leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
-            flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, garden.heart, droops = 1f - sleep)
+            // Each leaf grows from a point on the stem, so it stays on the stem as the head nods.
+            val leafColor = lerp(garden.leaf, garden.wilted, wilt * 0.6f)
+            leaf(onStem(base, bend, head, 0.4f), w * 0.22f, -35f, leafColor, leafPath)
+            leaf(onStem(base, bend, head, 0.55f), w * 0.18f, 215f, leafColor, leafPath)
+            val heart = lerp(garden.heartOf(petalColor), garden.wilted, wilt * 0.6f)
+            flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, heart, droops = 1f - sleep)
         }
         }
         if (!mushroom && animatedBloom < 0.15f && sleep < 0.5f) {
@@ -159,6 +163,12 @@ private fun DrawScope.mushroom(
 /** Where a cap's spots go, across its width and up its height, and their sizes. */
 private val MUSHROOM_SPOTS = listOf(Triple(-0.24f, 0.45f, 0.06f), Triple(0.16f, 0.62f, 0.07f), Triple(0.02f, 0.25f, 0.045f), Triple(0.3f, 0.28f, 0.04f))
 
+/** The point at [t] (0 at [from], 1 at [to]) along the curve from [from] to [to] that bends towards [bend]. */
+internal fun onStem(from: Offset, bend: Offset, to: Offset, t: Float): Offset {
+    val u = 1f - t
+    return from * (u * u) + bend * (2f * u * t) + to * (t * t)
+}
+
 private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Color, path: Path = Path()) {
     rotate(degrees, pivot = at) {
         path.reset()
@@ -191,7 +201,7 @@ private fun DrawScope.flowerHead(center: Offset, radius: Float, petals: Int, col
 
 /** A small flat daisy for decorating headers and empty states. */
 @Composable
-fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Color = Garden.colors.heart) {
+fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Color = Garden.colors.heartOf(petal)) {
     Canvas(modifier) {
         val c = Offset(size.width / 2f, size.height / 2f)
         val r = size.minDimension / 2f
@@ -256,7 +266,7 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
                             val a = Math.toRadians(72.0 * k).toFloat()
                             drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
                         }
-                        drawCircle(garden.heart, radius = 1.05f * unit, center = Offset.Zero)
+                        drawCircle(garden.heartOf(color), radius = 1.05f * unit, center = Offset.Zero)
                     }
                 }
             }

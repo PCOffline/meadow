@@ -69,14 +69,40 @@ class ThemeContrastTest {
     )
 
     @Test
-    fun `every flower's heart stands out from each petal`() = assertNone(
-        failures { out, theme, dark ->
+    fun `every flower's centre differs from its petals`() {
+        val problems = mutableListOf<String>()
+        for ((theme, dark) in looks) {
             val garden = gardenColorsFor(theme, dark)
             garden.petals.forEachIndexed { i, petal ->
-                out.require("${name(theme, dark)} heart on petal $i", garden.heart, petal, HEART_TARGET)
+                val distance = labDistance(garden.heartOf(petal), petal)
+                if (distance < HEART_DISTANCE) problems += "${name(theme, dark)} centre of petal $i is ΔE %.1f, needs %.0f".format(distance, HEART_DISTANCE)
             }
-        },
-    )
+        }
+        assertNone(problems)
+    }
+
+    @Test
+    fun `a flower that isn't one of the theme's gets a gold centre`() {
+        val garden = gardenColorsFor(GardenTheme.BLOSSOM, dark = false)
+        assertEquals(Color(0xFFF4C542), garden.heartOf(Color.White))
+        assertEquals(garden.hearts[3], garden.heartOf(garden.petals[3]))
+    }
+
+    /** The CIELAB distance (ΔE*ab, 1976) between two colours: about 2.3 is just noticeable. */
+    private fun labDistance(a: Color, b: Color): Float {
+        fun lab(c: Color): FloatArray {
+            fun linear(v: Float) = if (v <= 0.04045f) v / 12.92f else Math.pow((v + 0.055) / 1.055, 2.4).toFloat()
+            val (r, g, bl) = listOf(c.red, c.green, c.blue).map(::linear)
+            val x = (0.4124f * r + 0.3576f * g + 0.1805f * bl) / 0.95047f
+            val y = 0.2126f * r + 0.7152f * g + 0.0722f * bl
+            val z = (0.0193f * r + 0.1192f * g + 0.9505f * bl) / 1.08883f
+            fun f(t: Float) = if (t > 0.008856f) Math.cbrt(t.toDouble()).toFloat() else 7.787f * t + 16f / 116f
+            return floatArrayOf(116f * f(y) - 16f, 500f * (f(x) - f(y)), 200f * (f(y) - f(z)))
+        }
+        val (l1, a1, b1) = lab(a).toList()
+        val (l2, a2, b2) = lab(b).toList()
+        return kotlin.math.sqrt((l1 - l2) * (l1 - l2) + (a1 - a2) * (a1 - a2) + (b1 - b2) * (b1 - b2))
+    }
 
     @Test
     fun `colours made for each other are readable together`() = assertNone(

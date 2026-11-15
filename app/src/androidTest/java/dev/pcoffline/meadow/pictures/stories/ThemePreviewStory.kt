@@ -21,8 +21,8 @@ import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import org.junit.Test
 
 /**
- * A theme's preview shows the flowers that its garden grows, and each theme's garden grows petals
- * that stand out, around a heart of one colour.
+ * A theme's preview shows the flowers that its garden grows. Each theme grows five real flowers,
+ * each with the centre that the real flower has, and leaves that stay on the stem as it nods.
  */
 class ThemePreviewStory : Story("Each theme's preview shows the flowers its garden grows") {
     private var garden by mutableStateOf<GardenTheme?>(null)
@@ -42,22 +42,22 @@ class ThemePreviewStory : Story("Each theme's preview shows the flowers its gard
                 }
             }
         }
-        step("Meadow: rose, lavender, buttercup, coral and cornflower petals, each with a chestnut heart.") {
+        step("Meadow: cosmos, aster, buttercup, poppy and forget-me-not. A nodding flower keeps its leaves on its stem.") {
             garden = GardenTheme.MEADOW
         }
-        step("Cherry blossom: blush, orchid, coral rose, lilac and butter petals, with a raspberry heart.") {
+        step("Cherry blossom: cherry, plum blossom, peony, wisteria and kerria.") {
             garden = GardenTheme.BLOSSOM
         }
-        step("Lavender field: lavender, periwinkle, iris, mauve and gold petals, with an indigo heart.") {
+        step("Lavender field: lavender, periwinkle, iris, sweet pea and a yellow pansy.") {
             garden = GardenTheme.LAVENDER
         }
-        step("Sunflower: sunflower, marigold, apricot, cornflower and rust petals, with a cocoa heart.") {
+        step("Sunflower: sunflower, marigold, zinnia, cornflower and blanket flower.") {
             garden = GardenTheme.SUNFLOWER
         }
-        step("Lily pond: lily pink, aqua, seafoam, periwinkle and coral petals, with a gold heart.") {
+        step("Lily pond: pink and blue water lilies, water hyacinth, flag iris and loosestrife.") {
             garden = GardenTheme.POND
         }
-        step("Mushroom forest: the caps are as before. A toadstool has no heart.") {
+        step("Mushroom forest: the caps are as before. A toadstool has no centre.") {
             garden = GardenTheme.MUSHROOM
         }
         step("Lily pond by night: each petal still stands out from the dark page.") {
