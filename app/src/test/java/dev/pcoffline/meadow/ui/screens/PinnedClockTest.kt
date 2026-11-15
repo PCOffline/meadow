@@ -12,6 +12,9 @@ import dev.pcoffline.meadow.ui.home.GardenState
 import dev.pcoffline.meadow.ui.opensAtText
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -55,5 +58,17 @@ class PinnedClockTest : ScreenTest() {
             }
         }
         compose.onNodeWithText(opensAtText(threeHours, lateEvening), substring = true).assertExists()
+    }
+
+    @Test
+    fun `the garden names today from the pinned clock`() {
+        show {
+            CompositionLocalProvider(LocalNow provides { morning }) {
+                GardenContent(DemoGarden.robin, GardenState(listOf(night), loaded = true, essentialsReady = true))
+            }
+        }
+        // Monday, January 5, 2026, whatever day the test runs on.
+        val today = morning.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(Locale.getDefault()))
+        compose.onNodeWithText(today).assertExists()
     }
 }

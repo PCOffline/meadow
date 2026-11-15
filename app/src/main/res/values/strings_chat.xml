@@ -6,6 +6,10 @@
     <string name="chats_unread">Unread</string>
     <string name="chat_closed_title">This chat is closed</string>
     <string name="chat_placeholder">Write something kind…</string>
+    <string name="chat_new_line">New</string>
+    <string name="chat_new_line_spoken">New messages</string>
+    <string name="chat_new_message">New message</string>
+    <string name="chat_new_message_spoken">New message, go to the latest</string>
     <string name="chat_sending">sending…</string>
     <plurals name="chat_sending_pictures">
         <item quantity="one">Sending a picture…</item>

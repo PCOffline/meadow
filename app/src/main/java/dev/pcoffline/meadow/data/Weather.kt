@@ -11,7 +11,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import dev.pcoffline.meadow.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -86,6 +88,11 @@ class WeatherRepository(
     /** The last reading, while the weather is on. */
     val reading: StateFlow<WeatherReading?> get() = store.weather
 
+    // Where the last reading was for, rounded as for Open-Meteo. Only in memory, for the times of
+    // sunrise and sunset ([SunTimes]): it is never written down or sent anywhere else.
+    private val lastPlace = MutableStateFlow<Place?>(null)
+    val place: StateFlow<Place?> = lastPlace.asStateFlow()
+
     fun hasPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
@@ -97,9 +104,10 @@ class WeatherRepository(
         store.setWeatherOn(true)
     }
 
-    /** Off, and the last reading is forgotten with it. */
+    /** Off, and the last reading and its place are forgotten with it. */
     fun turnOff() {
         store.setWeatherOn(false)
+        lastPlace.value = null
     }
 
     /**
@@ -112,6 +120,9 @@ class WeatherRepository(
         val last = store.weather.value
         if (last != null && now() - last.atMillis in 0 until REFRESH_AFTER_MS) return@withLock
         val location = runCatching { locate() }.getOrNull() ?: return@withLock
+        // Turned off while the phone was being found: the place isn't kept either.
+        if (!store.weatherOn.value) return@withLock
+        lastPlace.value = Place(OpenMeteo.round(location.latitude), OpenMeteo.round(location.longitude))
         val body = runCatching { fetch(OpenMeteo.url(location.latitude, location.longitude)) }.getOrNull() ?: return@withLock
         val weather = OpenMeteo.parse(body) ?: return@withLock
         // Turned off while the forecast was on its way: it isn't kept.
