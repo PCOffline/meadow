@@ -116,10 +116,12 @@ fun BloomFlower(
             stem.moveTo(base.x, base.y)
             stem.quadraticTo(bend.x, bend.y, head.x, head.y)
             drawPath(stem, lerp(garden.stem, garden.wilted, wilt * 0.7f), style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
-            // Each leaf grows from a point on the stem, so it stays on the stem as the head nods.
+            // Two leaves low on the stem, one on each side, as a real stem grows them. Each grows from
+            // a point on the stem, so it stays on it as the head nods, and droops as the flower wilts.
             val leafColor = lerp(garden.leaf, garden.wilted, wilt * 0.6f)
-            leaf(onStem(base, bend, head, 0.4f), w * 0.22f, -35f, leafColor, leafPath)
-            leaf(onStem(base, bend, head, 0.55f), w * 0.18f, 215f, leafColor, leafPath)
+            val droop = wilt * 40f
+            leaf(onStem(base, bend, head, 0.22f), w * 0.24f, -28f + droop, leafColor, leafPath)
+            leaf(onStem(base, bend, head, 0.45f), w * 0.2f, 208f - droop, leafColor, leafPath)
             val heart = lerp(garden.heartOf(petalColor), garden.wilted, wilt * 0.6f)
             flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, heart, droops = 1f - sleep)
         }
