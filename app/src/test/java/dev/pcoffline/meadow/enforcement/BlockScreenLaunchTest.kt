@@ -2,9 +2,13 @@ package dev.pcoffline.meadow.enforcement
 
 import android.app.Application
 import android.os.Looper
+import android.view.accessibility.AccessibilityEvent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.TimeWindow
 import kotlinx.coroutines.job
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -17,6 +21,7 @@ import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowAccessibilityService
+import java.time.ZonedDateTime
 
 /**
  * When an app's time is up the block screen opens straight over it. Going Home first made
@@ -105,6 +110,93 @@ class BlockScreenLaunchTest {
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(listOf(APP), blockScreensOpened())
+    }
+
+    @Test
+    fun `asked again and again while a cover is under way, the block screen opens once`() {
+        // Windows change several times a second while a video plays, and each change can ask.
+        repeat(30) { service.block(APP) }
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(listOf(APP), blockScreensOpened())
+    }
+
+    @Test
+    fun `a resting app on screen is covered once, however often the windows change`() {
+        AppGraph.store.setGrants(emptyList())
+        AppGraph.store.setEmergency(null)
+        AppGraph.store.setLimits(listOf(AppLimit(APP, "Reels", 30, 0, schedule = hoursAwayFromNow())))
+        // Each change is looked at, to test the watcher by itself.
+        service.windowScanMs = 0
+        try {
+            service.onForeground(APP)
+            // Half a second of window changes, as a video feed with a floating player makes them.
+            val main = shadowOf(Looper.getMainLooper())
+            repeat(25) {
+                service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
+                main.idle()
+                Thread.sleep(20)
+            }
+            main.idle()
+
+            assertEquals(listOf(APP), blockScreensOpened())
+        } finally {
+            AppGraph.store.setLimits(emptyList())
+        }
+    }
+
+    @Test
+    fun `however often the windows change, they are listed about once a second`() {
+        var listed = 0
+        service.listWindows = { listed++; emptyList() }
+        val main = shadowOf(Looper.getMainLooper())
+
+        // Half a second of window changes, as a video feed with a floating player makes them.
+        repeat(25) {
+            service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
+            main.idle()
+            Thread.sleep(20)
+        }
+        assertEquals(1, listed)
+
+        // The changes since are looked at once the second is up: the last one is never missed.
+        waitUntil { listed == 2 }
+        Thread.sleep(300)
+        main.idle()
+        assertEquals(2, listed)
+    }
+
+    @Test
+    fun `an app opened again just after its block screen showed is covered again at once`() {
+        service.block(APP)
+        // The screen showed, and the person left it and opened the app again within a second,
+        // before the first cover finished its work.
+        BlockActivity.markShown(APP)
+        service.block(APP)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(listOf(APP, APP), blockScreensOpened())
+    }
+
+    @Test
+    fun `a cover that has ended lets the app be covered again`() {
+        service.block(APP)
+        BlockActivity.markShown(APP)
+        waitUntil { service.scope.coroutineContext.job.children.none() }
+        blockScreensOpened()
+        opened.clear()
+
+        // The app is opened again later, still resting.
+        service.block(APP)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(listOf(APP), blockScreensOpened())
+    }
+
+    /** Hours far from now, so an app limited to them is resting. */
+    private fun hoursAwayFromNow(): Schedule {
+        val from = if (ZonedDateTime.now().hour < 12) 20 * 60 else 2 * 60
+        return Schedule((1..7).associateWith { listOf(TimeWindow(from, from + 60)) })
     }
 
     /** Collects the block screens started since the last call. */
