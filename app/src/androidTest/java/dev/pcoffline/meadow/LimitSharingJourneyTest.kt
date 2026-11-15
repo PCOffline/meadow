@@ -108,7 +108,7 @@ class LimitSharingJourneyTest : EndToEndTest() {
             // Kai suggests a change from Sam's page: the limit menu, the editor, then Send.
             compose.onNodeWithContentDescription(text(R.string.action_back)).performClick()
             openChatWithSam()
-            compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Sam")).performClick()
+            described(text(R.string.chat_see_garden, "Sam")).performClick()
             waitFor(R.string.limit_menu_hint)
             compose.onAllNodes(hasClickAction() and hasText("Pebbles", substring = true)).onLast().performScrollTo().performClick()
             node(R.string.limit_menu_suggest_change).performClick()
