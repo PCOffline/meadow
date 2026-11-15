@@ -1,6 +1,9 @@
 package dev.pcoffline.meadow.pictures.stories
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -58,8 +61,11 @@ class ThemePreviewStory : Story("Each theme's preview shows the flowers its gard
                 Box(Modifier.statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp)) { AppearanceCard() }
             } else {
                 MeadowTheme(theme, if (night) DarkMode.DARK else DarkMode.LIGHT) {
-                    CompositionLocalProvider(LocalSkyHour provides if (night) 22 else 10) {
-                        GardenContent(DemoGarden.robin, DemoGarden.garden)
+                    // On this theme's own page, as the app draws it: by night, the page is dark too.
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        CompositionLocalProvider(LocalSkyHour provides if (night) 22 else 10) {
+                            GardenContent(DemoGarden.robin, DemoGarden.garden)
+                        }
                     }
                 }
             }
