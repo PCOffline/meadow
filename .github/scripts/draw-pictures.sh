@@ -5,8 +5,8 @@
 #
 # Runs the phone tests in dev.pcoffline.meadow.pictures (the gallery and the stories) with
 # pictures=true. Used by the Pictures workflow, once for the pull request and once for its base.
-# LOOKS=all draws every look and weather in the gallery; the default, basic, draws one theme by day,
-# large text and a narrow phone (.github/scripts/pictures_scope.py).
+# The default, basic, draws one theme by day, large text and a narrow phone. LOOKS adds more, such
+# as "themes,night" (.github/scripts/pictures_scope.py), and LOOKS=all draws every look and weather.
 # Copies whatever was drawn, even when a test fails, and then exits with the tests' result. Fails
 # when nothing could be copied (the emulator stopped), so no empty result is published.
 set -uo pipefail
