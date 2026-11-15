@@ -208,6 +208,16 @@ abstract class EndToEndTest {
         compose.waitForIdle()
     }
 
+    /**
+     * Types into a field in a bottom sheet. As in [typeIntoDialog], the keyboard stays up: it
+     * belongs to the sheet's window, which [hideKeyboard] doesn't watch. It closes with the sheet.
+     */
+    protected fun typeIntoSheet(field: SemanticsMatcher, value: String) {
+        eventually("the sheet's field") { compose.onAllNodes(field).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(field).performTextInput(value)
+        compose.waitForIdle()
+    }
+
     private fun hideKeyboard() {
         val ime = WindowInsetsCompat.Type.ime()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -347,8 +357,8 @@ abstract class EndToEndTest {
     }
 
     /**
-     * Becomes [friend]'s Bumblebee by pasting their invite link into People's friend code
-     * field (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
+     * Becomes [friend]'s Bumblebee by pasting their invite link into the friend code field
+     * behind People's plus button (for links that opened in the browser) and saying yes. Returns the uid of the person on this phone.
      */
     protected fun acceptInviteFrom(friend: EmulatorFriend, friendName: String): String {
         val token = friend.call("createInviteLink")!!["token"] as String
@@ -356,8 +366,8 @@ abstract class EndToEndTest {
         tab(R.string.tab_people).performClick()
         waitFor(R.string.people_title)
         val joinField = hasSetTextAction() and hasText(text(R.string.invite_code_placeholder))
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(joinField)
-        typeInto(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
+        compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
+        typeIntoSheet(joinField, "Be my Bumblebee? https://${BuildConfig.LINK_HOST}/i/$token")
         node(R.string.invite_code_button).performClick()
         waitForText(text(R.string.accept_invite_title, friendName))
         compose.onNode(hasText(text(R.string.accept_invite_yes)) and hasAnyAncestor(isDialog())).performClick()
