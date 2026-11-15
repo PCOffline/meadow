@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -87,7 +86,7 @@ abstract class Story(private val title: String) {
         }
         recording = Device.startRecording("$dir/story.mp4", seconds = MAX_SECONDS)
         settle()
-        writeStatusBar()
+        Device.writeSystemBars(dir, compose.activity)
         capture(firstCaption)
     }
 
@@ -109,19 +108,6 @@ abstract class Story(private val title: String) {
     private fun hideKeyboard() = compose.runOnUiThread {
         val window = compose.activity.window
         WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
-    }
-
-    /**
-     * Writes the status bar's height in pixels. The workflow leaves the status bar out when it
-     * compares a step with the base's: its signal icons change from run to run.
-     */
-    private fun writeStatusBar() {
-        var top = 0
-        compose.runOnUiThread {
-            val insets = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
-            top = insets?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0
-        }
-        Device.write("$dir/status-bar.txt", "$top")
     }
 
     private fun capture(caption: String) {

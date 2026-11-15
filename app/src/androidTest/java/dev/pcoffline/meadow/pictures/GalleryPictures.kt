@@ -114,6 +114,10 @@ class GalleryPictures {
                 }
             }
         }
+        // The window fades in as the test starts: the first picture waits until it has.
+        compose.waitForIdle()
+        Thread.sleep(WINDOW_MS)
+        Device.writeSystemBars("gallery", compose.activity)
         // Each screen in each look in turn, and an index with their names, in this order.
         val index = mutableListOf<String>()
         Scenarios.all.forEachIndexed { i, scenario ->
@@ -121,6 +125,8 @@ class GalleryPictures {
                 shown = look to i
                 compose.waitForIdle()
                 Thread.sleep(SETTLE_MS)
+                // A picture that loaded late changes the screen once more.
+                compose.waitForIdle()
                 val path = "${look.name}/${slug(scenario.screen)}--${slug(scenario.name)}.png"
                 Device.screenshot("gallery/$path")
                 index += listOf(path, scenario.screen, scenario.name, look.label, look.group).joinToString("\t")
@@ -134,6 +140,9 @@ class GalleryPictures {
 
         /** Long enough for pictures to load; the motion is off, so nothing else moves. */
         const val SETTLE_MS = 300L
+
+        /** Longer than a window takes to fade in. */
+        const val WINDOW_MS = 2_000L
 
         fun slug(text: String) = text.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
     }

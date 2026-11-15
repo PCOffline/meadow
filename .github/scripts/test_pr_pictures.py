@@ -11,6 +11,7 @@ from pr_pictures import (
     Step,
     StoryPictures,
     compare,
+    differs,
     label,
     names,
     section,
@@ -226,7 +227,7 @@ class StoriesTest(unittest.TestCase):
                     ImageDraw.Draw(picture).rectangle((60, 0, 107, 23), fill="black")
                 picture.save(story / "01.png")
                 (story / "story.json").write_text(json.dumps({"title": "S", "steps": ["One."]}))
-            (root / "after" / "stories" / "S" / "status-bar.txt").write_text("24")
+            (root / "after" / "stories" / "S" / "system-bars.txt").write_text("24 24")
             self.assertFalse(stories(root / "before", root / "after", root / "out")[0].changed)
 
     def test_a_story_that_differs_under_the_status_bar_has_changed(self):
@@ -244,8 +245,23 @@ class StoriesTest(unittest.TestCase):
                     ImageDraw.Draw(picture).rectangle((60, 24, 107, 47), fill="black")
                 picture.save(story / "01.png")
                 (story / "story.json").write_text(json.dumps({"title": "S", "steps": ["One."]}))
-            (root / "after" / "stories" / "S" / "status-bar.txt").write_text("24")
+            (root / "after" / "stories" / "S" / "system-bars.txt").write_text("24 24")
             self.assertTrue(stories(root / "before", root / "after", root / "out")[0].changed)
+
+    def test_a_picture_that_differs_only_in_the_navigation_bar_is_the_same(self):
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            Image.new("RGB", (108, 240), "white").save(root / "before.png")
+            after = Image.new("RGB", (108, 240), "white")
+            # The gesture handle drawn dark instead of light, in the bottom 24 px.
+            ImageDraw.Draw(after).rectangle((30, 220, 78, 230), fill="black")
+            after.save(root / "after.png")
+            self.assertTrue(differs(root / "before.png", root / "after.png"))
+            self.assertFalse(differs(root / "before.png", root / "after.png", (24, 24)))
 
 if __name__ == "__main__":
     unittest.main()

@@ -212,26 +212,31 @@ def pictures(root: Path, sub: str) -> set[str]:
     return {str(p.relative_to(base)) for p in base.rglob("*.png")} if base.is_dir() else set()
 
 
-def differs(before: Path, after: Path, top: int = 0) -> bool:
-    """Whether [after] looks different from [before], below the top [top] rows (the status bar)."""
+def differs(before: Path, after: Path, bars: tuple[int, int] = (0, 0)) -> bool:
+    """
+    Whether [after] looks different from [before]. The rows of the system [bars] (the status bar
+    at the top, the navigation bar at the bottom) are left out.
+    """
     from PIL import Image, ImageChops
 
     with Image.open(before) as a, Image.open(after) as b:
         if a.size != b.size:
             return True
-        box = (0, min(top, a.height), a.width, a.height)
+        top, bottom = bars
+        box = (0, min(top, a.height), a.width, max(min(top, a.height), a.height - bottom))
         a, b = a.convert("RGB").crop(box), b.convert("RGB").crop(box)
         diff = ImageChops.difference(a, b).convert("L")
         moved = sum(diff.point(lambda v: 255 if v > PIXEL_TOLERANCE else 0).histogram()[255:])
         return moved > CHANGED_SHARE * a.width * a.height
 
 
-def status_bar(story: Path) -> int:
-    """The status bar's height in pixels, as the story wrote it; 0 when it didn't."""
+def system_bars(folder: Path) -> tuple[int, int]:
+    """The status bar's and the navigation bar's heights in pixels, as the phone wrote them; 0 when it didn't."""
     try:
-        return int((story / "status-bar.txt").read_text().strip())
+        top, bottom = (int(n) for n in (folder / "system-bars.txt").read_text().split())
+        return top, bottom
     except (OSError, ValueError):
-        return 0
+        return 0, 0
 
 
 def smaller(source: Path, target: Path) -> None:
@@ -262,10 +267,10 @@ def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
         old = before / "stories" / name
         old_story = json.loads((old / "story.json").read_text()) if (old / "story.json").exists() else None
         old_count = len(old_story["steps"]) if old_story else 0
-        # The status bar is Android's, and its signal icons change from run to run.
-        top = status_bar(meta.parent)
+        # The system bars are Android's, and their icons and colours change from run to run.
+        bars = system_bars(meta.parent)
         changed = old_story is None or old_story["steps"] != story["steps"] or any(
-            not (old / f"{i:02d}.png").exists() or differs(old / f"{i:02d}.png", meta.parent / f"{i:02d}.png", top)
+            not (old / f"{i:02d}.png").exists() or differs(old / f"{i:02d}.png", meta.parent / f"{i:02d}.png", bars)
             for i in range(1, len(story["steps"]) + 1)
         )
         if not changed:
@@ -293,9 +298,10 @@ def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
 def main(before: Path, after: Path, out: Path, url: str, browse: str | None = None) -> None:
     out.mkdir(parents=True, exist_ok=True)
     named = names(after) + names(before)
+    bars = system_bars(after / "gallery")
     gallery = compare(
         pictures(before, "gallery"), pictures(after, "gallery"),
-        lambda p: differs(before / "gallery" / p, after / "gallery" / p),
+        lambda p: differs(before / "gallery" / p, after / "gallery" / p, bars),
         order=[path for path, _, _ in named],
     )
     gallery.names = {path: name for path, name, _ in reversed(named)}
