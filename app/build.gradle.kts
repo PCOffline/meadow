@@ -61,7 +61,7 @@ android {
         versionCode = appVersionCode
         versionName = appVersion
         buildConfigField("boolean", "HAS_FIREBASE_CONFIG", hasFirebaseConfig.toString())
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "dev.pcoffline.meadow.JourneyRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
         buildConfigField("String", "FUNCTIONS_REGION", "\"$functionsRegion\"")
         buildConfigField("String", "UPDATE_REPO", "\"${findProperty("meadow.updateRepo") ?: "PCOffline/meadow"}\"")
@@ -134,6 +134,8 @@ android {
         unitTests.all {
             // Robolectric loads a whole Android framework per test class.
             it.maxHeapSize = "3g"
+            // Two test JVMs at a time. A CI runner has 4 cores and 16 GB.
+            it.maxParallelForks = 2
             // Conscrypt (Robolectric's TLS) loads a native library; JDK 24+ warns unless allowed.
             it.jvmArgs("--enable-native-access=ALL-UNNAMED")
             // Robolectric loads app classes through its own class loader, which JaCoCo must follow.
