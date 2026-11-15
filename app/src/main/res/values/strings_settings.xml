@@ -5,7 +5,7 @@
     <string name="settings_week_start_pending">Weekly limits change on %1$s, at the end of this week.</string>
     <string name="settings_strict_title">Strict mode</string>
     <string name="settings_strict_body">Locks Meadow\'s settings, its removal and the clock.</string>
-    <string name="settings_strict_on">Strict mode on 🌿</string>
+    <string name="settings_strict_on">Strict mode on\u00A0🌿</string>
     <string name="settings_strict_off_title">Turn off strict mode?</string>
     <string name="settings_strict_off_now">Strict mode turns off now. Nobody gets a message.</string>
     <string name="settings_strict_off_button">Turn off</string>
@@ -29,14 +29,14 @@
     <string name="settings_share_progress">Progress</string>
     <string name="settings_privacy_preview">See what your Bumblebees see</string>
     <string name="privacy_preview_title">What your Bumblebees see</string>
-    <string name="settings_privacy_saved">Privacy choices saved 🔒</string>
+    <string name="settings_privacy_saved">Privacy choices saved\u00A0🔒</string>
 
     <string name="settings_updates_title">Updates</string>
     <string name="settings_updates_version">You have Meadow %1$s.</string>
     <string name="settings_updates_auto">Check for updates daily</string>
     <string name="settings_updates_check">Check now</string>
     <string name="settings_updates_checking">Looking for updates…</string>
-    <string name="settings_updates_current">You\'re up to date 🌿</string>
+    <string name="settings_updates_current">You\'re up to date\u00A0🌿</string>
     <string name="settings_updates_available">Meadow %1$s is ready</string>
     <string name="settings_updates_install">Update</string>
     <string name="settings_updates_downloading">Downloading… %1$d%%</string>
@@ -46,7 +46,7 @@
 
     <string name="settings_legal_title">Your data and legal</string>
     <string name="settings_export">Download my data</string>
-    <string name="settings_export_done">Your data is saved 📦</string>
+    <string name="settings_export_done">Your data is saved\u00A0📦</string>
     <string name="settings_delete">Delete my account</string>
     <string name="settings_delete_title">Delete your account?</string>
     <string name="settings_delete_body">This deletes your profile, limits, requests, chats and photo for good. Your circle sees that you left.</string>
@@ -65,7 +65,7 @@
     <string name="share_commitment_in_meadow">Send in Meadow</string>
     <string name="share_commitment_loading">Finding your circle…</string>
     <string name="share_commitment_send_to">Send to %1$s</string>
-    <string name="share_commitment_sent">Sent to %1$s 💌</string>
+    <string name="share_commitment_sent">Sent to %1$s\u00A0💌</string>
     <string name="share_commitment_other_apps">Other apps</string>
-    <string name="share_limit">I committed to %2$s on %1$s with Meadow 🌼</string>
+    <string name="share_limit">I committed to %2$s on %1$s with Meadow\u00A0🌼</string>
 </resources>
