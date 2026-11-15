@@ -212,15 +212,26 @@ def pictures(root: Path, sub: str) -> set[str]:
     return {str(p.relative_to(base)) for p in base.rglob("*.png")} if base.is_dir() else set()
 
 
-def differs(before: Path, after: Path) -> bool:
+def differs(before: Path, after: Path, top: int = 0) -> bool:
+    """Whether [after] looks different from [before], below the top [top] rows (the status bar)."""
     from PIL import Image, ImageChops
 
     with Image.open(before) as a, Image.open(after) as b:
         if a.size != b.size:
             return True
-        diff = ImageChops.difference(a.convert("RGB"), b.convert("RGB")).convert("L")
+        box = (0, min(top, a.height), a.width, a.height)
+        a, b = a.convert("RGB").crop(box), b.convert("RGB").crop(box)
+        diff = ImageChops.difference(a, b).convert("L")
         moved = sum(diff.point(lambda v: 255 if v > PIXEL_TOLERANCE else 0).histogram()[255:])
         return moved > CHANGED_SHARE * a.width * a.height
+
+
+def status_bar(story: Path) -> int:
+    """The status bar's height in pixels, as the story wrote it; 0 when it didn't."""
+    try:
+        return int((story / "status-bar.txt").read_text().strip())
+    except (OSError, ValueError):
+        return 0
 
 
 def smaller(source: Path, target: Path) -> None:
@@ -251,8 +262,10 @@ def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
         old = before / "stories" / name
         old_story = json.loads((old / "story.json").read_text()) if (old / "story.json").exists() else None
         old_count = len(old_story["steps"]) if old_story else 0
+        # The status bar is Android's, and its signal icons change from run to run.
+        top = status_bar(meta.parent)
         changed = old_story is None or old_story["steps"] != story["steps"] or any(
-            not (old / f"{i:02d}.png").exists() or differs(old / f"{i:02d}.png", meta.parent / f"{i:02d}.png")
+            not (old / f"{i:02d}.png").exists() or differs(old / f"{i:02d}.png", meta.parent / f"{i:02d}.png", top)
             for i in range(1, len(story["steps"]) + 1)
         )
         if not changed:
