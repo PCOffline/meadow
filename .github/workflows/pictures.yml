@@ -153,6 +153,13 @@ jobs:
           if [ "$DRAW_BASE" = true ]; then
             (cd ../base && ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace) || echo "The base didn't build"
           fi
+      - name: Free the memory that the build used
+        # The emulator has stopped partway through when the runner ran short of memory. Gradle and
+        # the Kotlin compiler keep up to 4 GB each after a build; drawing needs neither again.
+        run: |
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
+          free -m
       - name: Draw on an emulator
         id: draw
         # An emulator that stops partway is replaced once, in the next step.
@@ -191,6 +198,12 @@ jobs:
           disk-size: 6G
           disable-animations: false
           script: .github/scripts/draw-all.sh
+      - name: Show why the emulator stopped
+        # The kernel stops the biggest process when memory runs out, and that's the emulator.
+        if: steps.draw.outcome == 'failure'
+        run: |
+          free -m
+          sudo dmesg -T | grep -iE "out of memory|killed process|oom" | tail -20 || true
       - name: Check the drawing
         if: steps.draw.outcome == 'failure' && steps.redraw.outcome != 'success'
         run: |
