@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.pcoffline.meadow.R
@@ -38,10 +39,10 @@ import org.junit.Test
 
 /**
  * With a profile photo, the emoji is still a choice. It shows after the name: in the garden's
- * greeting, on People and at the top of a chat.
+ * greeting, on People and at the top of a chat. Without a photo, all is as before.
  */
 class EmojiWithPhotoStory : Story("Pick an emoji when you have a profile photo") {
-    private enum class Screen { PROFILE, GARDEN, PEOPLE, CHAT }
+    private enum class Screen { PROFILE, GARDEN, PEOPLE, CHAT, PROFILE_AGAIN, GARDEN_WITHOUT_PHOTO }
 
     private var screen by mutableStateOf(Screen.PROFILE)
 
@@ -87,6 +88,7 @@ class EmojiWithPhotoStory : Story("Pick an emoji when you have a profile photo")
         val robin = DemoGarden.robin.copy(avatar = DemoGarden.robin.avatar.copy(photoUrl = robinPhoto))
         // Saved with 🐝, as the profile's last step leaves it.
         val robinWithBee = robin.copy(avatar = robin.avatar.copy(emoji = "🐝"))
+        val robinWithoutPhoto = robinWithBee.copy(avatar = robinWithBee.avatar.copy(photoUrl = null))
         val maya = DemoGarden.maya.copy(avatar = DemoGarden.maya.avatar.copy(photoUrl = mayaPhoto))
         val chat = DemoGarden.chat.copy(avatars = DemoGarden.chat.avatars + (maya.uid to maya.avatar))
 
@@ -98,6 +100,8 @@ class EmojiWithPhotoStory : Story("Pick an emoji when you have a profile photo")
                 Screen.CHAT -> Box(Modifier.fillMaxSize().navigationBarsPadding()) {
                     ChatContent(robinWithBee, chat, DemoGarden.messages, requestCard = { _, _ -> })
                 }
+                Screen.PROFILE_AGAIN -> ProfileScreen(robinWithBee, onBack = {}, onSave = {}, onRemovePhoto = {})
+                Screen.GARDEN_WITHOUT_PHOTO -> WithTabs(Tab.GARDEN) { GardenContent(robinWithoutPhoto, DemoGarden.garden) }
             }
         }
         step("The emoji is still a choice. It shows next to your name, and there's no circle colour.") {
@@ -109,5 +113,11 @@ class EmojiWithPhotoStory : Story("Pick an emoji when you have a profile photo")
         step("Saved: the garden's greeting ends with 🐝, after your name.") { screen = Screen.GARDEN }
         step("People: Maya has a photo, so her emoji 🌻 follows her name.") { screen = Screen.PEOPLE }
         step("A chat with Maya: her emoji follows her name at the top.") { screen = Screen.CHAT }
+        step("Back in the profile, Remove photo: 🐝 shows on its circle, and the circle colour is a choice again.") {
+            screen = Screen.PROFILE_AGAIN
+            compose.waitForIdle()
+            compose.onNodeWithText(text(R.string.profile_photo_remove)).performClick()
+        }
+        step("Without a photo, the greeting has only your name, as before.") { screen = Screen.GARDEN_WITHOUT_PHOTO }
     }
 }
