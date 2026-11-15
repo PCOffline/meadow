@@ -4,7 +4,8 @@ import { projectId } from "./db";
 
 initializeApp();
 // Only while integration tests measure coverage: the emulator stops its workers with SIGTERM,
-// which would end them before Node writes what ran. Exiting normally writes it.
+// which would end them before Node writes what ran. Exiting normally writes it, and
+// backend/emulators-exec.cjs waits for that before c8 reads it.
 if (process.env.NODE_V8_COVERAGE) process.once("SIGTERM", () => process.exit(0));
 // Set once in backend/functions/.env, which Firebase loads when deploying and running.
 const region = process.env.MEADOW_REGION?.trim();
