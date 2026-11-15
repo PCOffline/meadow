@@ -20,4 +20,8 @@ status=0
   --stacktrace) || status=$?
 adb pull "$DIR/." "$OUT" || true
 echo "Drew $(find "$OUT" -name '*.png' | wc -l) pictures in $OUT"
+# Names the tests that failed, last in the log where it's easy to find.
+if [ "$status" != 0 ]; then
+  python3 "$(dirname "$0")/failed_tests.py" "$CHECKOUT/app/build/outputs/androidTest-results" || true
+fi
 exit "$status"
