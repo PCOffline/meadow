@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="setup_title">Set up Meadow 🌱</string>
+    <string name="setup_title">Set up Meadow\u00A0🌱</string>
     <plurals name="setup_progress">
         <item quantity="one">%1$d of %2$d ready</item>
         <item quantity="other">%1$d of %2$d ready</item>
@@ -30,12 +30,12 @@
     <string name="setup_listener_how">Next, turn on \"Allow notification access\" (or the switch next to Meadow), then tap \"Allow\".</string>
     <string name="setup_overlay_how">Next, turn on \"Allow display over other apps\".</string>
     <string name="setup_admin_how">Next, tap \"Activate\".</string>
-    <string name="setup_step_done">Done ✓</string>
+    <string name="setup_step_done">Done\u00A0✓</string>
     <string name="setup_step_allow">Allow</string>
     <string name="setup_step_required">Required</string>
     <string name="setup_restricted_hint">Greyed out? In App info, tap ⋮ › Allow restricted settings.</string>
     <string name="setup_restricted_action">Open App info</string>
-    <string name="setup_done">Open my garden 🌼</string>
+    <string name="setup_done">Open my garden\u00A0🌼</string>
     <string name="setup_later">I\'ll do this later</string>
     <string name="backend_missing_title">Meadow can\'t start</string>
     <string name="backend_missing_body">This build isn\'t connected to a server. See the README.</string>

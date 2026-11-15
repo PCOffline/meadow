@@ -145,7 +145,8 @@ For agent instructions such as this file, follow
 ### App text
 
 App text tells people what they need to know to act. It is warm, calm and plain. Use sentence
-case, and one emoji at most, at the end.
+case, and one emoji at most, at the end. Put a no-break space (`\u00A0`) before that emoji, so
+that it stays on the line of the last word.
 
 - Describe what people see and do. Services, providers, error codes, browsers and how a feature
   works go in the README, `docs/` and the legal documents.
