@@ -219,7 +219,7 @@ private fun MainScaffold(profile: UserProfile, pendingRoute: MutableStateFlow<St
         }
         val target = DeepLinks.toRoute(l) ?: return@LaunchedEffect
         pendingRoute.value = null
-        nav.navigate(target) { launchSingleTop = true }
+        nav.openLink(target)
     }
     val pendingInvite by AppGraph.store.pendingInvite.collectAsStateWithLifecycle()
     val acceptedTerms by AppGraph.store.acceptedTerms.collectAsStateWithLifecycle()
@@ -395,10 +395,37 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: Tab, select
     )
 }
 
+/**
+ * Opens [route]'s tab. Each tab keeps the screens opened on it, so going back to a tab shows them
+ * again. The garden is the first screen of all: its tab goes back to it, and keeps the other
+ * tab's screens for when that tab opens again.
+ */
 fun NavController.switchTab(route: Any) {
+    val start = graph.findStartDestination().id
+    if (route == GardenRoute) {
+        // Navigation would restore the screens last saved over the garden here, such as People
+        // when a notification opened it on top of the garden (#124).
+        popBackStack(start, inclusive = false, saveState = true)
+        return
+    }
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        popUpTo(start) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+/**
+ * Opens the screen a notification links to. A tab opens as a tab. A chat or a friend's garden
+ * opens on the People tab, so Back goes to People and the tab bar works as usual.
+ */
+fun NavController.openLink(route: Any) {
+    when (route) {
+        GardenRoute, PeopleRoute, StatsRoute -> switchTab(route)
+        is ChatRoute, is FriendRoute -> {
+            switchTab(PeopleRoute)
+            navigate(route) { launchSingleTop = true }
+        }
+        else -> navigate(route) { launchSingleTop = true }
     }
 }
