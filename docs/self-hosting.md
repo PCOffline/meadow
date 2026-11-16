@@ -380,13 +380,15 @@ have tags like `backend-v0.7.0` (7.6).
   major × 1,000,000 + minor × 1,000 + patch, and the build stops at 1000.
 
 Automatic runs increase a version only when that part of Meadow changed. The commits that
-changed it set the part to increase:
+changed it set the part to increase. Each commit counts by its
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) type, or by a marker in
+its message. The largest part wins:
 
 | In a commit message | Meaning | 0.4.2 becomes | 1.4.2 becomes |
 |---|---|---|---|
-| nothing | a fix | 0.4.3 | 1.4.3 |
-| `[minor]` | a new feature | 0.5.0 | 1.5.0 |
-| `[major]` or `[breaking]` | an incompatible change | 0.5.0 | 2.0.0 |
+| `fix:`, `docs:` or any other type, or no type | a fix | 0.4.3 | 1.4.3 |
+| `feat:`, or `[minor]` | a new feature | 0.5.0 | 1.5.0 |
+| `!` after the type (`feat!:`), a `BREAKING CHANGE:` footer, `[major]` or `[breaking]` | an incompatible change | 0.5.0 | 2.0.0 |
 
 Below 1.0.0, an incompatible change increases the minor part, as SemVer says for 0.x versions.
 Thus commits alone never make Meadow 1.0.0. To go to 1.0.0, run Deliver by hand and choose

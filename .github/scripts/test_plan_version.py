@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import unittest
 
-from plan_version import plan
+from plan_version import bump_from_messages, plan
 
 
 class PlanVersionTest(unittest.TestCase):
@@ -67,6 +67,30 @@ class PlanVersionTest(unittest.TestCase):
         self.git("tag", "v0.3.4")
         self.commit("app/a.kt", "Add schedules [minor]")
         self.assertEqual("0.4.0", self.auto("app", self.commit("app/a.kt", "Fix a typo"))["version"])
+
+    def test_conventional_commit_types_choose_the_part(self):
+        self.assertEqual("patch", bump_from_messages("fix(app): keep the timer\0docs: say how\0Merge pull request #9"))
+        self.assertEqual("minor", bump_from_messages("fix: a\0feat(app): share a limit\0test: b"))
+        self.assertEqual("minor", bump_from_messages("Feat: upper case types count too"))
+        self.assertEqual("major", bump_from_messages("feat(sync)!: a new format\0feat: c"))
+        self.assertEqual("major", bump_from_messages("refactor: move\n\nBREAKING CHANGE: the old app can't sync"))
+        self.assertEqual("major", bump_from_messages("fix: x\n\nBREAKING-CHANGE: y"))
+        # Only the subject's type counts, not the word anywhere else.
+        self.assertEqual("patch", bump_from_messages("docs: how feat: commits release\0Revert \"feat: share\""))
+        self.assertEqual("patch", bump_from_messages("fix: x\n\nNot a BREAKING CHANGE: at all"))
+        self.assertEqual("patch", bump_from_messages(""))
+
+    def test_a_feature_raises_the_minor_part_of_its_own_component_only(self):
+        self.commit("app/a.kt")
+        self.commit("backend/f.ts")
+        self.git("tag", "v0.5.2")
+        self.git("tag", "backend-v0.4.5")
+        self.commit("backend/f.ts", "feat(backend): a new callable")
+        sha = self.commit("app/a.kt", "fix(app): a crash")
+        self.assertEqual("0.5.3", self.auto("app", sha)["version"])
+        self.assertEqual("0.5.0", self.auto("backend", sha)["version"])
+        self.git("tag", "v1.2.0")
+        self.assertEqual("2.0.0", self.auto("app", self.commit("app/a.kt", "feat(app)!: a new sync"))["version"])
 
     def test_only_commits_touching_the_component_count(self):
         self.commit("app/a.kt")
