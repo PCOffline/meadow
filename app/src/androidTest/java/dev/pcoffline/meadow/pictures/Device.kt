@@ -107,7 +107,9 @@ internal object Device {
     /** Starts a screen recording to [path], under [DIR], for at most [seconds]. [stopRecording] ends it. */
     fun startRecording(path: String, seconds: Int): ParcelFileDescriptor {
         shell("mkdir -p ${"$DIR/$path".substringBeforeLast('/')}")
-        return automation.executeShellCommand("screenrecord --time-limit $seconds --bit-rate 6000000 $DIR/$path")
+        // Half the screen's size: the description shows the video 300 pixels wide, and a smaller
+        // recording asks less of the emulator's software graphics, which crash under load.
+        return automation.executeShellCommand("screenrecord --time-limit $seconds --size 540x1200 --bit-rate 2000000 $DIR/$path")
     }
 
     /** Ends a recording from [startRecording] and waits until the file is complete. */

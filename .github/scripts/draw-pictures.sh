@@ -58,7 +58,12 @@ status=0
   --stacktrace) || status=$?
 kill "$copier" 2> /dev/null
 wait "$copier" 2> /dev/null
-adb pull "$DIR/." "$OUT" > /dev/null || echo "Couldn't copy every picture from the emulator"
+# Gradle can pass when the emulator crashed partway: then this copy fails, and the drawing isn't
+# complete, so a fresh emulator draws the rest.
+if ! adb pull "$DIR/." "$OUT" > /dev/null; then
+  echo "Couldn't copy every picture from the emulator"
+  status=1
+fi
 rm -f "$OUT/drawn.txt" "$drawn"
 total=$(find "$OUT" -name '*.png' | wc -l)
 echo "Has $total pictures in $OUT"

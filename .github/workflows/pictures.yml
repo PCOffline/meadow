@@ -14,7 +14,7 @@ name: Pictures
 # they're drawn from (.github/scripts/pictures-key.sh), in every look. A pull request on main then
 # takes its "before" pictures from the cache, and builds and draws only its own. When the cache has
 # no pictures for its base, it draws the base too. An emulator that stops keeps what it drew,
-# and a fresh one draws the rest, up to twice (draw-pictures.sh).
+# and a fresh one draws the rest, up to four times (draw-pictures.sh).
 on:
   push:
     branches: [main]
@@ -164,7 +164,7 @@ jobs:
       - name: Draw on an emulator
         id: draw
         # The emulator can crash partway (SwiftShader's "Failed to find ColorBuffer"). The pictures
-        # it drew are kept, and a fresh emulator draws the rest, up to twice, in the next steps.
+        # it drew are kept, and a fresh emulator draws the rest, up to four times, in the next steps.
         continue-on-error: true
         env:
           DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
@@ -186,8 +186,8 @@ jobs:
           # with SwiftShader's Vulkan, the software graphics that runners have.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
           script: .github/scripts/draw-all.sh
-      - name: Draw the rest on a fresh emulator
-        id: redraw
+      - name: Draw the rest on fresh emulator 2
+        id: redraw-2
         continue-on-error: true
         if: steps.draw.outcome == 'failure'
         env:
@@ -204,9 +204,46 @@ jobs:
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
           script: .github/scripts/draw-all.sh
-      - name: Draw the rest on another fresh emulator
-        id: redraw-again
-        if: steps.redraw.outcome == 'failure'
+      - name: Draw the rest on fresh emulator 3
+        id: redraw-3
+        continue-on-error: true
+        if: steps.redraw-2.outcome == 'failure'
+        env:
+          DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
+          LOOKS: ${{ steps.looks.outputs.looks }}
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
+          script: .github/scripts/draw-all.sh
+      - name: Draw the rest on fresh emulator 4
+        id: redraw-4
+        continue-on-error: true
+        if: steps.redraw-3.outcome == 'failure'
+        env:
+          DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
+          LOOKS: ${{ steps.looks.outputs.looks }}
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
+          script: .github/scripts/draw-all.sh
+      - name: Draw the rest on fresh emulator 5
+        id: redraw-5
+        continue-on-error: true
+        if: steps.redraw-4.outcome == 'failure'
         env:
           DRAW_BASE: ${{ steps.draw-base.outputs.yes }}
           LOOKS: ${{ steps.looks.outputs.looks }}
@@ -230,10 +267,17 @@ jobs:
           sudo dmesg -T | grep -iE "out of memory|killed process|oom|segfault|qemu" | tail -20 || true
           find /tmp/android-runner -maxdepth 2 -newer "$GITHUB_EVENT_PATH" -ls 2>/dev/null | tail -20 || true
       - name: Check the drawing
-        if: steps.draw.outcome == 'failure' && steps.redraw.outcome != 'success' && steps.redraw-again.outcome != 'success'
+        # Each emulator keeps what it drew, so the drawing is done once this pull request's part is
+        # complete. The base is drawn once (draw-all.sh): what it lacks shows as new.
+        if: always() && steps.draw.outcome == 'failure'
         run: |
-          echo "::error::The pictures weren't drawn. Read the drawing steps above."
-          exit 1
+          if [ ! -e build/pictures/after/.complete ]; then
+            echo "::error::The pictures weren't drawn. Read the drawing steps above."
+            exit 1
+          fi
+          if [ -e build/pictures/before/.tried ] && [ ! -e build/pictures/before/.complete ]; then
+            echo "::warning::The base's emulator stopped partway, so some screens show as new."
+          fi
       # On main, the pictures drawn are the "before" of the pull requests to come.
       - name: Keep main's pictures
         if: github.event_name == 'push'
