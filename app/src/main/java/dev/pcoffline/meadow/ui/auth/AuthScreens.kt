@@ -107,6 +107,7 @@ import dev.pcoffline.meadow.ui.settings.WeekStartPicker
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.pcoffline.meadow.ui.theme.Garden
 import kotlinx.coroutines.launch
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
 
 private enum class Step { INTRO, NAME, SIGN_IN }
 
@@ -215,11 +216,12 @@ private fun PageDots(count: Int, current: Int, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PlantIllustration() {
-    val garden = Garden.colors
+    // Three of the theme's plants, its own in the middle: the one on the right has little time left.
+    val plants = plantsOf(Garden.theme)
     Row(verticalAlignment = Alignment.Bottom) {
-        BloomFlower(0.55f, garden.petalLavender, Modifier.size(76.dp, 120.dp))
-        BloomFlower(1f, garden.petalPink, Modifier.size(110.dp, 180.dp), petals = 7)
-        BloomFlower(0.2f, garden.petalHoney, Modifier.size(76.dp, 120.dp), petals = 5)
+        BloomFlower(0.55f, plants[1], Modifier.size(76.dp, 120.dp))
+        BloomFlower(1f, plants[0], Modifier.size(110.dp, 180.dp))
+        BloomFlower(0.2f, plants[2], Modifier.size(76.dp, 120.dp))
     }
 }
 

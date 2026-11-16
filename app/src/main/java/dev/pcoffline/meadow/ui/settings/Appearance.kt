@@ -62,6 +62,7 @@ import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
 
 /**
  * How Meadow looks: live previews of each theme, plus light / dark / system. Changes apply at once.
@@ -170,10 +171,10 @@ private fun ThemeCard(theme: GardenTheme, selected: Boolean, modifier: Modifier,
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // The theme itself, small: its sky, sun, hills and a flower (a toadstool in the mushroom forest).
+        // The theme itself, small: its sky, sun, hills and its own plant (a toadstool in the mushroom forest).
         Box(Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(12.dp))) {
             SkyPreview(Modifier.matchParentSize())
-            BloomFlower(1f, Garden.colors.petalPink, Modifier.align(Alignment.BottomCenter).size(38.dp, 54.dp), sway = false, growIn = false)
+            BloomFlower(1f, plantsOf(Garden.theme).first(), Modifier.align(Alignment.BottomCenter).size(38.dp, 54.dp), sway = false, growIn = false)
         }
         Spacer(Modifier.height(6.dp))
         // Room for two lines on every card, so a long name doesn't make its card taller than the rest.

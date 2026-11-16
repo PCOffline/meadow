@@ -28,6 +28,7 @@ LOOKS = {
         KOTLIN + "ui/theme/",
         KOTLIN + "ui/components/Butterfly.kt",
         KOTLIN + "ui/components/Flowers.kt",
+        KOTLIN + "ui/components/flora/",
         KOTLIN + "ui/settings/Appearance.kt",
         APP + "res/values/colors.xml",
         APP + "res/values/themes.xml",

@@ -298,6 +298,13 @@ internal object Scenarios {
         }
     } + listOf(
 
+        // The theme's five plants, as the time of their apps goes.
+        Scenario("Plants", "All the time left") { Page { PlantSheet(1f) } },
+        Scenario("Plants", "A third of the time left") { Page { PlantSheet(0.33f) } },
+        Scenario("Plants", "A tenth of the time left") { Page { PlantSheet(0.1f) } },
+        Scenario("Plants", "Time used up") { Page { PlantSheet(0f) } },
+        Scenario("Plants", "Asleep") { Page { PlantSheet(1f, asleep = true) } },
+
         Scenario("Growth", "Week (tap Day, Week, Month, or a day of the month)") { Growth(d.stats) },
         Scenario("Growth", "Month") { Growth(d.monthStats) },
         Scenario("Growth", "A day") { Growth(Demo.day(Demo.yesterday)) },

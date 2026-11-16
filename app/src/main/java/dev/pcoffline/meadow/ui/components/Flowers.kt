@@ -15,26 +15,43 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.pcoffline.meadow.ui.components.flora.Form
+import dev.pcoffline.meadow.ui.components.flora.Look
+import dev.pcoffline.meadow.ui.components.flora.Piece
+import dev.pcoffline.meadow.ui.components.flora.Plant
+import dev.pcoffline.meadow.ui.components.flora.Sketch
+import dev.pcoffline.meadow.ui.components.flora.sketch
+import dev.pcoffline.meadow.ui.components.flora.vigour
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.theme.LocalDarkTheme
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.readable
 import kotlin.math.cos
@@ -45,33 +62,35 @@ val FlowerAsleep = SemanticsPropertyKey<Boolean>("FlowerAsleep")
 private var SemanticsPropertyReceiver.flowerAsleep by FlowerAsleep
 
 /**
- * A flower whose bloom mirrors how much time is left: wide open with plenty left,
- * closing and drooping as the limit approaches, wilted once it is used up. [asleep] folds it into
- * a closed bud nodding off, keeping its colour: resting outside its hours, not used up. In the
- * mushroom forest it's a mushroom instead, its cap [petalColor]: spread wide with plenty left,
- * closing and drooping the same way.
+ * A plant that shows how much time is left ([bloom], from 1 to 0). It is in full bloom while half
+ * or more is left. With less, it nods, closes a little and drops a petal or two. With none left,
+ * it is dried, in its own colour and in the form its kind takes: a seed head, a bare cup or a
+ * skirt of hanging petals. [asleep] closes it into a bud in full colour: it rests outside its
+ * hours, and its time isn't used up. In the mushroom forest, [plant] is a mushroom, which ages in
+ * place of wilting.
  */
 @Composable
 fun BloomFlower(
     bloom: Float,
-    petalColor: Color,
+    plant: Plant,
     modifier: Modifier = Modifier,
-    petals: Int = 6,
     sway: Boolean = true,
     growIn: Boolean = true,
     asleep: Boolean = false,
 ) {
-    val garden = Garden.colors
-    val mushroom = Garden.theme == GardenTheme.MUSHROOM
+    val theme = Garden.theme
+    val dark = LocalDarkTheme.current
     val reduced = rememberReducedMotion()
-    val animatedBloom by animateFloatAsState(bloom.coerceIn(0f, 1f), tween(900), label = "bloom")
+    val left = bloom.coerceIn(0f, 1f)
+    val lively by animateFloatAsState(vigour(left), tween(900), label = "vigour")
+    // Used up and asleep are forms of their own, so the plant fades from one form to the next.
+    val spent by animateFloatAsState(if (left <= 0f) 1f else 0f, tween(900), label = "spent")
     val sleep by animateFloatAsState(if (asleep) 1f else 0f, tween(900), label = "sleep")
     // Sprouts up from the soil the first time it appears.
     val grow = remember { Animatable(if (growIn && !reduced) 0f else 1f) }
     LaunchedEffect(Unit) {
         grow.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessVeryLow))
     }
-    // Read only while drawing, so the sway redraws the flower without recomposing it.
     val swayAngle: State<Float>? = if (sway && !reduced) {
         val transition = rememberInfiniteTransition(label = "sway")
         transition.animateFloat(
@@ -81,83 +100,84 @@ fun BloomFlower(
             label = "swayAngle",
         )
     } else null
-    // Reused every frame instead of allocating new paths.
-    val stem = remember { Path() }
-    val leafPath = remember { Path() }
+    // A mushroom is stiffer than a flower.
+    val bend = if (plant.form == Form.MUSHROOM) 0.4f else 1f
 
-    Canvas(modifier.semantics { flowerAsleep = asleep }) {
-        // Asleep, it barely sways and never looks wilted.
-        val angle = (swayAngle?.value ?: 0f) * (1f - 0.7f * sleep)
-        val wilt = (1f - animatedBloom) * (1f - sleep)
-        val shown = animatedBloom + (0.12f - animatedBloom) * sleep
-        val w = size.width
-        val h = size.height
-        val base = Offset(w / 2f, h * 0.94f)
-        // Nods off to one side, gently, rather than drooping.
-        val head = Offset(
-            w / 2f + wilt * wilt * w * 0.22f + sleep * w * 0.12f,
-            h * 0.34f + wilt * wilt * h * 0.16f + sleep * h * 0.07f,
+    Box(modifier.semantics { flowerAsleep = asleep }) {
+        // What lies on the ground stays still.
+        Spacer(
+            Modifier.matchParentSize().drawWithCache {
+                val look = looks(lively, spent, sleep).maxBy { it.second }.first
+                val ground = painted(sketch(theme, plant, look, dark).ground)
+                onDrawBehind { paint(ground) }
+            },
         )
-
-        // Soil mound.
-        drawOval(garden.soil.copy(alpha = 0.55f), topLeft = Offset(w * 0.22f, h * 0.89f), size = Size(w * 0.56f, h * 0.09f))
-
-        scale(grow.value, grow.value, pivot = base) {
-        rotate(angle * (0.4f + shown), pivot = base) {
-            if (mushroom) {
-                // A shorter stalk than a flower's stem, so the cap sits low like a mushroom's.
-                val top = Offset(head.x, head.y + h * 0.16f)
-                mushroom(base, top, w, lerp(petalColor, garden.wilted, wilt * 0.85f), lerp(MushroomStalk, garden.wilted, wilt * 0.6f),
-                    lerp(garden.leaf, garden.wilted, wilt * 0.6f), open = shown, droop = wilt * (1f - sleep), path = stem, leafPath = leafPath)
-                return@rotate
-            }
-            stem.reset()
-            stem.moveTo(base.x, base.y)
-            stem.quadraticTo(w / 2f - w * 0.06f, h * 0.62f, head.x, head.y)
-            drawPath(stem, lerp(garden.stem, garden.wilted, wilt * 0.7f), style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
-            leaf(Offset(w / 2f - w * 0.02f, h * 0.70f), w * 0.22f, -35f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
-            leaf(Offset(w / 2f + w * 0.01f, h * 0.60f), w * 0.18f, 200f, lerp(garden.leaf, garden.wilted, wilt * 0.6f), leafPath)
-            flowerHead(head, w * 0.13f + w * 0.11f * shown, petals, lerp(petalColor, garden.wilted, wilt * 0.85f), shown, garden.petalHoney, droops = 1f - sleep)
-        }
-        }
-        if (!mushroom && animatedBloom < 0.15f && sleep < 0.5f) {
-            // A couple of fallen petals.
-            val fallen = lerp(petalColor, garden.wilted, 0.6f)
-            drawOval(fallen, topLeft = Offset(w * 0.62f, h * 0.88f), size = Size(w * 0.10f, h * 0.035f))
-            drawOval(fallen, topLeft = Offset(w * 0.28f, h * 0.90f), size = Size(w * 0.08f, h * 0.03f))
-        }
+        // The plant is drawn once for each look, and then only turned: the sway and the sprouting
+        // are read here, so they move the drawing without drawing it again.
+        Spacer(
+            Modifier.matchParentSize()
+                .graphicsLayer {
+                    val foot = size.height - (Sketch.HEIGHT - Sketch.BASE.y) * fit(size)
+                    transformOrigin = TransformOrigin(0.5f, foot / size.height)
+                    // Asleep, it barely sways.
+                    rotationZ = (swayAngle?.value ?: 0f) * bend * (0.6f + 0.6f * lively) * (1f - 0.7f * sleep)
+                    scaleX = grow.value
+                    scaleY = grow.value
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
+                .drawWithCache {
+                    val layers = looks(lively, spent, sleep).map { (look, share) -> painted(sketch(theme, plant, look, dark).body) to share }
+                    onDrawBehind {
+                        layers.forEach { (shapes, share) ->
+                            if (share > 0.99f) {
+                                paint(shapes)
+                            } else {
+                                drawIntoCanvas { canvas ->
+                                    canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = share })
+                                    paint(shapes)
+                                    canvas.restore()
+                                }
+                            }
+                        }
+                    }
+                },
+        )
     }
 }
-
-private val MushroomStalk = Color(0xFFF1E6D2)
 
 /**
- * A mushroom from [base] up to its cap at [top]: a pale stalk with a tuft of moss, and a [cap]
- * that's a tall closed dome at [open] 0 and a wide, flatter cap at 1, tipping over as it [droop]s.
+ * The looks to draw, each with its share from 0 to 1. At rest there is one. While a plant changes
+ * to or from used up ([spent]) or asleep ([sleep]), there are two, and one fades into the other.
  */
-private fun DrawScope.mushroom(
-    base: Offset, top: Offset, w: Float, cap: Color, stalk: Color, moss: Color, open: Float, droop: Float, path: Path, leafPath: Path,
-) {
-    path.reset()
-    path.moveTo(base.x, base.y)
-    path.quadraticTo(base.x - w * 0.03f, (base.y + top.y) / 2f, top.x, top.y)
-    drawPath(path, stalk, style = Stroke(width = w * 0.11f, cap = StrokeCap.Round))
-    leaf(Offset(base.x - w * 0.04f, base.y - w * 0.02f), w * 0.15f, -150f, moss, leafPath)
-    leaf(Offset(base.x + w * 0.04f, base.y - w * 0.02f), w * 0.13f, -28f, moss, leafPath)
-    val width = w * (0.32f + 0.3f * open)
-    val height = width * (0.9f - 0.42f * open)
-    rotate(droop * droop * 32f, pivot = top) {
-        // The gills under the cap, then the cap over them, then its pale spots.
-        drawOval(lerp(cap, stalk, 0.55f), topLeft = Offset(top.x - width * 0.45f, top.y - height * 0.1f), size = Size(width * 0.9f, height * 0.22f))
-        drawArc(cap, startAngle = 180f, sweepAngle = 180f, useCenter = true, topLeft = Offset(top.x - width / 2f, top.y - height), size = Size(width, height * 2f))
-        for ((dx, dy, r) in MUSHROOM_SPOTS) {
-            drawCircle(Color.White.copy(alpha = 0.82f), radius = width * r, center = Offset(top.x + dx * width, top.y - dy * height))
-        }
+internal fun looks(vigour: Float, spent: Float, sleep: Float): List<Pair<Look, Float>> = listOf(
+    Look.Open(vigour) to (1f - spent) * (1f - sleep),
+    Look.Spent to spent * (1f - sleep),
+    Look.Asleep to sleep,
+).filter { it.second > 0.01f }
+
+/** How many pixels one unit of a [Sketch] is, so that the whole sketch fits in [size]. */
+private fun fit(size: Size): Float = minOf(size.width / Sketch.WIDTH, size.height / Sketch.HEIGHT)
+
+private class Painted(val path: Path, val color: Color, val clip: Path?)
+
+/** [pieces] as paths in this size: centred, and standing on the bottom edge. */
+private fun CacheDrawScope.painted(pieces: List<Piece>): List<Painted> {
+    val scale = fit(size)
+    val left = (size.width - Sketch.WIDTH * scale) / 2f
+    val top = size.height - Sketch.HEIGHT * scale
+    fun path(points: FloatArray) = Path().apply {
+        moveTo(left + points[0] * scale, top + points[1] * scale)
+        for (i in 2 until points.size step 2) lineTo(left + points[i] * scale, top + points[i + 1] * scale)
+        close()
     }
+    // Pieces that are cut to one outline share its path.
+    val clips = HashMap<FloatArray, Path>()
+    return pieces.map { Painted(path(it.points), it.color, it.clip?.let { clip -> clips.getOrPut(clip) { path(clip) } }) }
 }
 
-/** Where a cap's spots go, across its width and up its height, and their sizes. */
-private val MUSHROOM_SPOTS = listOf(Triple(-0.24f, 0.45f, 0.06f), Triple(0.16f, 0.62f, 0.07f), Triple(0.02f, 0.25f, 0.045f), Triple(0.3f, 0.28f, 0.04f))
+private fun DrawScope.paint(shapes: List<Painted>) = shapes.forEach {
+    if (it.clip == null) drawPath(it.path, it.color) else clipPath(it.clip) { drawPath(it.path, it.color) }
+}
 
 private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Color, path: Path = Path()) {
     rotate(degrees, pivot = at) {
@@ -168,25 +188,6 @@ private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Col
         path.close()
         drawPath(path, color)
     }
-}
-
-private fun DrawScope.flowerHead(center: Offset, radius: Float, petals: Int, color: Color, bloom: Float, heart: Color, droops: Float = 1f) {
-    // Petals fold inwards and droop as the bloom fades; a sleeping bud folds without drooping.
-    val spread = 0.45f + 0.55f * bloom
-    val droop = (1f - bloom) * 50f * droops
-    for (i in 0 until petals) {
-        val baseAngle = 360f / petals * i - 90f
-        val a = baseAngle * spread + droop * (if (baseAngle > -90f) 1f else -1f) * 0.3f + (1f - spread) * 90f
-        rotate(a, pivot = center) {
-            drawOval(
-                color = color,
-                topLeft = Offset(center.x - radius * 0.32f, center.y - radius * 1.05f),
-                size = Size(radius * 0.64f, radius * 1.05f),
-            )
-        }
-    }
-    drawCircle(heart, radius = radius * (0.26f + 0.08f * bloom), center = center)
-    drawCircle(Color.White.copy(alpha = 0.35f), radius = radius * 0.08f, center = center + Offset(-radius * 0.08f, -radius * 0.08f))
 }
 
 /** A small flat daisy for decorating headers and empty states. */

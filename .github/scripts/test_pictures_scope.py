@@ -10,6 +10,7 @@ class LooksTest(unittest.TestCase):
     def test_a_change_to_the_themes_or_the_flowers_draws_each_theme_by_day_only(self):
         self.assertEqual("themes", looks([KOTLIN + "ui/profile/ProfileScreen.kt", KOTLIN + "ui/theme/Theme.kt"]))
         self.assertEqual("themes", looks([KOTLIN + "ui/components/Flowers.kt", KOTLIN + "ui/settings/Appearance.kt"]))
+        self.assertEqual("themes", looks([KOTLIN + "ui/components/flora/Plants.kt"]))
 
     def test_a_change_to_the_night_colours_draws_each_theme_by_night(self):
         self.assertEqual("night", looks(["app/src/main/res/values-night/colors.xml"]))

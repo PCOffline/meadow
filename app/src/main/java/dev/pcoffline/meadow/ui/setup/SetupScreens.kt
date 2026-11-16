@@ -70,6 +70,7 @@ import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.components.asHeading
 import dev.pcoffline.meadow.ui.theme.Garden
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
 
 @Composable
 fun SetupScreen(
@@ -117,7 +118,7 @@ fun SetupScreen(
                 GrowthBar(done / total.toFloat(), color = Garden.colors.growth)
             }
             Spacer(Modifier.width(12.dp))
-            BloomFlower(0.1f + 0.9f * done / total, Garden.colors.petalPink, Modifier.size(76.dp, 116.dp), petals = 7)
+            BloomFlower(0.1f + 0.9f * done / total, plantsOf(Garden.theme).first(), Modifier.size(76.dp, 116.dp))
         }
         SetupStep(
             emoji = "📊",

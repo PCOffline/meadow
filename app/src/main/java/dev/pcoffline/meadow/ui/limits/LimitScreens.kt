@@ -124,6 +124,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import dev.pcoffline.meadow.ui.components.flora.plantFor
 
 @Composable
 fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable () -> Unit = {}) {
@@ -407,7 +408,7 @@ internal fun LimitEditor(
                 }
             }
             BloomFlower(
-                1f - (state.budget?.usedFraction ?: 0f), Garden.colors.petalPink, Modifier.size(48.dp, 72.dp),
+                1f - (state.budget?.usedFraction ?: 0f), plantFor(packageName, Garden.theme), Modifier.size(48.dp, 72.dp),
                 asleep = state.budget?.sleeping == true,
             )
         }
