@@ -17,8 +17,9 @@ commit messages).
 - By hand, auto: as below, but the backend deploys even when unchanged, as the version it has.
 - Automatically, after Build passes on main: ships only when the component changed since its last
   tag, unless the last commit says [skip release] (app) or [skip deploy] (backend). Commits that
-  touch the component decide the part: [major] or [breaking] for incompatible changes, [minor] for
-  new features, anything else a patch.
+  touch the component decide the part, by their Conventional Commits type or a marker:
+  `type!:`, a `BREAKING CHANGE:` footer, [major] or [breaking] for incompatible changes; `feat`
+  or [minor] for new features; anything else a patch.
 
 Leaving 0.x is a choice made by hand. Until then, SemVer's rule for 0.x versions applies to
 automatic runs: an incompatible change raises the minor part (0.4.2 → 0.5.0). From 1.0.0 on,
@@ -87,10 +88,24 @@ def bumped(version: Version, part: str, chosen: bool) -> tuple[Version, str]:
     return (major, minor, patch + 1), part
 
 
-def bump_from_messages(messages: str) -> str:
-    if "[major]" in messages or "[breaking]" in messages:
+# A Conventional Commits subject, `type(scope)!: summary`, and the footer of a breaking change.
+SUBJECT = re.compile(r"^(?P<type>[a-z]+)(\([^)\n]*\))?(?P<breaking>!)?: ", re.IGNORECASE)
+BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
+
+
+def part_of(message: str) -> str:
+    """The part one commit raises: by its markers, else by its Conventional Commits type."""
+    subject = SUBJECT.match(message.strip())
+    if "[major]" in message or "[breaking]" in message or BREAKING_FOOTER.search(message) or (subject and subject["breaking"]):
         return "major"
-    return "minor" if "[minor]" in messages else "patch"
+    if "[minor]" in message or (subject and subject["type"].lower() == "feat"):
+        return "minor"
+    return "patch"
+
+
+def bump_from_messages(messages: str) -> str:
+    """The largest part that any of the NUL-separated commit [messages] raises."""
+    return max((part_of(m) for m in messages.split("\0")), key=PARTS.index, default="patch")
 
 
 def text(version: Version) -> str:

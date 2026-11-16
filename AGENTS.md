@@ -12,8 +12,9 @@ Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
   `revert`.
 - Scopes, when they help: `app`, `backend`, `rules`, `legal`, `ci`, `e2e`, or a feature name.
 - Breaking changes: put `!` after the type, or add a `BREAKING CHANGE:` footer.
-- Release markers also apply: `[minor]`, `[major]`, `[skip release]`, `[skip deploy]`. Read
-  `docs/self-hosting.md`.
+- The type sets the next version: `feat` raises the minor part, a breaking change raises the
+  major part, and other types raise the patch. Read `docs/self-hosting.md` (7.5).
+- Markers also apply: `[minor]`, `[major]`, `[skip release]`, `[skip deploy]`.
 
 ## Branches
 
