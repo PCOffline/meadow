@@ -1,17 +1,19 @@
 """Turns the Pictures workflow's two emulator runs into the pull request's pictures comment.
 
-Usage: pr_pictures.py <before dir> <after dir> <out dir> <url of out dir> [<url to browse it>]
+Usage: STORIES=<names> pr_pictures.py <before dir> <after dir> <out dir> <url of out dir> [<url to browse it>]
        pr_pictures.py body <description file> <pictures.md>   (prints the new description)
 
 <before dir> and <after dir> hold what the phone tests wrote (GalleryPictures and the stories),
 for the pull request's base and for the pull request. This writes, under <out dir>:
 - the pictures the comment shows, made smaller, and each story's video as an animated WebP,
-- pictures.md: each story that is new or changed, step by step, then each screen that changed,
+- pictures.md: each story that the pull request adds or changes (STORIES, from pictures_scope.py)
+  and that looks different from the base's, step by step, then each screen that changed,
   before and after, grouped by theme (day and night) and by the large-text and narrow looks.
 The workflow publishes <out dir> at <url of out dir>, and puts pictures.md in the pull request's
 description (with_pictures). Needs Pillow, and ffmpeg for the videos.
 """
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -265,10 +267,24 @@ def animation(video: Path, target: Path) -> bool:
     return result.returncode == 0 and target.exists()
 
 
-def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
+def touched(names: str | None) -> set[str] | None:
+    """The stories named in [names] ("A,B"), or None for every story ("*", or not set)."""
+    if names is None or names.strip() == "*":
+        return None
+    return {name for name in names.split(",") if name}
+
+
+def stories(before: Path, after: Path, out: Path, only: set[str] | None = None) -> list[StoryPictures]:
+    """
+    Each story drawn, paired with the base's. With [only], just those stories: a story that the
+    pull request doesn't touch can look different too (a new flower colour shows in every garden),
+    but it's about another change.
+    """
     found = []
     for meta in sorted((after / "stories").glob("*/story.json")):
         name = meta.parent.name
+        if only is not None and name not in only:
+            continue
         story = json.loads(meta.read_text())
         old = before / "stories" / name
         old_story = json.loads((old / "story.json").read_text()) if (old / "story.json").exists() else None
@@ -301,7 +317,7 @@ def stories(before: Path, after: Path, out: Path) -> list[StoryPictures]:
     return found
 
 
-def main(before: Path, after: Path, out: Path, url: str, browse: str | None = None) -> None:
+def main(before: Path, after: Path, out: Path, url: str, browse: str | None = None, only: set[str] | None = None) -> None:
     out.mkdir(parents=True, exist_ok=True)
     named = names(after) + names(before)
     bars = system_bars(after / "gallery")
@@ -321,7 +337,7 @@ def main(before: Path, after: Path, out: Path, url: str, browse: str | None = No
         for path in gallery.added:
             (out / "after" / "gallery" / path).parent.mkdir(parents=True, exist_ok=True)
             (out / "after" / "gallery" / path).write_bytes((after / "gallery" / path).read_bytes())
-    text = section(stories(before, after, out), gallery, url.rstrip("/"), browse and browse.rstrip("/"))
+    text = section(stories(before, after, out, only), gallery, url.rstrip("/"), browse and browse.rstrip("/"))
     (out / "pictures.md").write_text(text)
     print(f"{len(gallery.changed)} changed, {len(gallery.added)} new, {len(gallery.removed)} gone, {gallery.unchanged} the same")
 
@@ -330,4 +346,5 @@ if __name__ == "__main__":
     if sys.argv[1] == "body":
         print(with_pictures(Path(sys.argv[2]).read_text(), Path(sys.argv[3]).read_text()), end="")
     else:
-        main(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4], (sys.argv[5:] or [None])[0])
+        main(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4], (sys.argv[5:] or [None])[0],
+             touched(os.environ.get("STORIES")))

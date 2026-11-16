@@ -17,6 +17,7 @@ from pr_pictures import (
     names,
     section,
     stories,
+    touched,
     with_pictures,
 )
 
@@ -263,6 +264,38 @@ class StoriesTest(unittest.TestCase):
             after.save(root / "after.png")
             self.assertTrue(differs(root / "before.png", root / "after.png"))
             self.assertFalse(differs(root / "before.png", root / "after.png", (24, 24)))
+
+class TouchedTest(unittest.TestCase):
+    def test_reads_the_stories_that_the_pull_request_touches(self):
+        self.assertEqual({"ThemePreviewStory", "EmojiWithPhotoStory"}, touched("ThemePreviewStory,EmojiWithPhotoStory"))
+
+    def test_none_touched_is_an_empty_set(self):
+        self.assertEqual(set(), touched(""))
+
+    def test_every_story_or_not_set_is_none(self):
+        self.assertIsNone(touched("*"))
+        self.assertIsNone(touched(None))
+
+
+class OnlyTouchedStoriesTest(unittest.TestCase):
+    def test_a_story_that_the_pull_request_doesnt_touch_isnt_shown_even_when_it_differs(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs Pillow")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("ThemePreviewStory", "RainInSceneStory"):
+                for side, colour in (("before", "white"), ("after", "pink")):
+                    story = root / side / "stories" / name
+                    story.mkdir(parents=True)
+                    Image.new("RGB", (108, 240), colour).save(story / "01.png")
+                    (story / "story.json").write_text(json.dumps({"title": name, "steps": ["One."]}))
+            found = stories(root / "before", root / "after", root / "out", only={"ThemePreviewStory"})
+            self.assertEqual(["ThemePreviewStory"], [story.name for story in found])
+            self.assertTrue(found[0].changed)
+            self.assertFalse((root / "out" / "after" / "stories" / "RainInSceneStory").exists())
+
 
 class MainTest(unittest.TestCase):
     def test_a_look_left_out_on_purpose_is_not_gone(self):

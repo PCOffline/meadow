@@ -41,10 +41,10 @@ import org.junit.runner.RunWith
 
 /**
  * Every state of every screen in the debug gallery ([Scenarios]), for the pull request pictures:
- * in the Meadow theme by day, in large text and on a narrow phone. With `looks=all` (main, and a
- * pull request that changes the themes, the sky or the weather), also in each theme by day and by
- * night, and in each weather. The Pictures workflow draws them for the pull request and for its
- * base, and shows the ones that changed. The sky, the weather and the motion are fixed, so two runs
+ * in the Meadow theme by day, in large text and on a narrow phone. The `looks` argument adds more
+ * (.github/scripts/pictures_scope.py): `themes` each theme by day, `night` each theme by night,
+ * `weather` each weather, and `all` every one of them (main). The Pictures workflow draws them for
+ * the pull request and for its base, and shows the ones that changed. The sky, the weather and the motion are fixed, so two runs
  * of the same code draw the same pixels.
  *
  * Skipped unless run with `-Pandroid.testInstrumentationRunnerArguments.pictures=true`.
@@ -82,14 +82,20 @@ class GalleryPictures {
     }
 
     /**
-     * Whether to draw every look and every weather (`looks=all`): on main, and in a pull request
-     * that changes the themes, the sky or the weather. Other pull requests draw [BASIC_LOOKS] and
-     * the clear sky only, as their change looks the same in each.
+     * The looks to draw beyond [BASIC_LOOKS] under a clear sky: `themes`, `night`, `weather`, or
+     * `all`. A pull request draws only those its change looks different in.
      */
-    private val drawsAll get() = InstrumentationRegistry.getArguments().getString("looks") == "all"
+    private val extra by lazy {
+        InstrumentationRegistry.getArguments().getString("looks").orEmpty().split(",").toSet()
+    }
 
-    private fun drawn(look: Look, scenario: Scenario) =
-        drawsAll || (look.name in BASIC_LOOKS && !scenario.name.startsWith(WEATHER))
+    private fun drawn(look: Look, scenario: Scenario): Boolean {
+        if ("all" in extra) return true
+        val inLook = look.name in BASIC_LOOKS ||
+            (look.mode == DarkMode.LIGHT && "themes" in extra) ||
+            (look.mode == DarkMode.DARK && "night" in extra)
+        return inLook && (!scenario.name.startsWith(WEATHER) || "weather" in extra)
+    }
 
     @Before
     fun setUp() {

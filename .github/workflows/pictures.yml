@@ -1,10 +1,11 @@
 name: Pictures
 
 # Draws a pull request's pictures on an Android emulator and puts them in its description: each
-# story that is new or changed, step by step with a video, and each screen of the debug gallery
-# that changed, before and after. A pull request draws one theme by day, large text and a narrow
-# phone, unless it changes the themes, the sky or the weather (.github/scripts/pictures_scope.py). Read "Pull requests" in AGENTS.md. The pictures are published on the
-# branch pictures/pr-<number>. A pull request from a fork gets them in the run's artifact only.
+# story that the pull request adds or changes, step by step with a video, and each screen of the
+# debug gallery that changed, before and after. A pull request draws one theme by day, large text
+# and a narrow phone, and only the other looks that its change shows in
+# (.github/scripts/pictures_scope.py). Read "Pull requests" in AGENTS.md. The pictures are
+# published on the branch pictures/pr-<number>. A pull request from a fork gets them in the run's artifact only.
 #
 # Two jobs: "pictures" builds and runs the pull request's code with a read-only token, and
 # "publish" holds the write token and runs no code from the pull request, only the base's.
@@ -106,8 +107,16 @@ jobs:
         env:
           BASE: ${{ steps.base.outputs.sha }}
         run: |
-          # Main draws every look: it's the base of every pull request to come.
-          if [ "$GITHUB_EVENT_NAME" = push ]; then looks=all; else looks="$(python3 .github/scripts/pictures_scope.py "$BASE")"; fi
+          # Main draws every look: it's the base of every pull request to come. A pull request
+          # draws the looks its change shows in, and shows only the stories it adds or changes.
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            looks=all
+          else
+            looks="$(python3 .github/scripts/pictures_scope.py looks "$BASE")"
+            stories="$(python3 .github/scripts/pictures_scope.py stories "$BASE")"
+            echo "Stories: ${stories:-none}"
+            echo "stories=$stories" >> "$GITHUB_OUTPUT"
+          fi
           echo "Looks: $looks"
           echo "looks=$looks" >> "$GITHUB_OUTPUT"
       - name: Check out the base
@@ -243,6 +252,7 @@ jobs:
         env:
           REPO: ${{ github.repository }}
           RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+          STORIES: ${{ steps.looks.outputs.stories }}
         run: |
           # Each run has a folder of its own, so a picture never comes from an older run's cache.
           echo "folder=$RUN" >> "$GITHUB_OUTPUT"
