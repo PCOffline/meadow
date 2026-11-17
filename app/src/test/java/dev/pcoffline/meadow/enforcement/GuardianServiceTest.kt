@@ -8,8 +8,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.Emergency
+import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.notifications.Notifier
+import dev.pcoffline.meadow.ui.durationText
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -99,5 +103,35 @@ class GuardianServiceTest {
         GuardianService.start(app)
 
         assertEquals(GuardianService::class.java.name, shadowOf(app).nextStartedService?.component?.className)
+    }
+
+    private val asleep = Schedule((1..7).associateWith { emptyList<TimeWindow>() })
+
+    @Test
+    fun `with time left, its notification names the app with the least`() {
+        AppGraph.store.setLimits(listOf(AppLimit("com.pebbles", "Pebbles", 30, 0), AppLimit("com.ducks", "Ducks", 90, 0)))
+        create()
+
+        val expected = app.getString(R.string.guardian_left, "Pebbles", app.resources.durationText(30 * 60_000L))
+        assertEquals(expected, awaitGuardianText { it == expected })
+    }
+
+    @Test
+    fun `apps outside their hours are counted as resting`() {
+        AppGraph.store.setLimits(listOf(AppLimit("com.pebbles", "Pebbles", 0, 0, schedule = asleep)))
+        create()
+
+        val expected = app.resources.getQuantityString(R.plurals.guardian_resting, 1, 1)
+        assertEquals(expected, awaitGuardianText { it == expected })
+    }
+
+    @Test
+    fun `time left and resting apps are said together`() {
+        AppGraph.store.setLimits(listOf(AppLimit("com.pebbles", "Pebbles", 0, 0, schedule = asleep), AppLimit("com.ducks", "Ducks", 45, 0)))
+        create()
+
+        val left = app.getString(R.string.guardian_left, "Ducks", app.resources.durationText(45 * 60_000L))
+        val expected = app.getString(R.string.guardian_joined, left, app.resources.getQuantityString(R.plurals.guardian_resting, 1, 1))
+        assertEquals(expected, awaitGuardianText { it == expected })
     }
 }
