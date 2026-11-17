@@ -32,25 +32,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.SunTimes
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
 
 /** Garden palette beyond Material's roles: petals, leaves and soil for drawings and charts. */
 @Immutable
 data class GardenColors(
-    val petalPink: Color,
-    val petalLavender: Color,
-    val petalHoney: Color,
-    val petalPeach: Color,
-    val petalSky: Color,
+    /**
+     * The petal colours of the theme's five plants, its own first. The small flowers on the hills,
+     * the section titles' daisy, the falling petals and the petal shower are in these colours.
+     */
+    val petals: List<Color>,
+    /** The middle of each of those flowers, in the same order. */
+    val hearts: List<Color>,
     val leaf: Color,
     val leafDark: Color,
     val stem: Color,
     val soil: Color,
     val sky: Color,
-    val wilted: Color,
     val cardTint: Color,
     /** Bars and progress: [leaf], deepened (by night, lightened) to stand out from any surface (3:1). */
     val growth: Color,
-    /** Highlighted bars and nearly-full progress: [petalPink], made to stand out the same way. */
+    /** Highlighted bars and nearly-full progress: the theme's own petal, made to stand out the same way. */
     val growthHigh: Color,
     /**
      * Less screen time than before: green in every theme, as the colour of things going well.
@@ -64,9 +66,7 @@ data class GardenColors(
     val grass: Color,
     /** A pale tint the daytime sky takes on in this theme. */
     val skyTint: Color,
-) {
-    val petals: List<Color> get() = listOf(petalPink, petalLavender, petalHoney, petalPeach, petalSky)
-}
+)
 
 /** How Meadow looks. Picked in Profile; each theme has a light and a dark version. */
 enum class GardenTheme(val key: String, @StringRes val label: Int, val emoji: String) {
@@ -132,50 +132,42 @@ private data class Seed(
     val secondary: Color,
     val tertiary: Color,
     val background: Color,
-    /** Flower colours, the theme's own flower first. */
-    val petals: List<Color>,
     val leaf: Color,
     /** A pale tint for the daytime sky, so it takes on the theme without going grey. */
     val sky: Color,
 )
 
-// Each page is lightly tinted with its theme's own colour, as cherry blossom's is pink, and its
-// flowers are picked to sit together.
+// Each page is lightly tinted with its theme's own colour, as cherry blossom's is pink. The flower
+// colours are those of the theme's plants (ui/components/flora/Plants.kt).
 private val Seeds = mapOf(
     GardenTheme.MEADOW to Seed(
         Color(0xFF4F7F4C), Color(0xFFB4646C), Color(0xFF6B7FB8), Color(0xFFF3F6EA),
-        listOf(Color(0xFFEFA3B0), Color(0xFFB9A9E0), Color(0xFFF2C24F), Color(0xFFF5B48A), Color(0xFF93C1E6)),
         Color(0xFF86B56F),
         Color(0xFFCDE8F2),
     ),
     GardenTheme.BLOSSOM to Seed(
         Color(0xFFB5577A), Color(0xFF7F8F5A), Color(0xFF8E6FB0), Color(0xFFFCEBEE),
-        listOf(Color(0xFFF4B6C8), Color(0xFFF9D3DF), Color(0xFFE8A0A6), Color(0xFFD7B6E0), Color(0xFFFFE1A8)),
         Color(0xFF9DB57E),
         Color(0xFFF0B4C8),
     ),
     GardenTheme.LAVENDER to Seed(
         Color(0xFF6B57A8), Color(0xFFA0607E), Color(0xFF5E8C7A), Color(0xFFF5F2FB),
-        listOf(Color(0xFFB7A6E4), Color(0xFFD5C8F2), Color(0xFF9C88D2), Color(0xFFF1B5C8), Color(0xFFF3D98F)),
         Color(0xFF97B39A),
         Color(0xFFD9CCF2),
     ),
     GardenTheme.SUNFLOWER to Seed(
         Color(0xFF9A6412), Color(0xFF6E8A3A), Color(0xFFB0614A), Color(0xFFFFF8E8),
-        listOf(Color(0xFFF4C13E), Color(0xFFF7D774), Color(0xFFEC9F35), Color(0xFFF0B184), Color(0xFFD98E5F)),
         Color(0xFF92B45E),
         Color(0xFFFBE3A6),
     ),
     GardenTheme.POND to Seed(
         Color(0xFF2E7A80), Color(0xFFC07A86), Color(0xFF6C7FB0), Color(0xFFECF6F4),
-        listOf(Color(0xFFF2B2C4), Color(0xFF98CBE0), Color(0xFFB5E0D3), Color(0xFFF0D98A), Color(0xFFC8B8EA)),
         Color(0xFF72B39A),
         Color(0xFFBFE6E3),
     ),
     GardenTheme.MUSHROOM to Seed(
-        // A woodland floor: toadstool red, chanterelle, tan and brown caps, and moss.
+        // A woodland floor: toadstool red, bark brown and moss.
         Color(0xFF9B3F2E), Color(0xFF5E7A45), Color(0xFF8A6D4E), Color(0xFFF5F1E8),
-        listOf(Color(0xFFD4573F), Color(0xFFE59B52), Color(0xFFBF9670), Color(0xFF9E6B4A), Color(0xFFC7A2D8)),
         Color(0xFF7FA05F),
         Color(0xFFEEC49A),
     ),
@@ -253,7 +245,7 @@ internal fun colorSchemeFor(theme: GardenTheme, dark: Boolean): androidx.compose
     Seeds.getValue(theme).let { if (dark) darkScheme(it) else lightScheme(it) }
 
 /** The garden palette for a theme; internal so tests can check the colours used behind text. */
-internal fun gardenColorsFor(theme: GardenTheme, dark: Boolean): GardenColors = gardenColors(Seeds.getValue(theme), dark)
+internal fun gardenColorsFor(theme: GardenTheme, dark: Boolean): GardenColors = gardenColors(theme, dark)
 
 private val LightErrorContainer = Color(0xFFF7DCD3)
 private val DarkErrorContainer = Color(0xFF6E3324)
@@ -367,8 +359,10 @@ private fun darkScheme(s: Seed): androidx.compose.material3.ColorScheme {
     )
 }
 
-private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
-    val p = if (dark) s.petals.map { lerp(it, Color.White, 0.08f) } else s.petals
+private fun gardenColors(theme: GardenTheme, dark: Boolean): GardenColors {
+    val s = Seeds.getValue(theme)
+    val plants = plantsOf(theme).map { if (dark) it.night() else it }
+    val petals = plants.map { it.petal.color }
     val background = if (dark) nightOf(s) else s.background
     val leaf = if (dark) lerp(s.leaf, Color.Black, 0.08f) else s.leaf
     val cardTint = cardTintOf(s, dark)
@@ -383,20 +377,16 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
     fun visible(color: Color) = readable(color, surfaces, min = 3f, toward = if (dark) Color.White else Color.Black)
     val better = if (dark) lerp(s.leaf, Color.Black, 0.62f) else lerp(s.leaf, Color.White, 0.7f)
     return GardenColors(
-        petalPink = p[0],
-        petalLavender = p[1],
-        petalHoney = p[2],
-        petalPeach = p[3],
-        petalSky = p[4],
+        petals = petals,
+        hearts = plants.map { it.centre.color },
         leaf = leaf,
         leafDark = if (dark) lerp(s.leaf, Color.White, 0.25f) else lerp(s.leaf, Color.Black, 0.3f),
         stem = lerp(s.leaf, Color.Black, 0.18f),
         soil = if (dark) Color(0xFF6B5B47) else Color(0xFFB9A285),
         sky = if (dark) lerp(background, Color.White, 0.04f) else lerp(background, Color(0xFFE6DCC8), 0.3f),
-        wilted = if (dark) Color(0xFF7D7363) else Color(0xFFC2B49A),
         cardTint = cardTint,
         growth = visible(leaf),
-        growthHigh = visible(p[0]),
+        growthHigh = visible(petals.first()),
         better = better,
         onBetter = readable(if (dark) lerp(s.leaf, Color.White, 0.85f) else lerp(s.leaf, Color.Black, 0.7f), listOf(better),
             toward = if (dark) Color.White else Color.Black),
@@ -472,7 +462,7 @@ private val MeadowShapes = Shapes(
     extraLarge = RoundedCornerShape(36.dp),
 )
 
-val LocalGarden = staticCompositionLocalOf { gardenColors(Seeds.getValue(GardenTheme.MEADOW), dark = false) }
+val LocalGarden = staticCompositionLocalOf { gardenColors(GardenTheme.MEADOW, dark = false) }
 
 /** The theme showing now, for what's drawn rather than coloured, like its butterflies. */
 val LocalGardenTheme = staticCompositionLocalOf { GardenTheme.MEADOW }
@@ -496,9 +486,8 @@ fun MeadowTheme(
     val minute = if (darkMode == DarkMode.CLOCK) dev.pcoffline.meadow.ui.components.LocalSkyHour.current?.times(60) ?: rememberMinuteOfDay() else 0
     val sun = if (darkMode == DarkMode.CLOCK) dev.pcoffline.meadow.ui.components.rememberSunTimes() else SunTimes.DEFAULT
     val dark = darkMode.isDarkAt(minute / 60, systemDark, minute % 60, sun)
-    val seed = Seeds.getValue(theme)
     val scheme = remember(theme, dark) { colorSchemeFor(theme, dark) }
-    val garden = remember(theme, dark) { gardenColors(seed, dark) }
+    val garden = remember(theme, dark) { gardenColors(theme, dark) }
     CompositionLocalProvider(LocalGarden provides garden, LocalGardenTheme provides theme, LocalDarkTheme provides dark) {
         MaterialTheme(colorScheme = scheme, typography = MeadowTypography, shapes = MeadowShapes) {
             // Screens drawn straight on the background (onboarding, the rest screen) have no Surface

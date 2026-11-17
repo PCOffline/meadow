@@ -38,7 +38,10 @@ class SyncWorkerSignedInTest : EmulatorTest() {
     @Test
     fun `it shares what is shared, sends a heartbeat at most hourly, and succeeds`() {
         val robin = person("Robin")
-        AppGraph.store.setPrivacy(Privacy(shareTime = true))
+        // Saved as the app saves it: on the account as well as on the phone. An earlier test in this
+        // JVM can leave the app's profile listener running, and it copies the account's choices to
+        // the phone: with only the phone's copy set, it would turn sharing off again before the sync.
+        onBackend { AppGraph.profiles.setPrivacy(Privacy(shareTime = true)) }
 
         assertEquals(ListenableWorker.Result.success(), runSync())
 

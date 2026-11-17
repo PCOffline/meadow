@@ -15,7 +15,7 @@ time. When the time is used, the app rests. To get more time, ask a Bumblebee: a
 chose to look after your garden.
 
 <p align="center">
-  <img src="docs/images/screen-garden.png" alt="The garden: a flower for each app, open while time is left and closed when it is used" width="250">
+  <img src="docs/images/screen-garden.png" alt="The garden: a plant for each app, in bloom while time is left and dried when it is used" width="250">
   &nbsp;
   <img src="docs/images/screen-chat.png" alt="A chat with a Bumblebee, who gave 15 more minutes" width="250">
   &nbsp;
@@ -34,8 +34,9 @@ chose to look after your garden.
 
 ## Your garden
 
-Each app you limit is a flower. The flower is open while time is left and closes as the time
-goes. The sky follows your day, from sunrise to a night with fireflies. It can also show the
+Each app you limit is a plant: a flower, or a mushroom in the Mushroom forest. It is in full bloom
+while half or more of the time is left. Then it nods and closes. When the time is used, it is dried,
+in its own colour. Each theme grows five plants of its own. The sky follows your day, from sunrise to a night with fireflies. It can also show the
 weather outside.
 
 ## Limits for your week

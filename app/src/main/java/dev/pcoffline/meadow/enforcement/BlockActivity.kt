@@ -94,6 +94,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import java.util.concurrent.atomic.AtomicBoolean
+import dev.pcoffline.meadow.ui.components.flora.plantFor
 
 /** The calm screen shown in place of an app whose time is up. */
 class BlockActivity : ComponentActivity() {
@@ -330,7 +331,8 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
                     AppIcon(pkg, size = 56.dp)
                     Box {
                         BloomFlower(
-                            if (state.unlocked) 0.9f else 0.05f, Garden.colors.petalPink, Modifier.size(110.dp, 150.dp),
+                            // The app's own plant, as in the garden: in bloom when it is open again.
+                            if (state.unlocked) 0.9f else 0f, plantFor(pkg, Garden.theme), Modifier.size(110.dp, 150.dp),
                             asleep = !state.unlocked && state.budget?.sleeping == true,
                         )
                         if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))

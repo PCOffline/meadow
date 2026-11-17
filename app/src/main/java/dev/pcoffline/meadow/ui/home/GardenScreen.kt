@@ -103,6 +103,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
+import dev.pcoffline.meadow.ui.components.flora.plantFor
 
 data class GardenState(
     val budgets: List<AppBudget> = emptyList(),
@@ -216,7 +218,7 @@ fun GardenContent(
                 item {
                     MeadowCard(clear.padding(horizontal = 20.dp).fillMaxWidth(), onClick = onPlantLimit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            BloomFlower(0.2f, Garden.colors.petalPink, Modifier.size(56.dp, 84.dp), sway = false)
+                            BloomFlower(1f, plantsOf(Garden.theme).first(), Modifier.size(56.dp, 84.dp), sway = false)
                             Spacer(Modifier.width(12.dp))
                             Text(stringResource(R.string.garden_empty_title), style = MaterialTheme.typography.titleMedium)
                         }
@@ -373,11 +375,8 @@ private val SUN_ABOVE_TOTAL = 44.dp
 
 @Composable
 private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {
-    val garden = Garden.colors
-    // Keyed by the theme's colours too: a new theme gives the app its petal in that theme.
-    val color = remember(budget.limit.packageName, garden) {
-        garden.petals[(budget.limit.packageName.hashCode() and 0x7fffffff) % garden.petals.size]
-    }
+    // An app keeps its place in each theme's five plants: a new theme gives it that theme's plant.
+    val plant = plantFor(budget.limit.packageName, Garden.theme)
     // A long press offers the limit's choices: share it as saved, or change it. A screen reader
     // offers sharing as an action on the card.
     var menu by remember { mutableStateOf(false) }
@@ -393,7 +392,7 @@ private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit
             onLongClickLabel = stringResource(R.string.garden_tile_options),
         ) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                BloomFlower(1f - budget.usedFraction, color, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
+                BloomFlower(1f - budget.usedFraction, plant, Modifier.size(90.dp, 120.dp), asleep = budget.sleeping)
                 AppIcon(budget.limit.packageName, Modifier.align(Alignment.TopStart), size = 28.dp)
                 if (budget.exhausted) SleepyZs(Modifier.align(Alignment.TopEnd))
             }

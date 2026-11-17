@@ -27,6 +27,11 @@ import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.components.BloomFlower
+import dev.pcoffline.meadow.ui.components.MeadowHills
+import dev.pcoffline.meadow.ui.components.SectionTitle
+import dev.pcoffline.meadow.ui.components.flora.Soils
+import dev.pcoffline.meadow.ui.components.flora.Tone
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
@@ -51,24 +56,88 @@ class ThemeLooksTest : ScreenTest() {
         return n
     }
 
+    /** [theme]'s own plant in full bloom, as drawn. */
     private fun flower(theme: GardenTheme): PixelMap {
-        show(theme) { BloomFlower(1f, Color.Red, Modifier.size(90.dp, 120.dp), sway = false, growIn = false) }
+        show(theme) { BloomFlower(1f, plantsOf(theme).first(), Modifier.size(90.dp, 120.dp), sway = false, growIn = false) }
         return compose.onNode(isRoot()).captureToImage().toPixelMap()
     }
 
-    private val stalk = Color(0xFFF1E6D2)
+    /** A mushroom's pale stalk. No flower has this colour. */
+    private val stalk = Tone(0.93f, 0.03f, 85f).color
 
     @Test
     fun `the mushroom forest grows mushrooms on pale stalks`() {
         val mushroom = flower(GardenTheme.MUSHROOM)
         assertTrue(mushroom.count(stalk) > 100)
-        // A red cap with pale spots on it.
-        assertTrue(mushroom.count(Color.Red) > 300)
+        // A fly agaric's red cap.
+        assertTrue(mushroom.count(plantsOf(GardenTheme.MUSHROOM).first().petal.color) > 300)
     }
 
     @Test
     fun `other gardens grow flowers, with no stalks`() {
         assertEquals(0, flower(GardenTheme.MEADOW).count(stalk))
+    }
+
+    @Test
+    fun `a flower is in its fresh colour until its time is used up, and then in that colour dried`() {
+        val sunflower = plantsOf(GardenTheme.SUNFLOWER).first().petal
+        // With a little time left, it has dried a little. With none left, it is fully dried.
+        val nearly = sunflower.mix(sunflower.dried(), 0.1f).color
+        val dried = sunflower.dried().color
+        var bloom by mutableStateOf(1f)
+        var asleep by mutableStateOf(false)
+        show(GardenTheme.SUNFLOWER) {
+            BloomFlower(bloom, plantsOf(GardenTheme.SUNFLOWER).first(), Modifier.size(90.dp, 120.dp), sway = false, growIn = false, asleep = asleep)
+        }
+        fun drawn(): PixelMap {
+            compose.waitForIdle()
+            return compose.onNode(isRoot()).captureToImage().toPixelMap()
+        }
+        val full = drawn()
+        assertTrue("fresh petals in bloom: ${full.count(sunflower.color)}", full.count(sunflower.color) > 300)
+        assertEquals(0, full.count(dried))
+
+        bloom = 0.02f
+        val little = drawn()
+        assertTrue("petals with little time left: ${little.count(nearly)}", little.count(nearly) > 300)
+        assertEquals(0, little.count(dried))
+
+        bloom = 0f
+        val used = drawn()
+        assertTrue("dried petals when used up: ${used.count(dried)}", used.count(dried) > 100)
+        assertEquals(0, used.count(sunflower.color))
+
+        // Asleep, a used-up flower is a bud in its fresh colour.
+        asleep = true
+        val bud = drawn()
+        assertTrue("fresh petals in the bud: ${bud.count(sunflower.color)}", bud.count(sunflower.color) > 100)
+        assertEquals(0, bud.count(dried))
+    }
+
+    @Test
+    fun `the flowers on the hills are the theme's plants, each on a stem`() {
+        show(GardenTheme.LAVENDER) { MeadowHills(Modifier.size(411.dp, 200.dp)) }
+        val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
+        val stem = Soils.getValue(GardenTheme.LAVENDER).stem.color
+        assertTrue("stems on the hills: ${shot.count(stem)}", shot.count(stem) > 10)
+        // Lavender, the field's own plant, among them.
+        assertTrue(shot.count(plantsOf(GardenTheme.LAVENDER).first().petal.color) > 10)
+    }
+
+    @Test
+    fun `a section title's daisy is in the colours of the theme's own plant`() {
+        var theme by mutableStateOf(GardenTheme.LAVENDER)
+        show { MeadowTheme(theme, DarkMode.LIGHT) { SectionTitle("Your garden") } }
+        fun drawn(colour: Color) = compose.onNode(isRoot()).captureToImage().toPixelMap().count(colour)
+        val lavender = gardenColorsFor(GardenTheme.LAVENDER, dark = false)
+        assertTrue("lavender petals: ${drawn(lavender.petals.first())}", drawn(lavender.petals.first()) > 60)
+        assertTrue("its middle: ${drawn(lavender.hearts.first())}", drawn(lavender.hearts.first()) > 10)
+
+        theme = GardenTheme.MUSHROOM
+        compose.waitForIdle()
+        val forest = gardenColorsFor(GardenTheme.MUSHROOM, dark = false)
+        assertEquals(0, drawn(lavender.petals.first()))
+        assertTrue("a fly agaric's red: ${drawn(forest.petals.first())}", drawn(forest.petals.first()) > 60)
     }
 
     @Test
@@ -85,7 +154,7 @@ class ThemeLooksTest : ScreenTest() {
     }
 
     @Test
-    fun `a new theme gives each garden card that theme's petal`() {
+    fun `a new theme gives each garden card that theme's plant`() {
         var theme by mutableStateOf(GardenTheme.MEADOW)
         // Apps with no time used yet: each flower is in full bloom, in its exact petal colour.
         val fresh = GardenState(
@@ -95,9 +164,9 @@ class ThemeLooksTest : ScreenTest() {
             loaded = true,
         )
         show { MeadowTheme(theme, DarkMode.LIGHT) { GardenContent(DemoGarden.robin, fresh) } }
-        val sunflower = gardenColorsFor(GardenTheme.SUNFLOWER, dark = false).petals
-        // Meadow's buttercup and Sunflower's sunflower are nearly the same yellow, so it isn't counted.
-        val meadowOnly = gardenColorsFor(GardenTheme.MEADOW, dark = false).petals.filter { m ->
+        val sunflower = plantsOf(GardenTheme.SUNFLOWER).map { it.petal.color }
+        // Meadow's buttercup is nearly a sunflower's yellow, so it isn't counted.
+        val meadowOnly = plantsOf(GardenTheme.MEADOW).map { it.petal.color }.filter { m ->
             sunflower.none { abs(it.red - m.red) + abs(it.green - m.green) + abs(it.blue - m.blue) < 0.1f }
         }
         fun shown(colours: List<Color>) = compose.onNode(isRoot()).captureToImage().toPixelMap().let { shot -> colours.sumOf { shot.count(it) } }
