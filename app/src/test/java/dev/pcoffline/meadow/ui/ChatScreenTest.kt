@@ -21,6 +21,11 @@ import com.google.firebase.firestore.snapshots
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.UserProfile
+import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.data.RequestRepository
+import dev.pcoffline.meadow.data.LimitsRepository
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.EmulatorTest
 import dev.pcoffline.meadow.data.stringList
 import dev.pcoffline.meadow.showcase.DemoGarden
@@ -84,5 +89,44 @@ class ChatScreenTest : EmulatorTest() {
             backend.account(robin.uid).snapshots().firstWhere { it.get("pendingRemovals.${bee.uid}") == null }
         }
         onBackend { assert(bee.uid in backend.account(robin.uid).snapshots().firstWhere { true }.stringList("approverIds")) }
+    }
+
+    /** Robin asks Bee, Robin's Bumblebee, for 20 more minutes on Pebbles. Bee stays signed in. */
+    private fun askedInChat(): Triple<Person, Person, String> {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        onBackend {
+            val requests = RequestRepository(backend)
+            LimitsRepository(backend, store, requests).save(AppLimit("com.example.pebbles", "Pebbles", 30, 0))
+            requests.create(RequestType.EXTRA_TIME, message = "One more level", packageName = "com.example.pebbles", appName = "Pebbles", minutes = 20)
+        }
+        return Triple(robin, bee, ChatRepository.chatIdFor(robin.uid, bee.uid))
+    }
+
+    private fun showChat(me: UserProfile, chatId: String) = compose.setContent {
+        MeadowTheme { CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) { ChatScreen(me, chatId, onBack = {}) } }
+    }
+
+    private val summary get() = app.resources.getQuantityString(R.plurals.request_extra_time, 20, 20, "Pebbles")
+
+    @Test
+    fun `a request asked for shows in the chat as its card, for the asker`() {
+        val (robin, bee, chatId) = askedInChat()
+        showChat(DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid)), chatId)
+        waitForText(summary)
+        compose.onNodeWithText(text(R.string.request_withdraw)).assertExists()
+    }
+
+    @Test
+    fun `and for the Bumblebee asked, who can answer it`() {
+        val (robin, bee, chatId) = askedInChat()
+        signInAs(bee)
+        showChat(DemoGarden.robin.copy(uid = bee.uid, displayName = "Bee", approveeIds = listOf(robin.uid)), chatId)
+        waitForText(summary)
+        compose.onNodeWithText(text(R.string.request_say_yes)).assertExists()
+        // A garden I look after is a tap away.
+        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Robin")).assertExists()
     }
 }
