@@ -46,7 +46,6 @@ data class GardenColors(
     val stem: Color,
     val soil: Color,
     val sky: Color,
-    val wilted: Color,
     val cardTint: Color,
     /** Bars and progress: [leaf], deepened (by night, lightened) to stand out from any surface (3:1). */
     val growth: Color,
@@ -132,7 +131,7 @@ private data class Seed(
     val secondary: Color,
     val tertiary: Color,
     val background: Color,
-    /** Flower colours, the theme's own flower first. */
+    /** The colours of the small flowers on the hills, the falling petals and the chart's highlight. */
     val petals: List<Color>,
     val leaf: Color,
     /** A pale tint for the daytime sky, so it takes on the theme without going grey. */
@@ -393,7 +392,6 @@ private fun gardenColors(s: Seed, dark: Boolean): GardenColors {
         stem = lerp(s.leaf, Color.Black, 0.18f),
         soil = if (dark) Color(0xFF6B5B47) else Color(0xFFB9A285),
         sky = if (dark) lerp(background, Color.White, 0.04f) else lerp(background, Color(0xFFE6DCC8), 0.3f),
-        wilted = if (dark) Color(0xFF7D7363) else Color(0xFFC2B49A),
         cardTint = cardTint,
         growth = visible(leaf),
         growthHigh = visible(p[0]),

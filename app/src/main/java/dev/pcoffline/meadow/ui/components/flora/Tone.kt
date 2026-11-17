@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.components.flora
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import kotlin.math.cos
 import kotlin.math.min
@@ -11,6 +12,7 @@ import kotlin.math.sin
  * plant part is drawn in. In this space a change of lightness or chroma keeps the hue, so a shaded
  * or dried petal is still that flower's colour.
  */
+@Immutable
 data class Tone(val l: Float, val c: Float, val h: Float) {
     val color: Color get() = oklch(l, c, h)
 
@@ -39,21 +41,46 @@ internal fun turn(h: Float, toward: Float, share: Float): Float {
     return (h + d * share).mod(360f)
 }
 
-/** The sRGB colour of an OKLCH colour. A colour outside sRGB is brought to its nearest edge. */
+/**
+ * The sRGB colour of an OKLCH colour. A colour that sRGB can't show keeps its lightness and hue,
+ * and gets the most chroma that sRGB can show. Thus a strong shade is paler, and not another hue.
+ */
 internal fun oklch(l: Float, c: Float, h: Float): Color {
     val hr = Math.toRadians(h.toDouble())
-    val a = c * cos(hr)
-    val b = c * sin(hr)
-    val l3 = (l + 0.3963377774 * a + 0.2158037573 * b).pow(3)
-    val m3 = (l - 0.1055613458 * a - 0.0638541728 * b).pow(3)
-    val s3 = (l - 0.0894841775 * a - 1.2914855480 * b).pow(3)
+    val (ca, sb) = cos(hr) to sin(hr)
+    // Red, green and blue as light, before they are cut to what a screen shows.
+    fun linear(chroma: Double): DoubleArray {
+        val a = chroma * ca
+        val b = chroma * sb
+        val l3 = (l + 0.3963377774 * a + 0.2158037573 * b).pow(3)
+        val m3 = (l - 0.1055613458 * a - 0.0638541728 * b).pow(3)
+        val s3 = (l - 0.0894841775 * a - 1.2914855480 * b).pow(3)
+        return doubleArrayOf(
+            4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+            -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+            -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3,
+        )
+    }
+    fun shows(rgb: DoubleArray) = rgb.all { it >= -GAMUT_SLACK && it <= 1.0 + GAMUT_SLACK }
+    var rgb = linear(c.toDouble())
+    if (!shows(rgb)) {
+        var fits = 0.0
+        var over = c.toDouble()
+        repeat(GAMUT_STEPS) {
+            val mid = (fits + over) / 2
+            if (shows(linear(mid))) fits = mid else over = mid
+        }
+        rgb = linear(fits)
+    }
     fun encode(v: Double): Float {
         val x = v.coerceIn(0.0, 1.0)
         return (if (x <= 0.0031308) 12.92 * x else 1.055 * x.pow(1 / 2.4) - 0.055).toFloat()
     }
-    return Color(
-        encode(4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3),
-        encode(-1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3),
-        encode(-0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3),
-    )
+    return Color(encode(rgb[0]), encode(rgb[1]), encode(rgb[2]))
 }
+
+/** How far outside 0 to 1 a channel can be and still round to a colour that sRGB shows. */
+private const val GAMUT_SLACK = 0.0005
+
+/** Halvings of the chroma to find the most that fits: enough for a step no eye can see. */
+private const val GAMUT_STEPS = 12

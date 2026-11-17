@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.animation.core.RepeatMode
@@ -64,10 +65,10 @@ private var SemanticsPropertyReceiver.flowerAsleep by FlowerAsleep
 /**
  * A plant that shows how much time is left ([bloom], from 1 to 0). It is in full bloom while half
  * or more is left. With less, it nods, closes a little and drops a petal or two. With none left,
- * it is dried, in its own colour and in the form its kind takes: a seed head, a bare cup or a
- * skirt of hanging petals. [asleep] closes it into a bud in full colour: it rests outside its
- * hours, and its time isn't used up. In the mushroom forest, [plant] is a mushroom, which ages in
- * place of wilting.
+ * it is dried, in its own colour and in the form its kind takes: a seed head, a bare twig, or a
+ * head that hangs and has lost petals. [asleep] closes it into a bud in full colour: it rests
+ * outside its hours, and its time isn't used up. In the mushroom forest, [plant] is a mushroom,
+ * which ages in place of wilting.
  */
 @Composable
 fun BloomFlower(
@@ -102,13 +103,17 @@ fun BloomFlower(
     } else null
     // A mushroom is stiffer than a flower.
     val bend = if (plant.form == Form.MUSHROOM) 0.4f else 1f
+    // Each look's shapes with its share, made once for the ground and for the plant on it.
+    val sketches by remember(theme, plant, dark) {
+        derivedStateOf { looks(lively, spent, sleep).map { (look, share) -> sketch(theme, plant, look, dark) to share } }
+    }
 
     Box(modifier.semantics { flowerAsleep = asleep }) {
         // What lies on the ground stays still.
         Spacer(
             Modifier.matchParentSize().drawWithCache {
-                val look = looks(lively, spent, sleep).maxBy { it.second }.first
-                val ground = painted(sketch(theme, plant, look, dark).ground)
+                // While the plant fades between two looks, the ground is that of the stronger one.
+                val ground = painted(sketches.maxBy { it.second }.first.ground)
                 onDrawBehind { paint(ground) }
             },
         )
@@ -117,8 +122,9 @@ fun BloomFlower(
         Spacer(
             Modifier.matchParentSize()
                 .graphicsLayer {
+                    // It turns and sprouts about its foot. With no height yet, there is no foot to find.
                     val foot = size.height - (Sketch.HEIGHT - Sketch.BASE.y) * fit(size)
-                    transformOrigin = TransformOrigin(0.5f, foot / size.height)
+                    transformOrigin = TransformOrigin(0.5f, if (size.height > 0f) foot / size.height else 1f)
                     // Asleep, it barely sways.
                     rotationZ = (swayAngle?.value ?: 0f) * bend * (0.6f + 0.6f * lively) * (1f - 0.7f * sleep)
                     scaleX = grow.value
@@ -126,14 +132,17 @@ fun BloomFlower(
                     compositingStrategy = CompositingStrategy.Offscreen
                 }
                 .drawWithCache {
-                    val layers = looks(lively, spent, sleep).map { (look, share) -> painted(sketch(theme, plant, look, dark).body) to share }
+                    val layers = sketches.map { (sketch, share) -> painted(sketch.body) to share }
+                    val bounds = Rect(Offset.Zero, size)
+                    val fade = Paint()
                     onDrawBehind {
                         layers.forEach { (shapes, share) ->
                             if (share > 0.99f) {
                                 paint(shapes)
                             } else {
+                                // A look that fades is drawn whole and then made faint, so its shapes don't show through each other.
                                 drawIntoCanvas { canvas ->
-                                    canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = share })
+                                    canvas.saveLayer(bounds, fade.apply { alpha = share })
                                     paint(shapes)
                                     canvas.restore()
                                 }
@@ -146,8 +155,9 @@ fun BloomFlower(
 }
 
 /**
- * The looks to draw, each with its share from 0 to 1. At rest there is one. While a plant changes
- * to or from used up ([spent]) or asleep ([sleep]), there are two, and one fades into the other.
+ * The looks to draw, each with its share from 0 to 1. The shares add up to 1. At rest there is
+ * one look. While a plant changes to or from used up ([spent]) or asleep ([sleep]), there are two
+ * or three, and they fade into each other.
  */
 internal fun looks(vigour: Float, spent: Float, sleep: Float): List<Pair<Look, Float>> = listOf(
     Look.Open(vigour) to (1f - spent) * (1f - sleep),

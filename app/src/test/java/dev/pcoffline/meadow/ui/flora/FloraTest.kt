@@ -212,6 +212,20 @@ class FloraTest {
     }
 
     @Test
+    fun `each tone of each plant is drawn in its own lightness and hue`() = assertNone(
+        everyPlant.flatMap { (theme, plant) ->
+            val tones = listOfNotNull(plant.petal, plant.centre, plant.tip, plant.calyx, plant.warts, plant.stalk)
+            tones.flatMap { tone -> listOf(tone, tone.shade(), tone.light(), tone.dried(), tone.night(), tone.night().shade(), tone.night().dried()) }.mapNotNull { tone ->
+                // A tone that sRGB can't show loses chroma only: its lightness and its hue stay.
+                val (l, c, h) = lch(tone.color)
+                // A pale tone's hue can't be read back to the degree from a colour of 8 bits a channel.
+                val off = abs(l - tone.l) > 0.006f || c > tone.c + 0.004f || c < tone.c * 0.6f || (tone.c > 0.05f && hueGap(h, tone.h) > 1.5f)
+                if (off) "$theme ${plant.name}: $tone is drawn as l=$l c=$c h=$h" else null
+            }
+        }.distinct(),
+    )
+
+    @Test
     fun `a dried petal keeps its hue and more than half of its chroma`() = everyPlant.forEach { (_, plant) ->
         val dried = plant.petal.dried()
         // A red, orange or yellow petal turns a little towards straw. Each other one keeps its hue exactly.

@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.components.flora
 
+import androidx.compose.runtime.Immutable
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 
 /** How a plant is built. Each form has its own outline, so a plant is told by its shape as well as its colour. */
@@ -21,6 +22,7 @@ enum class Cap { DOME, FUNNEL, BUN, TROOP, BELL, PARASOL }
  * [cup] lifts the petal tips: 0 is flat open, 1 is closed. [plen] scales the petals' length and
  * [dry] is how dried the colours are. [x] and [y] place the head, and [lean] bends the stem.
  */
+@Immutable
 data class Pose(val tilt: Float, val face: Float, val cup: Float, val plen: Float, val dry: Float, val y: Float, val x: Float, val lean: Float)
 
 /**
@@ -29,6 +31,7 @@ data class Pose(val tilt: Float, val face: Float, val cup: Float, val plen: Floa
  * units of [Sketch]: [n] petals of [kind], each [len] long and [half] wide to each side, round a
  * middle [disc] in radius.
  */
+@Immutable
 data class Plant(
     val name: String,
     val form: Form,
@@ -53,11 +56,9 @@ data class Plant(
     val leaf: LeafShape = LeafShape.LANCE,
     /** How many petals lie on the ground when the time is used up. */
     val shed: Int = 0,
-    /** The petals that stay on when the time is used up. All stay when this is null. */
+    /** The petals that stay on when the time is used up: it has lost the others. All stay when this is null. */
     val keep: Set<Int>? = null,
     val pod: Pod? = null,
-    /** Stays upright when the time is used up, and drops its petals instead of hanging. */
-    val upright: Boolean = false,
     val low: Pose? = null,
     val spent: Pose? = null,
     /** A lotus petal's width as a share of its length. */
@@ -79,7 +80,7 @@ data class Plant(
 
 /** What a theme's plants grow from: the colours of its ground, stems and leaves. */
 internal data class Soil(val ground: Tone, val stem: Tone, val leaf: Tone) {
-    fun night() = Soil(Tone(ground.l * 0.52f, ground.c, ground.h), Tone(stem.l - 0.06f, stem.c * 0.9f, stem.h), Tone(leaf.l - 0.10f, leaf.c * 0.9f, leaf.h))
+    fun night() = Soil(Tone(ground.l * 0.52f, ground.c, ground.h), Tone(stem.l - 0.05f, stem.c * 0.9f, stem.h), Tone(leaf.l - 0.07f, leaf.c * 0.92f, leaf.h))
 }
 
 internal val Gold = Tone(0.84f, 0.16f, 88f)
@@ -94,7 +95,7 @@ private val Seed = Tone(0.40f, 0.06f, 55f)
 
 internal val FullPose = Pose(tilt = -14f, face = 0.86f, cup = 0.04f, plen = 1f, dry = 0f, y = 40f, x = 46f, lean = -6f)
 internal val LowPose = Pose(tilt = 40f, face = 0.72f, cup = 0.24f, plen = 0.97f, dry = 0.1f, y = 45f, x = 53f, lean = -9f)
-internal val SpentPose = Pose(tilt = 136f, face = 0.6f, cup = 0.3f, plen = 0.8f, dry = 1f, y = 54f, x = 60f, lean = -13f)
+internal val SpentPose = Pose(tilt = 98f, face = 0.7f, cup = 0.3f, plen = 0.8f, dry = 1f, y = 51f, x = 60f, lean = -13f)
 internal val AsleepPose = Pose(tilt = 16f, face = 0.5f, cup = 1f, plen = 1f, dry = 0f, y = 47f, x = 49f, lean = -7f)
 
 /** A blossom on a twig stays up when its petals fall. */
@@ -131,11 +132,11 @@ internal val Plants = mapOf(
         ),
         Plant(
             "Cosmos", Form.RAY, Tone(0.79f, 0.125f, 352f), Pale, n = 8, kind = PetalShape.TOOTH, len = 17f, half = 6f, disc = 4.6f, alt = 0.45f,
-            leaf = LeafShape.FEATHER, shed = 3, keep = setOf(0, 1, 3, 4, 6),
+            leaf = LeafShape.FEATHER, shed = 3, keep = setOf(0, 1, 2, 4, 5, 7),
         ),
         Plant(
             "Buttercup", Form.ROSETTE, Tone(0.85f, 0.17f, 92f), Amber, n = 5, kind = PetalShape.ROUND, len = 15f, half = 7.6f, disc = 4.4f,
-            size = 0.95f, alt = 0.4f, stamens = 9, shed = 3, keep = setOf(0, 3),
+            size = 0.95f, alt = 0.4f, stamens = 9, shed = 3, keep = setOf(0, 1, 3, 4),
         ),
         Plant(
             "Aster", Form.RAY, Tone(0.75f, 0.105f, 300f), Pale, n = 13, kind = PetalShape.NARROW, len = 17f, half = 3.3f, disc = 6.4f,
@@ -145,7 +146,7 @@ internal val Plants = mapOf(
     GardenTheme.BLOSSOM to listOf(
         Plant(
             "Cherry", Form.ROSETTE, Tone(0.855f, 0.08f, 358f), Tone(0.60f, 0.17f, 5f), n = 5, kind = PetalShape.NOTCH, len = 17.5f, half = 7.9f,
-            disc = 3f, alt = 0.3f, upright = true, calyx = Tone(0.56f, 0.12f, 12f), stamens = 7, shed = 5, keep = setOf(0, 3),
+            disc = 3f, alt = 0.3f, calyx = Tone(0.56f, 0.12f, 12f), stamens = 7, shed = 5, keep = setOf(0, 3),
             low = LowPose.copy(tilt = 30f, face = 0.72f, y = 42f, x = 50f), spent = BareTwig,
         ),
         // Under the trees: spikes of blue bells on green stems.
@@ -160,7 +161,7 @@ internal val Plants = mapOf(
         Plant("Wisteria", Form.RACEME, Tone(0.74f, 0.105f, 300f)),
         Plant(
             "Kerria", Form.ROSETTE, Tone(0.85f, 0.165f, 90f), Amber, n = 5, kind = PetalShape.POINT, len = 16.5f, half = 6.6f, disc = 3.4f,
-            alt = 0.4f, stamens = 7, shed = 4, keep = setOf(0, 2, 3),
+            alt = 0.4f, stamens = 7, shed = 4, keep = setOf(0, 1, 3, 4),
         ),
     ),
     GardenTheme.LAVENDER to listOf(
@@ -168,11 +169,11 @@ internal val Plants = mapOf(
         Plant("Allium", Form.GLOBE, Tone(0.77f, 0.115f, 328f)),
         Plant(
             "Periwinkle", Form.ROSETTE, Tone(0.73f, 0.11f, 276f), Tone(0.97f, 0.02f, 95f), n = 5, kind = PetalShape.TOOTH, len = 15.5f,
-            half = 7.6f, disc = 2.6f, alt = 0.4f, shed = 3, keep = setOf(0, 1, 3), leaf = LeafShape.OVAL,
+            half = 7.6f, disc = 2.6f, alt = 0.4f, shed = 3, keep = setOf(0, 1, 3, 4), leaf = LeafShape.OVAL,
         ),
         Plant(
             "Rock rose", Form.ROSETTE, Tone(0.81f, 0.105f, 345f), Rust, n = 5, kind = PetalShape.WIDE, len = 15.5f, half = 8.6f, disc = 3.8f,
-            alt = 0.35f, stamens = 9, shed = 3, keep = setOf(0, 1), leaf = LeafShape.OVAL,
+            alt = 0.35f, stamens = 9, shed = 3, keep = setOf(0, 1, 3, 4), leaf = LeafShape.OVAL,
         ),
         Plant(
             "Golden marguerite", Form.RAY, Tone(0.85f, 0.16f, 92f), Amber, n = 9, kind = PetalShape.ROUND, len = 11.5f, half = 4.6f, disc = 6f,
@@ -204,7 +205,7 @@ internal val Plants = mapOf(
         Plant("Blue water lily", Form.LOTUS, Tone(0.76f, 0.10f, 255f), Pale, len = 20f, slim = 0.2f, pod = Pod.LOTUS, shed = 4, leaf = LeafShape.NONE),
         Plant(
             "Kingcup", Form.ROSETTE, Tone(0.85f, 0.17f, 92f), Amber, n = 5, kind = PetalShape.ROUND, len = 15f, half = 8f, disc = 4.4f,
-            alt = 0.4f, stamens = 9, shed = 3, keep = setOf(0, 3), leaf = LeafShape.HEART,
+            alt = 0.4f, stamens = 9, shed = 3, keep = setOf(0, 1, 3, 4), leaf = LeafShape.HEART,
         ),
         Plant("Loosestrife", Form.SPIKE, Tone(0.66f, 0.16f, 335f), stems = 2, whorls = 10, cover = 0.62f, floret = 3.6f),
         Plant("Violet water lily", Form.LOTUS, Tone(0.62f, 0.135f, 300f), Pale, len = 19f, slim = 0.235f, pod = Pod.LOTUS, shed = 4, leaf = LeafShape.NONE),

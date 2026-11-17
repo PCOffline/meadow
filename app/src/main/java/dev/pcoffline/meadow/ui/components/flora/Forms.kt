@@ -314,17 +314,10 @@ private fun Sketch.flower(p: Plant, soil: Soil, look: Look) {
         return
     }
     val keep = if (look == Look.Spent) p.keep else null
-    if (look == Look.Spent && !p.upright) {
-        leaves(p, soil, line, droop, wilt)
-        skirt(p, head, keep, length, half, disc, petal, cupTone)
-        // The stem ends on the back of the head, so it is drawn over it.
-        stem()
-        return
-    }
-
     stem()
     leaves(p, soil, line, droop, wilt)
-    if (pose.face < 0.66f) ellipse(at - head.v * ((disc * 1.1f + 1.5f) * 0.55f), (disc * 1.1f + 1.5f) * 0.8f, (disc * 1.1f + 1.5f) * 0.62f, cupTone, head.across)
+    // The green cup shows behind a head that has turned away, or has closed.
+    if (pose.face < 0.66f || look == Look.Spent) ellipse(at - head.v * ((disc * 1.1f + 1.5f) * 0.55f), (disc * 1.1f + 1.5f) * 0.8f, (disc * 1.1f + 1.5f) * 0.62f, cupTone, head.across)
     when (p.form) {
         Form.RAY -> {
             if (p.layers > 1) ring(head, p.n, p.kind, length * 0.97f, half, shade, shade.shade(0.6f), start = disc * 0.5f, offset = 180f / p.n, keep = keep)
@@ -339,18 +332,18 @@ private fun Sketch.flower(p: Plant, soil: Soil, look: Look) {
         }
         Form.ROSETTE -> {
             val offset = 90f - 180f / p.n
-            ring(head, p.n, p.kind, length, half, petal, shade, start = disc * 0.2f, offset = offset, keep = keep, alt = p.alt)
-            // Where petals fell, the points of the cup show.
+            // Behind the petals are the points of the cup. They show where petals fell.
             if (look == Look.Spent) ring(head, 5, PetalShape.POINT, disc * 2.3f, disc * 0.6f, cupTone, cupTone, start = disc * 0.5f, offset = offset + 36f, farShade = false)
+            ring(head, p.n, p.kind, length, half, petal, shade, start = disc * 0.2f, offset = offset, keep = keep, alt = p.alt)
             disc(head, disc, centre, 0.2f)
-            if (p.stamens > 0) dots(head, p.stamens, disc * 1.9f, 0.95f * size, centre, 0.5f)
+            if (p.stamens > 0 && look != Look.Spent) dots(head, p.stamens, disc * 1.9f, 0.95f * size, centre, 0.5f)
         }
         Form.CUP -> {
             // A few broad petals in two layers: the back ones darker.
             ring(head, p.n, p.kind, length, half, shade, shade.shade(0.7f), start = disc * 0.1f, offset = 90f, keep = keep, farShade = false)
             ring(head, p.n, p.kind, length * 0.93f, half, petal, shade, start = disc * 0.1f, offset = 90f - 180f / p.n, keep = keep, alt = p.alt)
             disc(head, disc, centre, 0.2f)
-            if (p.stamens > 0) dots(head, p.stamens, disc * 1.5f, 0.9f * size, centre, 0.3f)
+            if (p.stamens > 0 && look != Look.Spent) dots(head, p.stamens, disc * 1.5f, 0.9f * size, centre, 0.3f)
         }
         else -> listOf(1f to shade, 0.76f to petal, 0.52f to petal.light(0.8f), 0.28f to petal.light(1.5f)).forEachIndexed { i, (k, tone) ->
             ring(head, p.n - i * 2, p.kind, length * k, half * (0.8f + 0.25f * k), tone, tone.shade(0.7f), offset = i * 17f + 5f)
@@ -367,32 +360,6 @@ private fun Sketch.bud(at: Offset, tilt: Float, long: Float, petal: Tone, cup: T
     petal(head, 58f, PetalShape.POINT, long * 0.5f, long * 0.15f, cup, start = -2f)
     petal(head, 122f, PetalShape.POINT, long * 0.5f, long * 0.15f, cup, start = -2f)
     petal(head, 90f, PetalShape.POINT, long * 0.4f, long * 0.19f, cup.light(0.6f), start = -2.5f)
-}
-
-/** A used-up head: it nods, and its dried petals hang from it as a skirt, under the green cup. */
-private fun Sketch.skirt(p: Plant, head: Head, keep: Set<Int>?, length: Float, half: Float, disc: Float, petal: Tone, cup: Tone) {
-    val pompom = p.form == Form.POMPOM
-    val r = if (pompom) length * 0.45f else max(disc * 1.05f, 5.5f)
-    val (v, u) = head.v to head.u
-    val rim = head.at + v * (r * 0.35f)
-    val kept = (0 until if (pompom) 9 else p.n).filter { keep == null || it in keep || pompom }
-    val kind = if (p.kind == PetalShape.WIDE) PetalShape.ROUND else p.kind
-    fun hang(tone: Tone, scale: Float, shift: Float) = kept.indices.forEach { j ->
-        val x = -0.92f + 1.84f * (j + shift) / max(1f, kept.size - 1 + 2 * shift)
-        val d = Offset(v.x * 0.55f + u.x * x * 0.42f, v.y * 0.55f + 0.75f + u.y * x * 0.42f)
-        val long = length * 1.2f * scale * (0.82f + 0.18f * cos(j * 2.4f))
-        petal(Head(rim + u * (r * x), 0f, 1f), degrees(atan2(-d.y, d.x)), kind, long, min(half, r * 0.62f) * 0.9f, tone, start = -1f)
-    }
-    hang(petal.shade(), 1f, 0.5f)
-    if (p.tip != null) {
-        hang(p.tip.dried(), 0.98f, 0f)
-        hang(petal, 0.66f, 0f)
-    } else {
-        hang(petal, 0.94f, 0f)
-    }
-    ellipse(rim, r, r * 0.36f, cup.shade(0.7f), head.across)
-    ellipse(head.at + v * (r * 0.05f), r * 0.98f, r * 0.62f, cup, head.across)
-    ellipse(head.at - v * (r * 0.12f), r * 0.7f, r * 0.4f, cup.light(0.6f), head.across)
 }
 
 /** What stays when the petals are gone: a poppy's capsule, or a lotus's seed head. */

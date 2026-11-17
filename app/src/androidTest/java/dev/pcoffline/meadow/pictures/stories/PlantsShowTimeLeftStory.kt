@@ -41,7 +41,7 @@ class PlantsShowTimeLeftStory : Story("Each theme grows its own plants, and they
         }
         step("Half of the time is left: each is still in full bloom.") { look(GardenTheme.MEADOW, 0.5f) }
         step("A tenth is left: each nods and closes a little, and two petals lie on the ground.") { look(GardenTheme.MEADOW, 0.1f) }
-        step("The time is used up: each is dried, in its own colour. The poppy is a seed capsule with one petal.") { look(GardenTheme.MEADOW, 0f) }
+        step("The time is used up: each hangs its head and has lost petals, dried in its own colour. The poppy is a seed capsule.") { look(GardenTheme.MEADOW, 0f) }
         step("Outside its hours, each is a bud in full colour, also when its time is used up.") { look(GardenTheme.MEADOW, 0f, asleep = true) }
 
         step("Cherry blossom: a cherry, a grape hyacinth, a camellia, a wisteria and a kerria. They grow on brown twigs.") { look(GardenTheme.BLOSSOM, 1f) }
