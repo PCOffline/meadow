@@ -8,7 +8,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LocalStore
+import dev.pcoffline.meadow.MainActivity
+import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.ui.navigation.DeepLinks
 import dev.pcoffline.meadow.enforcement.AppBudget
+import dev.pcoffline.meadow.enforcement.BlockActivity
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -23,12 +27,14 @@ class NotifierTest {
     private val app: Application = ApplicationProvider.getApplicationContext()
     private val manager = app.getSystemService(NotificationManager::class.java)
     private lateinit var notifier: Notifier
+    private lateinit var store: LocalStore
 
     @Before
     fun setUp() {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         app.getSharedPreferences("meadow_store", Context.MODE_PRIVATE).edit().clear().commit()
-        notifier = Notifier(app, LocalStore(app)).apply { createChannels() }
+        store = LocalStore(app)
+        notifier = Notifier(app, store).apply { createChannels() }
     }
 
     private fun budget(usedMinutes: Double, daily: Int = 30, emergencyUntil: Long = 0L) = AppBudget(
@@ -154,5 +160,58 @@ class NotifierTest {
         val notification = shadowOf(manager).getNotification(Notifier.UPDATE_ID)
         assertEquals(true, notification.extras.getCharSequence("android.title")!!.contains("1.2.0"))
         assertEquals(true, notification.contentIntent != null)
+    }
+
+    private fun only() = shadowOf(manager).allNotifications.single()
+
+    @Test
+    fun `with Bumblebees, a reminder offers to ask for more time`() {
+        notifier.maybeWarn(budget(usedMinutes = 15.5))
+        assertEquals(0, only().actions?.size ?: 0)
+        manager.cancelAll()
+
+        store.setApproverCount(1)
+        notifier.maybeWarn(budget(usedMinutes = 20.5))
+        val ask = only().actions.single()
+        assertEquals(app.getString(R.string.notify_warning_ask), ask.title.toString())
+        assertEquals(DeepLinks.ask("demo.app"), shadowOf(ask.actionIntent).savedIntent.getStringExtra(MainActivity.EXTRA_ROUTE))
+    }
+
+    @Test
+    fun `time up opens the rest screen for the app`() {
+        notifier.timeUp(budget(usedMinutes = 30.0))
+        val shown = only()
+        assertEquals(Notifier.CH_WARNINGS, shown.channelId)
+        assertEquals(app.getString(R.string.notify_time_up_title, "Demo"), shown.extras.getCharSequence("android.title").toString())
+        val opens = shadowOf(shown.contentIntent).savedIntent
+        assertEquals(BlockActivity::class.java.name, opens.component?.className)
+        assertEquals("demo.app", opens.getStringExtra(BlockActivity.EXTRA_PACKAGE))
+    }
+
+    @Test
+    fun `each kind of push goes on its own channel`() {
+        val kinds = mapOf(
+            "request_new" to Notifier.CH_REQUESTS,
+            "request_decided" to Notifier.CH_DECISIONS,
+            "invite" to Notifier.CH_SOCIAL,
+            "approver_left" to Notifier.CH_SOCIAL,
+            "alert" to Notifier.CH_ALERTS,
+            "emergency" to Notifier.CH_ALERTS,
+            "something_new" to Notifier.CH_SOCIAL,
+        )
+        for ((type, channel) in kinds) {
+            manager.cancelAll()
+            notifier.fromPush(mapOf("to" to "sam", "type" to type, "title" to "A $type"), signedInUid = "sam")
+            assertEquals(type, channel, only().channelId)
+        }
+    }
+
+    @Test
+    fun `a new request can be answered from the notification`() {
+        notifier.fromPush(mapOf("to" to "sam", "type" to "request_new", "requestId" to "r1", "title" to "Bee asks"), signedInUid = "sam")
+        assertEquals(
+            listOf(app.getString(R.string.request_say_yes), app.getString(R.string.request_not_today)),
+            only().actions.map { it.title.toString() },
+        )
     }
 }
