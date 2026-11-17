@@ -32,11 +32,12 @@ object LocalDocs {
             NAME,
         )
         FirebaseFirestore.getInstance(firebase).apply {
-            // Port 9 discards everything: nothing reaches a server.
+            // Never a real server: an address that discards everything, and no network at all.
             useEmulator("127.0.0.1", 9)
             firestoreSettings = FirebaseFirestoreSettings.Builder()
                 .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
                 .build()
+            wait(disableNetwork())
         }.also { db = it }
     }
 
@@ -44,10 +45,10 @@ object LocalDocs {
     fun doc(app: Application, fields: Map<String, Any?>, id: String = "doc${++count}"): DocumentSnapshot {
         val ref = db(app).collection("local${++count}").document(id)
         ref.set(fields)
-        return wait(ref.get(Source.CACHE))
+        return checkNotNull(wait(ref.get(Source.CACHE)))
     }
 
-    private fun <T> wait(task: Task<T>): T {
+    private fun <T> wait(task: Task<T>): T? {
         val until = System.currentTimeMillis() + 10_000
         while (!task.isComplete) {
             check(System.currentTimeMillis() < until) { "The local cache didn't answer" }
