@@ -33,7 +33,7 @@ class PlantsShowTimeLeftStory : Story("Each theme grows its own plants, and they
 
     @Test
     fun story() {
-        show(firstCaption = "Meadow, with all the time left: a cornflower, a corn poppy, a cosmos, a buttercup and an aster in full bloom.") {
+        show(firstCaption = "Meadow, with all the time left: a cosmos, a corn poppy, a cornflower, a buttercup and an aster in full bloom.") {
             // The page draws its own background, as the app's Scaffold does, so the night page is dark.
             MeadowTheme(theme, mode) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { PlantSheet(bloom, asleep) }

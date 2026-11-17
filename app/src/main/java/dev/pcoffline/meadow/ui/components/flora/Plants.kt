@@ -116,14 +116,15 @@ internal val Soils = mapOf(
 
 /**
  * Each theme's five plants, its own first. Two plants of a theme differ in outline or clearly in
- * colour. The six themes' own plants have different colours, except that Cherry blossom's and Lily
- * pond's are both pink: a pale one on a twig, and a deeper one on water.
+ * colour. Three themes' own plants are pink, in three lightnesses: Meadow's cosmos is deep,
+ * Cherry blossom's cherry is pale, and Lily pond's lotus is between them, on water.
  */
 internal val Plants = mapOf(
     GardenTheme.MEADOW to listOf(
+        // Meadow's own plant, and the app's icon: a cosmos in a deep pink, darker than the cherry's and the lotus's.
         Plant(
-            "Cornflower", Form.RAY, Tone(0.69f, 0.125f, 262f), Tone(0.45f, 0.13f, 295f), n = 9, kind = PetalShape.FAN, len = 17.5f,
-            half = 5.6f, disc = 5.4f, seeds = 9, alt = 0.5f, shed = 3, keep = setOf(0, 2, 3, 5, 6, 8),
+            "Cosmos", Form.RAY, Tone(0.66f, 0.16f, 350f), Pale, n = 8, kind = PetalShape.TOOTH, len = 17f, half = 6f, disc = 4.6f, alt = 0.45f,
+            leaf = LeafShape.FEATHER, shed = 3, keep = setOf(0, 1, 2, 4, 5, 7),
         ),
         Plant(
             "Corn poppy", Form.CUP, Tone(0.70f, 0.185f, 30f), Plum, n = 4, kind = PetalShape.WIDE, len = 18.5f, half = 12.2f, disc = 4.4f,
@@ -132,8 +133,8 @@ internal val Plants = mapOf(
             spent = Pose(tilt = 14f, face = 0.6f, cup = 0f, plen = 1f, dry = 1f, y = 44f, x = 50f, lean = -8f),
         ),
         Plant(
-            "Cosmos", Form.RAY, Tone(0.79f, 0.125f, 352f), Pale, n = 8, kind = PetalShape.TOOTH, len = 17f, half = 6f, disc = 4.6f, alt = 0.45f,
-            leaf = LeafShape.FEATHER, shed = 3, keep = setOf(0, 1, 2, 4, 5, 7),
+            "Cornflower", Form.RAY, Tone(0.69f, 0.125f, 262f), Tone(0.45f, 0.13f, 295f), n = 9, kind = PetalShape.FAN, len = 17.5f,
+            half = 5.6f, disc = 5.4f, seeds = 9, alt = 0.5f, shed = 3, keep = setOf(0, 2, 3, 5, 6, 8),
         ),
         Plant(
             "Buttercup", Form.ROSETTE, Tone(0.85f, 0.17f, 92f), Amber, n = 5, kind = PetalShape.ROUND, len = 15f, half = 7.6f, disc = 4.4f,
