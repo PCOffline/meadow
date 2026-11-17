@@ -200,9 +200,9 @@ private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Col
     }
 }
 
-/** A small flat daisy for decorating headers and empty states. */
+/** A small flat daisy in the colours of the theme's own plant, for section titles. */
 @Composable
-fun Daisy(modifier: Modifier = Modifier, petal: Color = Color.White, heart: Color = Garden.colors.petalHoney) {
+fun Daisy(modifier: Modifier = Modifier, petal: Color = Garden.colors.petals.first(), heart: Color = Garden.colors.hearts.first()) {
     Canvas(modifier) {
         val c = Offset(size.width / 2f, size.height / 2f)
         val r = size.minDimension / 2f
@@ -267,7 +267,7 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
                             val a = Math.toRadians(72.0 * k).toFloat()
                             drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
                         }
-                        drawCircle(garden.petalHoney, radius = 1.05f * unit, center = Offset.Zero)
+                        drawCircle(garden.hearts[i % garden.hearts.size], radius = 1.05f * unit, center = Offset.Zero)
                     }
                 }
             }

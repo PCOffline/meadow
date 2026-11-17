@@ -27,6 +27,7 @@ import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.components.BloomFlower
+import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.flora.Tone
 import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
@@ -109,6 +110,22 @@ class ThemeLooksTest : ScreenTest() {
         val bud = drawn()
         assertTrue("fresh petals in the bud: ${bud.count(sunflower.color)}", bud.count(sunflower.color) > 100)
         assertEquals(0, bud.count(dried))
+    }
+
+    @Test
+    fun `a section title's daisy is in the colours of the theme's own plant`() {
+        var theme by mutableStateOf(GardenTheme.LAVENDER)
+        show { MeadowTheme(theme, DarkMode.LIGHT) { SectionTitle("Your garden") } }
+        fun drawn(colour: Color) = compose.onNode(isRoot()).captureToImage().toPixelMap().count(colour)
+        val lavender = gardenColorsFor(GardenTheme.LAVENDER, dark = false)
+        assertTrue("lavender petals: ${drawn(lavender.petals.first())}", drawn(lavender.petals.first()) > 60)
+        assertTrue("its middle: ${drawn(lavender.hearts.first())}", drawn(lavender.hearts.first()) > 10)
+
+        theme = GardenTheme.MUSHROOM
+        compose.waitForIdle()
+        val forest = gardenColorsFor(GardenTheme.MUSHROOM, dark = false)
+        assertEquals(0, drawn(lavender.petals.first()))
+        assertTrue("a fly agaric's red: ${drawn(forest.petals.first())}", drawn(forest.petals.first()) > 60)
     }
 
     @Test

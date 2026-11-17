@@ -357,8 +357,9 @@ fun SkyScene(
                     val x = size.width * (0.1f + 0.15f * i) + sin(t * 0.6f + i) * 18f
                     val y = size.height * (0.62f + 0.05f * (i % 3)) + cos(t * 0.8f + i * 2f) * 10f
                     val glow = 0.4f + 0.6f * abs(sin(t * 1.3f + i))
-                    drawCircle(garden.petalHoney.copy(alpha = 0.25f * glow), radius = 9f, center = Offset(x, y))
-                    drawCircle(garden.petalHoney.copy(alpha = glow), radius = 2.6f, center = Offset(x, y))
+                    // A firefly glows in the sun's gold.
+                    drawCircle(garden.sun.copy(alpha = 0.25f * glow), radius = 9f, center = Offset(x, y))
+                    drawCircle(garden.sun.copy(alpha = glow), radius = 2.6f, center = Offset(x, y))
                 }
                 else -> {
                     // The theme's two butterflies, the smaller one further off and higher up.
@@ -539,6 +540,9 @@ private fun cloudShape(r: Float): Path = cloudShapes.getOrPut(r) {
 
 private data class Petal(val x: Float, val speed: Float, val sway: Float, val phase: Float, val size: Float, val colorIndex: Int)
 
+/** How many petal colours a theme has: one for each of its five plants. */
+private const val PETAL_COLOURS = 5
+
 /** Petals drifting down slowly, forever. Purely decorative. */
 @Composable
 fun FallingPetals(modifier: Modifier = Modifier, count: Int = 14) {
@@ -546,7 +550,7 @@ fun FallingPetals(modifier: Modifier = Modifier, count: Int = 14) {
     val clock = rememberClock()
     val petals = remember(count) {
         val r = Random(42)
-        List(count) { Petal(r.nextFloat(), 0.04f + r.nextFloat() * 0.05f, 10f + r.nextFloat() * 24f, r.nextFloat() * 6f, 5f + r.nextFloat() * 5f, r.nextInt(5)) }
+        List(count) { Petal(r.nextFloat(), 0.04f + r.nextFloat() * 0.05f, 10f + r.nextFloat() * 24f, r.nextFloat() * 6f, 5f + r.nextFloat() * 5f, r.nextInt(PETAL_COLOURS)) }
     }
     Canvas(modifier) {
         val t = clock.value
@@ -556,7 +560,7 @@ fun FallingPetals(modifier: Modifier = Modifier, count: Int = 14) {
             val y = progress * (size.height + 40f) - 20f
             val s = p.size * density / 2f
             rotate(t * 40f + p.phase * 60f, pivot = Offset(x, y)) {
-                drawOval(garden.petals[p.colorIndex].copy(alpha = 0.75f), topLeft = Offset(x - s, y - s * 0.6f), size = Size(s * 2f, s * 1.2f))
+                drawOval(garden.petals[p.colorIndex % garden.petals.size].copy(alpha = 0.75f), topLeft = Offset(x - s, y - s * 0.6f), size = Size(s * 2f, s * 1.2f))
             }
         }
     }

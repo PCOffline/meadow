@@ -142,7 +142,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composa
         modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Daisy(Modifier.size(14.dp), petal = Garden.colors.petalPink)
+        Daisy(Modifier.size(14.dp))
         Spacer(Modifier.width(8.dp))
         Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.asHeading().weight(1f))
         trailing?.invoke()

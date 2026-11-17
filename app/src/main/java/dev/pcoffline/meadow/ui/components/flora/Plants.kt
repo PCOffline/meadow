@@ -92,6 +92,7 @@ private val Rust = Tone(0.62f, 0.15f, 55f)
 private val Amber = Tone(0.72f, 0.16f, 62f)
 private val Plum = Tone(0.36f, 0.07f, 340f)
 private val Seed = Tone(0.40f, 0.06f, 55f)
+private val Cream = Tone(0.95f, 0.03f, 90f)
 
 internal val FullPose = Pose(tilt = -14f, face = 0.86f, cup = 0.04f, plen = 1f, dry = 0f, y = 40f, x = 46f, lean = -6f)
 internal val LowPose = Pose(tilt = 40f, face = 0.72f, cup = 0.24f, plen = 0.97f, dry = 0.1f, y = 45f, x = 53f, lean = -9f)
@@ -190,7 +191,7 @@ internal val Plants = mapOf(
             half = 4.4f, disc = 5.6f, alt = 0.4f, dome = 0.9f, shed = 3, keep = setOf(0, 1, 3, 4, 6, 7, 9),
         ),
         Plant(
-            "Marigold", Form.POMPOM, Tone(0.74f, 0.175f, 55f), Amber, n = 12, kind = PetalShape.ROUND, len = 18f, half = 6.6f, disc = 3f,
+            "Marigold", Form.POMPOM, Tone(0.74f, 0.175f, 55f), Rust, n = 12, kind = PetalShape.ROUND, len = 18f, half = 6.6f, disc = 3f,
             leaf = LeafShape.FEATHER, shed = 3,
         ),
         // The one cool colour in the field: spikes of blue sage.
@@ -211,11 +212,12 @@ internal val Plants = mapOf(
         Plant("Violet water lily", Form.LOTUS, Tone(0.62f, 0.135f, 300f), Pale, len = 19f, slim = 0.235f, pod = Pod.LOTUS, shed = 4, leaf = LeafShape.NONE),
     ),
     GardenTheme.MUSHROOM to listOf(
-        Plant("Fly agaric", Form.MUSHROOM, Tone(0.62f, 0.20f, 30f), cap = Cap.DOME, warts = Tone(0.95f, 0.03f, 90f)),
-        Plant("Chanterelle", Form.MUSHROOM, Tone(0.84f, 0.135f, 82f), cap = Cap.FUNNEL),
-        Plant("Penny bun", Form.MUSHROOM, Tone(0.47f, 0.08f, 55f), cap = Cap.BUN),
-        Plant("Amethyst deceiver", Form.MUSHROOM, Tone(0.66f, 0.115f, 305f), cap = Cap.TROOP, stalk = Tone(0.80f, 0.06f, 305f)),
-        Plant("Parasol", Form.MUSHROOM, Tone(0.84f, 0.055f, 75f), cap = Cap.PARASOL, umbo = true),
+        // A mushroom has no middle. Where a small flower has one, a mushroom's colour is cream, as its warts or its stalk.
+        Plant("Fly agaric", Form.MUSHROOM, Tone(0.62f, 0.20f, 30f), Cream, cap = Cap.DOME, warts = Cream),
+        Plant("Chanterelle", Form.MUSHROOM, Tone(0.84f, 0.135f, 82f), Cream, cap = Cap.FUNNEL),
+        Plant("Penny bun", Form.MUSHROOM, Tone(0.47f, 0.08f, 55f), Cream, cap = Cap.BUN),
+        Plant("Amethyst deceiver", Form.MUSHROOM, Tone(0.66f, 0.115f, 305f), Cream, cap = Cap.TROOP, stalk = Tone(0.80f, 0.06f, 305f)),
+        Plant("Parasol", Form.MUSHROOM, Tone(0.84f, 0.055f, 75f), Cream, cap = Cap.PARASOL, umbo = true),
     ),
 )
 

@@ -274,6 +274,40 @@ class FloraTest {
     )
 
     @Test
+    fun `the small flowers, the falling petals and the petal shower are in the colours of the theme's plants`() {
+        for (theme in GardenTheme.entries) for (dark in listOf(false, true)) {
+            val garden = gardenColorsFor(theme, dark)
+            val plants = plantsOf(theme)
+            assertEquals("$theme dark=$dark", plants.map { (if (dark) it.petal.night() else it.petal).color }, garden.petals)
+            assertEquals(plants.size, garden.hearts.size)
+        }
+    }
+
+    @Test
+    fun `a small flower's middle differs from its petals, and a mushroom's is cream, as its warts`() {
+        for (theme in GardenTheme.entries) {
+            val garden = gardenColorsFor(theme, dark = false)
+            garden.petals.zip(garden.hearts).forEach { (petal, heart) ->
+                assertTrue("$theme: $petal and $heart", abs(lch(petal).first - lch(heart).first) >= 0.08f || hueGap(lch(petal).third, lch(heart).third) >= 60f)
+            }
+        }
+        val agaric = plantsOf(GardenTheme.MUSHROOM).first()
+        assertEquals(agaric.warts!!.color, gardenColorsFor(GardenTheme.MUSHROOM, dark = false).hearts.first())
+    }
+
+    @Test
+    fun `the chart's highlight is the theme's own petal, made to stand out`() {
+        for (theme in GardenTheme.entries) {
+            val garden = gardenColorsFor(theme, dark = false)
+            val own = lch(plantsOf(theme).first().petal.color)
+            val high = lch(garden.growthHigh)
+            // It is that petal, darkened only as far as it must be to show on each surface.
+            assertTrue("$theme: hue ${own.third} is drawn as ${high.third}", hueGap(own.third, high.third) <= 12f)
+            assertTrue(high.first <= own.first + 0.01f)
+        }
+    }
+
+    @Test
     fun `shade is darker and light is lighter`() = everyPlant.forEach { (_, plant: Plant) ->
         assertTrue(plant.petal.shade().l < plant.petal.l)
         assertTrue(plant.petal.light().l > plant.petal.l)
