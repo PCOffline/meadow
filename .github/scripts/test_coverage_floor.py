@@ -1,6 +1,8 @@
+import os
+import tempfile
 import unittest
 
-from coverage_floor import check, counts
+from coverage_floor import check, composable_signatures, counts
 
 REPORT = """<?xml version="1.0"?>
 <report name="debug">
@@ -45,6 +47,72 @@ class CoverageFloorTest(unittest.TestCase):
 
     def test_an_empty_report_is_fully_covered(self):
         self.assertEqual(check({}, 100, 100)[1], [])
+
+
+GARDEN_KT = """package dev.pcoffline.meadow.ui
+
+@Composable
+fun Garden(
+    name: String,
+    size: Int = 3,
+) {
+    if (size > 2) Text(name)
+}
+
+@Composable private fun Leaf(on: Boolean) = if (on) 1 else 0
+
+@Preview
+@Composable
+internal fun Bloom(open: Boolean): Int {
+    return if (open) 1 else 0
+}
+
+fun plain(content: @Composable () -> Unit) {
+    if (true) content()
+}
+"""
+
+SOURCED_REPORT = """<?xml version="1.0"?>
+<report name="debug">
+  <package name="dev/pcoffline/meadow/ui">
+    <class name="dev/pcoffline/meadow/ui/GardenKt">
+      <counter type="LINE" missed="1" covered="9"/>
+      <counter type="BRANCH" missed="9" covered="1"/>
+    </class>
+    <sourcefile name="Garden.kt">
+      <line nr="4" mi="0" ci="1" mb="4" cb="0"/>
+      <line nr="7" mi="0" ci="1" mb="2" cb="0"/>
+      <line nr="8" mi="0" ci="1" mb="1" cb="1"/>
+      <line nr="11" mi="0" ci="1" mb="1" cb="1"/>
+      <line nr="15" mi="0" ci="1" mb="2" cb="0"/>
+      <line nr="16" mi="0" ci="1" mb="0" cb="2"/>
+      <line nr="20" mi="0" ci="1" mb="1" cb="1"/>
+    </sourcefile>
+  </package>
+</report>"""
+
+
+class ComposableSignaturesTest(unittest.TestCase):
+    def test_each_composable_signature_is_found_up_to_its_body(self):
+        self.assertEqual(composable_signatures(GARDEN_KT), {4, 5, 6, 7, 11, 15})
+
+    def test_with_sources_branches_on_composable_signatures_are_left_out(self):
+        with tempfile.TemporaryDirectory() as sources:
+            folder = os.path.join(sources, "dev/pcoffline/meadow/ui")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "Garden.kt"), "w", encoding="utf-8") as f:
+                f.write(GARDEN_KT)
+            packages = counts(SOURCED_REPORT, sources)
+        # Lines 8, 16 and 20: what the code itself decides. Lines stay counted by class.
+        self.assertEqual(packages["dev.pcoffline.meadow.ui"]["BRANCH"], [2, 4])
+        self.assertEqual(packages["dev.pcoffline.meadow.ui"]["LINE"], [1, 9])
+
+    def test_without_sources_every_branch_counts(self):
+        self.assertEqual(counts(SOURCED_REPORT)["dev.pcoffline.meadow.ui"]["BRANCH"], [9, 1])
+
+    def test_a_source_file_that_is_missing_keeps_all_its_branches(self):
+        with tempfile.TemporaryDirectory() as sources:
+            self.assertEqual(counts(SOURCED_REPORT, sources)["dev.pcoffline.meadow.ui"]["BRANCH"], [11, 5])
 
 
 if __name__ == "__main__":
