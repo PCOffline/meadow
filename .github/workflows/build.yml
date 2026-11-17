@@ -142,11 +142,11 @@ jobs:
           npx firebase emulators:exec --only auth,firestore,functions --project demo-meadow
           "cd .. && ./gradlew createDebugUnitTestCoverageReport -Pmeadow.unitEmulatorHost=127.0.0.1 --stacktrace"
       - name: Unit test coverage floor
-        # Just under what the tests reach today (84.1% of lines, 69.0% of branches on 15 November
+        # Just under what the tests reach today (90.2% of lines, 73.9% of branches on 17 November
         # 2026): it can only go up. Raise it as coverage grows.
         run: |
           report=$(find app/build/reports/coverage -name report.xml | head -n 1)
-          python3 .github/scripts/coverage_floor.py "$report" --lines 82 --branches 67
+          python3 .github/scripts/coverage_floor.py "$report" --lines 90 --branches 73
       - name: Show failed unit tests
         if: failure()
         run: python3 .github/scripts/failed_tests.py app/build/test-results
