@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.LocalStore
+import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.MainActivity
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.navigation.DeepLinks
@@ -213,5 +214,47 @@ class NotifierTest {
             listOf(app.getString(R.string.request_say_yes), app.getString(R.string.request_not_today)),
             only().actions.map { it.title.toString() },
         )
+    }
+
+    private fun body() = only().extras.getCharSequence("android.text").toString()
+
+    @Test
+    fun `a reminder says why time is short, from hours ending, a cap or the week`() {
+        val limit = AppLimit("demo.app", "Demo", 0, 0)
+        notifier.maybeWarn(AppBudget(limit, 0, 0, 0, 0, untilScheduleChangeMs = 14 * 60_000L))
+        assertEquals(app.getString(R.string.notify_warning_body_hours, "Demo"), body())
+        manager.cancelAll()
+
+        notifier.maybeWarn(AppBudget(limit.copy(dailyMinutes = 60), 0, 0, 0, 0, capRemainingMs = 9 * 60_000L, untilCapEndsMs = 60 * 60_000L,
+            cap = TimeCap(listOf(1, 2, 3, 4, 5, 6, 7), 0, 1440, 30)))
+        assertEquals(app.getString(R.string.notify_warning_body_cap, "Demo"), body())
+        manager.cancelAll()
+
+        notifier.maybeWarn(AppBudget(limit.copy(weeklyMinutes = 120), 0, 116 * 60_000L, 0, 0))
+        assertEquals(app.getString(R.string.notify_warning_body_week, "Demo"), body())
+    }
+
+    @Test
+    fun `a push missing its kind is dropped, and one missing its title is Meadow's`() {
+        notifier.fromPush(mapOf("to" to "sam", "title" to "No kind"), signedInUid = "sam")
+        assertEquals(0, posted())
+        notifier.fromPush(mapOf("to" to "sam", "type" to "invite", "inviteId" to "i1"), signedInUid = "sam")
+        assertEquals(app.getString(R.string.app_name), only().extras.getCharSequence("android.title").toString())
+    }
+
+    @Test
+    fun `an alert about a garden opens that garden, and one without opens the circle`() {
+        notifier.fromPush(mapOf("to" to "sam", "type" to "alert", "uid" to "robin", "title" to "Robin"), signedInUid = "sam")
+        assertEquals(DeepLinks.friend("robin"), shadowOf(only().contentIntent).savedIntent.getStringExtra(MainActivity.EXTRA_ROUTE))
+        manager.cancelAll()
+        notifier.fromPush(mapOf("to" to "sam", "type" to "chat", "title" to "Bee"), signedInUid = "sam")
+        assertEquals(null, shadowOf(only().contentIntent).savedIntent.getStringExtra(MainActivity.EXTRA_ROUTE))
+    }
+
+    @Test
+    fun `with notifications off, nothing is posted`() {
+        shadowOf(manager).setNotificationsEnabled(false)
+        notifier.fromPush(chatPush(to = "sam"), signedInUid = "sam")
+        assertEquals(0, posted())
     }
 }
