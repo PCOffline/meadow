@@ -224,7 +224,7 @@ class MeadowRootTest : EmulatorTest() {
     @Test
     fun `with notifications off, troubleshooting opens their settings`() {
         val robin = person("Robin")
-        shadowOf(app).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        shadowOf(app.getSystemService(android.app.NotificationManager::class.java)).setNotificationsEnabled(false)
         pending.value = DeepLinks.troubleshoot()
         showRootFor(robin)
         waitForText(R.string.trouble_title)
