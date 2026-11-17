@@ -74,16 +74,16 @@ class GuardianWindowsTest {
     private fun resting(pkg: String) = AppLimit(pkg, pkg, 30, 0, schedule = asleep())
 
     private fun window(id: Int, pkg: String?, pip: Boolean = false, type: Int = AccessibilityWindowInfo.TYPE_APPLICATION): AccessibilityWindowInfo =
-        AccessibilityWindowInfo.obtain().also { w ->
+        AccessibilityWindowInfo().also { w ->
             val s = shadowOf(w)
             s.setId(id)
             s.setType(type)
             s.setPictureInPicture(pip)
-            if (pkg != null) s.setRoot(AccessibilityNodeInfo.obtain().apply { packageName = pkg })
+            if (pkg != null) s.setRoot(AccessibilityNodeInfo().apply { packageName = pkg })
         }
 
     private fun windowsChanged() {
-        service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
+        service.onAccessibilityEvent(AccessibilityEvent(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
         shadowOf(Looper.getMainLooper()).idle()
     }
 
@@ -118,7 +118,7 @@ class GuardianWindowsTest {
 
     private fun opened(pkg: String, className: String?) {
         service.onAccessibilityEvent(
-            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).apply {
+            AccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).apply {
                 packageName = pkg
                 this.className = className
             },
