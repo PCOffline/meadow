@@ -2,6 +2,9 @@ package dev.pcoffline.meadow.ui.screens
 
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
@@ -91,5 +94,20 @@ class SettingsDialogsTest : ScreenTest() {
 
         node(R.string.settings_delete_keep).performClick()
         node(R.string.settings_delete_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `an emergency unlock opens from Settings while there are some left`() {
+        var profile by mutableStateOf(DemoGarden.robin.copy(emergencyUsesMillis = emptyList()))
+        show { SettingsScreen(profile, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
+        node(R.string.settings_emergency_button).performScrollTo().assertIsEnabled().performClick()
+        node(R.string.emergency_dialog_title).assertExists()
+        node(R.string.action_cancel).performClick()
+        node(R.string.emergency_dialog_title).assertDoesNotExist()
+
+        // All three used this month: none left until the oldest is a month old.
+        val now = System.currentTimeMillis()
+        profile = profile.copy(emergencyUsesMillis = listOf(now - 1_000, now - 2_000, now - 3_000))
+        node(R.string.settings_emergency_button).performScrollTo().assertIsNotEnabled()
     }
 }
