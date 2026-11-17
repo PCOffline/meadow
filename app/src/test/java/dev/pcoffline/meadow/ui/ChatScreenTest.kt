@@ -4,8 +4,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -20,18 +20,20 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.firestore.snapshots
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.EmulatorTest
+import dev.pcoffline.meadow.data.LimitCardMode
+import dev.pcoffline.meadow.data.LimitsRepository
+import dev.pcoffline.meadow.data.RequestRepository
+import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.SocialRepository
 import dev.pcoffline.meadow.data.UserProfile
-import dev.pcoffline.meadow.data.RequestType
-import dev.pcoffline.meadow.data.RequestRepository
-import dev.pcoffline.meadow.data.LimitsRepository
-import dev.pcoffline.meadow.data.AppLimit
-import dev.pcoffline.meadow.data.EmulatorTest
 import dev.pcoffline.meadow.data.stringList
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.chat.ChatScreen
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -165,5 +167,60 @@ class ChatScreenTest : EmulatorTest() {
         compose.onNodeWithText(text(R.string.chat_offer_confirm)).performClick()
 
         onBackend { SocialRepository(backend).outgoingInvites(robin.uid).firstWhere { list -> list.any { it.toUid == bee.uid && it.offer } } }
+    }
+
+    @Test
+    fun `a suggestion from my Bumblebee is applied from its card, and Change opens it to edit`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        val site = AppLimit("site:example.com", "example.com", 20, 0)
+        onBackend { ChatRepository(backend).sendLimit(chatId, site, LimitCardMode.SUGGESTED, "Suggested a limit for example.com") }
+        signInAs(robin)
+        val copied = mutableListOf<AppLimit>()
+        compose.setContent {
+            MeadowTheme {
+                CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) {
+                    ChatScreen(
+                        DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid)), chatId,
+                        onBack = {}, onCopyLimit = { copied += it },
+                    )
+                }
+            }
+        }
+        waitForText(text(R.string.limit_card_suggested))
+        compose.onNodeWithText(text(R.string.limit_change)).performClick()
+        assertEquals(listOf(site), copied)
+
+        compose.onNodeWithText(text(R.string.limit_apply)).performClick()
+        val saved = onBackend { backend.user(robin.uid).collection("limits").document(site.packageName).snapshots().firstWhere { it.exists() } }
+        assertEquals(20L, saved.getLong("dailyMinutes"))
+    }
+
+    @Test
+    fun `a limit shared with me can be copied from its card`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        val shared = AppLimit("com.example.pebbles", "Pebbles", 30, 0)
+        onBackend { ChatRepository(backend).sendLimit(chatId, shared, LimitCardMode.SHARED, "Shared a limit for Pebbles") }
+        signInAs(bee)
+        val copied = mutableListOf<AppLimit>()
+        compose.setContent {
+            MeadowTheme {
+                CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) {
+                    ChatScreen(
+                        DemoGarden.robin.copy(uid = bee.uid, displayName = "Bee", approveeIds = listOf(robin.uid)), chatId,
+                        onBack = {}, onCopyLimit = { copied += it },
+                    )
+                }
+            }
+        }
+        waitForText(text(R.string.limit_card_shared))
+        compose.onNodeWithText(text(R.string.limit_menu_copy)).performClick()
+        assertEquals(listOf(shared), copied)
     }
 }
