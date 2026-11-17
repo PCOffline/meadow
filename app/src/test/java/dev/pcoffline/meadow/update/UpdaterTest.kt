@@ -9,7 +9,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.data.LocalStore
 import dev.pcoffline.meadow.notifications.Notifier
+import dev.pcoffline.meadow.R
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -17,6 +21,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import android.content.pm.PackageInstaller
 
 /** An update handed to Android's installer must never leave Meadow waiting for ever. */
 @RunWith(AndroidJUnit4::class)
@@ -36,6 +47,48 @@ class UpdaterTest {
     }
 
     private fun updater(timeoutMs: Long = Updater.INSTALL_TIMEOUT_MS) = Updater(app, { notifier }, timeoutMs)
+
+    /** A web server that gives [answer] for each address, and records the addresses asked for. */
+    private class Web(val answer: (String) -> Answer) {
+        val asked = mutableListOf<String>()
+        fun open(url: String): HttpURLConnection {
+            asked += url
+            return FakeConnection(url, answer(url))
+        }
+    }
+
+    private class Answer(val code: Int, val body: ByteArray = ByteArray(0), val length: Long = body.size.toLong(), val failure: IOException? = null)
+
+    private class FakeConnection(url: String, val answer: Answer) : HttpURLConnection(URL(url)) {
+        var disconnected = false
+        override fun connect() = Unit
+        override fun usingProxy() = false
+        override fun disconnect() { disconnected = true }
+        override fun getResponseCode(): Int = answer.failure?.let { throw it } ?: answer.code
+        override fun getContentLengthLong(): Long = answer.length
+        override fun getInputStream(): InputStream = ByteArrayInputStream(answer.body)
+    }
+
+    private fun online(web: Web) = Updater(app, { notifier }, Updater.INSTALL_TIMEOUT_MS, web::open)
+
+    private fun release(tag: String, vararg assets: String) = """
+        {"tag_name": "$tag", "body": "* feat: a new flower by @sam in #1", "html_url": "https://example.com/r",
+         "assets": [${assets.joinToString()}]}
+    """.trimIndent()
+
+    private fun apkAsset(size: Long = 4, digest: String? = null) =
+        """{"name": "meadow.apk", "browser_download_url": "https://example.com/meadow.apk", "size": $size${digest?.let { ", \"digest\": \"$it\"" } ?: ""}}"""
+
+    /** Waits for the install that [updater] started to fail or reach Android's installer. */
+    private fun settled(updater: Updater): UpdateState {
+        val until = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < until) {
+            val state = updater.state.value
+            if (state is UpdateState.Failed || state is UpdateState.Installing) return state
+            Thread.sleep(10)
+        }
+        return updater.state.value
+    }
 
     @Test
     fun `while Meadow is on screen, Android's confirmation opens straight away`() {
@@ -93,5 +146,151 @@ class UpdaterTest {
     fun `without a size, a download has a fixed limit`() {
         assertEquals(42L, Updater.maxBytes(update.copy(sizeBytes = 42)))
         assertEquals(Updater.MAX_APK_BYTES, Updater.maxBytes(update.copy(sizeBytes = 0)))
+    }
+
+    @Test
+    fun `a newer release on GitHub is offered, with its notes for people`() = runBlocking {
+        val web = Web { Answer(200, release("v99.0.0", apkAsset(digest = "sha256:ABCD")).toByteArray()) }
+        val updater = online(web)
+        val update = updater.check()
+        assertNotNull(update)
+        assertEquals(Version(99, 0, 0), update!!.version)
+        assertEquals("abcd", update.sha256)
+        assertEquals("• A new flower", update.notes)
+        assertEquals(UpdateState.Available(update), updater.state.value)
+        assertTrue(web.asked.single(), web.asked.single().endsWith("/releases/latest"))
+    }
+
+    @Test
+    fun `the same or an older release means Meadow is up to date`() = runBlocking {
+        val updater = online(Web { Answer(200, release("v0.0.1", apkAsset()).toByteArray()) })
+        assertNull(updater.check())
+        assertEquals(UpdateState.UpToDate, updater.state.value)
+    }
+
+    @Test
+    fun `with no releases yet, Meadow is up to date`() = runBlocking {
+        val updater = online(Web { Answer(HttpURLConnection.HTTP_NOT_FOUND) })
+        assertNull(updater.check())
+        assertEquals(UpdateState.UpToDate, updater.state.value)
+    }
+
+    @Test
+    fun `an error from GitHub or no connection says to check the connection`() = runBlocking {
+        for (web in listOf(Web { Answer(500) }, Web { Answer(0, failure = IOException("no route")) })) {
+            val updater = online(web)
+            assertNull(updater.check())
+            assertEquals(UpdateState.Failed(app.getString(R.string.error_offline), null), updater.state.value)
+        }
+    }
+
+    @Test
+    fun `an answer Meadow can't read says the check failed`() = runBlocking {
+        val updater = online(Web { Answer(200, "not json".toByteArray()) })
+        assertNull(updater.check())
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_check), null), updater.state.value)
+    }
+
+    @Test
+    fun `a check during a download or an install keeps that update`() = runBlocking {
+        val web = Web { Answer(200, release("v99.0.0", apkAsset()).toByteArray()) }
+        val updater = online(web)
+        updater.installing(update)
+        assertEquals(update, updater.check())
+        assertEquals(UpdateState.Installing(update), updater.state.value)
+        assertTrue(web.asked.isEmpty())
+    }
+
+    @Test
+    fun `a download that doesn't match its checksum isn't installed, and its file is checked`() {
+        val apk = "not an apk".toByteArray()
+        val web = Web { Answer(200, apk) }
+        val updater = online(web)
+        updater.startInstall(update.copy(sizeBytes = apk.size.toLong(), sha256 = "00"))
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), update.copy(sizeBytes = apk.size.toLong(), sha256 = "00")), settled(updater))
+        assertEquals(listOf(update.apkUrl), web.asked)
+        assertTrue(File(app.cacheDir, "updates/meadow-9.0.0.apk").exists())
+    }
+
+    @Test
+    fun `a download that isn't an app isn't installed`() {
+        val apk = "not an apk".toByteArray()
+        val file = File(app.cacheDir, "check.apk").apply { writeBytes(apk) }
+        val right = update.copy(sizeBytes = apk.size.toLong(), sha256 = Updater.sha256(file))
+        val updater = online(Web { Answer(200, apk) })
+        updater.startInstall(right)
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), right), settled(updater))
+    }
+
+    @Test
+    fun `a download larger than its release says isn't installed`() {
+        val updater = online(Web { Answer(200, ByteArray(100), length = -1) })
+        val small = update.copy(sizeBytes = 10)
+        updater.startInstall(small)
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), small), settled(updater))
+    }
+
+    @Test
+    fun `a download that fails says to check the connection`() {
+        val updater = online(Web { Answer(503) })
+        updater.startInstall(update)
+        assertEquals(UpdateState.Failed(app.getString(R.string.error_offline), update), settled(updater))
+    }
+
+    @Test
+    fun `Settings for installing apps opens on Meadow`() {
+        val intent = updater().installPermissionIntent()
+        assertEquals(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, intent.action)
+        assertEquals("package:${app.packageName}", intent.dataString)
+        assertFalse(updater().canInstall())
+    }
+
+    @Test
+    fun `a finished install clears the downloaded file and the notification`() {
+        val updater = updater().apply { installing(update) }
+        val dir = File(app.cacheDir, "updates").apply { mkdirs() }
+        File(dir, "meadow.apk").writeText("apk")
+        notifier.confirmUpdate(confirm)
+        updater.onInstallResult(true, null)
+        assertFalse(dir.exists())
+        assertTrue(shadowOf(manager).allNotifications.isEmpty())
+        assertEquals(UpdateState.Installing(update), updater.state.value)
+    }
+
+    @Test
+    fun `without a message, a failed install says Android can't install it`() {
+        val updater = updater().apply { installing(update) }
+        updater.onInstallResult(false, null)
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_install), update), updater.state.value)
+    }
+
+    @Test
+    fun `the installer's answers reach the updater`() {
+        dev.pcoffline.meadow.AppGraph.init(app)
+        val updater = dev.pcoffline.meadow.AppGraph.updater
+        val receiver = InstallResultReceiver()
+        fun answer(status: Int, extra: Intent? = null) = receiver.onReceive(
+            app,
+            Intent().putExtra(PackageInstaller.EXTRA_STATUS, status).apply { extra?.let { putExtra(Intent.EXTRA_INTENT, it) } },
+        )
+
+        updater.installing(update)
+        answer(PackageInstaller.STATUS_FAILURE_ABORTED)
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_cancelled), update), updater.state.value)
+
+        updater.installing(update)
+        answer(PackageInstaller.STATUS_FAILURE)
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_install), update), updater.state.value)
+
+        updater.installing(update)
+        answer(PackageInstaller.STATUS_PENDING_USER_ACTION)
+        assertTrue(updater.state.value is UpdateState.Failed)
+
+        updater.installing(update)
+        answer(PackageInstaller.STATUS_PENDING_USER_ACTION, confirm)
+        assertEquals(UpdateState.Installing(update), updater.state.value)
+
+        answer(PackageInstaller.STATUS_SUCCESS)
+        assertEquals(UpdateState.Installing(update), updater.state.value)
     }
 }
