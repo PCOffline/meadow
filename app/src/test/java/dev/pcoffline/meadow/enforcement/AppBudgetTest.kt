@@ -142,4 +142,50 @@ class AppBudgetTest {
         assertEquals(60 * minute, b.wakesInMs)
         assertEquals(null, b.copy(untilScheduleChangeMs = Long.MAX_VALUE / 2).wakesInMs)
     }
+
+    @Test
+    fun `outside its hours with no time left it wilts, and during an emergency it neither sleeps nor rests`() {
+        val spent = AppBudget(AppLimit("app", "App", 30, 0), 30 * minute, 30 * minute, 0, 0, outsideHours = true, untilScheduleChangeMs = 60 * minute)
+        assertFalse(spent.restingByHours)
+        assertFalse(spent.sleeping)
+        assertTrue(spent.exhausted)
+
+        val unlocked = AppBudget(
+            AppLimit("app", "App", 30, 0), 0, 0, 0, 0, emergencyUntilMillis = System.currentTimeMillis() + 60 * minute,
+            outsideHours = true, untilScheduleChangeMs = 60 * minute,
+        )
+        assertTrue(unlocked.restingByHours)
+        assertFalse(unlocked.sleeping)
+        assertFalse(unlocked.exhausted)
+    }
+
+    @Test
+    fun `a sleeping app wakes when its hours change, or never within a week`() {
+        val hours = AppBudget(AppLimit("app", "App", 0, 0), 0, 0, 0, 0, outsideHours = true, untilScheduleChangeMs = null)
+        assertEquals(null, hours.wakesInMs)
+        val cap = AppBudget(AppLimit("app", "App", 60, 0), 0, 0, 0, 0, capRemainingMs = 0, untilCapEndsMs = Long.MAX_VALUE / 2)
+        assertTrue(cap.restingByCap)
+        assertEquals(null, cap.wakesInMs)
+        // A cap with nothing left but no day limit: the hours alone rest it.
+        val onlyCap = AppBudget(AppLimit("app", "App", 0, 0), 0, 0, 0, 0, capRemainingMs = 0, untilCapEndsMs = 30 * minute)
+        assertTrue(onlyCap.restingByCap)
+        assertEquals(30 * minute, onlyCap.wakesInMs)
+    }
+
+    @Test
+    fun `the weekly limit is tighter only when it has less left`() {
+        assertTrue(budget(daily = 0, weekly = 120).weeklyIsTighter)
+        assertFalse(budget(daily = 30, weekly = 0).weeklyIsTighter)
+        assertFalse(budget(daily = 30, weekly = 120, usedToday = 10 * minute, usedWeek = 10 * minute).weeklyIsTighter)
+        assertTrue(budget(daily = 60, weekly = 120, usedToday = 0, usedWeek = 100 * minute).weeklyIsTighter)
+    }
+
+    @Test
+    fun `within its hours, the end of the hours and extra time both count`() {
+        val b = AppBudget(AppLimit("app", "App", 0, 0), 0, 0, 0, 0, untilScheduleChangeMs = 20 * minute, outsideHoursAllowanceMs = 10 * minute)
+        assertEquals(30 * minute, b.remainingMs)
+        assertEquals(null, b.allowedTodayMs)
+        val negative = b.copy(outsideHoursAllowanceMs = -5 * minute)
+        assertEquals(20 * minute, negative.remainingMs)
+    }
 }
