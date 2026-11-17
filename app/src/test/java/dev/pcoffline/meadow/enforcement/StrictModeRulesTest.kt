@@ -32,4 +32,11 @@ class StrictModeRulesTest {
         assertFalse(blocks("com.android.settings", "Apps\nMeadow\nInstagram"))
         assertFalse(blocks("com.android.settings", "Wi-Fi\nBluetooth"))
     }
+
+    @Test
+    fun `the clock's words count only in a settings app`() {
+        // A clock app's own "Set time" for an alarm is no way around a limit.
+        assertFalse(blocks("com.google.android.deskclock", "Alarm\nSet time"))
+        assertTrue(blocks("com.samsung.android.settings", "Automatic date & time"))
+    }
 }
