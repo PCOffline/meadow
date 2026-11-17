@@ -5,8 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -18,13 +21,17 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.AppSync
+import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.EmulatorTest
+import dev.pcoffline.meadow.data.LimitCardMode
 import dev.pcoffline.meadow.data.LimitsRepository
+import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.RequestRepository
 import dev.pcoffline.meadow.data.RequestStatus
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.ui.limits.LimitEditorScreen
+import dev.pcoffline.meadow.ui.limits.SuggestLimitScreen
 import dev.pcoffline.meadow.ui.theme.MeadowTheme
 import kotlinx.coroutines.tasks.await
 import org.junit.Assert.assertEquals
@@ -122,6 +129,62 @@ class LimitEditorScreenTest : EmulatorTest() {
         onBackend {
             requests.outgoing(robin.uid, fresh = true).firstWhere { list -> list.single { it.id == asked.id }.status == RequestStatus.CANCELLED }
         }
+    }
+
+    @Test
+    fun `alone, a limit is removed at once`() {
+        val robin = person("Robin")
+        onBackend { LimitsRepository(backend, store, requests).save(AppLimit(APP, "Pebbles", 30, 0)) }
+        var done = 0
+        showEditor(robin) { done++ }
+        waitOnMain { AppGraph.store.limits.value.isNotEmpty() }
+        waitOnMain { shows(text(R.string.limit_editor_remove)) }
+        compose.onNodeWithText(text(R.string.limit_editor_remove)).performScrollTo().performClick()
+        compose.onNode(hasText(text(R.string.action_remove)) and hasAnyAncestor(isDialog())).performClick()
+
+        waitOnMain { done == 1 }
+        val gone = onBackend { backend.user(robin.uid).collection("limits").document(APP).get().await() }
+        assertEquals(false, gone.exists())
+    }
+
+    @Test
+    fun `a copied limit for an app that isn't on this phone says so, and saves nothing`() {
+        val robin = person("Robin")
+        onBackend { AppGraph.sync.profile.firstWhere { (it as? ProfileState.Ready)?.profile?.uid == robin.uid } }
+        compose.setContent {
+            MeadowTheme {
+                CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) {
+                    LimitEditorScreen(APP, onDone = {}, start = AppLimit(APP, "Pebbles", 45, 0), onChangeApp = {})
+                }
+            }
+        }
+        waitOnMain { shows(text(R.string.limit_apply_not_on_phone, "Pebbles")) }
+        compose.onNodeWithText(text(R.string.limit_copy_other_app)).assertExists()
+        compose.onNodeWithText(text(R.string.limit_editor_plant)).performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun `a Bumblebee's suggestion is sent to the chat as a card`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        var done = 0
+        onBackend { AppGraph.sync.profile.firstWhere { (it as? ProfileState.Ready)?.profile?.uid == bee.uid } }
+        compose.setContent {
+            MeadowTheme {
+                CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) {
+                    SuggestLimitScreen(chatId, APP, "Pebbles", start = null, onDone = { done++ })
+                }
+            }
+        }
+        compose.onNodeWithText(text(R.string.limit_suggest_title)).assertExists()
+        compose.onNodeWithText(text(R.string.limit_suggest_send)).performScrollTo().performClick()
+        waitOnMain { done == 1 }
+        val card = onBackend { ChatRepository(backend).messages(chatId).firstWhere { list -> list.any { it.kind == MessageKind.LIMIT } } }
+            .single { it.kind == MessageKind.LIMIT }
+        assertEquals(LimitCardMode.SUGGESTED, card.limitMode)
+        assertEquals(30, card.limit?.dailyMinutes)
     }
 
     private companion object {
