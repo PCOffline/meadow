@@ -134,7 +134,7 @@ data class StatsUiState(
     val progress: Progress? = null,
 )
 
-class StatsViewModel : ViewModel() {
+class StatsViewModel(private val history: UsageHistory = AppGraph.history) : ViewModel() {
     private val selection = MutableStateFlow(Selection())
 
     private val loaded = combine(selection, AppGraph.store.weekRule) { sel, week -> sel to week.first }
@@ -175,7 +175,6 @@ class StatsViewModel : ViewModel() {
     private fun load(sel: Selection, firstDay: DayOfWeek): PeriodStats {
         val today = Days.today()
         val (from, to) = sel.range(today, firstDay)
-        val history = AppGraph.history
         val days = history.range(from, to)
         val limitable = AppGraph.catalog.launchablePackages()
         val perApp = HashMap<String, Long>()
