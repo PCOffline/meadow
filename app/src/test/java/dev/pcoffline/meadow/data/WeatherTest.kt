@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.content.Context
 import android.location.Location
+import android.location.LocationManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
@@ -202,5 +203,49 @@ class WeatherTest {
         assertFalse(restarted.weatherOn.value)
         assertNull(restarted.weather.value)
         assertFalse(LocalStore(app).weatherOn.value)
+    }
+
+    /** The repository finding the phone as the app does, through Android's location service. */
+    private fun located() = WeatherRepository(app, store, fetch = { asked += it; answer }, now = { System.currentTimeMillis() })
+
+    private val locations get() = shadowOf(app.getSystemService(LocationManager::class.java))
+
+    private fun fix(provider: String, ageMs: Long, latitude: Double) = Location(provider).apply {
+        this.latitude = latitude
+        longitude = -0.12
+        time = System.currentTimeMillis() - ageMs
+    }
+
+    @Test
+    fun `the phone's own recent rough location is used`() = runBlocking {
+        locations.setLocationEnabled(true)
+        locations.setProviderEnabled(LocationManager.NETWORK_PROVIDER, true)
+        locations.setLastKnownLocation(LocationManager.NETWORK_PROVIDER, fix(LocationManager.NETWORK_PROVIDER, 60_000, 51.5))
+        val weather = located()
+        weather.turnOn()
+        weather.refreshIfStale()
+        assertEquals(Place(OpenMeteo.round(51.5), OpenMeteo.round(-0.12)), weather.place.value)
+    }
+
+    @Test
+    fun `an old location is used when the network can't find a newer one`() = runBlocking {
+        locations.setLocationEnabled(true)
+        locations.setProviderEnabled(LocationManager.GPS_PROVIDER, true)
+        locations.setLastKnownLocation(LocationManager.GPS_PROVIDER, fix(LocationManager.GPS_PROVIDER, 24 * 60 * 60_000L, 48.85))
+        locations.setProviderEnabled(LocationManager.NETWORK_PROVIDER, false)
+        val weather = located()
+        weather.turnOn()
+        weather.refreshIfStale()
+        assertEquals(OpenMeteo.round(48.85), weather.place.value?.latitude)
+    }
+
+    @Test
+    fun `with location off, nothing is read`() = runBlocking {
+        locations.setLocationEnabled(false)
+        val weather = located()
+        weather.turnOn()
+        weather.refreshIfStale()
+        assertEquals(null, weather.place.value)
+        assertTrue(asked.isEmpty())
     }
 }
