@@ -27,7 +27,9 @@ import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.components.LocalSkyHour
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.components.BloomFlower
+import dev.pcoffline.meadow.ui.components.MeadowHills
 import dev.pcoffline.meadow.ui.components.SectionTitle
+import dev.pcoffline.meadow.ui.components.flora.Soils
 import dev.pcoffline.meadow.ui.components.flora.Tone
 import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
@@ -110,6 +112,16 @@ class ThemeLooksTest : ScreenTest() {
         val bud = drawn()
         assertTrue("fresh petals in the bud: ${bud.count(sunflower.color)}", bud.count(sunflower.color) > 100)
         assertEquals(0, bud.count(dried))
+    }
+
+    @Test
+    fun `the flowers on the hills are the theme's plants, each on a stem`() {
+        show(GardenTheme.LAVENDER) { MeadowHills(Modifier.size(411.dp, 200.dp)) }
+        val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
+        val stem = Soils.getValue(GardenTheme.LAVENDER).stem.color
+        assertTrue("stems on the hills: ${shot.count(stem)}", shot.count(stem) > 10)
+        // Lavender, the field's own plant, among them.
+        assertTrue(shot.count(plantsOf(GardenTheme.LAVENDER).first().petal.color) > 10)
     }
 
     @Test

@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.compositeOver
@@ -49,6 +50,8 @@ import dev.pcoffline.meadow.ui.components.flora.Look
 import dev.pcoffline.meadow.ui.components.flora.Piece
 import dev.pcoffline.meadow.ui.components.flora.Plant
 import dev.pcoffline.meadow.ui.components.flora.Sketch
+import dev.pcoffline.meadow.ui.components.flora.Soils
+import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.components.flora.sketch
 import dev.pcoffline.meadow.ui.components.flora.vigour
 import dev.pcoffline.meadow.ui.theme.Garden
@@ -224,7 +227,10 @@ fun Daisy(modifier: Modifier = Modifier, petal: Color = Garden.colors.petals.fir
 @Composable
 fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? = null, rise: Float = 1f) {
     val garden = Garden.colors
-    val mushrooms = Garden.theme == GardenTheme.MUSHROOM
+    val theme = Garden.theme
+    val mushrooms = theme == GardenTheme.MUSHROOM
+    val plants = plantsOf(theme)
+    val stem = Soils.getValue(theme).let { if (LocalDarkTheme.current) it.night() else it }.stem.color
     val (backColor, frontColor) = remember(garden, sky, text) {
         val back = garden.grass.copy(alpha = 0.35f)
         val front = garden.grass.copy(alpha = 0.55f)
@@ -256,19 +262,13 @@ fun MeadowHills(modifier: Modifier = Modifier, sky: Color? = null, text: Color? 
         drawPath(front, frontColor)
         val unit = 1.dp.toPx()
         HILL_FLOWERS.forEachIndexed { i, f ->
-            val color = garden.petals[i % garden.petals.size]
+            // Each is one of the theme's five plants, in its own shape and colours.
+            val k = i % plants.size
+            val color = garden.petals[k]
             translate(w * f.x, y(f.down)) {
                 // A toadstool is wider than a flower, so it grows a little less, staying under a butterfly.
                 scale(if (mushrooms) f.scale * TOADSTOOL_SHARE else f.scale, pivot = Offset.Zero) {
-                    if (mushrooms) {
-                        tinyToadstool(color, unit)
-                    } else {
-                        for (k in 0 until 5) {
-                            val a = Math.toRadians(72.0 * k).toFloat()
-                            drawCircle(color, radius = 1.5f * unit, center = Offset(cos(a) * 1.7f * unit, sin(a) * 1.7f * unit))
-                        }
-                        drawCircle(garden.hearts[i % garden.hearts.size], radius = 1.05f * unit, center = Offset.Zero)
-                    }
+                    if (mushrooms) tinyToadstool(color, unit) else tinyPlant(plants[k].form, color, garden.hearts[k], stem, unit)
                 }
             }
         }
@@ -291,13 +291,54 @@ internal val HILL_FLOWERS = listOf(
     HillFlower(0.91f, 0.88f, 1.4f),
 )
 
-/** A flower's width before scaling: five petals 1.5 dp round, 1.7 dp from its middle. */
-private const val HILL_FLOWER_BASE_DP = 2 * (1.7f + 1.5f)
+/** A flower's width before scaling: it is drawn within 3.2 dp of its middle. */
+private const val HILL_FLOWER_BASE_DP = 2 * 3.2f
 
 private const val TOADSTOOL_SHARE = 0.85f
 
 /** How wide [flower] is drawn, in dp. */
 internal fun hillFlowerWidthDp(flower: HillFlower): Float = HILL_FLOWER_BASE_DP * flower.scale
+
+/**
+ * A plant a few dp across, its head at the origin, in the shape of its [form]: a ring of petals,
+ * a spike, a ball, a hanging cluster or a lotus's fan. A short [stem] holds it.
+ */
+private fun DrawScope.tinyPlant(form: Form, petal: Color, heart: Color, stem: Color, unit: Float) {
+    drawLine(stem, Offset(0f, 0.6f * unit), Offset(-0.3f * unit, 3.4f * unit), strokeWidth = 0.7f * unit, cap = StrokeCap.Round)
+    when (form) {
+        Form.SPIKE -> for (j in 0 until 4) {
+            // Florets up a spike, smaller to its tip.
+            drawCircle(petal, radius = (1.15f - 0.17f * j) * unit, center = Offset(0f, (1.2f - 1.45f * j) * unit))
+        }
+        Form.GLOBE -> {
+            drawCircle(petal, radius = 2.5f * unit, center = Offset(0f, -0.6f * unit))
+            drawCircle(heart.copy(alpha = 0.5f), radius = 0.8f * unit, center = Offset(-0.7f * unit, -1.3f * unit))
+        }
+        Form.RACEME -> for ((dx, dy, r) in listOf(Triple(-1.2f, -1.6f, 1.05f), Triple(1.2f, -1.6f, 1.05f), Triple(0f, -0.2f, 1f), Triple(0f, 1.3f, 0.8f))) {
+            // A cluster that hangs and narrows downwards.
+            drawCircle(petal, radius = r * unit, center = Offset(dx * unit, dy * unit))
+        }
+        Form.LOTUS -> {
+            // A fan of three pointed petals, rising from the water.
+            for (a in listOf(-38f, 38f, 0f)) {
+                rotate(a, pivot = Offset(0f, 0.8f * unit)) {
+                    drawOval(petal, topLeft = Offset(-0.95f * unit, -3.2f * unit), size = Size(1.9f * unit, 4f * unit))
+                }
+            }
+            drawCircle(heart, radius = 0.6f * unit, center = Offset(0f, -0.6f * unit))
+        }
+        else -> {
+            // A ring of petals round its middle: five broad ones, or eight narrow ones for a daisy's kind.
+            val count = if (form == Form.RAY) 8 else 5
+            val (reach, round) = if (count == 8) 2.15f to 1.05f else 1.75f to 1.45f
+            for (j in 0 until count) {
+                val a = Math.toRadians(360.0 / count * j - 90.0).toFloat()
+                drawCircle(petal, radius = round * unit, center = Offset(cos(a) * reach * unit, sin(a) * reach * unit))
+            }
+            drawCircle(heart, radius = 1.05f * unit, center = Offset.Zero)
+        }
+    }
+}
 
 /** A toadstool a few dp tall, its cap [cap] with pale spots, standing on the origin's ground. */
 private fun DrawScope.tinyToadstool(cap: Color, unit: Float) {
