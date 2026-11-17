@@ -3,6 +3,8 @@ package dev.pcoffline.meadow.enforcement
 import android.app.Application
 import android.app.NotificationManager
 import android.app.Service
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,6 +27,7 @@ import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSettings
 
 /** The foreground service that keeps Meadow alive and says how much time is left. */
 @RunWith(AndroidJUnit4::class)
@@ -133,5 +136,52 @@ class GuardianServiceTest {
         val left = app.getString(R.string.guardian_left, "Ducks", app.resources.durationText(45 * 60_000L))
         val expected = app.getString(R.string.guardian_joined, left, app.resources.getQuantityString(R.plurals.guardian_resting, 1, 1))
         assertEquals(expected, awaitGuardianText { it == expected })
+    }
+
+    /** [pkg] came to the front a moment ago, as the usage log tells it. The log keeps it for the other tests here too. */
+    private fun inFront(pkg: String) {
+        shadowOf(app.getSystemService(UsageStatsManager::class.java))
+            .addEvent(pkg, System.currentTimeMillis() - 1_000, UsageEvents.Event.ACTIVITY_RESUMED)
+    }
+
+    private fun waitUntil(done: () -> Boolean): Boolean {
+        val end = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < end) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            if (done()) return true
+            Thread.sleep(20)
+        }
+        return false
+    }
+
+    @Test
+    fun `without the accessibility service, a resting app in front gets its rest screen from the usage log`() {
+        ShadowSettings.setCanDrawOverlays(true)
+        AppGraph.store.setLimits(listOf(AppLimit("com.reels", "Reels", 0, 0, schedule = asleep)))
+        inFront("com.reels")
+        create()
+        assertTrue(waitUntil { shadowOf(app).nextStartedActivity?.component?.className == BlockActivity::class.java.name })
+    }
+
+    @Test
+    fun `without drawing over apps, a notification asks to rest it instead`() {
+        ShadowSettings.setCanDrawOverlays(false)
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        AppGraph.notifier.createChannels()
+        AppGraph.store.setLimits(listOf(AppLimit("com.reels", "Reels", 0, 0, schedule = asleep)))
+        inFront("com.reels")
+        create()
+        val title = app.getString(R.string.notify_time_up_title, "Reels")
+        assertTrue(waitUntil { shadowOf(manager).allNotifications.any { it.extras.getCharSequence("android.title")?.toString() == title } })
+    }
+
+    @Test
+    fun `an app in front with a few minutes left is reminded about`() {
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        AppGraph.notifier.createChannels()
+        AppGraph.store.setLimits(listOf(AppLimit("com.reels", "Reels", 14, 0)))
+        inFront("com.reels")
+        create()
+        assertTrue(waitUntil { shadowOf(manager).allNotifications.any { it.channelId == Notifier.CH_WARNINGS } })
     }
 }
