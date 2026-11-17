@@ -21,12 +21,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
 import java.net.HttpURLConnection
-import java.net.URL
 import android.content.pm.PackageInstaller
 
 /** An update handed to Android's installer must never leave Meadow waiting for ever. */
@@ -48,28 +45,7 @@ class UpdaterTest {
 
     private fun updater(timeoutMs: Long = Updater.INSTALL_TIMEOUT_MS) = Updater(app, { notifier }, timeoutMs)
 
-    /** A web server that gives [answer] for each address, and records the addresses asked for. */
-    private class Web(val answer: (String) -> Answer) {
-        val asked = mutableListOf<String>()
-        fun open(url: String): HttpURLConnection {
-            asked += url
-            return FakeConnection(url, answer(url))
-        }
-    }
-
-    private class Answer(val code: Int, val body: ByteArray = ByteArray(0), val length: Long = body.size.toLong(), val failure: IOException? = null)
-
-    private class FakeConnection(url: String, val answer: Answer) : HttpURLConnection(URL(url)) {
-        var disconnected = false
-        override fun connect() = Unit
-        override fun usingProxy() = false
-        override fun disconnect() { disconnected = true }
-        override fun getResponseCode(): Int = answer.failure?.let { throw it } ?: answer.code
-        override fun getContentLengthLong(): Long = answer.length
-        override fun getInputStream(): InputStream = ByteArrayInputStream(answer.body)
-    }
-
-    private fun online(web: Web) = Updater(app, { notifier }, Updater.INSTALL_TIMEOUT_MS, web::open)
+    private fun online(web: FakeWeb) = Updater(app, { notifier }, Updater.INSTALL_TIMEOUT_MS, web::open)
 
     private fun release(tag: String, vararg assets: String) = """
         {"tag_name": "$tag", "body": "* feat: a new flower by @sam in #1", "html_url": "https://example.com/r",
@@ -150,7 +126,7 @@ class UpdaterTest {
 
     @Test
     fun `a newer release on GitHub is offered, with its notes for people`() = runBlocking {
-        val web = Web { Answer(200, release("v99.0.0", apkAsset(digest = "sha256:ABCD")).toByteArray()) }
+        val web = FakeWeb { FakeWeb.Answer(200, release("v99.0.0", apkAsset(digest = "sha256:ABCD")).toByteArray()) }
         val updater = online(web)
         val update = updater.check()
         assertNotNull(update)
@@ -163,21 +139,21 @@ class UpdaterTest {
 
     @Test
     fun `the same or an older release means Meadow is up to date`() = runBlocking {
-        val updater = online(Web { Answer(200, release("v0.0.1", apkAsset()).toByteArray()) })
+        val updater = online(FakeWeb { FakeWeb.Answer(200, release("v0.0.1", apkAsset()).toByteArray()) })
         assertNull(updater.check())
         assertEquals(UpdateState.UpToDate, updater.state.value)
     }
 
     @Test
     fun `with no releases yet, Meadow is up to date`() = runBlocking {
-        val updater = online(Web { Answer(HttpURLConnection.HTTP_NOT_FOUND) })
+        val updater = online(FakeWeb { FakeWeb.Answer(HttpURLConnection.HTTP_NOT_FOUND) })
         assertNull(updater.check())
         assertEquals(UpdateState.UpToDate, updater.state.value)
     }
 
     @Test
     fun `an error from GitHub or no connection says to check the connection`() = runBlocking {
-        for (web in listOf(Web { Answer(500) }, Web { Answer(0, failure = IOException("no route")) })) {
+        for (web in listOf(FakeWeb { FakeWeb.Answer(500) }, FakeWeb { FakeWeb.Answer(0, failure = IOException("no route")) })) {
             val updater = online(web)
             assertNull(updater.check())
             assertEquals(UpdateState.Failed(app.getString(R.string.error_offline), null), updater.state.value)
@@ -186,14 +162,14 @@ class UpdaterTest {
 
     @Test
     fun `an answer Meadow can't read says the check failed`() = runBlocking {
-        val updater = online(Web { Answer(200, "not json".toByteArray()) })
+        val updater = online(FakeWeb { FakeWeb.Answer(200, "not json".toByteArray()) })
         assertNull(updater.check())
         assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_check), null), updater.state.value)
     }
 
     @Test
     fun `a check during a download or an install keeps that update`() = runBlocking {
-        val web = Web { Answer(200, release("v99.0.0", apkAsset()).toByteArray()) }
+        val web = FakeWeb { FakeWeb.Answer(200, release("v99.0.0", apkAsset()).toByteArray()) }
         val updater = online(web)
         updater.installing(update)
         assertEquals(update, updater.check())
@@ -204,7 +180,7 @@ class UpdaterTest {
     @Test
     fun `a download that doesn't match its checksum isn't installed, and its file is checked`() {
         val apk = "not an apk".toByteArray()
-        val web = Web { Answer(200, apk) }
+        val web = FakeWeb { FakeWeb.Answer(200, apk) }
         val updater = online(web)
         updater.startInstall(update.copy(sizeBytes = apk.size.toLong(), sha256 = "00"))
         assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), update.copy(sizeBytes = apk.size.toLong(), sha256 = "00")), settled(updater))
@@ -217,14 +193,14 @@ class UpdaterTest {
         val apk = "not an apk".toByteArray()
         val file = File(app.cacheDir, "check.apk").apply { writeBytes(apk) }
         val right = update.copy(sizeBytes = apk.size.toLong(), sha256 = Updater.sha256(file))
-        val updater = online(Web { Answer(200, apk) })
+        val updater = online(FakeWeb { FakeWeb.Answer(200, apk) })
         updater.startInstall(right)
         assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), right), settled(updater))
     }
 
     @Test
     fun `a download larger than its release says isn't installed`() {
-        val updater = online(Web { Answer(200, ByteArray(100), length = -1) })
+        val updater = online(FakeWeb { FakeWeb.Answer(200, ByteArray(100), length = -1) })
         val small = update.copy(sizeBytes = 10)
         updater.startInstall(small)
         assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), small), settled(updater))
@@ -232,17 +208,21 @@ class UpdaterTest {
 
     @Test
     fun `a download that fails says to check the connection`() {
-        val updater = online(Web { Answer(503) })
+        val updater = online(FakeWeb { FakeWeb.Answer(503) })
         updater.startInstall(update)
         assertEquals(UpdateState.Failed(app.getString(R.string.error_offline), update), settled(updater))
     }
 
     @Test
-    fun `Settings for installing apps opens on Meadow`() {
+    fun `Android decides whether Meadow may install, and its setting opens on Meadow`() {
         val intent = updater().installPermissionIntent()
         assertEquals(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, intent.action)
         assertEquals("package:${app.packageName}", intent.dataString)
+        // Android's setting decides whether Meadow may install.
+        shadowOf(app.packageManager).setCanRequestPackageInstalls(false)
         assertFalse(updater().canInstall())
+        shadowOf(app.packageManager).setCanRequestPackageInstalls(true)
+        assertTrue(updater().canInstall())
     }
 
     @Test

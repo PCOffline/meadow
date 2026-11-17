@@ -59,6 +59,7 @@ import dev.pcoffline.meadow.ui.legal.LegalDoc
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.update.UpdateState
+import dev.pcoffline.meadow.update.Updater
 
 @Composable
 fun SettingsScreen(
@@ -221,9 +222,8 @@ private fun ProfileCard(profile: UserProfile, onOpenProfile: () -> Unit) {
 }
 
 @Composable
-private fun UpdatesCard() {
+internal fun UpdatesCard(updater: Updater = AppGraph.updater) {
     val context = LocalContext.current
-    val updater = AppGraph.updater
     val state by updater.state.collectAsStateWithLifecycle()
     val auto by AppGraph.store.autoUpdate.collectAsStateWithLifecycle()
     var needsPermission by remember { mutableStateOf(false) }
