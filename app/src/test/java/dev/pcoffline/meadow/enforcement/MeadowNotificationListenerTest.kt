@@ -112,6 +112,39 @@ class MeadowNotificationListenerTest {
         assertEquals(emptySet<String>(), shown())
     }
 
+    @Test
+    fun `Meadow's own notifications always stay`() {
+        AppGraph.store.setLimits(AppGraph.store.limits.value + AppLimit(app.packageName, "Meadow", 0, 0, schedule = hoursAwayFromNow()))
+        val own = post(app.packageName, 1)
+        service.onNotificationPosted(own)
+        service.onListenerConnected()
+        awaitWork()
+        assertEquals(setOf(own.key), shown())
+    }
+
+    @Test
+    fun `an app that starts resting has only its own notifications hidden, even with time left`() {
+        val open = post(OPEN, 1)
+        val free = post(FREE, 2)
+        service.onListenerConnected()
+        awaitWork()
+
+        MeadowNotificationListener.rest(app, OPEN)
+        assertEquals(setOf(free.key), shown())
+        assertTrue(open.key !in shown())
+    }
+
+    @Test
+    fun `a sweep hides apps that started resting since their notifications came`() {
+        service.onListenerConnected()
+        awaitWork()
+        val resting = post(RESTING, 1)
+        val open = post(OPEN, 2)
+        MeadowNotificationListener.sweepAll()
+        assertEquals(setOf(open.key), shown())
+        assertTrue(resting.key !in shown())
+    }
+
     private val shadow: ShadowNotificationListenerService
         get() = Shadow.extract(service)
 
