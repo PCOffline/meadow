@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.AppSync
 import dev.pcoffline.meadow.data.EmulatorTest
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.SocialRepository
@@ -49,7 +50,7 @@ class MeadowRootTest : EmulatorTest() {
         AppGraph.init(app)
         AppGraph.store.clearAll()
         AppGraph.backendReady = true
-        startSyncOnce()
+        AppSync.startOnce()
     }
 
     @After
@@ -197,17 +198,6 @@ class MeadowRootTest : EmulatorTest() {
         waitFor("the invite to close") { AppGraph.store.pendingInvite.value == null }
     }
 
-    private companion object {
-        private var started = false
-
-        /** The app starts sync once per process; so do these tests, which share one app graph. */
-        @Synchronized
-        fun startSyncOnce() {
-            if (started) return
-            AppGraph.sync.start()
-            started = true
-        }
-    }
 
     @Test
     fun `a link to troubleshooting opens it, and a test notification says the phone can't get them`() {
