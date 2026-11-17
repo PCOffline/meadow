@@ -38,6 +38,7 @@ import dev.pcoffline.meadow.ui.circle.People
 import dev.pcoffline.meadow.ui.circle.PeopleContent
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.settings.PrivacyPreviewContent
+import dev.pcoffline.meadow.ui.settings.PrivacyPreviewScreen
 import dev.pcoffline.meadow.ui.settings.SettingsScreen
 import dev.pcoffline.meadow.ui.settings.WeekStartCard
 import dev.pcoffline.meadow.ui.stats.StatsContent
@@ -259,5 +260,34 @@ class ProfileAndPrivacyTest : ScreenTest() {
         compose.mainClock.autoAdvance = true
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.error_generic), substring = true).fetchSemanticsNodes().isNotEmpty() }
         switch(R.string.settings_share_progress).assertIsOn()
+    }
+
+    @Test
+    fun `until what's shared has been read, the page waits rather than showing nothing`() {
+        show { PrivacyPreviewContent(robin.copy(privacy = Privacy(shareTime = true)), null, DemoGarden.progress, DemoGarden.myLimits, save = {}) }
+        node(R.string.loading_garden).performScrollTo().assertExists()
+        node(R.string.friend_nothing_shared, robin.displayName).assertDoesNotExist()
+    }
+
+    @Test
+    fun `progress shared but not read yet waits too, and limits alone need nothing read`() {
+        show { PrivacyPreviewContent(robin.copy(privacy = Privacy(shareProgress = true)), DemoGarden.today, null, DemoGarden.myLimits, save = {}) }
+        node(R.string.loading_garden).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun `limits alone are shown before anything is read`() {
+        show { PrivacyPreviewContent(robin.copy(privacy = Privacy(shareLimits = true)), null, null, DemoGarden.myLimits, save = {}) }
+        node(R.string.friend_limits).performScrollTo().assertExists()
+        node(R.string.loading_garden).assertDoesNotExist()
+    }
+
+    @Test
+    fun `the preview reads this phone's own day and progress`() {
+        show { PrivacyPreviewScreen(robin.copy(privacy = DemoGarden.sharesEverything), onBack = {}) }
+        // With no usage access, today reads as nothing used, and the page shows once it's read.
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(text(R.string.loading_garden)).fetchSemanticsNodes().isEmpty() }
+        node(R.string.privacy_preview_title).assertExists()
+        node(R.string.friend_nothing_shared, robin.displayName).assertDoesNotExist()
     }
 }
