@@ -39,8 +39,8 @@ class StatsScreenTest : ScreenTest() {
 
     @Before
     fun keptUsage() {
-        // An hour of a chat app on each of the last 60 days.
-        val usage = (1..60).associate { back -> Days.key(today.minusDays(back.toLong())) to mapOf("com.example.chat" to 3_600_000L) }
+        // An hour of a chat app on each of the last 60 days. Its package is its own: the catalog keeps names for the whole test run.
+        val usage = (1..60).associate { back -> Days.key(today.minusDays(back.toLong())) to mapOf("com.example.growth.chat" to 3_600_000L) }
         File(app.filesDir, UsageHistory.FILE).writeText(Json.encodeToString(usage))
         allowUsageAccess(true)
         viewModel = StatsViewModel(UsageHistory(app, AppGraph.tracker, AppGraph.catalog))
