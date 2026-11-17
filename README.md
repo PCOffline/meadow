@@ -34,10 +34,12 @@ chose to look after your garden.
 
 ## Your garden
 
-Each app you limit is a plant: a flower, or a mushroom in the Mushroom forest. It is in full bloom
-while half or more of the time is left. Then it nods and closes. When the time is used, it is dried,
-in its own colour. Each theme grows five plants of its own. The sky follows your day, from sunrise to a night with fireflies. It can also show the
-weather outside.
+Each app you limit is a plant. Each theme grows five plants of its own: for example a cosmos and
+a corn poppy in Meadow, a lotus in Lily pond, and a fly agaric in Mushroom forest. A plant is in
+full bloom while half or more of its time is left. With less, it nods and drops a petal. When the
+time is used, it is dried, in its own colour. A mushroom ages in place of wilting. Outside an
+app's hours, its plant is a bud. The sky follows your day, from sunrise to a night with fireflies.
+It can also show the weather outside.
 
 ## Limits for your week
 
@@ -92,14 +94,15 @@ data, or delete your account, at any time. Read the [privacy notice](legal/priva
 
 ## Make it yours
 
-Choose from six themes, by day or by night. Pick a critter or a flower for your picture, and add
-a photo if you like. With a photo, your critter or flower shows next to your name.
+Choose from six themes, by day or by night. Each theme has its own sky, colours and plants. Pick
+a critter or a flower for your picture, and add a photo if you like. With a photo, your critter
+or flower shows next to your name.
 
 <p align="center">
   <img src="docs/images/themes.png" alt="The garden in all six themes through one day: Cherry blossom at dawn, Meadow, Lily pond at midday, Sunflower, Mushroom forest in the evening, and Lavender field at night" width="100%">
 </p>
 <p align="center">
-  <img src="docs/images/screen-appearance.png" alt="The theme picker: each theme as a small sky with its sun, hills and flower" width="250">
+  <img src="docs/images/screen-appearance.png" alt="The theme picker: each theme as a small sky with its sun, hills and own plant" width="250">
   &nbsp;
   <img src="docs/images/screen-profile.png" alt="Your profile: your picture, your name and a few words about you" width="250">
   &nbsp;

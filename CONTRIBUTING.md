@@ -67,4 +67,6 @@ requests** in [AGENTS.md](AGENTS.md) for what it shows. To draw them on your own
 `ShowcaseTest` makes the screenshots and animations. The Screenshots workflow runs it on an
 emulator when a push to `main` changes the app's screens. Then it commits the images to `main`.
 To run it on a different branch, start it from the Actions tab. `docs/art/build.py` draws
-the banner and the illustrations.
+the banner and the illustrations. It draws the plants with `docs/art/flora.py`, a port of the
+app's plants in `ui/components/flora`. When you change the app's plants, change `flora.py` to
+match, and run `python3 docs/art/build.py`.
