@@ -32,6 +32,8 @@ import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowAccessibilityService
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 
 /**
  * What the guardian sees on screen: the app in front (a real screen of it, not a dialog or the
@@ -56,6 +58,8 @@ class GuardianWindowsTest {
         controller = Robolectric.buildService(GuardianAccessibilityService::class.java).create()
         service = controller.get()
         service.windowScanMs = 0
+        // The clock starts near zero, and some steps wait a second since the last time.
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(10))
         shadowOf(Looper.getMainLooper()).idle()
         shadowOf(app).clearNextStartedActivities()
         BlockActivity.markShown("")
@@ -164,6 +168,23 @@ class GuardianWindowsTest {
 
         waitUntil { SIDE in blockScreensOpened() }
         waitUntil { service.scope.coroutineContext.job.children.none() }
+        // It closed when asked, so nothing had to go Home.
+        assertTrue(shadow.globalActionsPerformed.isEmpty())
+    }
+
+    @Test
+    fun `a floating window that won't close is left with Home`() {
+        AppGraph.store.setLimits(listOf(resting(SIDE)))
+        // Android lists the floating window, but it has nothing that can be asked to close.
+        shadow.setWindows(listOf(window(7, null, pip = true)))
+        service.listWindows = { listOf(window(1, FRONT), window(7, SIDE, pip = true)) }
+        AppGraph.store.setLimits(emptyList())
+        service.onForeground(SIDE)
+        AppGraph.store.setLimits(listOf(resting(SIDE)))
+        service.onForeground(FRONT)
+        windowsChanged()
+
+        waitUntil { GLOBAL_ACTION_HOME in shadow.globalActionsPerformed }
     }
 
     // Robolectric answers only the older way of asking for a screen (see PackageQueriesTest).
