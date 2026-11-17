@@ -41,7 +41,11 @@ class BackupRulesTest {
     @Test
     fun `the launcher icon has a monochrome layer for themed icons`() {
         val icon = parse("res/drawable-anydpi/ic_launcher.xml")
-        assertEquals("@drawable/ic_launcher_foreground", icon.children("monochrome").single().getAttributeNS(ANDROID, "drawable"))
+        assertEquals("@drawable/ic_launcher_monochrome", icon.children("monochrome").single().getAttributeNS(ANDROID, "drawable"))
+        // Android tints the layer with one colour, so each path draws in one colour, opaque.
+        val paths = parse("res/drawable/ic_launcher_monochrome.xml").children("path")
+        val colours = paths.flatMap { path -> listOf("fillColor", "strokeColor").map { path.getAttributeNS(ANDROID, it) } }
+        assertEquals(setOf("#FF000000"), colours.filter { it.isNotEmpty() }.toSet())
     }
 
     private companion object {
