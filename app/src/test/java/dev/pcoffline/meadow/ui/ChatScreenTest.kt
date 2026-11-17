@@ -21,6 +21,7 @@ import com.google.firebase.firestore.snapshots
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.SocialRepository
 import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.RequestRepository
@@ -128,5 +129,41 @@ class ChatScreenTest : EmulatorTest() {
         compose.onNodeWithText(text(R.string.request_say_yes)).assertExists()
         // A garden I look after is a tap away.
         compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Robin")).assertExists()
+    }
+
+    @Test
+    fun `from the chat, a Bumblebee can be asked to be mine too, and then it waits`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        // Bee looks after Robin's garden, and asks Robin to look after Bee's.
+        showChat(DemoGarden.robin.copy(uid = bee.uid, displayName = "Bee", approverIds = emptyList(), approveeIds = listOf(robin.uid)), chatId)
+        waitForText(text(R.string.chat_ask_bee, "Robin"))
+        compose.onNodeWithText(text(R.string.chat_ask_bee, "Robin")).performClick()
+        compose.onNodeWithText(text(R.string.chat_ask_title, "Robin")).assertExists()
+        compose.onNodeWithText(text(R.string.action_cancel)).performClick()
+        compose.onNodeWithText(text(R.string.chat_ask_bee, "Robin")).performClick()
+        compose.onNodeWithText(text(R.string.chat_ask_confirm)).performClick()
+
+        onBackend { SocialRepository(backend).outgoingInvites(bee.uid).firstWhere { list -> list.any { it.toUid == robin.uid && !it.offer } } }
+        waitForText(text(R.string.chat_ask_waiting, "Robin"))
+    }
+
+    @Test
+    fun `from the chat, I can offer to look after their garden`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        // Robin is looked after by Bee, and offers to look after Bee's garden in return.
+        showChat(DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid), approveeIds = emptyList()), chatId)
+        waitForText(text(R.string.chat_offer_bee, "Bee"))
+        compose.onNodeWithText(text(R.string.chat_offer_bee, "Bee")).performClick()
+        compose.onNodeWithText(text(R.string.chat_offer_title, "Bee")).assertExists()
+        compose.onNodeWithText(text(R.string.chat_offer_confirm)).performClick()
+
+        onBackend { SocialRepository(backend).outgoingInvites(robin.uid).firstWhere { list -> list.any { it.toUid == bee.uid && it.offer } } }
     }
 }
