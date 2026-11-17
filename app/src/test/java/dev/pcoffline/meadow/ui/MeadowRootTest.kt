@@ -10,9 +10,11 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.EmulatorTest
 import dev.pcoffline.meadow.data.ProfileState
 import dev.pcoffline.meadow.data.SocialRepository
@@ -28,6 +30,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
@@ -204,5 +207,52 @@ class MeadowRootTest : EmulatorTest() {
             AppGraph.sync.start()
             started = true
         }
+    }
+
+    @Test
+    fun `a link to troubleshooting opens it, and a test notification says the phone can't get them`() {
+        val robin = person("Robin")
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        pending.value = DeepLinks.troubleshoot()
+        showRootFor(robin)
+        waitForText(R.string.trouble_title)
+        compose.onNodeWithText(text(R.string.trouble_notify_test)).performScrollTo().performClick()
+        // Robolectric's phone has no Firebase Cloud Messaging.
+        waitForText(R.string.trouble_notify_no_phone)
+    }
+
+    @Test
+    fun `with notifications off, troubleshooting opens their settings`() {
+        val robin = person("Robin")
+        shadowOf(app).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        pending.value = DeepLinks.troubleshoot()
+        showRootFor(robin)
+        waitForText(R.string.trouble_title)
+        compose.onNodeWithText(text(R.string.trouble_notify_settings)).performScrollTo().performClick()
+        waitFor("the notification settings") {
+            shadowOf(app).nextStartedActivity?.action == android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+        }
+    }
+
+    @Test
+    fun `a link to ask for more time asks about that app`() {
+        val robin = person("Robin")
+        pending.value = DeepLinks.ask("com.example.pebbles")
+        showRootFor(robin)
+        waitForText(R.string.ask_title)
+        waitFor("the link to be used") { pending.value == null }
+    }
+
+    @Test
+    fun `links to a chat and to a garden I look after open them`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        pending.value = DeepLinks.friend(robin.uid)
+        showRootFor(bee)
+        waitForText(app.getString(R.string.friend_step_down, "Robin"))
+
+        pending.value = DeepLinks.chat(ChatRepository.chatIdFor(robin.uid, bee.uid))
+        waitFor("the chat") { compose.onAllNodes(hasText(text(R.string.chat_placeholder))).fetchSemanticsNodes().isNotEmpty() }
     }
 }
