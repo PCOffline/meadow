@@ -92,7 +92,8 @@ class ChatMediaTest {
         // Conversations and messages that aren't what an export writes are passed over.
         val odd = """{ "conversations": [ "junk", { "messages": "none" }, { "messages": [ "junk",
             { "kind": "text", "path": "chats/c1/a/x.jpg" }, { "kind": "image" }, { "kind": "image", "path": 5 },
-            { "kind": 7 }, { "kind": "image", "path": "chats/c1/a/y.jpg" } ] } ] }"""
+            { "kind": 7 }, { "path": "chats/c1/a/z.jpg" }, { "kind": ["image"], "path": "chats/c1/a/w.jpg" },
+            { "kind": "image", "path": "chats/c1/a/y.jpg" } ] } ] }"""
         assertEquals(listOf("chats/c1/a/y.jpg"), ProfileRepository.picturePaths(odd))
     }
 }

@@ -137,6 +137,29 @@ class EngineBudgetsTest {
         assertEquals(null, engine.todayUsage()[APP])
     }
 
+    @Test
+    fun `the app in front inside its hours spends its extra time and its cap with the time since the last measure`() {
+        val allDay = Schedule.everyDay(TimeWindow.ALL_DAY)
+        val edges = Schedule.everyDay(TimeWindow(0, 1), TimeWindow(1439, 1440))
+        store.setLimits(
+            listOf(
+                AppLimit(APP, "Pebbles", 30, 0, schedule = allDay, caps = listOf(TimeCap((1..7).toList(), 0, 1440, 10))),
+                AppLimit("com.other", "Other", 30, 0, schedule = edges),
+            ),
+        )
+        store.setGrants(listOf(Grant("g1", APP, 20, Days.todayKey()), Grant("g2", "com.other", 5, Days.todayKey())))
+        engine().todayUsage(forceRefresh = true)
+        engine.setForeground(APP)
+        Thread.sleep(50)
+        val (pebbles, other) = engine.budgets()
+        assertEquals(false, pebbles.outsideHours)
+        val cap = pebbles.capRemainingMs!!
+        assertTrue(cap in 1 until 30 * 60_000L)
+        assertEquals(20 * 60_000L, pebbles.outsideHoursAllowanceMs)
+        // Away from its hours' edges, the other app is outside them, with its extra time to spend.
+        assertTrue(other.outsideHoursAllowanceMs <= 5 * 60_000L)
+    }
+
     private companion object {
         const val APP = "com.example.pebbles"
     }
