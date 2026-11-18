@@ -1,8 +1,8 @@
 """Meadow's plants as flat SVG shapes, drawn as the app draws them.
 
 This is a port of the app's flora (app/src/main/java/dev/pcoffline/meadow/ui/components/flora):
-Tone.kt, Sketch.kt, and the flowers, spikes and globes in Forms.kt. It has the plants of Plants.kt
-in those forms. When those files change, change this file to match.
+Tone.kt, Sketch.kt, and the flowers with a head of petals in Forms.kt. It has the Meadow theme's
+five plants from Plants.kt. When those files change, change this file to match.
 """
 from __future__ import annotations
 
@@ -100,9 +100,9 @@ class Pose:
 @dataclass(frozen=True)
 class Plant:
     name: str
-    form: str  # RAY, ROSETTE, CUP, POMPOM, SPIKE or GLOBE
+    form: str  # RAY, ROSETTE or CUP
     petal: Tone
-    centre: Tone = Tone(0.84, 0.16, 88)
+    centre: Tone
     n: int = 0
     kind: str = "ROUND"
     len: float = 0
@@ -114,24 +114,14 @@ class Plant:
     seeds: int = 0
     stamens: int = 0
     dome: float = 0.3
-    tip: Tone | None = None
-    calyx: Tone | None = None
     leaf: str = "LANCE"
     shed: int = 0
     keep: frozenset | None = None
     pod: str | None = None
-    low: Pose | None = None
     spent: Pose | None = None
-    stems: int = 3
-    whorls: int = 7
-    cover: float = 0.46
-    floret: float = 3.3
-    green: Tone | None = None
-    # The theme that grows it, for its soil. Not in Plants.kt, where each theme has its own list.
-    theme: str = "Meadow"
 
     def night(self) -> Plant:
-        return replace(self, petal=self.petal.night(), centre=self.centre.night(), tip=self.tip.night() if self.tip else None)
+        return replace(self, petal=self.petal.night(), centre=self.centre.night())
 
 
 @dataclass(frozen=True)
@@ -146,93 +136,30 @@ class Soil:
 
 
 PALE = Tone(0.94, 0.115, 102)
-RUST = Tone(0.62, 0.15, 55)
 AMBER = Tone(0.72, 0.16, 62)
 PLUM = Tone(0.36, 0.07, 340)
-SEED = Tone(0.40, 0.06, 55)
 
 FULL_POSE = Pose(tilt=-14, face=0.86, cup=0.04, plen=1, dry=0, y=40, x=46, lean=-6)
 LOW_POSE = Pose(tilt=40, face=0.72, cup=0.24, plen=0.97, dry=0.1, y=45, x=53, lean=-9)
 SPENT_POSE = Pose(tilt=98, face=0.7, cup=0.3, plen=0.8, dry=1, y=51, x=60, lean=-13)
 ASLEEP_POSE = Pose(tilt=16, face=0.5, cup=1, plen=1, dry=0, y=47, x=49, lean=-7)
-# A blossom on a twig stays up when its petals fall.
-BARE_TWIG = Pose(tilt=22, face=0.74, cup=0.1, plen=1, dry=0.25, y=42, x=50, lean=-7)
 
-SOILS = {
-    "Meadow": Soil(Tone(0.80, 0.045, 95), Tone(0.60, 0.10, 138), Tone(0.70, 0.12, 138)),
-    # Blossom grows on brown twigs.
-    "Cherry blossom": Soil(Tone(0.80, 0.04, 40), Tone(0.47, 0.055, 45), Tone(0.72, 0.105, 128)),
-    # Lavender's leaves are silver-green.
-    "Lavender field": Soil(Tone(0.83, 0.04, 85), Tone(0.64, 0.055, 150), Tone(0.74, 0.05, 155)),
-    "Sunflower": Soil(Tone(0.70, 0.06, 65), Tone(0.60, 0.11, 132), Tone(0.70, 0.13, 132)),
-    "Lily pond": Soil(Tone(0.84, 0.05, 205), Tone(0.60, 0.085, 165), Tone(0.68, 0.10, 162)),
-}
-
-
-def k(*petals: int) -> frozenset:
-    return frozenset(petals)
-
+MEADOW_SOIL = Soil(Tone(0.80, 0.045, 95), Tone(0.60, 0.10, 138), Tone(0.70, 0.12, 138))
 
 COSMOS = Plant("Cosmos", "RAY", Tone(0.66, 0.16, 350), PALE, n=8, kind="TOOTH", len=17, half=6, disc=4.6, alt=0.45,
-               leaf="FEATHER", shed=3, keep=k(0, 1, 2, 4, 5, 7))
+               leaf="FEATHER", shed=3, keep=frozenset({0, 1, 2, 4, 5, 7}))
 CORN_POPPY = Plant("Corn poppy", "CUP", Tone(0.70, 0.185, 30), PLUM, n=4, kind="WIDE", len=18.5, half=12.2, disc=4.4,
                    stamens=8, pod="POPPY", shed=4, leaf="FEATHER",
                    spent=Pose(tilt=14, face=0.6, cup=0, plen=1, dry=1, y=44, x=50, lean=-8))
 CORNFLOWER = Plant("Cornflower", "RAY", Tone(0.69, 0.125, 262), Tone(0.45, 0.13, 295), n=9, kind="FAN", len=17.5,
-                   half=5.6, disc=5.4, seeds=9, alt=0.5, shed=3, keep=k(0, 2, 3, 5, 6, 8))
+                   half=5.6, disc=5.4, seeds=9, alt=0.5, shed=3, keep=frozenset({0, 2, 3, 5, 6, 8}))
 BUTTERCUP = Plant("Buttercup", "ROSETTE", Tone(0.85, 0.17, 92), AMBER, n=5, kind="ROUND", len=15, half=7.6, disc=4.4,
-                  size=0.95, alt=0.4, stamens=9, shed=3, keep=k(0, 1, 3, 4))
+                  size=0.95, alt=0.4, stamens=9, shed=3, keep=frozenset({0, 1, 3, 4}))
 ASTER = Plant("Aster", "RAY", Tone(0.75, 0.105, 300), PALE, n=13, kind="NARROW", len=17, half=3.3, disc=6.4,
-              layers=2, seeds=14, dome=0.5, shed=2, keep=k(0, 1, 2, 4, 5, 7, 8, 9, 11, 12))
+              layers=2, seeds=14, dome=0.5, shed=2, keep=frozenset({0, 1, 2, 4, 5, 7, 8, 9, 11, 12}))
 
-CHERRY = Plant("Cherry", "ROSETTE", Tone(0.855, 0.08, 358), Tone(0.60, 0.17, 5), n=5, kind="NOTCH", len=17.5, half=7.9,
-               disc=3, alt=0.3, calyx=Tone(0.56, 0.12, 12), stamens=7, shed=5, keep=k(0, 3),
-               low=replace(LOW_POSE, tilt=30, face=0.72, y=42, x=50), spent=BARE_TWIG, theme="Cherry blossom")
-# Under the trees: spikes of blue bells on green stems.
-GRAPE_HYACINTH = Plant("Grape hyacinth", "SPIKE", Tone(0.60, 0.14, 275), stems=3, whorls=8, cover=0.5, floret=3.5, size=0.8,
-                       green=Tone(0.62, 0.10, 135), theme="Cherry blossom")
-CAMELLIA = Plant("Camellia", "CUP", Tone(0.65, 0.175, 22), PALE, n=5, kind="ROUND", len=16.5, half=9.6, disc=4.2,
-                 stamens=7, shed=4, leaf="OVAL", theme="Cherry blossom")
-KERRIA = Plant("Kerria", "ROSETTE", Tone(0.85, 0.165, 90), AMBER, n=5, kind="POINT", len=16.5, half=6.6, disc=3.4,
-               alt=0.4, stamens=7, shed=4, keep=k(0, 1, 3, 4), theme="Cherry blossom")
-
-LAVENDER = Plant("Lavender", "SPIKE", Tone(0.66, 0.135, 300), theme="Lavender field")
-ALLIUM = Plant("Allium", "GLOBE", Tone(0.77, 0.115, 328), theme="Lavender field")
-PERIWINKLE = Plant("Periwinkle", "ROSETTE", Tone(0.73, 0.11, 276), Tone(0.97, 0.02, 95), n=5, kind="TOOTH", len=15.5,
-                   half=7.6, disc=2.6, alt=0.4, shed=3, keep=k(0, 1, 3, 4), leaf="OVAL", theme="Lavender field")
-ROCK_ROSE = Plant("Rock rose", "ROSETTE", Tone(0.81, 0.105, 345), RUST, n=5, kind="WIDE", len=15.5, half=8.6, disc=3.8,
-                  alt=0.35, stamens=9, shed=3, keep=k(0, 1, 3, 4), leaf="OVAL", theme="Lavender field")
-GOLDEN_MARGUERITE = Plant("Golden marguerite", "RAY", Tone(0.85, 0.16, 92), AMBER, n=9, kind="ROUND", len=11.5, half=4.6,
-                          disc=6, size=1.05, alt=0.4, seeds=12, dome=0.5, leaf="FEATHER", shed=2, keep=k(0, 1, 3, 4, 6, 7),
-                          theme="Lavender field")
-
-SUNFLOWER = Plant("Sunflower", "RAY", Tone(0.86, 0.17, 90), SEED, n=13, kind="POINT", len=15.5, half=4.3, disc=9.4,
-                  layers=2, size=1.04, seeds=26, dome=0.35, leaf="HEART", shed=3, keep=k(0, 1, 2, 4, 5, 6, 8, 9, 10, 12),
-                  theme="Sunflower")
-CONEFLOWER = Plant("Coneflower", "RAY", Tone(0.72, 0.13, 345), Tone(0.50, 0.12, 50), n=10, kind="NARROW", len=18,
-                   half=4.4, disc=5.6, alt=0.4, dome=0.9, shed=3, keep=k(0, 1, 3, 4, 6, 7, 9), theme="Sunflower")
-MARIGOLD = Plant("Marigold", "POMPOM", Tone(0.74, 0.175, 55), RUST, n=12, kind="ROUND", len=18, half=6.6, disc=3,
-                 leaf="FEATHER", shed=3, theme="Sunflower")
-# The one cool colour in the field: spikes of blue sage.
-SAGE = Plant("Sage", "SPIKE", Tone(0.62, 0.15, 268), stems=3, whorls=9, cover=0.56, floret=3.2, size=0.92, theme="Sunflower")
-BLANKET_FLOWER = Plant("Blanket flower", "RAY", Tone(0.64, 0.185, 32), Tone(0.42, 0.10, 25), n=11, kind="TOOTH", len=16.5,
-                       half=4.9, disc=6.2, tip=Tone(0.87, 0.16, 92), dome=0.6, shed=3, keep=k(0, 1, 3, 4, 5, 7, 8, 10),
-                       theme="Sunflower")
-
-KINGCUP = Plant("Kingcup", "ROSETTE", Tone(0.85, 0.17, 92), AMBER, n=5, kind="ROUND", len=15, half=8, disc=4.4,
-                alt=0.4, stamens=9, shed=3, keep=k(0, 1, 3, 4), leaf="HEART", theme="Lily pond")
-LOOSESTRIFE = Plant("Loosestrife", "SPIKE", Tone(0.66, 0.16, 335), stems=2, whorls=10, cover=0.62, floret=3.6, theme="Lily pond")
-
-# Each flowering theme's plants, its own first. Left out: the wisteria (Cherry blossom), the lotus and
-# water lilies (Lily pond), and the Mushroom forest's mushrooms, whose forms this port doesn't draw.
-PLANTS = {
-    "Meadow": [COSMOS, CORN_POPPY, CORNFLOWER, BUTTERCUP, ASTER],
-    "Cherry blossom": [CHERRY, GRAPE_HYACINTH, CAMELLIA, KERRIA],
-    "Lavender field": [LAVENDER, ALLIUM, PERIWINKLE, ROCK_ROSE, GOLDEN_MARGUERITE],
-    "Sunflower": [SUNFLOWER, CONEFLOWER, MARIGOLD, SAGE, BLANKET_FLOWER],
-    "Lily pond": [KINGCUP, LOOSESTRIFE],
-}
-MEADOW = PLANTS["Meadow"]
+# The Meadow theme's five plants, its own first.
+MEADOW = [COSMOS, CORN_POPPY, CORNFLOWER, BUTTERCUP, ASTER]
 
 # ---------- Sketch.kt ----------
 
@@ -506,7 +433,7 @@ def fallen(sk: Sketch, points, tone, r=3.0):
 
 def flower(sk: Sketch, p: Plant, soil: Soil, look: Look):
     if look.kind == "open":
-        pose = mix_pose(p.low or LOW_POSE, FULL_POSE, look.vigour)
+        pose = mix_pose(LOW_POSE, FULL_POSE, look.vigour)
     elif look.kind == "spent":
         pose = p.spent or SPENT_POSE
     else:
@@ -516,8 +443,7 @@ def flower(sk: Sketch, p: Plant, soil: Soil, look: Look):
     shade = petal.shade()
     centre = p.centre.mix(p.centre.dried(0.6).shade(0.5), wilt)
     stem_tone = soil.stem.mix(soil.stem.dried(), wilt * 0.6)
-    cup = p.calyx or soil.leaf
-    cup_tone = cup.mix(cup.dried(), wilt * 0.6)
+    cup_tone = soil.leaf.mix(soil.leaf.dried(), wilt * 0.6)
     size = p.size * 1.1
     at = (pose.x, pose.y)
     line = stem_line(at, pose.tilt, pose.lean)
@@ -544,11 +470,7 @@ def flower(sk: Sketch, p: Plant, soil: Soil, look: Look):
     if p.form == "RAY":
         if p.layers > 1:
             ring(sk, head, p.n, p.kind, length * 0.97, half, shade, shade.shade(0.6), start=d * 0.5, offset=180 / p.n, keep=keep)
-        if p.tip is not None:
-            ring(sk, head, p.n, p.kind, length, half, p.tip, p.tip.shade(), start=d * 0.5, keep=keep)
-            ring(sk, head, p.n, p.kind, length * 0.68, half, petal, shade, start=d * 0.5, keep=keep)
-        else:
-            ring(sk, head, p.n, p.kind, length, half, petal, shade, start=d * 0.5, keep=keep, alt=p.alt)
+        ring(sk, head, p.n, p.kind, length, half, petal, shade, start=d * 0.5, keep=keep, alt=p.alt)
         disc(sk, head, d, centre, p.dome)
         if p.seeds > 0:
             for x, y in spiral(p.seeds, d * 0.78):
@@ -569,104 +491,11 @@ def flower(sk: Sketch, p: Plant, soil: Soil, look: Look):
         disc(sk, head, d, centre, 0.2)
         if p.stamens > 0 and look.kind != "spent":
             dots(sk, head, p.stamens, d * 1.5, 0.9 * size, centre, 0.3)
-    else:
-        # A pompom: rings of petals, each smaller and lighter than the one behind it.
-        for i, (scale, tone) in enumerate(((1, shade), (0.76, petal), (0.52, petal.light(0.8)), (0.28, petal.light(1.5)))):
-            ring(sk, head, p.n - i * 2, p.kind, length * scale, half * (0.8 + 0.25 * scale), tone, tone.shade(0.7), offset=i * 17 + 5)
 
 
-def blades(sk: Sketch, base, tone: Tone, spread, length):
-    """Blades of grass, or a plant's narrow leaves, from [base]."""
-    for i, a in enumerate(spread):
-        long = length * (1 if i % 2 == 1 else 0.75)
-        r = math.radians(a)
-        tip = (base[0] + math.sin(r) * long, base[1] - math.cos(r) * long)
-        mid = (base[0] + math.sin(r) * length * 0.3, base[1] - length * 0.55)
-        sk.ribbon(bezier(base, mid, mid, tip, 8), 2.4, 0.5, tone if i % 2 == 1 else tone.shade(0.6))
-
-
-STRAW = Tone(0.78, 0.07, 88)
-
-
-def spike(sk: Sketch, p: Plant, soil: Soil, look: Look):
-    """A small bush of stems, with whorls of florets up each one. Dried, it still stands."""
-    wilt = look.of(0, 0.1, 1, 0)
-    petal = p.petal.mix(p.petal.dried(), wilt)
-    stem_tone = (p.green or soil.stem).mix(STRAW, wilt * 0.8)
-    spread = look.of(15, 24, 26, 9)
-    height = look.of(82, 77, 70, 74) * p.size
-    bx, by = BASE
-    sk.part = "stem"
-    blades(sk, BASE, soil.leaf.mix(soil.leaf.dried(), wilt * 0.6), (-52, -30, -10, 12, 30, 54), 20)
-    middle = (p.stems - 1) / 2
-    # The outer stems first, so that the middle one is in front.
-    for i in sorted(range(p.stems), key=lambda i: -abs(i - middle)):
-        side = (i - middle) / max(1, middle) if p.stems > 1 else 0
-        a = math.radians(side * spread)
-        h = height * (1 - 0.12 * abs(side))
-        droop = look.of(0, 0.22, 0.42, 0) * side
-        tip = (bx + math.sin(a) * h + droop * 16, by - math.cos(a) * h + abs(droop) * 20)
-        line = bezier((bx + side * 3, by), (bx + side * 4, by - h * 0.45),
-                      (bx + math.sin(a) * h * 0.75, by - math.cos(a) * h * 0.85), tip, 30)
-        sk.part = "stem"
-        sk.ribbon(line, 2.2, 1, stem_tone)
-        sk.part = "head"
-        for w in range(p.whorls):
-            # A dried spike has lost some of its florets.
-            if look.kind == "spent" and (w + i) % 4 == 0:
-                continue
-            t = 1 - (w + 0.2) / p.whorls * p.cover
-            at = min(len(line) - 2, int(t * (len(line) - 1)))
-            here, there = line[at], line[at + 1]
-            along = sub(there, here)
-            long = math.hypot(*along) or 1.0
-            normal = (-along[1] / long, along[0] / long)
-            turned = math.degrees(math.atan2(along[1], along[0])) + 90
-            r = p.floret * (0.55 + 0.45 * (w + 1) / p.whorls) * look.of(1, 1, 0.9, 0.62)
-            tone = petal if (w + i) % 2 == 1 else petal.shade(0.8)
-            sk.ellipse(add(here, mul(normal, r * 0.75)), r, r * 0.72, tone, turned + 28)
-            sk.ellipse(sub(here, mul(normal, r * 0.75)), r, r * 0.72, tone, turned - 28)
-            sk.ellipse(here, r * 0.7, r * 0.8, petal.shade(0.4) if look.kind == "asleep" else petal.light(0.7), turned)
-    if look.kind == "spent":
-        sk.part = "fallen"
-        fallen(sk, [((27, 107), 10), ((62, 108), -14), ((53, 106.5), 30)], petal, 2)
-
-
-def globe(sk: Sketch, p: Plant, soil: Soil, look: Look):
-    """A ball of small florets on a straight stem. Used up, it is a seed head: the spokes stay."""
-    wilt = look.of(0, 0.1, 1, 0)
-    petal = p.petal.mix(p.petal.dried(), wilt)
-    stem_tone = soil.stem.mix(soil.stem.dried(), wilt * 0.7)
-    at = (look.of(46, 52, 57, 47), look.of(38, 42, 50, 44))
-    sk.part = "stem"
-    blades(sk, BASE, soil.leaf.mix(soil.leaf.dried(), wilt * 0.6), (-60, -34, 30, 58), 26)
-    sk.ribbon(stem_line(at, look.of(0, 20, 40, 5), -4), 3.6, 2.4, stem_tone)
-    sk.part = "head"
-    if look.kind == "asleep":
-        # A bud in its papery sheath.
-        head = Head(at, 5, 1)
-        sk.poly(head.petal(90, "POINT", 24, 8.5, -3), petal.shade(0.6))
-        sk.poly(head.petal(90, "POINT", 21, 5, -2), petal)
-        sk.poly(head.petal(90, "POINT", 11, 6.5, -4), stem_tone.light(0.9))
-    elif look.kind == "spent":
-        seeds = [add(at, s) for s in spiral(22, 15)]
-        for seed in seeds:
-            sk.ribbon([at, seed], 0.7, 0.7, stem_tone.light(0.6))
-        for seed in seeds:
-            sk.circle(seed, 2, petal)
-    else:
-        r = 17
-        sk.circle(at, r, petal.shade())
-        for i, d in enumerate(spiral(46, r * 0.93)):
-            sk.circle(add(at, d), 2.5 - 0.9 * (math.hypot(*d) / r), petal.light() if i % 3 == 0 else petal)
-
-
-def sketch(p: Plant, look: Look, dark: bool = False) -> Sketch:
-    """
-    [p] as flat shapes in its theme's soil, by day or with [dark] by night, in a box WIDTH by HEIGHT
-    with its foot at BASE. The ground is a patch of soil, as in each theme but Lily pond and Mushroom forest.
-    """
-    soil = SOILS[p.theme].night() if dark else SOILS[p.theme]
+def sketch(p: Plant, look: Look, dark: bool = False, soil: Soil = MEADOW_SOIL) -> Sketch:
+    """[p] as flat shapes, by day or with [dark] by night, in a box WIDTH by HEIGHT with its foot at BASE."""
+    soil = soil.night() if dark else soil
     p = p.night() if dark else p
     sk = Sketch()
     sk.part = "soil"
@@ -677,10 +506,5 @@ def sketch(p: Plant, look: Look, dark: bool = False) -> Sketch:
             fallen(sk, FALLEN[:2], p.petal)
         elif look.kind == "spent":
             fallen(sk, FALLEN[:p.shed], p.petal.mix(p.petal.dried(), 0.25))
-    if p.form == "SPIKE":
-        spike(sk, p, soil, look)
-    elif p.form == "GLOBE":
-        globe(sk, p, soil, look)
-    else:
-        flower(sk, p, soil, look)
+    flower(sk, p, soil, look)
     return sk
