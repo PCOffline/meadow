@@ -124,6 +124,40 @@ class SyncManagerTest : EmulatorTest() {
         onBackend { assertEquals(ids.takeLast(10), pushIds(robin.uid)) }
     }
 
+    @Test
+    fun `signed out, a new push id is kept nowhere, and this phone can't register`() {
+        onBackend { sync.profile.firstWhere { it == ProfileState.SignedOut } }
+        sync.onPushRegistered("phone-1")
+        val failure = onBackend { runCatching { sync.registerThisPhone() }.exceptionOrNull() }
+        assertTrue(failure != null)
+    }
+
+    @Test
+    fun `an account with no theme leaves this phone's own`() {
+        store.setAppearance("dusk", "light")
+        person("Robin")
+        onBackend {
+            sync.accountConfirmed.firstWhere { it }
+            delay(SETTLE_MS)
+        }
+        assertEquals("dusk", store.theme.value)
+        assertEquals("light", store.darkMode.value)
+    }
+
+    @Test
+    fun `the last limit removed leaves the phone with none`() {
+        person("Robin")
+        val limits = LimitsRepository(backend, store, RequestRepository(backend) { null })
+        val pebbles = AppLimit(APP, "Pebbles", 30, 0)
+        onBackend {
+            sync.profile.firstWhere { it is ProfileState.Ready }
+            limits.save(pebbles)
+            store.limits.firstWhere { list -> list.any { it.packageName == APP } }
+            limits.remove(pebbles)
+            store.limits.firstWhere { it.isEmpty() }
+        }
+    }
+
     private suspend fun pushIds(uid: String): List<String> = account(uid).stringList("pushIds")
 
     private suspend fun waitForPushIds(uid: String, done: (List<String>) -> Boolean) {
