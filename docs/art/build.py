@@ -136,9 +136,13 @@ def hills(dark: bool) -> tuple[str, str, str]:
     return back, middle, over(grass(dark), 0.55, middle)
 
 
-def petals(dark: bool) -> list[str]:
-    """The petal colours of the theme's five plants, its own first."""
-    return [(p.night() if dark else p).petal.color for p in flora.MEADOW]
+# The banner's plants, one for each place on the hills, from each theme that grows flowers. The bee
+# stops over the corn poppy, the second.
+BANNER_PLANTS = [
+    flora.COSMOS, flora.CORN_POPPY, flora.LAVENDER, flora.SUNFLOWER, flora.CORNFLOWER, flora.ALLIUM,
+    flora.BLANKET_FLOWER, flora.GRAPE_HYACINTH, flora.CONEFLOWER,
+    flora.KINGCUP, flora.CAMELLIA, flora.LOOSESTRIFE, flora.ROCK_ROSE,
+]
 
 
 def plant(sk: "flora.Sketch", foot: tuple[float, float], scale: float, parts=("fallen", "stem", "head")) -> str:
@@ -247,14 +251,10 @@ def banner(dark: bool) -> str:
     w, h = 1280, 420
     sky = NIGHT_SKY if dark else DAY_SKY
     back, middle, front = hills(dark)
-    # One drawing of each of the theme's five plants in full bloom, used for each plant on the hills.
-    plants = "".join(
-        f'<g id="plant-{i}">{flora.sketch(p, flora.open_(1), dark).svg(("stem", "head"))}</g>' for i, p in enumerate(flora.MEADOW)
-    )
     body = [
         (f'<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{sky[0]}"/>'
          f'<stop offset="1" stop-color="{sky[1]}"/></linearGradient>'
-         f'<clipPath id="frame"><rect width="{w}" height="{h}" rx="28"/></clipPath>{plants}</defs>'),
+         f'<clipPath id="frame"><rect width="{w}" height="{h}" rx="28"/></clipPath></defs>'),
         '<g clip-path="url(#frame)">',
         f'<rect width="{w}" height="{h}" fill="url(#sky)"/>',
     ]
@@ -273,23 +273,24 @@ def banner(dark: bool) -> str:
     body.append(f'<g class="drift" style="animation-duration:95s;animation-delay:-70s">{cloud(0, 70, 15, opacity)}</g>')
     body.append(f'<path d="M0,300 C220,240 420,250 640,290 C860,330 1060,250 1280,270 V420 H0Z" fill="{back}"/>')
     body.append(f'<path d="M0,345 C260,300 520,330 760,340 C1000,350 1140,300 1280,315 V420 H0Z" fill="{middle}"/>')
-    # The theme's plants on the hills, kept clear of the title on the left.
+    # Plants from each flowering theme on the hills, each once, kept clear of the title on the left.
     spots = [(560, 318), (640, 330), (720, 322), (820, 336), (900, 326), (980, 318), (1060, 330), (1150, 316), (1230, 326),
              (90, 366), (210, 372), (330, 368), (450, 374)]
     fx, fy = flora.BASE
     for i, (x, y) in enumerate(spots):
         s = rnd.uniform(0.86, 1.04)
         sx = -s if i % 3 == 1 else s
+        drawing = flora.sketch(BANNER_PLANTS[i], flora.open_(1), dark).svg(("stem", "head"))
         body.append(
             f'<g transform="translate({x - fx * sx:.1f} {y - fy * s:.1f}) scale({sx:.3f} {s:.3f})">'
-            f'<g class="sway" style="animation-delay:-{rnd.uniform(0, 5):.1f}s"><use href="#plant-{i % 5}"/></g></g>'
+            f'<g class="sway" style="animation-delay:-{rnd.uniform(0, 5):.1f}s">{drawing}</g></g>'
         )
     body.append(f'<path d="M0,385 C300,360 640,380 900,378 C1100,376 1200,360 1280,365 V420 H0Z" fill="{front}"/>')
     if dark:
         for i in range(9):
             body.append(firefly(rnd.uniform(620, 1250), rnd.uniform(220, 330), rnd))
     else:
-        colours = petals(dark)
+        colours = [p.petal.color for p in BANNER_PLANTS]
         for i in range(9):
             px = rnd.uniform(380, 1320)
             duration = rnd.uniform(24, 34)
@@ -298,7 +299,7 @@ def banner(dark: bool) -> str:
                 f'<g class="fall" style="animation-delay:-{rnd.uniform(0, duration):.1f}s;animation-duration:{duration:.1f}s">'
                 f'<g class="waft" style="animation-delay:-{rnd.uniform(0, 4.5):.1f}s;animation-duration:{rnd.uniform(3.5, 5.5):.1f}s">'
                 f'<g transform="translate({px:.0f} 0)"><g class="tumble" style="animation-delay:-{rnd.uniform(0, 6):.1f}s">'
-                f'<ellipse rx="{size:.1f}" ry="{size * 0.6:.1f}" fill="{colours[i % 5]}" fill-opacity=".75"/>'
+                f'<ellipse rx="{size:.1f}" ry="{size * 0.6:.1f}" fill="{colours[i]}" fill-opacity=".75"/>'
                 "</g></g></g></g>"
             )
         # The bee wanders across, stopping to hover over a flower on the way.
@@ -371,7 +372,7 @@ def step_ask() -> str:
         f'<path d="{TILE_HILL}" fill="{hills(False)[1]}"/>'
         f'<g class="sway" style="animation-delay:-1s">{plant(buttercup, (76, 178), 1.4, ("stem", "head"))}</g>'
         + '<g transform="translate(150 104)"><g class="bob">' + bee(1.3, "step-bee") + "</g></g>"
-        f'<path class="pop" d="M128,48 c0,-10 14,-12 16,-2 c2,-10 16,-8 16,2 c0,10 -16,18 -16,22 c0,-4 -16,-12 -16,-22z" fill="{petals(False)[0]}"/>',
+        f'<path class="pop" d="M128,48 c0,-10 14,-12 16,-2 c2,-10 16,-8 16,2 c0,10 -16,18 -16,22 c0,-4 -16,-12 -16,-22z" fill="{flora.COSMOS.petal.color}"/>',
         "Ask a Bumblebee for more time",
     )
 
