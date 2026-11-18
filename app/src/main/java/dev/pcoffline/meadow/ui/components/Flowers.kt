@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
@@ -192,17 +191,6 @@ private fun DrawScope.paint(shapes: List<Painted>) = shapes.forEach {
     if (it.clip == null) drawPath(it.path, it.color) else clipPath(it.clip) { drawPath(it.path, it.color) }
 }
 
-private fun DrawScope.leaf(at: Offset, length: Float, degrees: Float, color: Color, path: Path = Path()) {
-    rotate(degrees, pivot = at) {
-        path.reset()
-        path.moveTo(at.x, at.y)
-        path.quadraticTo(at.x + length * 0.5f, at.y - length * 0.35f, at.x + length, at.y)
-        path.quadraticTo(at.x + length * 0.5f, at.y + length * 0.35f, at.x, at.y)
-        path.close()
-        drawPath(path, color)
-    }
-}
-
 /** A small flat daisy in the colours of the theme's own plant, for section titles. */
 @Composable
 fun Daisy(modifier: Modifier = Modifier, petal: Color = Garden.colors.petals.first(), heart: Color = Garden.colors.hearts.first()) {
@@ -348,32 +336,4 @@ private fun DrawScope.tinyToadstool(cap: Color, unit: Float) {
     drawArc(cap, startAngle = 180f, sweepAngle = 180f, useCenter = true, topLeft = Offset(-3.6f * unit, -5.6f * unit), size = Size(7.2f * unit, 5.4f * unit))
     drawCircle(Color.White.copy(alpha = 0.85f), radius = 0.6f * unit, center = Offset(-1.3f * unit, -4.2f * unit))
     drawCircle(Color.White.copy(alpha = 0.85f), radius = 0.5f * unit, center = Offset(1.2f * unit, -3.7f * unit))
-}
-
-/** A thin vine with leaves, used as a section divider. */
-@Composable
-fun VineDivider(modifier: Modifier = Modifier) {
-    val garden = Garden.colors
-    Canvas(modifier) {
-        val y = size.height / 2f
-        val path = Path().apply {
-            moveTo(0f, y)
-            var x = 0f
-            var up = true
-            while (x < size.width) {
-                val next = x + 40f
-                quadraticTo(x + 20f, if (up) y - 6f else y + 6f, next, y)
-                x = next
-                up = !up
-            }
-        }
-        drawPath(path, garden.leaf.copy(alpha = 0.6f), style = Stroke(width = 2f))
-        var x = 30f
-        var flip = false
-        while (x < size.width) {
-            leaf(Offset(x, y), 14f, if (flip) 30f else -30f, garden.leaf.copy(alpha = 0.7f))
-            x += 80f
-            flip = !flip
-        }
-    }
 }
