@@ -184,4 +184,43 @@ class GuardianServiceTest {
         create()
         assertTrue(waitUntil { shadowOf(manager).allNotifications.any { it.channelId == Notifier.CH_WARNINGS } })
     }
+
+    @Test
+    fun `with the screen off, nothing is checked`() {
+        shadowOf(app.getSystemService(android.os.PowerManager::class.java)).setIsInteractive(false)
+        create()
+        val noLimits = app.getString(R.string.guardian_no_limits)
+        assertTrue(awaitGuardianText { it == noLimits } != noLimits)
+    }
+
+    @Test
+    fun `with the accessibility service on, the usage log isn't read for the app in front`() {
+        ShadowSettings.setCanDrawOverlays(true)
+        val accessibility = Robolectric.buildService(GuardianAccessibilityService::class.java).create()
+        GuardianAccessibilityService::class.java.getDeclaredMethod("onServiceConnected").apply { isAccessible = true }.invoke(accessibility.get())
+        try {
+            AppGraph.store.setLimits(listOf(AppLimit("com.reels.watched", "Reels", 0, 0, schedule = asleep)))
+            inFront("com.reels.watched")
+            create()
+            val resting = app.resources.getQuantityString(R.plurals.guardian_resting, 1, 1)
+            assertEquals(resting, awaitGuardianText { it == resting })
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            assertNull(shadowOf(app).nextStartedActivity)
+        } finally {
+            accessibility.destroy()
+        }
+    }
+
+    @Test
+    fun `during an emergency unlock, an app with a few minutes left isn't reminded about`() {
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        AppGraph.notifier.createChannels()
+        AppGraph.store.setEmergency(Emergency(System.currentTimeMillis() + 15 * 60_000L, null))
+        AppGraph.store.setLimits(listOf(AppLimit("com.reels.paused", "Reels", 14, 0)))
+        inFront("com.reels.paused")
+        create()
+        val paused = app.getString(R.string.guardian_emergency, "").trim()
+        assertTrue(awaitGuardianText { it.orEmpty().startsWith(paused) }.orEmpty().startsWith(paused))
+        assertTrue(shadowOf(manager).allNotifications.none { it.channelId == Notifier.CH_WARNINGS })
+    }
 }
