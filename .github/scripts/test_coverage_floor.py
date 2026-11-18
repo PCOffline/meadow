@@ -2,7 +2,14 @@ import os
 import tempfile
 import unittest
 
-from coverage_floor import check, composable_signatures, counts, jacoco_version, parse_lines, tool_classpath
+from coverage_floor import (
+    check,
+    composable_signatures,
+    counts,
+    jacoco_version,
+    parse_lines,
+    tool_classpath,
+)
 
 REPORT = """<?xml version="1.0"?>
 <report name="debug">
