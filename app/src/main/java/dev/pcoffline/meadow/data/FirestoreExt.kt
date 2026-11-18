@@ -167,6 +167,7 @@ fun DocumentSnapshot.toLimit() = AppLimit(
     schedule = Schedule.fromFirestore(get("schedule")),
     dayMinutes = DayMinutes.fromFirestore(get("dayMinutes")),
     caps = TimeCap.listFromFirestore(get("caps")),
+    plant = getLong("plant")?.toInt()?.takeIf { it in 0 until PLANTS_PER_THEME },
 )
 
 fun DocumentSnapshot.toGrant() = Grant(

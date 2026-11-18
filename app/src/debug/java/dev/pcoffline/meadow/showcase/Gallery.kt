@@ -68,6 +68,8 @@ import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.home.GardenState
 import dev.pcoffline.meadow.ui.limits.BackTopBar
 import dev.pcoffline.meadow.ui.limits.LimitEditor
+import dev.pcoffline.meadow.ui.components.flora.namedPlace
+import dev.pcoffline.meadow.data.PLANTS_PER_THEME
 import dev.pcoffline.meadow.ui.limits.LimitEditorState
 import dev.pcoffline.meadow.ui.profile.ProfileScreen
 import dev.pcoffline.meadow.ui.requests.BeeStatsContent
@@ -340,6 +342,9 @@ internal object Scenarios {
 
         Scenario("Limit", "Planting a new one") { EditorDemo(Demo.editor(bumblebees = 2, existing = null)) },
         Scenario("Limit", "Tending one, no Bumblebees") { EditorDemo(Demo.editor(bumblebees = 0)) },
+        Scenario("Limit", "Tending one, with its plant chosen") {
+            EditorDemo(Demo.editor(bumblebees = 0, existing = Demo.youtube.copy(plant = (namedPlace(Demo.youtube.packageName) + 2) % PLANTS_PER_THEME)))
+        },
         Scenario("Limit", "Tending one, with Bumblebees (loosening asks)") { EditorDemo(Demo.editor(bumblebees = 2)) },
         Scenario("Limit", "Waiting on a question") { EditorDemo(Demo.editor(bumblebees = 2, pending = true)) },
 

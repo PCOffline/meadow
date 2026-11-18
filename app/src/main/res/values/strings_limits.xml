@@ -92,6 +92,7 @@
     <string name="limit_editor_days_remove">Remove these days</string>
     <string name="limit_editor_days_no_limit">No limit these days</string>
     <string name="limit_editor_caps">Caps within hours</string>
+    <string name="limit_editor_plant_title">Plant</string>
     <string name="limit_editor_cap_add">Add a cap</string>
     <string name="limit_editor_cap_row">Up to %1$s, %2$s</string>
     <string name="limit_editor_cap_edit">Change this cap</string>

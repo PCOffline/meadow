@@ -376,7 +376,7 @@ private val SUN_ABOVE_TOTAL = 44.dp
 @Composable
 private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {
     // An app keeps its place in each theme's five plants: a new theme gives it that theme's plant.
-    val plant = plantFor(budget.limit.packageName, Garden.theme)
+    val plant = plantFor(budget.limit, Garden.theme)
     // A long press offers the limit's choices: share it as saved, or change it. A screen reader
     // offers sharing as an action on the card.
     var menu by remember { mutableStateOf(false) }

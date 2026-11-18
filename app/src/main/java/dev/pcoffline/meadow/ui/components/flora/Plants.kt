@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.ui.components.flora
 
 import androidx.compose.runtime.Immutable
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.PLANTS_PER_THEME
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 
 /** How a plant is built. Each form has its own outline, so a plant is told by its shape as well as its colour. */
@@ -225,5 +227,15 @@ internal val Plants = mapOf(
 /** The five plants that [theme] grows, its own first. */
 fun plantsOf(theme: GardenTheme): List<Plant> = Plants.getValue(theme)
 
-/** The plant that an app keeps in each theme: the same place in each theme's five, from its [packageName]. */
-fun plantFor(packageName: String, theme: GardenTheme): Plant = plantsOf(theme).let { it[(packageName.hashCode() and 0x7fffffff) % it.size] }
+/** The place in each theme's five plants that an app's [packageName] gives it, when no plant is chosen. */
+fun namedPlace(packageName: String): Int = (packageName.hashCode() and 0x7fffffff) % PLANTS_PER_THEME
+
+/**
+ * The plant that an app keeps in each theme: the same place in each theme's five. The place is
+ * [chosen], or the one that its [packageName] gives.
+ */
+fun plantFor(packageName: String, theme: GardenTheme, chosen: Int? = null): Plant =
+    plantsOf(theme)[chosen?.takeIf { it in 0 until PLANTS_PER_THEME } ?: namedPlace(packageName)]
+
+/** The plant of [limit] in [theme]. */
+fun plantFor(limit: AppLimit, theme: GardenTheme): Plant = plantFor(limit.packageName, theme, limit.plant)

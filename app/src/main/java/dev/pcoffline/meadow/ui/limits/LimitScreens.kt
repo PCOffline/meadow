@@ -351,6 +351,8 @@ internal fun LimitEditor(
     val groups = ScheduleJson.decodeFromString(GroupsSerializer, groupsJson)
     var capsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(CapsSerializer, from?.caps.orEmpty())) }
     val caps = ScheduleJson.decodeFromString(CapsSerializer, capsJson)
+    // A copied or suggested limit keeps the plant of the limit here: each person chooses their own.
+    var plant by rememberSaveable { mutableStateOf(if (sendTo == null) existing?.plant else null) }
     val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
     var message by rememberSaveable { mutableStateOf("") }
     var removeNote by rememberSaveable { mutableStateOf("") }
@@ -367,6 +369,7 @@ internal fun LimitEditor(
         schedule = if (hoursOn) schedule else null,
         dayMinutes = if (dailyOn) groups.toDayMinutes() else emptyMap(),
         caps = caps,
+        plant = if (sendTo == null) plant else null,
     )
     // What the fields made of the saved limit as they opened: changes count against that, so a
     // limit the editor puts in its own terms (merged hours, a default it fills in) isn't "unsaved".
@@ -408,7 +411,7 @@ internal fun LimitEditor(
                 }
             }
             BloomFlower(
-                1f - (state.budget?.usedFraction ?: 0f), plantFor(packageName, Garden.theme), Modifier.size(48.dp, 72.dp),
+                1f - (state.budget?.usedFraction ?: 0f), plantFor(packageName, Garden.theme, plant), Modifier.size(48.dp, 72.dp),
                 asleep = state.budget?.sleeping == true,
             )
         }
@@ -419,6 +422,7 @@ internal fun LimitEditor(
             Hint(stringResource(R.string.limit_copy_replaces, existing.appName))
         }
         onChangeApp?.let { TextButton(onClick = it, enabled = editable) { Text(stringResource(R.string.limit_copy_other_app)) } }
+        if (!suggesting) PlantPicker(packageName, plant, editable) { plant = it }
 
         MeadowCard(Modifier.fillMaxWidth()) {
             ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn, editable) { dailyOn = it }

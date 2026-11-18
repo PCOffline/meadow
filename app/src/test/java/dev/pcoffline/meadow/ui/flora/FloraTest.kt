@@ -1,6 +1,8 @@
 package dev.pcoffline.meadow.ui.flora
 
 import androidx.compose.ui.graphics.Color
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.PLANTS_PER_THEME
 import dev.pcoffline.meadow.ui.components.flora.Form
 import dev.pcoffline.meadow.ui.components.flora.LITTLE_LEFT
 import dev.pcoffline.meadow.ui.components.flora.Look
@@ -9,6 +11,7 @@ import dev.pcoffline.meadow.ui.components.flora.Piece
 import dev.pcoffline.meadow.ui.components.flora.Plant
 import dev.pcoffline.meadow.ui.components.flora.Sketch
 import dev.pcoffline.meadow.ui.components.flora.Tone
+import dev.pcoffline.meadow.ui.components.flora.namedPlace
 import dev.pcoffline.meadow.ui.components.flora.plantFor
 import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.components.flora.sketch
@@ -75,7 +78,10 @@ class FloraTest {
     // ---------- the plants ----------
 
     @Test
-    fun `each theme grows five plants`() = GardenTheme.entries.forEach { assertEquals(5, plantsOf(it).size) }
+    fun `each theme grows five plants`() = GardenTheme.entries.forEach {
+        assertEquals(5, plantsOf(it).size)
+        assertEquals(PLANTS_PER_THEME, plantsOf(it).size)
+    }
 
     @Test
     fun `only the mushroom forest grows mushrooms`() = everyPlant.forEach { (theme, plant) ->
@@ -88,6 +94,25 @@ class FloraTest {
             val places = GardenTheme.entries.map { plantsOf(it).indexOf(plantFor(app, it)) }
             assertEquals(app, 1, places.distinct().size)
         }
+    }
+
+    @Test
+    fun `a chosen plant keeps its place in each theme's five`() {
+        for (place in 0 until PLANTS_PER_THEME) {
+            GardenTheme.entries.forEach { assertEquals(plantsOf(it)[place], plantFor("com.example.notes", it, place)) }
+            val limit = AppLimit("com.example.notes", "Notes", 30, 0, plant = place)
+            assertEquals(plantsOf(GardenTheme.POND)[place], plantFor(limit, GardenTheme.POND))
+        }
+    }
+
+    @Test
+    fun `with no plant chosen, or one out of range, an app's name gives its plant`() {
+        val app = "com.example.notes"
+        val named = plantsOf(GardenTheme.MEADOW)[namedPlace(app)]
+        assertEquals(named, plantFor(app, GardenTheme.MEADOW))
+        assertEquals(named, plantFor(AppLimit(app, "Notes", 30, 0), GardenTheme.MEADOW))
+        assertEquals(named, plantFor(app, GardenTheme.MEADOW, PLANTS_PER_THEME))
+        assertEquals(named, plantFor(app, GardenTheme.MEADOW, -1))
     }
 
     @Test
