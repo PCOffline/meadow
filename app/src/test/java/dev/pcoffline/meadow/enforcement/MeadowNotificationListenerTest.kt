@@ -145,6 +145,43 @@ class MeadowNotificationListenerTest {
         assertTrue(resting.key !in shown())
     }
 
+    @Test
+    fun `once disconnected, a sweep finds nothing to hide, and another listener leaving changes nothing`() {
+        service.onListenerConnected()
+        awaitWork()
+        val other = Robolectric.buildService(MeadowNotificationListener::class.java).create()
+        other.get().onListenerDisconnected()
+        other.destroy()
+        val resting = post(RESTING, 1)
+        MeadowNotificationListener.sweepAll()
+        assertTrue(resting.key !in shown())
+
+        service.onListenerDisconnected()
+        val later = post(RESTING, 2)
+        MeadowNotificationListener.sweepAll()
+        assertTrue(later.key in shown())
+    }
+
+    @Test
+    fun `only a resting app's playing media is paused`() {
+        val playing = android.media.session.MediaSession(app, "playing").apply {
+            setPlaybackState(android.media.session.PlaybackState.Builder().setState(android.media.session.PlaybackState.STATE_PLAYING, 0, 1f).build())
+            isActive = true
+        }
+        val paused = android.media.session.MediaSession(app, "paused").apply {
+            setPlaybackState(android.media.session.PlaybackState.Builder().setState(android.media.session.PlaybackState.STATE_PAUSED, 0, 1f).build())
+        }
+        val sessions = org.robolectric.Shadows.shadowOf(app.getSystemService(android.media.session.MediaSessionManager::class.java))
+        sessions.addController(playing.controller)
+        sessions.addController(paused.controller)
+        // Nothing to pause: none of these apps rest.
+        MeadowNotificationListener.pauseMedia(app, emptySet())
+        MeadowNotificationListener.pauseMedia(app, setOf(OPEN))
+        MeadowNotificationListener.pauseMedia(app, setOf(app.packageName))
+        playing.release()
+        paused.release()
+    }
+
     private val shadow: ShadowNotificationListenerService
         get() = Shadow.extract(service)
 

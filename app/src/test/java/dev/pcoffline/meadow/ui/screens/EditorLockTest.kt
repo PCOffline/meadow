@@ -24,6 +24,7 @@ import dev.pcoffline.meadow.ui.limits.CapsEditor
 import dev.pcoffline.meadow.ui.limits.DayGroup
 import dev.pcoffline.meadow.ui.limits.DayLimitsEditor
 import dev.pcoffline.meadow.ui.limits.ScheduleEditor
+import dev.pcoffline.meadow.ui.limits.TimeDialog
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -126,5 +127,21 @@ class EditorLockTest : ScreenTest() {
         inDialog(R.string.action_ok).performClick()
         assertEquals(1, caps.size)
         assertEquals(60, caps.single().to - caps.single().from)
+    }
+
+    @Test
+    fun `a time that doesn't fit keeps the clock open and says so, until one fits`() {
+        var fits = false
+        val picked = mutableListOf<Int>()
+        var dismissed = 0
+        show { TimeDialog(initialMinute = 9 * 60 + 30, onDismiss = { dismissed++ }) { picked += it; fits } }
+        inDialog(R.string.action_ok).performClick()
+        inDialog(R.string.schedule_bad_window).assertExists()
+        fits = true
+        inDialog(R.string.action_ok).performClick()
+        inDialog(R.string.schedule_bad_window).assertDoesNotExist()
+        assertEquals(listOf(9 * 60 + 30, 9 * 60 + 30), picked)
+        inDialog(R.string.action_cancel).performClick()
+        assertEquals(1, dismissed)
     }
 }
