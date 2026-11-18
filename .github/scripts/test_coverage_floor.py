@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from coverage_floor import check, composable_signatures, counts
+from coverage_floor import check, composable_signatures, counts, jacoco_version, parse_lines, tool_classpath
 
 REPORT = """<?xml version="1.0"?>
 <report name="debug">
@@ -113,6 +113,49 @@ class ComposableSignaturesTest(unittest.TestCase):
     def test_a_source_file_that_is_missing_keeps_all_its_branches(self):
         with tempfile.TemporaryDirectory() as sources:
             self.assertEqual(counts(SOURCED_REPORT, sources)["dev.pcoffline.meadow.ui"]["BRANCH"], [11, 5])
+
+
+class ComposeBranchesTest(unittest.TestCase):
+    def test_the_tool_s_lines_are_read(self):
+        output = "dev/pcoffline/meadow/ui/Garden.kt 8 1 1\nnoise\ndev/pcoffline/meadow/ui/Garden.kt 20 0 2\n"
+        self.assertEqual(parse_lines(output), {("dev/pcoffline/meadow/ui/Garden.kt", 8): (1, 1), ("dev/pcoffline/meadow/ui/Garden.kt", 20): (0, 2)})
+
+    def test_with_the_tool_s_lines_each_line_has_only_its_own_branches(self):
+        # Line 16's branches are all the compiler's, so the tool lists no branches for it.
+        lines = {("dev/pcoffline/meadow/ui/Garden.kt", 8): (1, 1), ("dev/pcoffline/meadow/ui/Garden.kt", 20): (0, 2),
+                 ("dev/pcoffline/meadow/ui/Garden.kt", 4): (4, 0)}
+        with tempfile.TemporaryDirectory() as sources:
+            folder = os.path.join(sources, "dev/pcoffline/meadow/ui")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "Garden.kt"), "w", encoding="utf-8") as f:
+                f.write(GARDEN_KT)
+            packages = counts(SOURCED_REPORT, sources, lines)
+        # Line 4 is a signature: still left out. Lines 8 and 20 keep what the tool counted.
+        self.assertEqual(packages["dev.pcoffline.meadow.ui"]["BRANCH"], [1, 3])
+
+    def test_the_jacoco_version_is_the_build_s(self):
+        with tempfile.TemporaryDirectory() as folder:
+            toml = os.path.join(folder, "libs.versions.toml")
+            with open(toml, "w", encoding="utf-8") as f:
+                f.write('[versions]\nagp = "9.5.1"\njacoco = "0.8.15"\n')
+            self.assertEqual(jacoco_version(toml), "0.8.15")
+
+    def test_the_tool_uses_jacoco_and_the_newest_whole_asm_in_the_gradle_cache(self):
+        with tempfile.TemporaryDirectory() as home:
+            def jar(group, name, version):
+                folder = os.path.join(home, "caches", "modules-2", "files-2.1", group, name, version, "abc")
+                os.makedirs(folder)
+                path = os.path.join(folder, f"{name}-{version}.jar")
+                open(path, "w").close()
+                return path
+            core = jar("org.jacoco", "org.jacoco.core", "0.8.15")
+            whole = [jar("org.ow2.asm", part, "9.9") for part in ("asm", "asm-commons", "asm-tree", "asm-analysis")]
+            # 9.10.1 is newer, but without asm-analysis.
+            for part in ("asm", "asm-commons", "asm-tree"):
+                jar("org.ow2.asm", part, "9.10.1")
+            self.assertEqual(tool_classpath(home, "0.8.15").split(os.pathsep), [core] + whole)
+            with self.assertRaises(SystemExit):
+                tool_classpath(home, "0.8.99")
 
 
 if __name__ == "__main__":
