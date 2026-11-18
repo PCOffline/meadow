@@ -271,7 +271,7 @@ fun LimitEditorScreen(
     // A copy of a limit for an app that isn't here keeps its own name, and can't be saved until
     // another app is chosen.
     val notHere = start != null && remember(packageName) { !onThisPhone(packageName, AppGraph.catalog.launchablePackages()) }
-    val state = if (notHere && start != null) loaded.copy(appName = start.appName) else loaded
+    val state = start?.takeIf { notHere }?.let { loaded.copy(appName = it.appName) } ?: loaded
     var unsaved by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         BackTopBar(

@@ -5,7 +5,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
-import com.google.firebase.functions.HttpsCallableResult
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
