@@ -8,6 +8,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
+import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -24,9 +25,9 @@ private const val TAG = "MeadowFirestore"
  * already showed.
  */
 fun Query.observe(metadataChanges: MetadataChanges = MetadataChanges.EXCLUDE): Flow<QuerySnapshot> =
-    tracedSnapshots(metadataChanges).relisten("Query listener")
+    snapshots(metadataChanges).relisten("Query listener")
 
-fun DocumentReference.observe(): Flow<DocumentSnapshot> = tracedSnapshots().relisten("Document listener")
+fun DocumentReference.observe(): Flow<DocumentSnapshot> = snapshots().relisten("Document listener")
 
 /**
  * Listens again whenever this listener fails, so one dropped by the server (offline for too long,

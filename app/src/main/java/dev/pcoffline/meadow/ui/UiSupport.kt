@@ -33,7 +33,6 @@ import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Backend
 import dev.pcoffline.meadow.data.FriendlyException
-import dev.pcoffline.meadow.data.Trace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -151,20 +150,8 @@ fun rememberAction(): ActionState {
 /**
  * Turns any failure into something kind and human to show. People only learn what they can act
  * on (offline, sign in again, wait a bit); a fault on the server's side is just "try again later".
- * Trace builds add the technical cause underneath, for whoever is debugging.
  */
-fun Throwable.friendlyMessage(context: Context): String {
-    val message = plainMessage(context)
-    return if (Trace.enabled) "$message\n\n${technicalCause()}" else message
-}
-
-private fun Throwable.technicalCause(): String = when (this) {
-    is Backend.CallFailed -> "Cloud Function failed: ${code ?: "unreachable"} ${cause?.message.orEmpty()}"
-    is FirebaseFirestoreException -> "Firestore: $code $message"
-    else -> "${javaClass.simpleName}: $message"
-}.trim()
-
-private fun Throwable.plainMessage(context: Context): String = when (this) {
+fun Throwable.friendlyMessage(context: Context): String = when (this) {
     is FriendlyException -> context.getString(messageRes, *formatArgs)
     // Cloud Function errors already carry friendly text written in the backend's copy.ts.
     is Backend.CallFailed -> when {

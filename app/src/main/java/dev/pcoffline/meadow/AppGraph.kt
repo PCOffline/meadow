@@ -24,7 +24,6 @@ import dev.pcoffline.meadow.data.ProfileRepository
 import dev.pcoffline.meadow.data.RequestRepository
 import dev.pcoffline.meadow.data.SocialRepository
 import dev.pcoffline.meadow.data.SyncManager
-import dev.pcoffline.meadow.data.Trace
 import dev.pcoffline.meadow.data.UsageShareRepository
 import dev.pcoffline.meadow.enforcement.AppBudget
 import dev.pcoffline.meadow.enforcement.LimitEngine
@@ -92,14 +91,6 @@ object AppGraph {
         val emulatorHost = BuildConfig.EMULATOR_HOST
         if (emulatorHost.isNotEmpty()) useEmulators(application, emulatorHost)
         backendReady = (BuildConfig.HAS_FIREBASE_CONFIG || emulatorHost.isNotEmpty()) && FirebaseApp.getApps(application).isNotEmpty()
-        if (Trace.enabled && backendReady) {
-            // The SDK's own log of every read, write and listen, under the "Firestore" tag.
-            FirebaseFirestore.setLoggingEnabled(true)
-            Trace.log {
-                "trace on: project=${FirebaseApp.getInstance().options.projectId} region=${Backend.FUNCTIONS_REGION} " +
-                    "emulators=${emulatorHost.ifEmpty { "off" }} version=${BuildConfig.VERSION_NAME}"
-            }
-        }
     }
 
     private const val TAG = "Meadow"
