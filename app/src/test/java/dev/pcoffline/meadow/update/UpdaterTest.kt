@@ -214,6 +214,43 @@ class UpdaterTest {
     }
 
     @Test
+    fun `a second tap while an update downloads starts nothing more`() {
+        val release = java.util.concurrent.CountDownLatch(1)
+        val web = FakeWeb {
+            FakeWeb.Answer(200, length = 4, stream = { release.await(5, java.util.concurrent.TimeUnit.SECONDS); "apk!".byteInputStream() })
+        }
+        val updater = online(web)
+        updater.startInstall(update)
+        updater.startInstall(update)
+        release.countDown()
+        settled(updater)
+        assertEquals(listOf(update.apkUrl), web.asked)
+    }
+
+    @Test
+    fun `a download of unknown size, from a release without a checksum, is still checked to be an app`() {
+        val unsized = update.copy(sizeBytes = 0, sha256 = null)
+        val updater = online(FakeWeb { FakeWeb.Answer(200, "not an apk".toByteArray(), length = -1) })
+        updater.startInstall(unsized)
+        assertEquals(UpdateState.Failed(app.getString(R.string.update_failed_checksum), unsized), settled(updater))
+    }
+
+    @Test
+    fun `a confirmation that can't open on screen waits in a notification`() {
+        shadowOf(app).checkActivities(true)
+        val updater = updater().apply { installing(update) }
+        updater.onConfirmNeeded(confirm, inForeground = true)
+        assertEquals(Notifier.CH_UPDATES, shadowOf(manager).allNotifications.single().channelId)
+    }
+
+    @Test
+    fun `an installer's answer with nothing installing names no update`() {
+        val updater = updater()
+        updater.onInstallResult(false, "Update cancelled.")
+        assertEquals(UpdateState.Failed("Update cancelled.", null), updater.state.value)
+    }
+
+    @Test
     fun `Android decides whether Meadow may install, and its setting opens on Meadow`() {
         val intent = updater().installPermissionIntent()
         assertEquals(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, intent.action)
