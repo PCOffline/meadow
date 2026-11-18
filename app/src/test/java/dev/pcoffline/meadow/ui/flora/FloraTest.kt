@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.ui.flora
 import androidx.compose.ui.graphics.Color
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.PLANTS_PER_THEME
+import dev.pcoffline.meadow.usage.IconColour
 import dev.pcoffline.meadow.ui.components.flora.Form
 import dev.pcoffline.meadow.ui.components.flora.LITTLE_LEFT
 import dev.pcoffline.meadow.ui.components.flora.Look
@@ -11,6 +12,7 @@ import dev.pcoffline.meadow.ui.components.flora.Piece
 import dev.pcoffline.meadow.ui.components.flora.Plant
 import dev.pcoffline.meadow.ui.components.flora.Sketch
 import dev.pcoffline.meadow.ui.components.flora.Tone
+import dev.pcoffline.meadow.ui.components.flora.defaultPlace
 import dev.pcoffline.meadow.ui.components.flora.namedPlace
 import dev.pcoffline.meadow.ui.components.flora.plantFor
 import dev.pcoffline.meadow.ui.components.flora.plantsOf
@@ -113,6 +115,36 @@ class FloraTest {
         assertEquals(named, plantFor(AppLimit(app, "Notes", 30, 0), GardenTheme.MEADOW))
         assertEquals(named, plantFor(app, GardenTheme.MEADOW, PLANTS_PER_THEME))
         assertEquals(named, plantFor(app, GardenTheme.MEADOW, -1))
+    }
+
+    @Test
+    fun `with no plant chosen, the plant is the one nearest in colour to the app's icon`() {
+        val red = IconColour.of(IntArray(10) { 0xFFFF0000.toInt() })
+        val blue = IconColour.of(IntArray(10) { 0xFF1877F2.toInt() })
+        val yellow = IconColour.of(IntArray(10) { 0xFFFFD000.toInt() })
+        val app = "com.example.notes"
+        assertEquals("Corn poppy", plantFor(app, GardenTheme.MEADOW, icon = red).name)
+        assertEquals("Cornflower", plantFor(app, GardenTheme.MEADOW, icon = blue).name)
+        assertEquals("Buttercup", plantFor(app, GardenTheme.MEADOW, icon = yellow).name)
+        assertEquals("Blue water lily", plantFor(app, GardenTheme.POND, icon = blue).name)
+        assertEquals("Sunflower", plantFor(app, GardenTheme.SUNFLOWER, icon = yellow).name)
+        assertEquals("Fly agaric", plantFor(app, GardenTheme.MUSHROOM, icon = red).name)
+    }
+
+    @Test
+    fun `a chosen plant wins over the icon's colour`() {
+        val red = IconColour.of(IntArray(10) { 0xFFFF0000.toInt() })
+        val cornflower = plantsOf(GardenTheme.MEADOW).indexOfFirst { it.name == "Cornflower" }
+        assertEquals("Cornflower", plantFor("com.example.notes", GardenTheme.MEADOW, cornflower, red).name)
+    }
+
+    @Test
+    fun `a grey icon, or none, gives the plant of the app's name`() {
+        val app = "com.example.notes"
+        val named = plantsOf(GardenTheme.MEADOW)[namedPlace(app)]
+        assertEquals(named, plantFor(app, GardenTheme.MEADOW, icon = IconColour.Grey))
+        assertEquals(named, plantFor(app, GardenTheme.MEADOW, icon = null))
+        assertEquals(namedPlace(app), defaultPlace(app, GardenTheme.MEADOW, IconColour.Grey))
     }
 
     @Test

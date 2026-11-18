@@ -35,8 +35,9 @@ chose to look after your garden.
 ## Your garden
 
 Each app you limit is a plant. Each theme grows five plants of its own: for example a cosmos and
-a corn poppy in Meadow, a lotus in Lily pond, and a fly agaric in Mushroom forest. Choose the
-plant of each limit when you plant or change it. Your choice stays in each theme. A plant is in
+a corn poppy in Meadow, a lotus in Lily pond, and a fly agaric in Mushroom forest. Each app gets
+the plant nearest in colour to its icon. Choose another plant when you plant or change a limit.
+Your choice stays in each theme. A plant is in
 full bloom while half or more of its time is left. With less, it nods and drops a petal. When the
 time is used, it is dried, in its own colour. A mushroom ages in place of wilting. Outside an
 app's hours, its plant is a bud. The sky follows your day, from sunrise to a night with fireflies.

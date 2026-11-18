@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.limits
 
+import dev.pcoffline.meadow.usage.IconColour
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,17 +27,17 @@ import androidx.compose.ui.unit.dp
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.ui.components.BloomFlower
 import dev.pcoffline.meadow.ui.components.MeadowCard
-import dev.pcoffline.meadow.ui.components.flora.namedPlace
+import dev.pcoffline.meadow.ui.components.flora.defaultPlace
 import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.theme.Garden
 
 /**
  * The plant of the limit for [packageName]: one of the theme's five. [chosen] is its place in
- * them, or null for the place that the app's name gives. Choosing that place gives null.
+ * them, or null for the plant nearest in colour to the app's [icon]. Choosing that plant gives null.
  */
 @Composable
-internal fun PlantPicker(packageName: String, chosen: Int?, enabled: Boolean, onChoose: (Int?) -> Unit) {
-    val named = namedPlace(packageName)
+internal fun PlantPicker(packageName: String, icon: IconColour?, chosen: Int?, enabled: Boolean, onChoose: (Int?) -> Unit) {
+    val named = defaultPlace(packageName, Garden.theme, icon)
     val selected = chosen ?: named
     MeadowCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.limit_editor_plant_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 12.dp))

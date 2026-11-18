@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  * [schedule] means the app may be used at any hour. A day in [dayMinutes] has its own daily limit
  * instead of [dailyMinutes], and every one of [caps] applies on top: the app rests once any of
  * them is used up. [plant] is the plant that the person chose: its place in each theme's five
- * plants. A null [plant] is the one that the app's name gives.
+ * plants. A null [plant] is the plant nearest in colour to the app's icon.
  */
 @Serializable
 data class AppLimit(

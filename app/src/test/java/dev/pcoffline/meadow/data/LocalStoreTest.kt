@@ -50,6 +50,17 @@ class LocalStoreTest {
     }
 
     @Test
+    fun `icon colours survive a restart, and a wipe forgets them`() {
+        val red = dev.pcoffline.meadow.usage.IconColour(0.63f, 0.26f, 29f)
+        LocalStore(context).setIconColour("com.example.app", red)
+        val restarted = LocalStore(context)
+        assertEquals(mapOf("com.example.app" to red), restarted.iconColours.value)
+        restarted.clearAll()
+        assertEquals(emptyMap<String, dev.pcoffline.meadow.usage.IconColour>(), restarted.iconColours.value)
+        assertEquals(emptyMap<String, dev.pcoffline.meadow.usage.IconColour>(), LocalStore(context).iconColours.value)
+    }
+
+    @Test
     fun `without a weekly limit, a new first day applies at once`() {
         val store = LocalStore(context)
         store.setLimits(listOf(AppLimit("com.example.app", "Example", dailyMinutes = 30, weeklyMinutes = 0)))

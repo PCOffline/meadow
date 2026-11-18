@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.data
 
+import dev.pcoffline.meadow.usage.IconColour
 import android.content.Context
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,6 +54,20 @@ class LocalStore(context: Context) {
 
     private val _emergency = MutableStateFlow(read<Emergency>(KEY_EMERGENCY))
     val emergency: StateFlow<Emergency?> = _emergency.asStateFlow()
+
+    private val _iconColours = MutableStateFlow(read<Map<String, IconColour>>(KEY_ICON_COLOURS) ?: emptyMap())
+
+    /**
+     * The colour of each app's icon, as last read: a plant chosen by it shows at once, before the
+     * icon is read again.
+     */
+    val iconColours: StateFlow<Map<String, IconColour>> = _iconColours.asStateFlow()
+
+    fun setIconColour(packageName: String, colour: IconColour) {
+        val next = _iconColours.value + (packageName to colour)
+        write(KEY_ICON_COLOURS, next)
+        _iconColours.value = next
+    }
 
     private val _theme = MutableStateFlow(prefs.getString(KEY_THEME, null))
     val theme: StateFlow<String?> = _theme.asStateFlow()
@@ -209,6 +224,7 @@ class LocalStore(context: Context) {
         _sharingChosen.value = false
         _theme.value = null
         _darkMode.value = null
+        _iconColours.value = emptyMap()
         _autoUpdate.value = true
         _weatherOn.value = false
         _weather.value = null
@@ -313,6 +329,7 @@ class LocalStore(context: Context) {
         const val KEY_AUTO_UPDATE = "auto_update"
         const val KEY_WEATHER_ON = "weather_on"
         const val KEY_WEATHER = "weather"
+        const val KEY_ICON_COLOURS = "icon_colours"
         const val KEY_WEEK_FIRST = "week_first"
         const val KEY_WEEK_PREVIOUS = "week_previous"
         const val KEY_WEEK_LIMITS_FROM = "week_limits_from"

@@ -10,7 +10,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.usage.IconColour
+import androidx.compose.ui.test.assertIsNotEnabled
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChangeOutcome
 import dev.pcoffline.meadow.ui.components.flora.namedPlace
@@ -68,6 +71,22 @@ class PlantPickerTest : ScreenTest() {
             if (place == named) choice.assertIsSelected() else choice.assertIsNotSelected()
         }
         assertAccessible()
+    }
+
+    @Test
+    fun `with no plant chosen, the plant nearest in colour to the app's icon has the ring`() {
+        val poppy = plantsOf(GardenTheme.MEADOW).indexOfFirst { it.name == "Corn poppy" }
+        AppGraph.store.setIconColour(pkg, IconColour.of(IntArray(10) { 0xFFFF0000.toInt() }))
+        try {
+            editor(existing = AppLimit(pkg, "Instagram", 30, 0))
+            plant(poppy).performScrollTo().assertIsSelected()
+            // Choosing it again stores no choice: the limit goes on following the icon.
+            plant((poppy + 1) % 5).performClick()
+            plant(poppy).performClick()
+            node(R.string.action_save).performScrollTo().assertIsNotEnabled()
+        } finally {
+            AppGraph.store.clearAll()
+        }
     }
 
     @Test
