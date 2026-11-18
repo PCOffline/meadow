@@ -2,6 +2,7 @@
 
 These rules are for all people and coding agents who change this repository.
 [CONTRIBUTING.md](CONTRIBUTING.md) has the checks, the terms and the accessibility rules.
+Coding agents also follow [the lessons from earlier sessions](docs/agent-lessons.md).
 
 ## Commits
 
