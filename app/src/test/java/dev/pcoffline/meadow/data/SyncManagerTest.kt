@@ -158,6 +158,28 @@ class SyncManagerTest : EmulatorTest() {
         }
     }
 
+    @Test
+    fun `offline from the start, the cache's empty answers keep what the phone holds`() {
+        person("Robin")
+        val held = AppLimit(APP, "Pebbles", 30, 0)
+        val grant = Grant("g1", APP, 15, Days.todayKey())
+        onBackend { backend.db.disableNetwork().await() }
+        try {
+            store.setLimits(listOf(held))
+            store.setGrants(listOf(grant))
+            sync.profile.value
+            onBackend { delay(SETTLE_MS) }
+            // Nothing from the server: the garden isn't missing, and nothing held is wiped.
+            assertTrue(sync.profile.value != ProfileState.Missing)
+            assertEquals(listOf(held), store.limits.value)
+            assertEquals(listOf(grant), store.grants.value)
+            assertEquals(false, sync.accountConfirmed.value)
+        } finally {
+            onBackend { backend.db.enableNetwork().await() }
+        }
+        onBackend { sync.accountConfirmed.firstWhere { it } }
+    }
+
     private suspend fun pushIds(uid: String): List<String> = account(uid).stringList("pushIds")
 
     private suspend fun waitForPushIds(uid: String, done: (List<String>) -> Boolean) {
