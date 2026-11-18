@@ -1,7 +1,9 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -16,6 +18,7 @@ import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Emergency
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
 import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
+import dev.pcoffline.meadow.ui.minutesText
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -52,6 +55,22 @@ class EmergencyTest : ScreenTest() {
         compose.mainClock.advanceTimeBy(3_000)
         node(R.string.emergency_dialog_unlock).assertIsEnabled()
         assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `an unlock that fails says so and stays open, with the choices kept`() {
+        var dismissed = 0
+        show { EmergencyDialog("com.example.app", "Pebbles", onDismiss = { dismissed++ }) }
+        node(R.string.emergency_dialog_all_apps).performClick()
+        compose.onNodeWithText(app.resources.minutesText(30)).performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("My bus is late")
+        compose.mainClock.advanceTimeBy(6_000)
+        // These tests have no backend to reach, so the unlock can't start.
+        node(R.string.emergency_dialog_unlock).assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText(text(R.string.error_generic), substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(0, dismissed)
+        assertEquals(null, AppGraph.store.emergency.value)
+        node(R.string.emergency_dialog_all_apps).assertIsSelected()
     }
 
     @Test
