@@ -164,7 +164,7 @@ def sun(cx: float, cy: float, r: float) -> str:
 
 
 def moon(cx: float, cy: float, r: float) -> str:
-    """A soft glow, and a crescent: a disc with a bite cut out, as the app draws it."""
+    """A crescent: a disc with a bite cut out, as the app draws it. It has no glow, so no disc shows round it."""
     bx, by, br = cx + r * 0.45, cy - r * 0.25, r * 0.86
     d = math.hypot(bx - cx, by - cy)
     a = (r * r - br * br + d * d) / (2 * d)
@@ -174,7 +174,6 @@ def moon(cx: float, cy: float, r: float) -> str:
     p1 = (mx - uy * h, my + ux * h)
     p2 = (mx + uy * h, my - ux * h)
     return (
-        f'<circle cx="{cx}" cy="{cy}" r="{r * 1.8:.1f}" fill="{MOON_LIGHT}" fill-opacity=".15"/>'
         f'<path d="M{p1[0]:.2f},{p1[1]:.2f} A{r},{r} 0 1 1 {p2[0]:.2f},{p2[1]:.2f} '
         f'A{br:.2f},{br:.2f} 0 0 0 {p1[0]:.2f},{p1[1]:.2f}Z" fill="{MOON_LIGHT}"/>'
     )
