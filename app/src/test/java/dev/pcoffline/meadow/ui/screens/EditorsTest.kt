@@ -75,7 +75,7 @@ class EditorsTest : ScreenTest() {
         node(R.string.request_withdraw).assertDoesNotExist()
         assertAccessible(requireHeading = false)
 
-        // Answering opens a dialog, tested on a phone (DialogContrastTest): Robolectric never settles with it open.
+        // Answering opens a dialog: RequestDecideTest.
         node(R.string.request_say_yes).assertHasClickAction()
         node(R.string.request_not_today).assertHasClickAction()
     }
