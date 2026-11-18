@@ -3,7 +3,7 @@
 These rules are for all people and coding agents who change this repository.
 [CONTRIBUTING.md](CONTRIBUTING.md) has the checks, the terms and the accessibility rules.
 Coding agents also read [the lessons from earlier sessions](.agents/lessons.md) at the start of
-each session.
+each session, and add a lesson there when they find a mistake or a bug.
 
 ## Commits
 

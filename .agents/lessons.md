@@ -3,6 +3,28 @@
 Each rule comes from a real mistake in this repository. [AGENTS.md](../AGENTS.md) has the rules
 for commits, branches, pull requests and tests. This file adds what those rules don't say.
 
+## Add a lesson
+
+Add a lesson as soon as you find a mistake that you made or a bug. Add it on the branch of your
+task, in a `docs(agents)` commit of its own, so that the lesson ships with the pull request.
+
+Write the rule that prevents the mistake in each task, not the story of this one:
+
+- Pass the test: the rule changes what an agent does in a task about another feature. A rule
+  for one feature goes in a code comment next to that code.
+- State the target behaviour: "Scroll to each node before you click it." Add the reason in one
+  short sentence when it isn't clear.
+- Prefer a check to a lesson. When a test, a lint rule or a CI step can catch the mistake, add
+  that check.
+- Keep each rule in one place. Search this file, AGENTS.md and CONTRIBUTING.md first. When a rule
+  exists, make its words sharper.
+- Write what an agent can't find by looking: the trap, the reason, the unwritten convention.
+  Leave API facts, command options and values to the docs, `--help` and the files that hold them.
+- Name the file that holds a value that can change, not the value.
+- Put the rule under the heading where an agent looks for it.
+- Remove or merge each rule that your change makes old.
+- Follow **Writing** in AGENTS.md.
+
 ## Plan the work
 
 - Ask when a word in the request has two meanings and each meaning changes different code.
@@ -14,10 +36,10 @@ for commits, branches, pull requests and tests. This file adds what those rules 
 ## Code
 
 - `data` and `usage` import nothing from `ui`. Put a value that both sides need in `data`.
-- Change the screen at once, before the server answers. `awaitWrite` can wait for 8 seconds.
+- Change the screen at once, before the server answers. `awaitWrite` can wait for seconds (`WRITE_TIMEOUT_MS`).
   When the write fails, show the failure and put back what the person entered.
 - Use `ActionState.run` for an action that runs once. It drops a call while it is busy, and the
-  same call for 600 ms after a success. Start an action that people repeat quickly in
+  same call for a short time after a success (`SETTLE_MS`). Start an action that people repeat quickly in
   `AppGraph.scope`.
 - Firestore keeps the order of writes that start on the same thread. Start them with
   `Dispatchers.Main.immediate`, with no suspension before the write.
