@@ -139,6 +139,17 @@ class WeatherTest {
     }
 
     @Test
+    fun `a reading from a clock ahead of this one is read again, and an answer that can't be read keeps it`() = runBlocking {
+        val weather = repository()
+        weather.turnOn()
+        store.setWeather(WeatherReading(Weather.FOG, clock + 60_000))
+        answer = "not json"
+        weather.refreshIfStale()
+        assertEquals(1, asked.size)
+        assertEquals(Weather.FOG, store.weather.value?.weather)
+    }
+
+    @Test
     fun `turning it off forgets the last weather`() = runBlocking {
         val weather = repository()
         weather.turnOn()
