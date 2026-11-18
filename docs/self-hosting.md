@@ -648,9 +648,9 @@ send them. Look at **Firestore → Indexes**. If they are missing, run
 `firebase deploy --only firestore:indexes`.
 
 **The app shows "Meadow isn't available now", or stays on "Opening your garden…".** A server
-operation failed. The app doesn't show the cause to people. To see the cause on screen and in the
-log, build the app with trace mode (read [Debugging Meadow](debugging.md)). Without trace mode,
-`adb logcat -s MeadowSync MeadowBackend MeadowFirestore` also shows it. Find the code in the log:
+operation failed. The app doesn't show the cause to people. The log shows it:
+`adb logcat -s MeadowSync MeadowBackend MeadowFirestore` (read [Debugging Meadow](debugging.md)).
+Find the code in the log:
 
 - `PERMISSION_DENIED` on a read of your profile (`users/<uid>`): the security rules refused it.
   Usually the rules were never deployed, so Firestore still has its locked start rules. Run
@@ -664,8 +664,7 @@ log, build the app with trace mode (read [Debugging Meadow](debugging.md)). With
   and build the app again. If the regions are the same, deploy the functions again.
 - `UNAUTHENTICATED` or `PERMISSION_DENIED` from a Cloud Function, just after sign-in: Google Cloud
   refused the call before it got to Meadow, because the functions aren't public. The app asks you
-  to sign in again. A trace build also shows `Cloud Function failed: UNAUTHENTICATED`. Read
-  *Failed to set the IAM Policy* above.
+  to sign in again. Read *Failed to set the IAM Policy* above.
 - `INTERNAL` from a Cloud Function: the function crashed. `firebase functions:log` shows the
   cause. If the log shows `PERMISSION_DENIED: Missing or insufficient permissions`, read
   *The functions can't get to Firestore* above.

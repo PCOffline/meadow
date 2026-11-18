@@ -34,25 +34,15 @@ build-release version="":
 install:
     ./gradlew installDebug
 
-# Install a debug build that logs every request and shows error causes (docs/debugging.md)
-[group('app')]
-install-trace:
-    ./gradlew installDebug -Pmeadow.trace=true
-
-# Install a traced debug build that talks to the local emulators (10.0.2.2 is this computer, from an Android emulator)
+# Install a debug build that talks to the local emulators (10.0.2.2 is this computer, from an Android emulator)
 [group('app')]
 install-local host="10.0.2.2":
-    ./gradlew installDebug -Pmeadow.emulatorHost={{ host }} -Pmeadow.trace=true
+    ./gradlew installDebug -Pmeadow.emulatorHost={{ host }}
 
 # Follow the app's log
 [group('app')]
 logs:
-    adb logcat -s MeadowTrace MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian
-
-# Follow the app's log plus the Firestore SDK's own (trace builds; very verbose)
-[group('app')]
-logs-firestore:
-    adb logcat -s MeadowTrace Firestore
+    adb logcat -s Meadow MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian
 
 # Android lint and every test suite (CI also runs the end-to-end tests)
 [group('test')]

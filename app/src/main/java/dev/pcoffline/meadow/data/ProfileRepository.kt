@@ -56,11 +56,9 @@ class ProfileRepository(
         val uid = backend.requireUid()
         val bytes = withContext(Dispatchers.IO) { squareJpeg(uri) }
         val ref = storage.reference.child("avatars/$uid")
-        Trace.request<UploadTask.TaskSnapshot>("upload ${ref.path} (${bytes.size} bytes)", describe = { "${it.bytesTransferred} bytes sent" }) {
-            ref.putBytes(bytes, StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
-        }
+        ref.putBytes(bytes, StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
         // The fragment changes the image cache key so the new photo shows straight away.
-        val url = Trace.request("download URL of ${ref.path}") { ref.downloadUrl.await() }.toString() + "#v=" + System.currentTimeMillis()
+        val url = ref.downloadUrl.await().toString() + "#v=" + System.currentTimeMillis()
         backend.user(uid).update("photoUrl", url).awaitWrite()
     }
 
@@ -102,7 +100,7 @@ class ProfileRepository(
         val result = backend.call("exportMyData", timeoutSeconds = 130)
         val path = result["path"] as? String ?: throw FriendlyException(dev.pcoffline.meadow.R.string.error_generic)
         val ref = storage.reference.child(path)
-        val bytes = Trace.request<ByteArray>("download ${ref.path}", describe = { "${it.size} bytes" }) { ref.getBytes(MAX_EXPORT_BYTES).await() }
+        val bytes = ref.getBytes(MAX_EXPORT_BYTES).await()
         runCatchingCancellable { ref.delete().await() }
         val data = Json.parseToJsonElement(bytes.decodeToString())
         return PrettyJson.encodeToString(JsonElement.serializer(), data)
