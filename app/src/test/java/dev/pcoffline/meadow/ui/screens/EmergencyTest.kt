@@ -59,15 +59,17 @@ class EmergencyTest : ScreenTest() {
 
     @Test
     fun `an unlock that fails says so and stays open, with the choices kept`() {
+        // Signed out, the one unlock without a connection is already used.
+        AppGraph.store.lastOfflineEmergencyMillis = System.currentTimeMillis()
         var dismissed = 0
         show { EmergencyDialog("com.example.app", "Pebbles", onDismiss = { dismissed++ }) }
         node(R.string.emergency_dialog_all_apps).performClick()
         compose.onNodeWithText(app.resources.minutesText(30)).performClick()
         compose.onNode(hasSetTextAction()).performTextInput("My bus is late")
         compose.mainClock.advanceTimeBy(6_000)
-        // These tests have no backend to reach, so the unlock can't start.
+        // Whether or not an earlier test in this run set up the backend, the unlock can't start.
         node(R.string.emergency_dialog_unlock).assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText(text(R.string.error_generic), substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("🍂", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, dismissed)
         assertEquals(null, AppGraph.store.emergency.value)
         node(R.string.emergency_dialog_all_apps).assertIsSelected()
