@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.pictures.stories
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,11 +11,13 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.ChatMessage
 import dev.pcoffline.meadow.data.MessageKind
 import dev.pcoffline.meadow.showcase.DemoGarden
 import dev.pcoffline.meadow.ui.chat.ChatContent
+import dev.pcoffline.meadow.ui.requests.RequestCard
 import org.junit.Test
 
 /** The box clears as soon as a message is sent. A message that fails comes back to it. */
@@ -33,6 +36,8 @@ class ChatSendClearsStory : Story("A sent message leaves the box at once") {
                     // Each message shows as sending, and stays so.
                     messages = messages + ChatMessage("s${messages.size}", DemoGarden.robin.uid, text, MessageKind.TEXT, null, 0L, pending = true)
                     fail = failed
+                }, requestCard = { _, _ ->
+                    RequestCard(DemoGarden.request, DemoGarden.robin.uid, Modifier.padding(horizontal = 12.dp))
                 })
             }
         }
