@@ -245,7 +245,7 @@ class MainScreensTest : ScreenTest() {
     fun `chat shows the conversation and sends what you type`() {
         val sent = mutableListOf<String>()
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { text, done -> sent += text; done() }, requestCard = { id, _ -> Text("Request $id") })
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { text, _ -> sent += text }, requestCard = { id, _ -> Text("Request $id") })
         }
         compose.onNodeWithText("Thank you! 💛").assertExists()
         compose.onNodeWithText("Request r1").assertExists()
@@ -314,45 +314,55 @@ class MainScreensTest : ScreenTest() {
     }
 
     @Test
-    fun `a message that fails to send stays in the box with the reason`() {
+    fun `the box clears as soon as a message is sent, so the next can be typed and sent at once`() {
+        val sent = mutableListOf<String>()
+        show {
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { text, _ -> sent += text }, requestCard = { id, _ -> Text("Request $id") })
+        }
+        val field = compose.onNode(hasSetTextAction())
+        val send = compose.onNodeWithContentDescription(text(R.string.action_send))
+        // Neither is confirmed yet: the second goes all the same, with none of the first's text.
+        field.performTextInput("First")
+        send.performClick()
+        field.performTextInput("Second")
+        compose.onNode(hasSetTextAction() and hasText("Second")).assertExists()
+        send.assertIsEnabled().performClick()
+        assertEquals(listOf("First", "Second"), sent)
+        compose.onNode(hasSetTextAction() and hasText("Second")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a message that fails to send comes back to the box with the reason`() {
         val failed = "Couldn't send that just now"
         var error by mutableStateOf<String?>(null)
-        var sending by mutableStateOf(false)
-        val tries = mutableListOf<String>()
+        var fail: () -> Unit = {}
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, sending = sending, error = error, onSend = { text, _ ->
-                tries += text
-                sending = true
-            }, requestCard = { id, _ -> Text("Request $id") })
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, error = error, onSend = { _, onFailed -> fail = onFailed }, requestCard = { id, _ -> Text("Request $id") })
         }
-        val send = compose.onNodeWithContentDescription(text(R.string.action_send))
-        compose.onNode(hasSetTextAction()).performTextInput("See you tomorrow")
-        send.performClick()
-        // While it's on its way the text stays, and it can't be sent twice.
-        send.assertIsNotEnabled()
-        compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertExists()
+        val field = compose.onNode(hasSetTextAction())
+        field.performTextInput("See you tomorrow")
+        compose.onNodeWithContentDescription(text(R.string.action_send)).performClick()
+        compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertDoesNotExist()
 
-        sending = false
-        error = failed
+        compose.runOnIdle { error = failed; fail() }
         compose.onNodeWithText(failed, substring = true).assertExists()
         compose.onNode(hasSetTextAction() and hasText("See you tomorrow")).assertExists()
-        send.assertIsEnabled()
-        assertEquals(listOf("See you tomorrow"), tries)
+        compose.onNodeWithContentDescription(text(R.string.action_send)).assertIsEnabled()
         assertAccessible()
     }
 
     @Test
-    fun `text typed while a message sends isn't cleared when it's sent`() {
-        var finish: () -> Unit = {}
+    fun `a failed message comes back before what was typed since`() {
+        var fail: () -> Unit = {}
         show {
-            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { _, done -> finish = done }, requestCard = { id, _ -> Text("Request $id") })
+            ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, onSend = { _, onFailed -> fail = onFailed }, requestCard = { id, _ -> Text("Request $id") })
         }
         val field = compose.onNode(hasSetTextAction())
         field.performTextInput("First")
         compose.onNodeWithContentDescription(text(R.string.action_send)).performClick()
-        field.performTextInput(" and second")
-        compose.runOnIdle { finish() }
-        compose.onNode(hasSetTextAction() and hasText("First and second")).assertExists()
+        field.performTextInput("Second")
+        compose.runOnIdle { fail() }
+        compose.onNode(hasSetTextAction() and hasText("First\nSecond")).assertExists()
     }
 
     @Test
@@ -433,6 +443,18 @@ class MainScreensTest : ScreenTest() {
         button.performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Message 41").assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.chat_new_message_spoken)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a chat opens at its latest message when the server brings many more after the saved ones`() {
+        // The saved messages show first, then the server's, with several newer ones at once.
+        var messages by mutableStateOf(texts(10))
+        show { ChatContent(DemoGarden.robin, DemoGarden.chat, messages) }
+        compose.onNodeWithText("Message 10").assertIsDisplayed()
+        messages = texts(40)
+        compose.waitForIdle()
+        compose.onNodeWithText("Message 40").assertIsDisplayed()
         compose.onNodeWithContentDescription(text(R.string.chat_new_message_spoken)).assertDoesNotExist()
     }
 
