@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.tasks.await
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -180,6 +181,38 @@ class CircleRepositoriesTest : EmulatorTest() {
             requests.outgoing(robin.uid).firstWhere { list -> list.none { it.type == RequestType.CHANGE_LIMIT && it.status == RequestStatus.PENDING } }
             // Stricter applies at once, Bumblebee or not.
             assertEquals(ChangeOutcome.APPLIED, limits.save(strict.copy(dailyMinutes = 20)))
+        }
+    }
+
+    @Test
+    fun `with a Bumblebee, a limit's plant changes at once, also while a looser limit waits for a yes`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+
+        signInAs(robin)
+        onBackend {
+            val limits = LimitsRepository(backend, store, requests)
+            val doc = backend.user(robin.uid).collection("limits").document(APP)
+            suspend fun saved() = doc.get().await().toLimit()
+            val strict = AppLimit(APP, "Pebbles", 30, 0)
+            limits.save(strict)
+            store.setLimits(listOf(strict))
+            store.setApproverCount(1)
+
+            assertEquals(ChangeOutcome.APPLIED, limits.save(strict.copy(plant = 3)))
+            assertEquals(strict.copy(plant = 3), saved())
+            store.setLimits(listOf(strict.copy(plant = 3)))
+
+            // The time waits for a yes; the plant doesn't.
+            assertEquals(ChangeOutcome.REQUESTED, limits.save(strict.copy(dailyMinutes = 60, plant = 1)))
+            assertEquals(strict.copy(plant = 1), saved())
+            store.setLimits(listOf(strict.copy(plant = 1)))
+
+            // Hours go through the backend, which keeps the plant; the plant then changes on its own.
+            val hours = Schedule.everyDay(TimeWindow(9 * 60, 17 * 60))
+            assertEquals(ChangeOutcome.APPLIED, limits.save(strict.copy(schedule = hours)))
+            assertEquals(strict.copy(schedule = hours), saved())
         }
     }
 
