@@ -279,13 +279,7 @@ internal val HILL_FLOWERS = listOf(
     HillFlower(0.91f, 0.88f, 1.4f),
 )
 
-/** A flower's width before scaling: it is drawn within 3.2 dp of its middle. */
-private const val HILL_FLOWER_BASE_DP = 2 * 3.2f
-
 private const val TOADSTOOL_SHARE = 0.85f
-
-/** How wide [flower] is drawn, in dp. */
-internal fun hillFlowerWidthDp(flower: HillFlower): Float = HILL_FLOWER_BASE_DP * flower.scale
 
 /**
  * A plant a few dp across, its head at the origin, in the shape of its [form]: a ring of petals,

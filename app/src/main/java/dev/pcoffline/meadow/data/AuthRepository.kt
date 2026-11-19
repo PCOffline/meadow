@@ -44,11 +44,6 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
 
     val uid: Flow<String?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener {
-            Trace.log {
-                val user = it.currentUser
-                if (user == null) "auth: signed out"
-                else "auth: ${user.uid} anonymous=${user.isAnonymous} providers=${user.providerData.map { p -> p.providerId }}"
-            }
             _anonymous.value = it.currentUser?.isAnonymous == true
             trySend(it.currentUser?.uid)
         }
@@ -58,10 +53,6 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
 
     suspend fun signIn(email: String, password: String) {
         withFreshConnection { backend.auth.signInWithEmailAndPassword(email.trim(), password) }
-    }
-
-    suspend fun signUp(email: String, password: String) {
-        withFreshConnection { backend.auth.createUserWithEmailAndPassword(email.trim(), password) }
     }
 
     /** Starts without an email: an anonymous account plus a profile. */

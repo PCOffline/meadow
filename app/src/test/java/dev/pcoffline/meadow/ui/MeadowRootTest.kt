@@ -104,7 +104,7 @@ class MeadowRootTest : EmulatorTest() {
 
     @Test
     fun `an account without a garden is asked to plant one`() {
-        onBackend { AppGraph.auth.signUp(newEmail(), PASSWORD) }
+        onBackend { signUp(newEmail()) }
         showRoot()
         waitForText(R.string.profile_setup_title)
     }

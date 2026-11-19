@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.MetadataChanges.INCLUDE
+import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -88,25 +89,25 @@ class UsageShareRepository(private val backend: Backend) {
 
     /** A friend's screen time on [dayKey]; null while it isn't shared, or there's none for that day yet. */
     fun minutes(uid: String, dayKey: String): Flow<Int?> =
-        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(TODAY).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
+        sharedPart("Shared time", { backend.user(uid).collection(TIME).document(TODAY).snapshots(INCLUDE) }, { it.metadata.isFromCache }) {
             if (it.exists() && it.getString("dayKey") == dayKey) it.int("totalMinutes") else null
         }
 
     /** A friend's top apps on [dayKey]; null while they aren't shared, or there are none for that day yet. */
     fun apps(uid: String, dayKey: String): Flow<List<SharedAppUsage>?> =
-        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(TODAY).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
+        sharedPart("Shared apps", { backend.user(uid).collection(APPS).document(TODAY).snapshots(INCLUDE) }, { it.metadata.isFromCache }) {
             if (it.exists() && it.getString("dayKey") == dayKey) it.toSharedApps() else null
         }
 
     /** A friend's progress; null while it isn't shared, or there's none yet. */
     fun progress(uid: String): Flow<Progress?> =
-        sharedPart("Shared progress", { backend.user(uid).collection(PROGRESS).document(PROGRESS_DOC).tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) {
+        sharedPart("Shared progress", { backend.user(uid).collection(PROGRESS).document(PROGRESS_DOC).snapshots(INCLUDE) }, { it.metadata.isFromCache }) {
             if (it.exists()) it.toProgress() else null
         }
 
     /** A friend's limits; null while they aren't shared. */
     fun limits(uid: String): Flow<List<AppLimit>?> =
-        sharedPart("Shared limits", { backend.user(uid).collection("limits").tracedSnapshots(INCLUDE) }, { it.metadata.isFromCache }) { snapshot ->
+        sharedPart("Shared limits", { backend.user(uid).collection("limits").snapshots(INCLUDE) }, { it.metadata.isFromCache }) { snapshot ->
             snapshot.documents.map { it.toLimit() }.sortedBy { it.appName.lowercase() }
         }
 

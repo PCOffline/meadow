@@ -88,15 +88,11 @@ android {
             enableUnitTestCoverage = true
             // -Pmeadow.emulatorHost=10.0.2.2 points debug builds at the Firebase emulators (end-to-end tests).
             buildConfigField("String", "EMULATOR_HOST", "\"${findProperty("meadow.emulatorHost") ?: ""}\"")
-            // -Pmeadow.trace=true logs every request to Firebase and its answer (see docs/debugging.md).
-            buildConfigField("boolean", "TRACE", "${findProperty("meadow.trace") == "true"}")
             // The end-to-end tests' stand-in browser (in the test APK), so websites can be limited in tests.
             buildConfigField("String", "TEST_BROWSER", "\"dev.pcoffline.meadow.test\"")
         }
         release {
             buildConfigField("String", "EMULATOR_HOST", "\"\"")
-            // The trace includes people's data, so release builds never have it.
-            buildConfigField("boolean", "TRACE", "false")
             buildConfigField("String", "TEST_BROWSER", "\"\"")
             isMinifyEnabled = true
             isShrinkResources = true
@@ -175,7 +171,6 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons)
     debugImplementation(libs.compose.ui.tooling)

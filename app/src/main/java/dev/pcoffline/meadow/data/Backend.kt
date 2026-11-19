@@ -5,7 +5,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
-import com.google.firebase.functions.HttpsCallableResult
 import dev.pcoffline.meadow.BuildConfig
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.tasks.await
@@ -42,7 +41,7 @@ class Backend {
         if (!Connectivity.online.value) throw CallFailed("", unreachable = true, code = null, cause = null)
         try {
             val callable = functions.getHttpsCallable(name).apply { setTimeout(timeoutSeconds, TimeUnit.SECONDS) }
-            val result = Trace.request<HttpsCallableResult>("call $name $data", describe = { it.data.toString() }) { callable.call(data).await() }
+            val result = callable.call(data).await()
             @Suppress("UNCHECKED_CAST")
             return (result.data as? Map<String, Any?>) ?: emptyMap()
         } catch (e: FirebaseFunctionsException) {

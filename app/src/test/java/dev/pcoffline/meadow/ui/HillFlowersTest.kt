@@ -1,8 +1,8 @@
 package dev.pcoffline.meadow.ui
 
 import dev.pcoffline.meadow.ui.components.HILL_FLOWERS
+import dev.pcoffline.meadow.ui.components.HillFlower
 import dev.pcoffline.meadow.ui.components.SMALL_BUTTERFLY_DP
-import dev.pcoffline.meadow.ui.components.hillFlowerWidthDp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,4 +36,7 @@ class HillFlowersTest {
         val front = HILL_FLOWERS.filter { it.down >= 0.75f }.minOf { hillFlowerWidthDp(it) }
         assertTrue(back < front)
     }
+
+    /** How wide [flower] is drawn, in dp: before scaling, it is drawn within 3.2 dp of its middle. */
+    private fun hillFlowerWidthDp(flower: HillFlower): Float = 2 * 3.2f * flower.scale
 }

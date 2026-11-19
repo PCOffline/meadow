@@ -35,7 +35,7 @@ import dev.pcoffline.meadow.ui.components.flora.plantsOf
 import dev.pcoffline.meadow.ui.settings.AppearanceCard
 import dev.pcoffline.meadow.ui.theme.DarkMode
 import dev.pcoffline.meadow.ui.theme.GardenTheme
-import dev.pcoffline.meadow.ui.theme.gardenColorsFor
+import dev.pcoffline.meadow.ui.theme.gardenColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -129,13 +129,13 @@ class ThemeLooksTest : ScreenTest() {
         var theme by mutableStateOf(GardenTheme.LAVENDER)
         show { MeadowTheme(theme, DarkMode.LIGHT) { SectionTitle("Your garden") } }
         fun drawn(colour: Color) = compose.onNode(isRoot()).captureToImage().toPixelMap().count(colour)
-        val lavender = gardenColorsFor(GardenTheme.LAVENDER, dark = false)
+        val lavender = gardenColors(GardenTheme.LAVENDER, dark = false)
         assertTrue("lavender petals: ${drawn(lavender.petals.first())}", drawn(lavender.petals.first()) > 60)
         assertTrue("its middle: ${drawn(lavender.hearts.first())}", drawn(lavender.hearts.first()) > 10)
 
         theme = GardenTheme.MUSHROOM
         compose.waitForIdle()
-        val forest = gardenColorsFor(GardenTheme.MUSHROOM, dark = false)
+        val forest = gardenColors(GardenTheme.MUSHROOM, dark = false)
         assertEquals(0, drawn(lavender.petals.first()))
         assertTrue("a fly agaric's red: ${drawn(forest.petals.first())}", drawn(forest.petals.first()) > 60)
     }
@@ -147,7 +147,7 @@ class ThemeLooksTest : ScreenTest() {
         val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
         GardenTheme.entries.forEach { theme ->
             val card = compose.onNode(hasText(text(theme.label), substring = true) and hasClickAction()).fetchSemanticsNode().boundsInRoot
-            val sun = gardenColorsFor(theme, dark = false).sun
+            val sun = gardenColors(theme, dark = false).sun
             val inCard = shot.count(sun, card.left.toInt(), card.top.toInt(), card.right.toInt(), card.bottom.toInt())
             assertTrue("$theme: $inCard", inCard > 30)
         }
@@ -184,7 +184,7 @@ class ThemeLooksTest : ScreenTest() {
     fun `the sun sits clear below your picture and Settings`() {
         show { CompositionLocalProvider(LocalSkyHour provides 14) { GardenContent(DemoGarden.robin, DemoGarden.garden) } }
         val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
-        val sun = gardenColorsFor(GardenTheme.MEADOW, dark = false).sun
+        val sun = gardenColors(GardenTheme.MEADOW, dark = false).sun
         val row = listOf(R.string.action_settings, R.string.profile_open).map {
             compose.onNode(hasContentDescription(text(it))).fetchSemanticsNode().boundsInRoot
         }
@@ -199,7 +199,7 @@ class ThemeLooksTest : ScreenTest() {
     private fun sunAt(hour: Int): Float {
         show { CompositionLocalProvider(LocalSkyHour provides hour) { GardenContent(DemoGarden.robin, DemoGarden.garden) } }
         val shot = compose.onNode(isRoot()).captureToImage().toPixelMap()
-        val sun = gardenColorsFor(GardenTheme.MEADOW, dark = false).sun
+        val sun = gardenColors(GardenTheme.MEADOW, dark = false).sun
         val xs = (0 until shot.width).filter { x -> shot.count(sun, x, 0, x + 1, shot.height / 2) > 0 }
         return (xs.min() + xs.max()) / 2f / shot.width
     }

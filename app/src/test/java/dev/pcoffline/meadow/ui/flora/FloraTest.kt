@@ -16,7 +16,7 @@ import dev.pcoffline.meadow.ui.components.flora.vigour
 import dev.pcoffline.meadow.ui.components.looks
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.contrast
-import dev.pcoffline.meadow.ui.theme.gardenColorsFor
+import dev.pcoffline.meadow.ui.theme.gardenColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -267,7 +267,7 @@ class FloraTest {
         everyPlant.flatMap { (theme, plant) ->
             listOf(false, true).mapNotNull { dark ->
                 val petal = (if (dark) plant.petal.night() else plant.petal).color
-                val ratio = contrast(petal, gardenColorsFor(theme, dark).cardTint)
+                val ratio = contrast(petal, gardenColors(theme, dark).cardTint)
                 if (ratio >= PETAL_ON_CARD) null else "$theme ${plant.name} dark=$dark: $ratio"
             }
         },
@@ -276,7 +276,7 @@ class FloraTest {
     @Test
     fun `the small flowers, the falling petals and the petal shower are in the colours of the theme's plants`() {
         for (theme in GardenTheme.entries) for (dark in listOf(false, true)) {
-            val garden = gardenColorsFor(theme, dark)
+            val garden = gardenColors(theme, dark)
             val plants = plantsOf(theme)
             assertEquals("$theme dark=$dark", plants.map { (if (dark) it.petal.night() else it.petal).color }, garden.petals)
             assertEquals(plants.size, garden.hearts.size)
@@ -286,19 +286,19 @@ class FloraTest {
     @Test
     fun `a small flower's middle differs from its petals, and a mushroom's is cream, as its warts`() {
         for (theme in GardenTheme.entries) {
-            val garden = gardenColorsFor(theme, dark = false)
+            val garden = gardenColors(theme, dark = false)
             garden.petals.zip(garden.hearts).forEach { (petal, heart) ->
                 assertTrue("$theme: $petal and $heart", abs(lch(petal).first - lch(heart).first) >= 0.08f || hueGap(lch(petal).third, lch(heart).third) >= 60f)
             }
         }
         val agaric = plantsOf(GardenTheme.MUSHROOM).first()
-        assertEquals(agaric.warts!!.color, gardenColorsFor(GardenTheme.MUSHROOM, dark = false).hearts.first())
+        assertEquals(agaric.warts!!.color, gardenColors(GardenTheme.MUSHROOM, dark = false).hearts.first())
     }
 
     @Test
     fun `the chart's highlight is the theme's own petal, made to stand out`() {
         for (theme in GardenTheme.entries) {
-            val garden = gardenColorsFor(theme, dark = false)
+            val garden = gardenColors(theme, dark = false)
             val own = lch(plantsOf(theme).first().petal.color)
             val high = lch(garden.growthHigh)
             // It is that petal, darkened only as far as it must be to show on each surface.

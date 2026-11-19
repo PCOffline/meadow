@@ -1,6 +1,7 @@
 package dev.pcoffline.meadow.data
 
 import android.util.Log
+import com.google.firebase.firestore.snapshots
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.pcoffline.meadow.AppGraph
@@ -38,8 +39,6 @@ class SyncManager(
 ) {
     private val _profile = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profile: StateFlow<ProfileState> = _profile.asStateFlow()
-
-    val currentProfile: UserProfile? get() = (profile.value as? ProfileState.Ready)?.profile
 
     /** Bumped to listen again after the profile couldn't be loaded. */
     private val attempt = MutableStateFlow(0)
@@ -90,7 +89,7 @@ class SyncManager(
         var pushRegistered = false
         var appearanceSynced = false
         // The name card plus the owner-only account (who looks after whom, settings, status).
-        combine(backend.user(uid).tracedSnapshots(), backend.account(uid).tracedSnapshots()) { doc, accountDoc -> doc to accountDoc }
+        combine(backend.user(uid).snapshots(), backend.account(uid).snapshots()) { doc, accountDoc -> doc to accountDoc }
             .onEach { (doc, accountDoc) ->
                 if (!doc.exists()) {
                     if (!doc.metadata.isFromCache && !leaving) _profile.value = ProfileState.Missing
@@ -137,7 +136,7 @@ class SyncManager(
     private suspend fun syncLimits(uid: String) {
         // Stored in onEach, before relisten, so a snapshot that can't be stored is retried like a
         // dropped listener rather than ending sync.
-        backend.user(uid).collection("limits").tracedSnapshots().onEach { snapshot ->
+        backend.user(uid).collection("limits").snapshots().onEach { snapshot ->
             // An empty answer from a cold cache must not wipe commitments we already hold. One that
             // comes from this phone's own pending write (the last limit removed offline) is real.
             if (snapshot.isEmpty && snapshot.metadata.isFromCache && !snapshot.metadata.hasPendingWrites() &&
@@ -151,7 +150,7 @@ class SyncManager(
         val since = Days.key(Days.today().minusDays(7))
         backend.user(uid).collection("grants")
             .whereGreaterThanOrEqualTo("dayKey", since)
-            .tracedSnapshots()
+            .snapshots()
             .onEach { snapshot ->
                 if (snapshot.isEmpty && snapshot.metadata.isFromCache && store.grants.value.isNotEmpty()) return@onEach
                 store.setGrants(snapshot.documents.map { it.toGrant() })
