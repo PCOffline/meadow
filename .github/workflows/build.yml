@@ -47,7 +47,7 @@ jobs:
           files=$(git diff --name-only HEAD^1 HEAD)
           echo "$files"
           # The app is built from app/, the legal documents, detekt's config and Gradle's files.
-          app='^(app/|legal/|config/|gradle/|build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|\.github/workflows/build\.yml|\.github/scripts/(detekt\.sh|coverage_floor\.py|failed_tests\.py))'
+          app='^(app/|legal/|config/|gradle/|build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|\.github/workflows/build\.yml|\.github/scripts/(detekt\.sh|coverage_floor\.py|ComposeBranches\.java|failed_tests\.py))'
           # The backend tests cover backend/ and the hosted legal pages.
           backend='^(backend/|legal/|\.github/workflows/build\.yml|\.github/scripts/failed_tests\.py)'
           if grep -qE "$app" <<< "$files"; then echo "app=true"; else echo "app=false"; fi >> "$GITHUB_OUTPUT"
@@ -142,11 +142,14 @@ jobs:
           npx firebase emulators:exec --only auth,firestore,functions --project demo-meadow
           "cd .. && ./gradlew createDebugUnitTestCoverageReport -Pmeadow.unitEmulatorHost=127.0.0.1 --stacktrace"
       - name: Unit test coverage floor
-        # Just under what the tests reach today (84.1% of lines, 69.0% of branches on 15 November
-        # 2026): it can only go up. Raise it as coverage grows.
+        # Just under what the tests reach today (93.8% of lines, 85.4% of branches on 18 November
+        # 2026): it can only go up. Raise it as coverage grows. Branches leave out those that the
+        # Compose compiler adds (see coverage_floor.py and ComposeBranches.java).
         run: |
           report=$(find app/build/reports/coverage -name report.xml | head -n 1)
-          python3 .github/scripts/coverage_floor.py "$report" --lines 82 --branches 67
+          python3 .github/scripts/coverage_floor.py "$report" --lines 93 --branches 85 --sources app/src/main/java \
+            --classes app/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes \
+            --exec app/build/outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec
       - name: Show failed unit tests
         if: failure()
         run: python3 .github/scripts/failed_tests.py app/build/test-results

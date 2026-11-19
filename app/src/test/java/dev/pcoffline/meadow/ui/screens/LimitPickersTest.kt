@@ -18,6 +18,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
@@ -270,4 +274,24 @@ class LimitPickersTest : ScreenTest() {
         node(R.string.action_save).performScrollTo().assertIsNotEnabled()
     }
 
+
+    @Test
+    fun `holding a button keeps stepping, faster after a while, and stops at the end`() {
+        var value by mutableIntStateOf(30)
+        show { MinutesStepper(value, step = 5, min = 5, max = 120, enabled = true) { value = it } }
+        compose.mainClock.autoAdvance = false
+        val more = compose.onNodeWithContentDescription(text(R.string.limit_editor_more))
+        more.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(3_000)
+        more.performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(500)
+        // Held for long enough to reach the end, and letting go adds no step of its own.
+        assertEquals(120, value)
+        more.assertIsNotEnabled()
+
+        // A tap is one step.
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithContentDescription(text(R.string.limit_editor_less)).performClick()
+        assertEquals(115, value)
+    }
 }

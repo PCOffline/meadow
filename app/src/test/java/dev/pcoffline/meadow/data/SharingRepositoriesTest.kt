@@ -85,6 +85,31 @@ class SharingRepositoriesTest : EmulatorTest() {
     }
 
     @Test
+    fun `with every part shared nothing is taken down, and another day's apps aren't today's`() {
+        val robin = person("Robin")
+        val all = Privacy(shareLimits = true, shareTime = true, shareApps = true, shareProgress = true)
+        onBackend {
+            // Shared, but nothing sent yet: there's no progress to show.
+            assertNull(share.progress(robin.uid).first())
+            share.share(all, { today }, { progress })
+            share.takeDown(all)
+            assertEquals(today.apps, share.apps(robin.uid, DAY).firstWhere { it != null })
+            assertNull(share.apps(robin.uid, "2026-11-11").first())
+            assertEquals(95, share.minutes(robin.uid, DAY).firstWhere { it != null })
+        }
+    }
+
+    @Test
+    fun `signed out, nothing is shared, taken down or reported`() {
+        onBackend {
+            backend.auth.signOut()
+            share.share(Privacy(shareTime = true), { error("Not read signed out") }, { error("Not read signed out") })
+            share.takeDown(Privacy())
+            share.reportProtectionLost()
+        }
+    }
+
+    @Test
     fun `the heartbeat starts once, then moves on`() {
         person("Robin")
         onBackend {

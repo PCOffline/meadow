@@ -75,7 +75,7 @@ class EditorsTest : ScreenTest() {
         node(R.string.request_withdraw).assertDoesNotExist()
         assertAccessible(requireHeading = false)
 
-        // Answering opens a dialog, tested on a phone (DialogContrastTest): Robolectric never settles with it open.
+        // Answering opens a dialog: RequestDecideTest.
         node(R.string.request_say_yes).assertHasClickAction()
         node(R.string.request_not_today).assertHasClickAction()
     }
@@ -119,6 +119,45 @@ class EditorsTest : ScreenTest() {
         compose.onNodeWithText(text(R.string.request_decided_with_note, text(R.string.request_decided_yes, "Bee"), "Enjoy")).assertExists()
         node(R.string.request_withdraw).assertDoesNotExist()
         node(R.string.request_say_yes).assertDoesNotExist()
+    }
+
+    @Test
+    fun `the asker sees a no without a note, and nothing more when nobody's name came`() {
+        var decider by mutableStateOf<String?>("Bee")
+        show { RequestCard(request(status = RequestStatus.DENIED, decidedByName = decider, decisionNote = " "), myUid = "sam") }
+        compose.onNodeWithText(text(R.string.request_decided_no, "Bee")).assertExists()
+        compose.onNodeWithText(text(R.string.request_status_no)).assertExists()
+        decider = null
+        compose.onNodeWithText(text(R.string.request_decided_no, "Bee")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a Bumblebee who said yes sees it`() {
+        show { RequestCard(request(status = RequestStatus.APPROVED, decidedByName = "Bee", myDecision = "yes"), myUid = "bee") }
+        node(R.string.request_you_said_yes).assertExists()
+    }
+
+    @Test
+    fun `withdrawn and expired asks say so, and a day without an allowance shows only the time used`() {
+        var status by mutableStateOf(RequestStatus.CANCELLED)
+        var allowed by mutableStateOf<Int?>(null)
+        var used by mutableStateOf<Int?>(29)
+        show { RequestCard(request(status = status).copy(allowedMinutes = allowed, usedMinutes = used), myUid = "bee", compact = true) }
+        compose.onNodeWithText(text(R.string.request_status_withdrawn)).assertExists()
+        compose.onNodeWithText(text(R.string.request_usage_no_allowance, app.resources.minutesText(29))).assertExists()
+        status = RequestStatus.EXPIRED
+        allowed = 0
+        compose.onNodeWithText(text(R.string.request_status_expired)).assertExists()
+        compose.onNodeWithText(text(R.string.request_usage_no_allowance, app.resources.minutesText(29))).assertExists()
+        used = null
+        compose.onNodeWithText(text(R.string.request_usage_no_allowance, app.resources.minutesText(29))).assertDoesNotExist()
+        assertAccessible(requireHeading = false)
+    }
+
+    @Test
+    fun `a request about strict mode has no app`() {
+        show { RequestCard(request().copy(type = RequestType.DISABLE_STRICT_MODE, packageName = null, appName = null), myUid = "bee") }
+        compose.onNodeWithText(text(R.string.request_disable_strict_mode), substring = true, ignoreCase = true).assertExists()
     }
 
     @Test

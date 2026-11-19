@@ -73,9 +73,7 @@ class ChatMedia(private val context: Context) {
             .set(mapOf("path" to path, "at" to FieldValue.serverTimestamp())).await()
         val ref = storage.reference.child(path)
         val type = if (picture.gif) "image/gif" else "image/jpeg"
-        Trace.request<UploadTask.TaskSnapshot>("upload ${ref.path} (${picture.bytes.size} bytes)", describe = { "${it.bytesTransferred} bytes sent" }) {
-            ref.putBytes(picture.bytes, StorageMetadata.Builder().setContentType(type).build()).await()
-        }
+        ref.putBytes(picture.bytes, StorageMetadata.Builder().setContentType(type).build()).await()
         cacheFile(path).apply { parentFile?.mkdirs() }.writeBytes(picture.bytes)
         return path
     }
@@ -98,8 +96,7 @@ class ChatMedia(private val context: Context) {
     }
 
     /** The picture at [path], straight from Storage. */
-    suspend fun download(path: String): ByteArray =
-        Trace.request("download $path", describe = { "${it.size} bytes" }) { storage.reference.child(path).getBytes(MAX_BYTES.toLong()).await() }
+    suspend fun download(path: String): ByteArray = storage.reference.child(path).getBytes(MAX_BYTES.toLong()).await()
 
     private fun cacheFile(path: String) = File(cacheDir(context), sha256(path))
 

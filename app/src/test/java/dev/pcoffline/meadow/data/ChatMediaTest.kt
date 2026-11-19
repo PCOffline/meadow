@@ -89,5 +89,11 @@ class ChatMediaTest {
         assertEquals(listOf("chats/c1/robin/aaaaaaaa.jpg", "chats/c1/maya/bbbbbbbb.gif"), ProfileRepository.picturePaths(json))
         assertEquals(emptyList<String>(), ProfileRepository.picturePaths("""{ "profile": {} }"""))
         assertEquals(emptyList<String>(), ProfileRepository.picturePaths("not json"))
+        // Conversations and messages that aren't what an export writes are passed over.
+        val odd = """{ "conversations": [ "junk", { "messages": "none" }, { "messages": [ "junk",
+            { "kind": "text", "path": "chats/c1/a/x.jpg" }, { "kind": "image" }, { "kind": "image", "path": 5 },
+            { "kind": 7 }, { "path": "chats/c1/a/z.jpg" }, { "kind": ["image"], "path": "chats/c1/a/w.jpg" },
+            { "kind": "image", "path": "chats/c1/a/y.jpg" } ] } ] }"""
+        assertEquals(listOf("chats/c1/a/y.jpg"), ProfileRepository.picturePaths(odd))
     }
 }

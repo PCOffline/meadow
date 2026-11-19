@@ -9,6 +9,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.data.AppLimit
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -147,6 +149,82 @@ class SiteMeasureTest {
 
         assertTrue("never read again", eventually { service.measureSite(SITE) })
         assertEquals(2, readsAfterChange)
+    }
+
+    private fun changed(pkg: String = "com.android.chrome") = service.onAccessibilityEvent(
+        AccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply { packageName = pkg },
+    )
+
+    @Test
+    fun `quick changes in the browser are read once more when they settle`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        var address = "elsewhere.com"
+        var reads = 0
+        service.readBar = { reads++; AddressBar.Shows(address) }
+        service.onForeground("com.android.chrome")
+        eventually { reads == 1 }
+
+        // The page changes several times within half a second: the last address is read after.
+        address = "news.example.org/today"
+        repeat(5) { changed() }
+        assertTrue("the last address was never read", eventually { service.measureSite(SITE) })
+        assertEquals(2, reads)
+    }
+
+    @Test
+    fun `a change during a read is read again once it ends`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        val reading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        var reads = 0
+        service.readBar = {
+            reads++
+            if (reads == 1) {
+                reading.countDown()
+                release.await(5, TimeUnit.SECONDS)
+                AddressBar.Shows("elsewhere.com")
+            } else {
+                AddressBar.Shows("news.example.org/today")
+            }
+        }
+        service.onForeground("com.android.chrome")
+        reading.await(5, TimeUnit.SECONDS)
+        // Half a second on, the page changes while the first read is still going.
+        Thread.sleep(600)
+        changed()
+        release.countDown()
+        assertTrue("never read again", eventually { service.measureSite(SITE) })
+        assertEquals(2, reads)
+    }
+
+    @Test
+    fun `an address read after the browser was left doesn't count`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        val reading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        service.readBar = {
+            reading.countDown()
+            release.await(5, TimeUnit.SECONDS)
+            AddressBar.Shows("news.example.org/today")
+        }
+        service.onForeground("com.android.chrome")
+        reading.await(5, TimeUnit.SECONDS)
+        service.onForeground("com.example.notes")
+        release.countDown()
+        eventually(timeoutMs = 1_000) { false }
+        assertFalse(service.measureSite(SITE))
+    }
+
+    @Test
+    fun `changes in an app that isn't in front, or isn't a browser, read nothing`() {
+        AppGraph.store.setLimits(listOf(AppLimit(SITE, "example.org", 30, 0)))
+        var reads = 0
+        service.readBar = { reads++; AddressBar.Shows("news.example.org") }
+        service.onForeground("com.example.notes")
+        changed("com.example.notes")
+        changed("com.android.chrome")
+        eventually(timeoutMs = 1_000) { false }
+        assertEquals(0, reads)
     }
 
     /** Runs the main looper until [done], as the service reads off the main thread; false at the timeout. */

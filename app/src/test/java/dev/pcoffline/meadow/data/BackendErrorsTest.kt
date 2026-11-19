@@ -7,8 +7,11 @@ import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException.Code
 import dev.pcoffline.meadow.R
+import com.google.firebase.FirebaseNetworkException
 import dev.pcoffline.meadow.ui.friendlyMessage
+import dev.pcoffline.meadow.ui.relativeTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,5 +73,48 @@ class BackendErrorsTest {
         assertEquals(context.getString(R.string.error_unavailable), read(FirebaseFirestoreException.Code.NOT_FOUND))
         assertEquals(context.getString(R.string.error_unavailable), read(FirebaseFirestoreException.Code.INTERNAL))
         assertEquals(context.getString(R.string.error_offline), read(FirebaseFirestoreException.Code.UNAVAILABLE))
+    }
+
+    @Test
+    fun `each sign-in failure says what to do about it`() {
+        val codes = mapOf(
+            "ERROR_INVALID_EMAIL" to R.string.error_auth_invalid_email,
+            "ERROR_WRONG_PASSWORD" to R.string.error_auth_wrong_credentials,
+            "ERROR_INVALID_CREDENTIAL" to R.string.error_auth_wrong_credentials,
+            "ERROR_USER_NOT_FOUND" to R.string.error_auth_wrong_credentials,
+            "ERROR_EMAIL_ALREADY_IN_USE" to R.string.error_auth_email_taken,
+            "ERROR_CREDENTIAL_ALREADY_IN_USE" to R.string.error_auth_email_taken,
+            "ERROR_WEAK_PASSWORD" to R.string.error_auth_weak_password,
+            "ERROR_TOO_MANY_REQUESTS" to R.string.error_auth_too_many,
+            "ERROR_REQUIRES_RECENT_LOGIN" to R.string.error_auth_recent_login,
+            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" to R.string.error_auth_other_method,
+            "ERROR_INVALID_ACTION_CODE" to R.string.error_link_invalid,
+            "ERROR_EXPIRED_ACTION_CODE" to R.string.error_link_invalid,
+            "ERROR_SOMETHING_NEW" to R.string.error_generic,
+        )
+        for ((code, message) in codes) {
+            assertEquals(code, context.getString(message), FirebaseAuthException(code, "raw").friendlyMessage(context))
+        }
+    }
+
+    @Test
+    fun `a slow, signed-out or busy garden says so, and anything else is a plain apology`() {
+        fun read(code: FirebaseFirestoreException.Code) = FirebaseFirestoreException(code.name, code).friendlyMessage(context)
+        assertEquals(context.getString(R.string.error_offline), read(FirebaseFirestoreException.Code.DEADLINE_EXCEEDED))
+        assertEquals(context.getString(R.string.error_auth_recent_login), read(FirebaseFirestoreException.Code.UNAUTHENTICATED))
+        assertEquals(context.getString(R.string.error_server_busy), read(FirebaseFirestoreException.Code.RESOURCE_EXHAUSTED))
+        assertEquals(context.getString(R.string.error_offline), FirebaseNetworkException("offline").friendlyMessage(context))
+        assertEquals(context.getString(R.string.error_generic), IllegalStateException("boom").friendlyMessage(context))
+        assertEquals(context.getString(R.string.error_name_required), FriendlyException(R.string.error_name_required).friendlyMessage(context))
+        // Words that are only spaces are no words.
+        assertEquals(context.getString(R.string.error_unavailable), shown("   ", Code.INTERNAL))
+    }
+
+    @Test
+    fun `a time under a minute ago, or unknown, is just now`() {
+        val now = System.currentTimeMillis()
+        assertEquals(context.getString(R.string.time_just_now), relativeTime(context, 0L))
+        assertEquals(context.getString(R.string.time_just_now), relativeTime(context, now - 30_000L))
+        assertNotEquals(context.getString(R.string.time_just_now), relativeTime(context, now - 2 * 3600_000L))
     }
 }

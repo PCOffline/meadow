@@ -100,4 +100,35 @@ class SunTimesTest {
         assertFalse(DarkMode.CLOCK.isDarkAt(afterRise / 60, systemDark = true, afterRise % 60, sun))
         assertFalse(DarkMode.CLOCK.isDarkAt((sun.setMinute - 1) / 60, systemDark = false, (sun.setMinute - 1) % 60, sun))
     }
+
+    @Test
+    fun `a day that crosses midnight in local time is night only between sunset and sunrise`() {
+        // Far west of its time zone's centre: the sun rises late in the evening and sets after midnight.
+        val sun = SunTimes(riseMinute = 22 * 60, setMinute = 2 * 60)
+        assertFalse(sun.isNight(23 * 60))
+        assertFalse(sun.isNight(60))
+        assertTrue(sun.isNight(12 * 60))
+        assertEquals(4 * 60, sun.dayLength)
+        assertEquals(0.5f, sun.progress(0), 0.001f)
+        assertEquals(0.5f, sun.progress(12 * 60), 0.001f)
+    }
+
+    @Test
+    fun `in a polar day or night, the day's progress is the clock's`() {
+        val day = SunTimes(0, 0, SunTimes.Polar.DAY)
+        val night = SunTimes(0, 0, SunTimes.Polar.NIGHT)
+        assertEquals(SunTimes.DAY, day.dayLength)
+        assertEquals(0, night.dayLength)
+        assertEquals(0.5f, day.progress(12 * 60), 0.001f)
+        assertEquals(0.25f, night.progress(6 * 60), 0.001f)
+    }
+
+    @Test
+    fun `a time zone Meadow has no place for, under any name, has none`() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        assertEquals(null, ZonePlaces.of(context, "Mars/Olympus_Mons"))
+        assertEquals(null, ZonePlaces.of(context, "Etc/GMT+3"))
+        // Asked again, the answer is kept.
+        assertEquals(null, ZonePlaces.of(context, "Etc/GMT+3"))
+    }
 }

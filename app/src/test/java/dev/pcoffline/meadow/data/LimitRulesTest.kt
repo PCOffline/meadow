@@ -69,4 +69,54 @@ class LimitRulesTest {
         assertEquals(mapOf(6 to 120), DayMinutes.fromFirestore(mapOf("6" to 120L, "9" to 30L, "1" to -5L, "x" to 1L, "2" to "lots")))
         assertEquals(emptyMap<Int, Int>(), DayMinutes.fromFirestore(null))
     }
+
+    @Test
+    fun `a cap with bad days, hours or minutes can't be made`() {
+        val bad = listOf(
+            { TimeCap(emptyList(), 600, 960, 30) },
+            { TimeCap(listOf(0), 600, 960, 30) },
+            { TimeCap(weekdays, -1, 960, 30) },
+            { TimeCap(weekdays, 1440, 1500, 30) },
+            { TimeCap(weekdays, 600, 0, 30) },
+            { TimeCap(weekdays, 600, 1441, 30) },
+            { TimeCap(weekdays, 960, 600, 30) },
+            { TimeCap(weekdays, 600, 960, 0) },
+            { TimeCap(weekdays, 600, 960, 360) },
+        )
+        bad.forEach { make -> assertTrue(runCatching { make() }.isFailure) }
+        assertEquals(TimeWindow(600, 960), cap.window)
+        assertEquals(1440, TimeCap(weekdays, 0, 1440, 30).to)
+    }
+
+    @Test
+    fun `a stored cap missing any part is skipped, and only the most a limit can have are kept`() {
+        val raw = listOf(
+            mapOf("from" to 600L, "to" to 960L, "minutes" to 30L),
+            mapOf("days" to "weekdays", "from" to 600L, "to" to 960L, "minutes" to 30L),
+            mapOf("days" to listOf("x", 1L), "to" to 960L, "minutes" to 30L),
+            mapOf("days" to listOf(1L), "from" to 600L, "minutes" to 30L),
+            mapOf("days" to listOf(1L), "from" to 600L, "to" to 960L),
+            mapOf("days" to listOf(1L), "from" to "ten", "to" to 960L, "minutes" to 30L),
+        )
+        assertEquals(emptyList<TimeCap>(), TimeCap.listFromFirestore(raw))
+        assertEquals(emptyList<TimeCap>(), TimeCap.listFromFirestore("nonsense"))
+        val many = (1..8).map { mapOf("days" to listOf(1L), "from" to 600L + it, "to" to 960L, "minutes" to 30L) }
+        assertEquals(TimeCap.MAX, TimeCap.listFromFirestore(many).size)
+        assertEquals(emptyMap<Int, Int>(), DayMinutes.fromFirestore(mapOf(1 to 30L, "3" to 2000L)))
+    }
+
+    @Test
+    fun `a week's limit or allowed hours alone hold back, and each part counts as a difference`() {
+        assertTrue(AppLimit("app", "App", 0, 120).holdsBack)
+        assertTrue(AppLimit("app", "App", 0, 0, Schedule.everyDay(TimeWindow(600, 960))).holdsBack)
+        val hours = AppLimit("app", "App", 30, 0, Schedule.everyDay(TimeWindow(600, 960)))
+        assertFalse(hours.sameUncomparable(limit(30)))
+        assertFalse(limit(30, caps = listOf(cap)).sameUncomparable(limit(30, caps = listOf(cap.copy(minutes = 20)))))
+        assertTrue(LimitRules.isLooser(AppLimit("app", "App", 30, 60), AppLimit("app", "App", 30, 120)))
+        assertTrue(LimitRules.isLooser(hours, limit(30)))
+        // A cap kept on some days but not on a day it no longer covers is looser.
+        assertTrue(LimitRules.isLooser(limit(60, caps = listOf(cap)), limit(60, mapOf(1 to 20))))
+        assertFalse(LimitRules.isLooser(limit(60, caps = listOf(cap)), limit(60, caps = listOf(cap.copy(days = listOf(1, 2, 3, 4, 5, 6))))))
+        assertTrue(LimitRules.isLooser(limit(60, caps = listOf(cap)), limit(60, caps = listOf(cap.copy(to = 900)))))
+    }
 }

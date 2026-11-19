@@ -42,7 +42,7 @@ class Backend {
         if (!Connectivity.online.value) throw CallFailed("", unreachable = true, code = null, cause = null)
         try {
             val callable = functions.getHttpsCallable(name).apply { setTimeout(timeoutSeconds, TimeUnit.SECONDS) }
-            val result = Trace.request<HttpsCallableResult>("call $name $data", describe = { it.data.toString() }) { callable.call(data).await() }
+            val result = callable.call(data).await()
             @Suppress("UNCHECKED_CAST")
             return (result.data as? Map<String, Any?>) ?: emptyMap()
         } catch (e: FirebaseFunctionsException) {

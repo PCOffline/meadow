@@ -1,7 +1,7 @@
 # Debugging Meadow
 
-This guide shows how to see the requests that the app sends to Firebase, the answers, and the
-cause of a failure. On the phone, you need only a debug build of Meadow.
+This guide shows how to see the cause of a failure, and the requests that the app sends to
+Firebase. On the phone, you need only a debug build of Meadow.
 
 ## Connect to the phone
 
@@ -34,55 +34,27 @@ the release build first, or use a different phone or an emulator.
 To add a state, add a `Scenario` to `app/src/debug/java/…/showcase/Gallery.kt`. `GalleryTest`
 draws each scenario.
 
-## Trace mode
+## Logs
 
-A debug build made with `-Pmeadow.trace=true` logs each exchange with Firebase:
-
-```bash
-./gradlew installDebug -Pmeadow.trace=true
-adb logcat -s MeadowTrace
-```
-
-| Line | Meaning |
-|---|---|
-| `trace on: project=… region=… emulators=… version=…` | The backend that this build uses. Check this first. |
-| `auth: <uid> anonymous=… providers=[…]` / `auth: signed out` | Each sign-in change. |
-| `→ call createProfile {…}` | A Cloud Function call and the data it sent. |
-| `← call createProfile in 412 ms: {…}` | The answer. |
-| `✗ call createProfile failed after 95 ms` | The error. The stack trace has the code (`NOT_FOUND`, `PERMISSION_DENIED`…). |
-| `⇢ listen doc users/abc` | The app started to listen to a document or a collection. |
-| `⇠ doc users/abc: exists=true fromCache=false pendingWrites=false data={…}` | Each snapshot. `fromCache=true` means that the server didn't answer yet. |
-| `✗ listener doc users/abc failed` | The server refused the read, or the read failed. The line gives the reason. The app listens again after a pause: 1 s, then two times longer each time, up to one minute. |
-| `→ upload avatars/abc (48213 bytes)` / `→ download exports/abc/…` | Storage transfers. |
-| `push registered as …` / `push received: {…}` | Push registration and each push. |
-| `push dropped: not for the signed-in account` | A push for a different account, or a push when nobody is signed in. The app doesn't show it. |
-
-In a trace build, error messages on screen also show the technical cause, for example
-`Firestore: PERMISSION_DENIED …`. Normal builds show only what people can do (go online, sign in
-again). For all other errors, they tell people to try again later.
-
-Trace mode also turns on the log of the Firestore SDK. This log shows each read, write and
-listen at the wire level. It is very long:
+The app logs the failures that it doesn't show to people:
 
 ```bash
-adb logcat -s MeadowTrace Firestore
+adb logcat -s Meadow MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian
 ```
 
-The trace contains people's data: names, messages and limits. Release builds never have trace
-mode, because the flag applies only to debug builds.
-
-Without trace mode, the app still logs the failures that it doesn't show to people:
-`adb logcat -s Meadow MeadowSync MeadowBackend MeadowFirestore MeadowSocial MeadowListener MeadowGuardian`.
+Error messages on screen show only what people can do (go online, sign in again). For all other
+errors, they tell people to try again later. The log has the cause, for example the code of a
+failed Cloud Function call (`NOT_FOUND`, `PERMISSION_DENIED`…).
 
 ## Android Studio
 
 Run the debug build from Android Studio to use:
 
-- **Logcat**: the logs above, with filters.
+- **Logcat**: the log above, with filters.
 - **The debugger**: breakpoints in any location, for example `Backend.call` or `SyncManager`.
 - **App Inspection → Network Inspector**: Cloud Functions calls and Storage transfers, with their
-  bodies. Firestore uses its own gRPC connection, so it isn't in this view. Use trace mode for
-  Firestore.
+  bodies. Firestore uses its own gRPC connection, so it isn't in this view. Use the emulators'
+  **Requests** tab for Firestore (below).
 
 ## All local: the Firebase emulators
 
@@ -104,7 +76,7 @@ touch your real project.
    computer. From a phone, use the address of your computer on the local network:
 
    ```bash
-   ./gradlew installDebug -Pmeadow.emulatorHost=10.0.2.2 -Pmeadow.trace=true
+   ./gradlew installDebug -Pmeadow.emulatorHost=10.0.2.2
    ```
 
 4. Open <http://localhost:4000>. It shows the data, the logs of each function, and the Firestore

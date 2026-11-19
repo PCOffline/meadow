@@ -114,4 +114,50 @@ class ReleasesTest {
         val file = java.io.File.createTempFile("meadow", ".bin").apply { writeText("abc"); deleteOnExit() }
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", Updater.sha256(file))
     }
+
+    @Test
+    fun `a pre-release reads with its suffix`() {
+        assertEquals("1.5.0-beta.1", Version.parse("v1.5.0-beta.1").toString())
+        assertEquals("2.0.0", Version.parse("2.0").toString())
+    }
+
+    @Test
+    fun `notes keep what changed for people, a line each`() {
+        val body = """
+            ## What's Changed
+            **Full Changelog**: https://example.com/compare
+            <!-- Release notes generated -->
+            * feat(chat): open at what's new by @sam in #12
+            * fix: a garden that didn't wake by @ana in #13
+            * docs: say how to build by @sam in #14
+            * Rest screen: read the usage log once by @ana in #15
+            * odd(scope): kept as it reads
+            @sam made their first contribution in #12
+        """.trimIndent()
+        assertEquals(
+            listOf("• Open at what's new", "• A garden that didn't wake", "• Rest screen: read the usage log once", "• Odd(scope): kept as it reads").joinToString("\n"),
+            Releases.notesForPeople(body),
+        )
+        assertEquals("", Releases.notesForPeople("## Only a heading"))
+    }
+
+    @Test
+    fun `Meadow's own APK is picked, and a digest that isn't SHA-256 is no checksum`() {
+        val release = GitHubRelease(
+            tag = "v9.0.0",
+            assets = listOf(
+                GitHubAsset("other.apk", "https://example.com/other.apk", 5),
+                GitHubAsset("meadow-9.0.0.apk", "https://example.com/meadow.apk", 7, digest = "md5:ABC"),
+                GitHubAsset("notes.txt", "https://example.com/notes.txt", 1),
+            ),
+        )
+        val update = Releases.updateFrom(release, "1.0.0")!!
+        assertEquals("https://example.com/meadow.apk", update.apkUrl)
+        assertEquals(null, update.sha256)
+        assertEquals("", update.notes)
+        assertEquals(null, Releases.updateFrom(release.copy(assets = listOf(GitHubAsset("notes.txt", "u", 1))), "1.0.0"))
+        assertEquals(null, Releases.updateFrom(release.copy(tag = "nightly"), "1.0.0"))
+        assertEquals(null, Releases.updateFrom(release, "not a version"))
+        assertEquals(null, Releases.updateFrom(release.copy(prerelease = true), "1.0.0"))
+    }
 }

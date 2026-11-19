@@ -62,6 +62,8 @@ class Updater(
     private val notifier: () -> Notifier = { AppGraph.notifier },
     /** How long to wait for Android's answer once the update is handed over. */
     private val installTimeoutMs: Long = INSTALL_TIMEOUT_MS,
+    /** Opens a connection to a web address. Tests give answers of their own. */
+    private val open: (String) -> HttpURLConnection = { URL(it).openConnection() as HttpURLConnection },
 ) {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
@@ -184,7 +186,7 @@ class Updater(
     }
 
     private fun fetchLatest(): AvailableUpdate? {
-        val connection = (URL("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest").openConnection() as HttpURLConnection).apply {
+        val connection = open("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest").apply {
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             setRequestProperty("User-Agent", "Meadow/$currentVersion")
@@ -208,7 +210,7 @@ class Updater(
     private suspend fun download(update: AvailableUpdate): File {
         val dir = updatesDir().apply { deleteRecursively(); mkdirs() }
         val file = File(dir, "meadow-${update.version}.apk")
-        val connection = (URL(update.apkUrl).openConnection() as HttpURLConnection).apply {
+        val connection = open(update.apkUrl).apply {
             setRequestProperty("User-Agent", "Meadow/$currentVersion")
             instanceFollowRedirects = true
             connectTimeout = 15_000
