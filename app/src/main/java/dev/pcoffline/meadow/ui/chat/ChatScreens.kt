@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +26,7 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LocalFlorist
@@ -128,6 +130,7 @@ import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.components.EmptyState
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.limits.BackTopBar
+import dev.pcoffline.meadow.ui.friendlyMessage
 import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.requests.RequestCard
@@ -137,6 +140,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /** A chat once loaded; [chat] is null when it's closed (the friendship ended). */
@@ -200,11 +205,28 @@ fun ChatScreen(
     val invited by viewModel.invited.collectAsStateWithLifecycle()
     val uploading by viewModel.uploading.collectAsStateWithLifecycle()
     val sending = rememberAction()
+    val context = LocalContext.current
+    var textError by remember { mutableStateOf<String?>(null) }
     ChatContent(
         profile, loaded?.chat, messages, loading = loaded == null,
         sending = sending.busy,
-        error = sending.error,
-        onSend = { text, sent -> sending.run(onSuccess = sent) { viewModel.send(text) } },
+        error = sending.error ?: textError,
+        // Each text goes at once, in the order sent, even while another is on its way. It runs in
+        // the app's scope, so leaving the chat doesn't cancel it.
+        onSend = { text, failed ->
+            textError = null
+            AppGraph.scope.launch(Dispatchers.Main.immediate) {
+                try {
+                    viewModel.send(text)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("Meadow", "Message failed", e)
+                    textError = e.friendlyMessage(context)
+                    failed()
+                }
+            }
+        },
         onSendPicture = { uris -> sending.run { viewModel.sendPictures(uris) } },
         uploading = uploading,
         onSeen = viewModel::markRead,
@@ -237,8 +259,8 @@ private fun NewLine(modifier: Modifier) {
 
 /**
  * A conversation, drawn from plain state (also used for previews and screenshots).
- * [onSend] gets the draft and a callback to run once it's sent, which clears the draft; until then
- * (and if sending fails, shown as [error]) the draft stays. Sending is off while [sending].
+ * [onSend] gets the draft, which clears at once, and a callback to run if it fails to send (shown
+ * as [error]): that puts the text back. Pictures can't be sent while [sending].
  * [onSeen] runs when it opens and whenever a new message arrives. [requestCard] shows a request
  * message (with whether you asked it); by default it follows the live request. Whichever way
  * round the two aren't yet each other's Bumblebee, [onAskBee] asks (or offers, when true) unless
@@ -256,7 +278,7 @@ fun ChatContent(
     loading: Boolean = false,
     sending: Boolean = false,
     error: String? = null,
-    onSend: (text: String, sent: () -> Unit) -> Unit = { _, sent -> sent() },
+    onSend: (text: String, failed: () -> Unit) -> Unit = { _, _ -> },
     onSeen: () -> Unit = {},
     onBack: () -> Unit = {},
     invited: Boolean = false,
@@ -314,14 +336,16 @@ fun ChatContent(
     var newBelow by remember { mutableStateOf(false) }
     val atBottom by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
     LaunchedEffect(atBottom) { if (atBottom) newBelow = false }
-    val firstLatest = remember { mutableStateOf(true) }
+    // The latest message seen before, to tell how many came after it. The list keeps that message
+    // where it was, so with several at once (the saved ones, then the server's) it's further up.
+    var shownLatestId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(latestId) {
         if (latestId == null) return@LaunchedEffect
-        if (firstLatest.value) {
-            firstLatest.value = false
-            return@LaunchedEffect
-        }
-        if (listState.firstVisibleItemIndex <= 2 || messages.last().senderId == profile.uid) {
+        val before = shownLatestId
+        shownLatestId = latestId
+        if (before == null) return@LaunchedEffect
+        val newer = reversed.indexOfFirst { it.id == before }.takeIf { it >= 0 } ?: reversed.size
+        if (listState.firstVisibleItemIndex <= newer + 2 || messages.last().senderId == profile.uid) {
             listState.animateScrollToItem(0)
         } else {
             newBelow = true
@@ -418,10 +442,14 @@ fun ChatContent(
             FilledIconButton(
                 onClick = {
                     val text = draft.text.toString()
-                    // Anything typed while it was sending stays.
-                    onSend(text) { if (draft.text.toString() == text) draft.clearText() }
+                    draft.clearText()
+                    // A text that fails comes back, before anything typed since.
+                    onSend(text) {
+                        val typed = draft.text.toString()
+                        draft.setTextAndPlaceCursorAtEnd(if (typed.isBlank()) text else "$text\n$typed")
+                    }
                 },
-                enabled = draft.text.isNotBlank() && canSend,
+                enabled = draft.text.isNotBlank() && chat != null,
             ) { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = stringResource(R.string.action_send)) }
         }
     }
