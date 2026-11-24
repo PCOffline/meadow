@@ -1446,3 +1446,144 @@ describe("suggested limits", () => {
     assert.equal((await read(`users/${other.sam.uid}/limits/com.insta`)).dailyMinutes, 60);
   });
 });
+
+describe("cases the app meets less often", () => {
+  async function gardenWithLimit() {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin((db) => setDoc(doc(db, `users/${sam.uid}/limits/com.insta`), {
+      packageName: "com.insta", appName: "Instagram", dailyMinutes: 30, weeklyMinutes: 0,
+    }));
+    return { sam, bee };
+  }
+
+  test("a request for a day far from today is refused", async () => {
+    const { sam } = await gardenWithLimit();
+    await rejects(sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: "2020-01-01" }), "invalid-argument");
+  });
+
+  test("ten open questions at once are the most", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    await admin(async (db) => {
+      for (let i = 0; i < 10; i++) {
+        await addDoc(collection(db, "requests"), {
+          requesterId: sam.uid, requesterName: "Sam", type: "extra_time", packageName: `com.app${i}`, appName: `App ${i}`,
+          minutes: 5, message: "", status: "pending", approverIds: [bee.uid], dayKey: today(), createdAt: Timestamp.now(),
+        });
+      }
+    });
+    await rejects(sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() }), "resource-exhausted");
+  });
+
+  test("a limit change reads as people say it, with how the day stands", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    await sam.call("createRequest", {
+      type: "change_limit", packageName: "com.insta", dailyMinutes: 90, weeklyMinutes: 600,
+      dayMinutes: { 6: 120, 7: 120 }, dayKey: today(), usedMinutes: 45,
+    });
+    const [push] = await outbox(bee.uid, "request_new");
+    assert.match(push.title, /1h 30m a day/);
+    assert.match(push.title, /2h at weekends/);
+    assert.match(push.title, /10h a week/);
+    // The phone didn't say what was allowed, so only the time used is told.
+    assert.match(push.body, /Used 45m today\./);
+  });
+
+  test("answering a request that's gone says so, and cancelling an answered one changes nothing", async () => {
+    const { sam, bee } = await gardenWithLimit();
+    await rejects(bee.call("decideRequest", { requestId: "no-such-request", approve: true }), "not-found");
+
+    const { requestId } = await sam.call("createRequest", { type: "extra_time", packageName: "com.insta", minutes: 5, dayKey: today() });
+    await bee.call("decideRequest", { requestId, approve: true });
+    assert.deepEqual(await sam.call("cancelRequest", { requestId }), { ok: true });
+    assert.equal((await read(`requests/${requestId}`)).status, "approved");
+    await rejects(bee.call("cancelRequest", { requestId }), "not-found");
+  });
+
+  test("a second protection alert soon after the first tells nobody again", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    await admin((db) => addDoc(collection(db, `users/${sam.uid}/alerts`), { kind: "protection_off" }));
+    await eventually(async () => assert.equal((await outbox(bee.uid, "alert")).length, 1));
+    await admin((db) => addDoc(collection(db, `users/${sam.uid}/alerts`), { kind: "protection_off" }));
+    // The alert is deleted once the trigger has handled it.
+    await eventually(async () => assert.equal(await admin(async (db) => (await getDocs(collection(db, `users/${sam.uid}/alerts`))).size), 0));
+    assert.equal((await outbox(bee.uid, "alert")).length, 1);
+  });
+
+  test("a GIF is pushed as a GIF", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const chatId = [sam.uid, bee.uid].toSorted().join("_");
+    await admin((db) => addDoc(collection(db, `chats/${chatId}/messages`), {
+      senderId: sam.uid, kind: "image", path: `chats/${chatId}/${sam.uid}/dance1234.gif`, width: 100, height: 100, gif: true, createdAt: serverTimestamp(),
+    }));
+    const [push] = await eventually(async () => {
+      const sent = await outbox(bee.uid, "chat");
+      assert.equal(sent.length, 1);
+      return sent;
+    });
+    assert.equal(push.body, "GIF");
+  });
+
+  test("an invite link from someone I already look after says so, and can't be accepted", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const { token } = await sam.call("createInviteLink");
+    assert.equal((await bee.call("previewInviteLink", { token })).status, "already");
+    await rejects(bee.call("acceptInviteLink", { token }), "already-exists");
+    await rejects(bee.call("previewInviteLink", { token: "AbCdEfGh12345678" }), "not-found");
+  });
+
+  test("only the invited person can answer an invite", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    const stranger = await person("Stranger");
+    await sam.call("sendInvite", { friendCode: await friendCodeOf(bee) });
+    const [{ inviteId }] = await outbox(bee.uid, "invite");
+    await rejects(stranger.call("respondInvite", { inviteId, accept: true }), "not-found");
+    await bee.call("respondInvite", { inviteId, accept: true });
+  });
+
+  test("an offline unlock ended early stays ended, and a retried report counts once", async () => {
+    const sam = await person("Sam");
+    const bee = await person("Bee");
+    await link(sam, bee);
+    const startedAt = Date.now() - 10 * 60_000;
+    const endedAt = startedAt + 5 * 60_000;
+    const report = { minutes: 15, reason: "Was offline and needed maps", startedAt, endedAt, reportId: "offline-report-0001" };
+    const first = await sam.call("emergencyUnlock", report);
+    assert.equal(first.until, endedAt);
+    const again = await sam.call("emergencyUnlock", report);
+    assert.equal(again.remaining, 0);
+    assert.equal((await outbox(bee.uid, "emergency")).length, 1);
+    assert.equal((await read(`users/${sam.uid}/private/account`)).emergencyUntil.toMillis(), endedAt);
+  });
+
+  test("a profile from an older version moves its private fields to the account", async () => {
+    const sam = await person("Sam");
+    const heartbeat = Timestamp.fromMillis(Date.now() - 3600_000);
+    // Older versions kept these on the public profile.
+    await admin((db) => updateDoc(doc(db, `users/${sam.uid}`), {
+      friendCode: "OLDCODE1", strictMode: true, privacy: { shareUsage: false }, lastHeartbeat: heartbeat, staleNotified: true,
+    }));
+    const done = await sam.call("runSchedulesForTests", { now: Date.now() });
+    assert.ok(done.migrated >= 1);
+
+    const profile = await read(`users/${sam.uid}`);
+    for (const field of ["friendCode", "strictMode", "privacy", "lastHeartbeat", "staleNotified"]) assert.equal(profile[field], undefined, field);
+    const account = await read(`users/${sam.uid}/private/account`);
+    assert.equal(account.friendCode, "OLDCODE1");
+    assert.equal(account.strictMode, true);
+    assert.deepEqual(account.privacy, { shareLimits: true, shareTime: false, shareApps: false, shareProgress: false });
+    assert.deepEqual(account.pendingRemovals, {});
+    // The phone's last sign of life moves too. It's recent, so the same run counts the phone as back.
+    const beat = await read(`heartbeats/${sam.uid}`);
+    assert.equal(beat.at.toMillis(), heartbeat.toMillis());
+    assert.equal(beat.staleNotified, false);
+  });
+});

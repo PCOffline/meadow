@@ -1,13 +1,14 @@
 package dev.pcoffline.meadow.ui.screens
 
 import android.app.Application
-import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsProperties
+import android.content.ClipboardManager
+import android.content.Intent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
@@ -20,11 +21,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.Chat
 import dev.pcoffline.meadow.data.ChatRepository
@@ -39,6 +42,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** People: everyone in the circle, what's waiting on them, and each one's chat. */
@@ -264,6 +268,40 @@ class PeopleTest : ScreenTest() {
         invite.assertIsEnabled()
         compose.onNode(hasSetTextAction()).performTextReplacement("Be my Bumblebee? https://meadow.example/i/AbCdEfGh12345678")
         invite.assertIsEnabled()
+    }
+
+    @Test
+    fun `a pasted invite link is opened as an invite, and the sheet closes`() {
+        show { PeopleContent(robin, People()) }
+        compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Be my Bumblebee? https://meadow.example/i/AbCdEfGh12345678")
+        compose.onNode(hasText(text(R.string.invite_code_button)) and hasClickAction()).performClick()
+        assertEquals("AbCdEfGh12345678", AppGraph.store.pendingInvite.value)
+        node(R.string.invite_code_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `an invite that can't be sent, or a link that can't be made, says so`() {
+        show { PeopleContent(robin, People()) }
+        compose.onNodeWithContentDescription(text(R.string.people_invite_more)).performClick()
+        // Without a connection to the backend, neither goes anywhere.
+        compose.onNode(hasSetTextAction()).performTextInput("AB12CD34")
+        compose.onNode(hasText(text(R.string.invite_code_button)) and hasClickAction()).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("🍂", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        node(R.string.invite_link_button).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("🍂", substring = true)).fetchSemanticsNodes().size >= 2 }
+    }
+
+    @Test
+    fun `my friend code can be copied, and shared`() {
+        show { PeopleContent(robin, People(lookingAfter = listOf(DemoGarden.ana))) }
+        compose.onNodeWithContentDescription(text(R.string.circle_join_title)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.join_code_copy)).performClick()
+        val clip = app.getSystemService(ClipboardManager::class.java).primaryClip
+        assertEquals(robin.friendCode, clip?.getItemAt(0)?.text?.toString())
+        compose.onNodeWithContentDescription(text(R.string.join_code_share)).performClick()
+        val shared = shadowOf(app).nextStartedActivity
+        assertEquals(Intent.ACTION_CHOOSER, shared?.action)
     }
 
     @Test

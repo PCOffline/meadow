@@ -116,4 +116,43 @@ class ScheduleTest {
         assertThrows(IllegalArgumentException::class.java) { TimeWindow(-1, 60) }
         assertThrows(IllegalArgumentException::class.java) { TimeWindow(0, 1441) }
     }
+
+    @Test
+    fun `stored hours that can't be read are skipped, and a day with only bad hours is closed`() {
+        val raw = mapOf(
+            "2" to listOf("junk", mapOf("to" to 60L), mapOf("from" to 0L), mapOf("from" to 600L, "to" to 500L), mapOf("from" to 60L, "to" to 120L)),
+            "3" to "not a list",
+            "x" to listOf(mapOf("from" to 0L, "to" to 60L)),
+            "4" to listOf(mapOf("from" to 600L, "to" to 500L)),
+        )
+        val schedule = Schedule.fromFirestore(raw)!!
+        assertEquals(listOf(TimeWindow(60, 120)), schedule.windowsOn(2))
+        assertEquals(listOf(TimeWindow.ALL_DAY), schedule.windowsOn(3))
+        assertEquals(emptyList<TimeWindow>(), schedule.windowsOn(4))
+        assertNull(Schedule.fromFirestore("junk"))
+    }
+
+    @Test
+    fun `a window covers another only when it holds all of it`() {
+        val day = TimeWindow(480, 1200)
+        assertTrue(day.covers(TimeWindow(600, 700)))
+        assertTrue(day.covers(day))
+        assertFalse(day.covers(TimeWindow(400, 700)))
+        assertFalse(day.covers(TimeWindow(600, 1300)))
+        assertThrows(IllegalArgumentException::class.java) { TimeWindow(1440, 1441) }
+        assertThrows(IllegalArgumentException::class.java) { TimeWindow(0, 0) }
+    }
+
+    @Test
+    fun `a cap needs days, a window that ends after it starts, and fewer minutes than the window`() {
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(emptyList(), 60, 120, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(0), 60, 120, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(8), 60, 120, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), -1, 120, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 1441, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 120, 60, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 120, 0) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 120, 60) }
+        TimeCap(listOf(1, 7), 0, 1440, 1439)
+    }
 }

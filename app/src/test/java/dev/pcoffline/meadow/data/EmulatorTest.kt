@@ -15,6 +15,7 @@ import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.snapshots
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
+import dev.pcoffline.meadow.AppGraph
 import dev.pcoffline.meadow.ui.legal.LegalDoc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -165,6 +166,18 @@ abstract class EmulatorTest {
         const val PASSWORD = "longenough"
         const val WAIT_MS = 20_000L
         private const val TIMEOUT_MS = 60_000L
+    }
+}
+
+/** The app starts sync once per process; so do the tests, which share one app graph in each test JVM. */
+internal object AppSync {
+    private var started = false
+
+    @Synchronized
+    fun startOnce() {
+        if (started) return
+        AppGraph.sync.start()
+        started = true
     }
 }
 

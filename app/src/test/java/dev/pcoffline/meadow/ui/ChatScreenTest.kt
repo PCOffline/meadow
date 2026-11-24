@@ -1,0 +1,226 @@
+package dev.pcoffline.meadow.ui
+
+import androidx.activity.ComponentActivity
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.firebase.firestore.snapshots
+import dev.pcoffline.meadow.AppGraph
+import dev.pcoffline.meadow.R
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.ChatRepository
+import dev.pcoffline.meadow.data.EmulatorTest
+import dev.pcoffline.meadow.data.LimitCardMode
+import dev.pcoffline.meadow.data.LimitsRepository
+import dev.pcoffline.meadow.data.RequestRepository
+import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.data.SocialRepository
+import dev.pcoffline.meadow.data.UserProfile
+import dev.pcoffline.meadow.data.stringList
+import dev.pcoffline.meadow.showcase.DemoGarden
+import dev.pcoffline.meadow.ui.chat.ChatScreen
+import dev.pcoffline.meadow.ui.theme.MeadowTheme
+import org.junit.Assert.assertEquals
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+
+/** A chat on screen against the emulators: what is sent arrives, and a Bumblebee can be removed and kept. */
+@RunWith(AndroidJUnit4::class)
+@Config(application = android.app.Application::class, qualifiers = "w411dp-h891dp-xxhdpi")
+class ChatScreenTest : EmulatorTest() {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun startTheApp() {
+        AppGraph.init(app)
+        AppGraph.store.clearAll()
+        AppGraph.backendReady = true
+    }
+
+    private fun text(id: Int, vararg args: Any) = app.getString(id, *args)
+
+    private fun waitForText(value: String) =
+        compose.waitUntil(WAIT_MS) { compose.onAllNodes(hasText(value, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+
+    @Test
+    fun `words sent in a chat arrive, and a Bumblebee can be removed, then kept`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        var profile by mutableStateOf(DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid)))
+        compose.setContent {
+            MeadowTheme { CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) { ChatScreen(profile, chatId, onBack = {}) } }
+        }
+
+        // The chat loads with the other person's name.
+        waitForText("Bee")
+        compose.onNode(hasSetTextAction()).performTextInput("Hello Bee")
+        compose.onNodeWithContentDescription(text(R.string.action_send)).performClick()
+        compose.waitUntil(WAIT_MS) { compose.onAllNodes(hasText("Hello Bee")).fetchSemanticsNodes().size == 1 }
+
+        compose.onNodeWithContentDescription(text(R.string.action_more)).performClick()
+        compose.onNodeWithText(text(R.string.chat_remove_bee)).performClick()
+        compose.onNode(hasText(text(R.string.circle_remove_title, "Bee")) and hasAnyAncestor(isDialog())).assertExists()
+        compose.onNode(hasText(text(R.string.action_remove)) and hasAnyAncestor(isDialog())).performClick()
+        // The backend starts the day's wait before the Bumblebee leaves.
+        onBackend {
+            backend.account(robin.uid).snapshots().firstWhere { it.get("pendingRemovals.${bee.uid}") != null }
+        }
+
+        compose.runOnIdle { profile = profile.copy(pendingRemovals = mapOf(bee.uid to System.currentTimeMillis())) }
+        compose.onNodeWithContentDescription(text(R.string.action_more)).performClick()
+        compose.onNodeWithText(text(R.string.chat_keep_bee)).performClick()
+        onBackend {
+            backend.account(robin.uid).snapshots().firstWhere { it.get("pendingRemovals.${bee.uid}") == null }
+        }
+        onBackend { assert(bee.uid in backend.account(robin.uid).snapshots().firstWhere { true }.stringList("approverIds")) }
+    }
+
+    /** Robin asks Bee, Robin's Bumblebee, for 20 more minutes on Pebbles. Bee stays signed in. */
+    private fun askedInChat(): Triple<Person, Person, String> {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        onBackend {
+            val requests = RequestRepository(backend)
+            LimitsRepository(backend, store, requests).save(AppLimit("com.example.pebbles", "Pebbles", 30, 0))
+            requests.create(RequestType.EXTRA_TIME, message = "One more level", packageName = "com.example.pebbles", appName = "Pebbles", minutes = 20)
+        }
+        return Triple(robin, bee, ChatRepository.chatIdFor(robin.uid, bee.uid))
+    }
+
+    private fun showChat(me: UserProfile, chatId: String) = compose.setContent {
+        MeadowTheme { CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) { ChatScreen(me, chatId, onBack = {}) } }
+    }
+
+    private val summary get() = app.resources.getQuantityString(R.plurals.request_extra_time, 20, 20, "Pebbles")
+
+    @Test
+    fun `a request asked for shows in the chat as its card, for the asker`() {
+        val (robin, bee, chatId) = askedInChat()
+        showChat(DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid)), chatId)
+        waitForText(summary)
+        compose.onNodeWithText(text(R.string.request_withdraw)).assertExists()
+    }
+
+    @Test
+    fun `and for the Bumblebee asked, who can answer it`() {
+        val (robin, bee, chatId) = askedInChat()
+        signInAs(bee)
+        showChat(DemoGarden.robin.copy(uid = bee.uid, displayName = "Bee", approveeIds = listOf(robin.uid)), chatId)
+        waitForText(summary)
+        compose.onNodeWithText(text(R.string.request_say_yes)).assertExists()
+        // A garden I look after is a tap away.
+        compose.onNodeWithContentDescription(text(R.string.chat_see_garden, "Robin")).assertExists()
+    }
+
+    @Test
+    fun `from the chat, a Bumblebee can be asked to be mine too, and then it waits`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        // Bee looks after Robin's garden, and asks Robin to look after Bee's.
+        showChat(DemoGarden.robin.copy(uid = bee.uid, displayName = "Bee", approverIds = emptyList(), approveeIds = listOf(robin.uid)), chatId)
+        waitForText(text(R.string.chat_ask_bee, "Robin"))
+        compose.onNodeWithText(text(R.string.chat_ask_bee, "Robin")).performClick()
+        compose.onNodeWithText(text(R.string.chat_ask_title, "Robin")).assertExists()
+        compose.onNodeWithText(text(R.string.action_cancel)).performClick()
+        compose.onNodeWithText(text(R.string.chat_ask_bee, "Robin")).performClick()
+        compose.onNodeWithText(text(R.string.chat_ask_confirm)).performClick()
+
+        onBackend { SocialRepository(backend).outgoingInvites(bee.uid).firstWhere { list -> list.any { it.toUid == robin.uid && !it.offer } } }
+        waitForText(text(R.string.chat_ask_waiting, "Robin"))
+    }
+
+    @Test
+    fun `from the chat, I can offer to look after their garden`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        // Robin is looked after by Bee, and offers to look after Bee's garden in return.
+        showChat(DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid), approveeIds = emptyList()), chatId)
+        waitForText(text(R.string.chat_offer_bee, "Bee"))
+        compose.onNodeWithText(text(R.string.chat_offer_bee, "Bee")).performClick()
+        compose.onNodeWithText(text(R.string.chat_offer_title, "Bee")).assertExists()
+        compose.onNodeWithText(text(R.string.chat_offer_confirm)).performClick()
+
+        onBackend { SocialRepository(backend).outgoingInvites(robin.uid).firstWhere { list -> list.any { it.toUid == bee.uid && it.offer } } }
+    }
+
+    @Test
+    fun `a suggestion from my Bumblebee is applied from its card, and Change opens it to edit`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        val site = AppLimit("site:example.com", "example.com", 20, 0)
+        onBackend { ChatRepository(backend).sendLimit(chatId, site, LimitCardMode.SUGGESTED, "Suggested a limit for example.com") }
+        signInAs(robin)
+        val copied = mutableListOf<AppLimit>()
+        compose.setContent {
+            MeadowTheme {
+                CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) {
+                    ChatScreen(
+                        DemoGarden.robin.copy(uid = robin.uid, displayName = "Robin", approverIds = listOf(bee.uid)), chatId,
+                        onBack = {}, onCopyLimit = { copied += it },
+                    )
+                }
+            }
+        }
+        waitForText(text(R.string.limit_card_suggested))
+        compose.onNodeWithText(text(R.string.limit_change)).performClick()
+        assertEquals(listOf(site), copied)
+
+        compose.onNodeWithText(text(R.string.limit_apply)).performClick()
+        val saved = onBackend { backend.user(robin.uid).collection("limits").document(site.packageName).snapshots().firstWhere { it.exists() } }
+        assertEquals(20L, saved.getLong("dailyMinutes"))
+    }
+
+    @Test
+    fun `a limit shared with me can be copied from its card`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+        signInAs(robin)
+        val chatId = ChatRepository.chatIdFor(robin.uid, bee.uid)
+        val shared = AppLimit("com.example.pebbles", "Pebbles", 30, 0)
+        onBackend { ChatRepository(backend).sendLimit(chatId, shared, LimitCardMode.SHARED, "Shared a limit for Pebbles") }
+        signInAs(bee)
+        val copied = mutableListOf<AppLimit>()
+        compose.setContent {
+            MeadowTheme {
+                CompositionLocalProvider(LocalSnackbar provides remember { SnackbarHostState() }) {
+                    ChatScreen(
+                        DemoGarden.robin.copy(uid = bee.uid, displayName = "Bee", approveeIds = listOf(robin.uid)), chatId,
+                        onBack = {}, onCopyLimit = { copied += it },
+                    )
+                }
+            }
+        }
+        waitForText(text(R.string.limit_card_shared))
+        compose.onNodeWithText(text(R.string.limit_menu_copy)).performClick()
+        assertEquals(listOf(shared), copied)
+    }
+}

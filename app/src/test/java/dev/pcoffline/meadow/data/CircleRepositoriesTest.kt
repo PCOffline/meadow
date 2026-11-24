@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.data
 import android.app.Application
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
+import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import org.junit.Assert.assertEquals
@@ -181,6 +182,46 @@ class CircleRepositoriesTest : EmulatorTest() {
             requests.outgoing(robin.uid).firstWhere { list -> list.none { it.type == RequestType.CHANGE_LIMIT && it.status == RequestStatus.PENDING } }
             // Stricter applies at once, Bumblebee or not.
             assertEquals(ChangeOutcome.APPLIED, limits.save(strict.copy(dailyMinutes = 20)))
+        }
+    }
+
+    @Test
+    fun `with a Bumblebee, a stricter cap goes through the backend, and removing a limit asks first`() {
+        val robin = person("Robin")
+        val bee = person("Bee")
+        makeBumblebee(robin, bee)
+
+        signInAs(robin)
+        onBackend {
+            val limits = LimitsRepository(backend, store, requests)
+            val limit = AppLimit(APP, "Pebbles", 30, 0)
+            limits.save(limit)
+            store.setLimits(listOf(limit))
+            store.setApproverCount(1)
+
+            // Rules can't compare caps, so the backend saves this stricter one.
+            val capped = limit.copy(caps = listOf(TimeCap(listOf(1, 2, 3, 4, 5), from = 20 * 60, to = 23 * 60, minutes = 10)))
+            assertEquals(ChangeOutcome.APPLIED, limits.save(capped))
+            backend.user(robin.uid).collection("limits").document(APP).snapshots().firstWhere { (it.get("caps") as? List<*>)?.size == 1 }
+
+            assertEquals(ChangeOutcome.REQUESTED, limits.remove(capped, "Not needed"))
+            val asked = requests.outgoing(robin.uid, fresh = true).firstWhere { list -> list.any { it.type == RequestType.REMOVE_LIMIT } }
+            assertEquals("Not needed", asked.single { it.type == RequestType.REMOVE_LIMIT }.message)
+        }
+    }
+
+    @Test
+    fun `alone, removing a limit deletes it, and a limit that holds nothing back is refused`() {
+        val robin = person("Robin")
+        onBackend {
+            val limits = LimitsRepository(backend, store, requests)
+            val limit = AppLimit(APP, "Pebbles", 30, 0)
+            limits.save(limit)
+            assertEquals(ChangeOutcome.APPLIED, limits.remove(limit))
+            assertTrue(!backend.user(robin.uid).collection("limits").document(APP).get().await().exists())
+
+            val nothing = runCatching { limits.save(AppLimit(APP, "Pebbles", 0, 0)) }.exceptionOrNull()
+            assertEquals(R.string.error_set_a_limit, (nothing as FriendlyException).messageRes)
         }
     }
 

@@ -85,6 +85,54 @@ class StrictModeCheckTest {
         assertEquals(LEFT, shadow.globalActionsPerformed)
     }
 
+    @Suppress("DEPRECATION")
+    private fun contentChanged(pkg: String): AccessibilityEvent =
+        AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply { packageName = pkg }
+
+    @Test
+    fun `a screen that fills in is read as it changes, at most a few times a second`() {
+        shadow.setRootInActiveWindow(screen("Network & internet"))
+        service.onAccessibilityEvent(contentChanged(SETTINGS))
+        settle()
+        // Within the moment after a read, a change is passed over.
+        shadow.setRootInActiveWindow(screen("Meadow", "Force stop"))
+        service.onAccessibilityEvent(contentChanged(SETTINGS))
+        settle()
+        assertEquals(emptyList<Int>(), shadow.globalActionsPerformed)
+
+        Thread.sleep(800)
+        service.onAccessibilityEvent(contentChanged(SETTINGS))
+        settle()
+        assertEquals(LEFT, shadow.globalActionsPerformed)
+    }
+
+    @Test
+    fun `without strict mode, Settings is never read`() {
+        AppGraph.store.setStrictMode(false)
+        shadow.setRootInActiveWindow(screen("Meadow", "Force stop"))
+        service.onAccessibilityEvent(event(SETTINGS))
+        service.onAccessibilityEvent(contentChanged(SETTINGS))
+        settle()
+        assertEquals(emptyList<Int>(), shadow.globalActionsPerformed)
+    }
+
+    @Test
+    fun `an app that isn't a guarded system screen is never read`() {
+        shadow.setRootInActiveWindow(screen("Meadow", "Force stop"))
+        service.onAccessibilityEvent(event("com.example.notes"))
+        service.onAccessibilityEvent(contentChanged("com.example.notes"))
+        settle()
+        assertEquals(emptyList<Int>(), shadow.globalActionsPerformed)
+    }
+
+    @Test
+    fun `with nothing on screen to read, nothing happens`() {
+        shadow.setRootInActiveWindow(null)
+        service.onAccessibilityEvent(event(SETTINGS))
+        settle()
+        assertEquals(emptyList<Int>(), shadow.globalActionsPerformed)
+    }
+
     /** Runs the main thread until the service's background work is done. */
     private fun settle() {
         val main = shadowOf(Looper.getMainLooper())

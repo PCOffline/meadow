@@ -171,4 +171,50 @@ class AuthRepositoryTest : EmulatorTest() {
             auth.sendPasswordReset(email)
         }
     }
+
+    @Test
+    fun `a link for the address already signed in changes nothing`() = onBackend {
+        val email = newEmail()
+        signUp(email, "longenough")
+        val uid = backend.uid
+        auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email.uppercase())
+        assertEquals(uid, backend.uid)
+    }
+
+    @Test
+    fun `a link for another address signs the person signed in out first`() = onBackend {
+        val other = newEmail()
+        signUp(other, "longenough")
+        val owner = backend.uid
+        auth.signOut()
+        signUp(newEmail(), "longenough")
+
+        auth.finishSignInLink(linkFrom(other) { auth.sendSignInLink(other) }, other)
+        assertEquals(owner, backend.uid)
+    }
+
+    @Test
+    fun `a link needs an address, an email needs someone signed in, and a garden a name`() {
+        assertEquals(
+            R.string.error_email_required,
+            assertThrows(FriendlyException::class.java) { onBackend { auth.sendSignInLink("  ") } }.messageRes,
+        )
+        assertEquals(
+            R.string.error_sign_in_first,
+            assertThrows(FriendlyException::class.java) { onBackend { auth.addEmail(newEmail(), "longenough") } }.messageRes,
+        )
+        assertEquals(
+            R.string.error_name_required,
+            assertThrows(FriendlyException::class.java) { onBackend { auth.createProfile(" ", "🌼", LegalDoc.CURRENT_VERSION) } }.messageRes,
+        )
+    }
+
+    @Test
+    fun `a start already signed in keeps its account for the garden`() = onBackend {
+        backend.auth.signInAnonymously().await()
+        val start = backend.uid
+        auth.startWithoutEmail("Robin", "🌼", LegalDoc.CURRENT_VERSION)
+        assertEquals(start, backend.uid)
+        assertEquals("Robin", profile(start!!).getString("displayName"))
+    }
 }

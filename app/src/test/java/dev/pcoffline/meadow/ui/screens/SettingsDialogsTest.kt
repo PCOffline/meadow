@@ -1,13 +1,21 @@
 package dev.pcoffline.meadow.ui.screens
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.showcase.DemoGarden
@@ -66,5 +74,40 @@ class SettingsDialogsTest : ScreenTest() {
 
         node(R.string.settings_sign_out_stay).performClick()
         node(R.string.settings_sign_out_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `deleting the account needs the word typed, and keeping it closes the question`() {
+        show { SettingsScreen(DemoGarden.robin, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
+
+        node(R.string.settings_delete).performScrollTo().performClick()
+        node(R.string.settings_delete_title).assertExists()
+        node(R.string.settings_delete_body).assertExists()
+        node(R.string.settings_delete_button).assertIsNotEnabled()
+
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(isDialog())).performTextInput("delete it")
+        node(R.string.settings_delete_button).assertIsNotEnabled()
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(isDialog())).performTextReplacement(" delete ")
+        // The word counts in any case, with spaces around it.
+        node(R.string.settings_delete_button).assertIsEnabled()
+        assertAccessible(requireHeading = false)
+
+        node(R.string.settings_delete_keep).performClick()
+        node(R.string.settings_delete_title).assertDoesNotExist()
+    }
+
+    @Test
+    fun `an emergency unlock opens from Settings while there are some left`() {
+        var profile by mutableStateOf(DemoGarden.robin.copy(emergencyUsesMillis = emptyList()))
+        show { SettingsScreen(profile, onBack = {}, onOpenSetup = {}, onOpenProfile = {}, onOpenLegal = {}) }
+        node(R.string.settings_emergency_button).performScrollTo().assertIsEnabled().performClick()
+        node(R.string.emergency_dialog_title).assertExists()
+        node(R.string.action_cancel).performClick()
+        node(R.string.emergency_dialog_title).assertDoesNotExist()
+
+        // All three used this month: none left until the oldest is a month old.
+        val now = System.currentTimeMillis()
+        profile = profile.copy(emergencyUsesMillis = listOf(now - 1_000, now - 2_000, now - 3_000))
+        node(R.string.settings_emergency_button).performScrollTo().assertIsNotEnabled()
     }
 }
