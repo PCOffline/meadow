@@ -10,7 +10,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
-import com.google.firebase.storage.UploadTask
 import dev.pcoffline.meadow.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex

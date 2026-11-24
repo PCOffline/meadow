@@ -105,12 +105,6 @@ enum class DarkMode(val key: String, @StringRes val label: Int) {
     }
 }
 
-/**
- * Night is from sunset to sunrise: the hours the moon is out on a dark page. Without a place to
- * work them out for, from 19:00 to 5:00 ([SunTimes.DEFAULT]).
- */
-fun isNightHour(hour: Int, sun: SunTimes = SunTimes.DEFAULT): Boolean = sun.isNight(hour * 60)
-
 /** The minute of the day, kept up to date while it's on screen, so Clock changes over by itself. */
 @Composable
 private fun rememberMinuteOfDay(): Int {
@@ -244,9 +238,6 @@ fun contentOn(background: Color): Color =
 internal fun colorSchemeFor(theme: GardenTheme, dark: Boolean): androidx.compose.material3.ColorScheme =
     Seeds.getValue(theme).let { if (dark) darkScheme(it) else lightScheme(it) }
 
-/** The garden palette for a theme; internal so tests can check the colours used behind text. */
-internal fun gardenColorsFor(theme: GardenTheme, dark: Boolean): GardenColors = gardenColors(theme, dark)
-
 private val LightErrorContainer = Color(0xFFF7DCD3)
 private val DarkErrorContainer = Color(0xFF6E3324)
 
@@ -359,7 +350,8 @@ private fun darkScheme(s: Seed): androidx.compose.material3.ColorScheme {
     )
 }
 
-private fun gardenColors(theme: GardenTheme, dark: Boolean): GardenColors {
+/** The garden palette for a theme; internal so tests can check the colours used behind text. */
+internal fun gardenColors(theme: GardenTheme, dark: Boolean): GardenColors {
     val s = Seeds.getValue(theme)
     val plants = plantsOf(theme).map { if (dark) it.night() else it }
     val petals = plants.map { it.petal.color }

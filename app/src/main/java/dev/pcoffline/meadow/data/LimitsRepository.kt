@@ -35,6 +35,7 @@ class LimitsRepository(
                 caps = limit.caps,
                 approverIds = approverIds,
             )
+            savePlant(uid, current, limit)
             return ChangeOutcome.REQUESTED
         }
         // Rules can't compare hours, days' own limits or caps, so with Bumblebees a change to them
@@ -52,14 +53,26 @@ class LimitsRepository(
                     "caps" to limit.caps.map(TimeCap::toFirestore),
                 ),
             )
+            savePlant(uid, current, limit)
             return ChangeOutcome.APPLIED
         }
         val data = limitFields(limit).toMutableMap()
+        limit.plant?.let { data["plant"] = it }
         data["updatedAt"] = FieldValue.serverTimestamp()
         if (current == null) data["createdAt"] = FieldValue.serverTimestamp()
         // The local snapshot updates right away; offline writes are queued by Firestore.
         backend.user(uid).collection("limits").document(limit.packageName).set(data).awaitWrite()
         return ChangeOutcome.APPLIED
+    }
+
+    /**
+     * Saves the plant of [limit] when it differs from that of [current]. A plant holds nothing
+     * back, so it changes at once, also while a Bumblebee is asked about the rest.
+     */
+    private suspend fun savePlant(uid: String, current: AppLimit, limit: AppLimit) {
+        if (current.plant == limit.plant) return
+        backend.user(uid).collection("limits").document(limit.packageName)
+            .update("plant", limit.plant ?: FieldValue.delete()).awaitWrite()
     }
 
     suspend fun remove(limit: AppLimit, message: String = "", approverIds: List<String>? = null): ChangeOutcome {

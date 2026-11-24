@@ -1,15 +1,19 @@
-"""Draws the README's animated SVG art in Meadow's palette, with its own fonts embedded.
+"""Draws the README's animated SVG art in the Meadow theme, with its own fonts embedded.
 
 Run from the repository root: python3 docs/art/build.py  (needs: pip install fonttools brotli)
 Writes docs/images/banner-light.svg, banner-dark.svg and the step-*.svg illustrations.
+The plants, sun, moon, clouds, stars and fireflies are drawn as the app draws them. The plants
+come from flora.py, a port of the app's flora.
 Animations are CSS, so they stop for people who ask for reduced motion.
 """
 import base64
+import colorsys
 import io
 import math
 import random
 from pathlib import Path
 
+import flora
 from fontTools import subset
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
@@ -20,7 +24,12 @@ OUT = ROOT / "docs/images"
 
 INK, NIGHT_INK = "#3E3A32", "#F3EEE2"
 SOFT_INK, NIGHT_SOFT = "#6F675A", "#C3BBAC"
-PETALS = ["#E8A0A6", "#B4A7D6", "#E9B949", "#F2B48C", "#9CC3D5"]
+
+# The skies of Ambient.kt: the afternoon by day, and the night.
+DAY_SKY, NIGHT_SKY = ("#D9ECF2", "#F8F4E8"), ("#26304A", "#3A4658")
+MOON_LIGHT = "#FFF6DC"
+# The Meadow theme's primary colour (Theme.kt). The sun and the grass lean a little towards it.
+PRIMARY = "#4F7F4C"
 TITLE, TAGLINE = "Meadow", "Gentle app limits, kept with friends"
 
 
@@ -75,6 +84,8 @@ MOTION_CSS = """
 @keyframes grow{0%{transform:scaleY(.15)}45%,85%{transform:scaleY(1)}100%{transform:scaleY(.15)}}
 .bloom{transform-box:fill-box;transform-origin:center;animation:bloom 4s ease-in-out infinite}
 @keyframes bloom{0%,20%{transform:scale(0)}50%,85%{transform:scale(1)}100%{transform:scale(0)}}
+.spin{transform-box:fill-box;transform-origin:center;animation:spin 45s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.rise{opacity:1}}
 """
 
@@ -87,25 +98,111 @@ def svg(width: int, height: int, body: str, label: str, fonts: bool = False) -> 
     )
 
 
-def flower(x: float, y: float, size: float, petal: str, stem: str, delay: float, petals: int = 6) -> str:
-    """A swaying flower whose stem starts at (x, y)."""
-    head_y = y - size * 2.2
-    parts = [
-        (f'<path d="M{x},{y} C{x - size * .3},{y - size} {x + size * .3},{y - size * 1.5} {x},{head_y}" '
-        f'stroke="{stem}" stroke-width="{max(2, size * .14):.1f}" fill="none" stroke-linecap="round"/>'),
-        (f'<ellipse cx="{x + size * .38}" cy="{y - size * .9}" rx="{size * .34}" ry="{size * .14}" fill="{stem}" '
-        f'transform="rotate(-30 {x + size * .38} {y - size * .9})"/>'),
-    ]
-    for i in range(petals):
-        angle = 360 / petals * i
-        rad = math.radians(angle)
-        px, py = x + math.cos(rad) * size * .42, head_y + math.sin(rad) * size * .42
-        parts.append(
-            f'<ellipse cx="{px:.1f}" cy="{py:.1f}" rx="{size * .36:.1f}" ry="{size * .22:.1f}" fill="{petal}" '
-            f'transform="rotate({angle:.0f} {px:.1f} {py:.1f})"/>'
-        )
-    parts.append(f'<circle cx="{x}" cy="{head_y}" r="{size * .24:.1f}" fill="#F6E3A1"/>')
-    return f'<g class="sway" style="animation-delay:-{delay:.1f}s">{"".join(parts)}</g>'
+def hex_rgb(color: str) -> tuple[float, float, float]:
+    return tuple(int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+
+
+def rgb_hex(rgb) -> str:
+    return "#" + "".join(f"{round(min(max(v, 0), 1) * 255):02X}" for v in rgb)
+
+
+def lean_towards(color: str, toward: str, share: float, max_degrees: float) -> str:
+    """[color] with its hue turned towards [toward]'s, as leanTowards in Theme.kt."""
+    h, l, s = colorsys.rgb_to_hls(*hex_rgb(color))
+    h2 = colorsys.rgb_to_hls(*hex_rgb(toward))[0]
+    turn = (((h2 - h) * 360 + 540) % 360 - 180) * share
+    return rgb_hex(colorsys.hls_to_rgb(((h * 360 + max(-max_degrees, min(max_degrees, turn))) % 360) / 360, l, s))
+
+
+def over(color: str, alpha: float, below: str) -> str:
+    """[color] at [alpha] over [below], as one solid colour."""
+    return rgb_hex(a * alpha + b * (1 - alpha) for a, b in zip(hex_rgb(color), hex_rgb(below)))
+
+
+SUN = lean_towards("#F4C04E", PRIMARY, 0.2, 8)
+
+
+def grass(dark: bool) -> str:
+    """The hills' grass: by night a little darker, scaled so that its hue holds."""
+    g = lean_towards("#8DB57A", PRIMARY, 0.2, 12)
+    return rgb_hex(v * 0.92 for v in hex_rgb(g)) if dark else g
+
+
+def hills(dark: bool) -> tuple[str, str, str]:
+    """The back, middle and front hills: the grass over the sky at the strengths the app uses."""
+    sky = (NIGHT_SKY if dark else DAY_SKY)[1]
+    back = over(grass(dark), 0.35, sky)
+    middle = over(grass(dark), 0.55, back)
+    return back, middle, over(grass(dark), 0.55, middle)
+
+
+def petals(dark: bool) -> list[str]:
+    """The petal colours of the theme's five plants, its own first."""
+    return [(p.night() if dark else p).petal.color for p in flora.MEADOW]
+
+
+def plant(sk: "flora.Sketch", foot: tuple[float, float], scale: float, parts=("fallen", "stem", "head")) -> str:
+    """A plant's sketch with its foot at [foot], drawn [scale] times its size."""
+    fx, fy = flora.BASE
+    return (f'<g transform="translate({foot[0] - fx * scale:.1f} {foot[1] - fy * scale:.1f}) scale({scale:.3f})">'
+            f'{sk.svg(parts)}</g>')
+
+
+def sun(cx: float, cy: float, r: float) -> str:
+    """The sun as the app draws it: two soft halos, ten turning rays and the disc."""
+    rays = "".join(
+        f'<path d="M{math.cos(a) * r * 1.3:.1f},{math.sin(a) * r * 1.3:.1f} L{math.cos(a) * r * 1.75:.1f},{math.sin(a) * r * 1.75:.1f}"/>'
+        for a in (2 * math.pi * i / 10 for i in range(10))
+    )
+    return (
+        f'<circle cx="{cx}" cy="{cy}" r="{r * 2.1:.1f}" fill="{SUN}" fill-opacity=".18"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r * 1.5:.1f}" fill="{SUN}" fill-opacity=".28"/>'
+        f'<g transform="translate({cx} {cy})"><g class="spin" stroke="{SUN}" stroke-opacity=".7" stroke-width="{r * .16:.1f}" '
+        f'stroke-linecap="round">{rays}</g></g>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{SUN}"/>'
+    )
+
+
+def moon(cx: float, cy: float, r: float) -> str:
+    """A crescent: a disc with a bite cut out, as the app draws it. It has no glow, so no disc shows round it."""
+    bx, by, br = cx + r * 0.45, cy - r * 0.25, r * 0.86
+    d = math.hypot(bx - cx, by - cy)
+    a = (r * r - br * br + d * d) / (2 * d)
+    h = math.sqrt(r * r - a * a)
+    ux, uy = (bx - cx) / d, (by - cy) / d
+    mx, my = cx + ux * a, cy + uy * a
+    p1 = (mx - uy * h, my + ux * h)
+    p2 = (mx + uy * h, my - ux * h)
+    return (
+        f'<path d="M{p1[0]:.2f},{p1[1]:.2f} A{r},{r} 0 1 1 {p2[0]:.2f},{p2[1]:.2f} '
+        f'A{br:.2f},{br:.2f} 0 0 0 {p1[0]:.2f},{p1[1]:.2f}Z" fill="{MOON_LIGHT}"/>'
+    )
+
+
+def cloud(x: float, y: float, r: float, opacity: float) -> str:
+    """A cloud as the app draws it: three puffs on a flat base, one even shape."""
+    return (
+        f'<g fill="#FFFFFF" opacity="{opacity}">'
+        f'<rect x="{x - r * 2.4:.1f}" y="{y + r * 0.2:.1f}" width="{r * 4.8:.1f}" height="{r * 1.25:.1f}" rx="{r * 0.62:.1f}"/>'
+        f'<circle cx="{x}" cy="{y}" r="{r * 1.4:.1f}"/>'
+        f'<circle cx="{x - r * 1.5:.1f}" cy="{y + r * 0.35:.1f}" r="{r * 1.1:.1f}"/>'
+        f'<circle cx="{x + r * 1.5:.1f}" cy="{y + r * 0.3:.1f}" r="{r * 1.2:.1f}"/></g>'
+    )
+
+
+def star(x: float, y: float, big: bool, delay: float) -> str:
+    return (f'<circle class="twinkle" style="animation-delay:-{delay:.1f}s" cx="{x:.0f}" cy="{y:.0f}" '
+            f'r="{3 if big else 1.8}" fill="#FFFFFF" fill-opacity=".85"/>')
+
+
+def firefly(x: float, y: float, rnd: random.Random) -> str:
+    """A firefly glows in the sun's gold."""
+    return (
+        f'<g class="float" style="animation-delay:-{rnd.uniform(0, 7):.1f}s;animation-duration:{rnd.uniform(5, 9):.1f}s">'
+        f'<g class="twinkle" style="animation-delay:-{rnd.uniform(0, 3):.1f}s">'
+        f'<circle cx="{x:.0f}" cy="{y:.0f}" r="11" fill="{SUN}" fill-opacity=".25"/>'
+        f'<circle cx="{x:.0f}" cy="{y:.0f}" r="3.2" fill="{SUN}"/></g></g>'
+    )
 
 
 def bee(scale: float = 1, uid: str = "bee") -> str:
@@ -145,74 +242,69 @@ def flight_css(name: str, points: list[tuple[float, float, float]], duration: fl
     return f".{name}{{animation:{name} {duration}s linear infinite}}@keyframes {name}{{{''.join(frames)}}}"
 
 
-def cloud(x: float, y: float, s: float, color: str) -> str:
-    return (
-        f'<g fill="{color}"><ellipse cx="{x}" cy="{y}" rx="{60 * s}" ry="{22 * s}"/>'
-        f'<circle cx="{x - 22 * s}" cy="{y - 12 * s}" r="{24 * s}"/><circle cx="{x + 16 * s}" cy="{y - 18 * s}" r="{30 * s}"/></g>'
-    )
-
-
 def banner(dark: bool) -> str:
     rnd = random.Random(7)
     w, h = 1280, 420
-    sky = ("#26304A", "#3A4658") if dark else ("#D9ECF2", "#FBF4E8")
-    hills = ("#2F472B", "#3B5636", "#263B23") if dark else ("#C4DBB4", "#9CC08E", "#86AE79")
-    stem = "#6E8F63" if dark else "#5B7F55"
+    sky = NIGHT_SKY if dark else DAY_SKY
+    back, middle, front = hills(dark)
+    # One drawing of each of the theme's five plants in full bloom, used for each plant on the hills.
+    plants = "".join(
+        f'<g id="plant-{i}">{flora.sketch(p, flora.open_(1), dark).svg(("stem", "head"))}</g>' for i, p in enumerate(flora.MEADOW)
+    )
     body = [
         (f'<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{sky[0]}"/>'
-        f'<stop offset="1" stop-color="{sky[1]}"/></linearGradient>'
-        f'<radialGradient id="halo"><stop offset="0" stop-color="{"#F3EEE2" if dark else "#FBE3A6"}"/>'
-        f'<stop offset="1" stop-color="{"#F3EEE2" if dark else "#FBE3A6"}" stop-opacity="0"/></radialGradient>'
-        '<clipPath id="frame"><rect width="1280" height="420" rx="28"/></clipPath></defs>'),
+         f'<stop offset="1" stop-color="{sky[1]}"/></linearGradient>'
+         f'<clipPath id="frame"><rect width="{w}" height="{h}" rx="28"/></clipPath>{plants}</defs>'),
         '<g clip-path="url(#frame)">',
         f'<rect width="{w}" height="{h}" fill="url(#sky)"/>',
     ]
     if dark:
         for i in range(46):
-            sx, sy, r = rnd.uniform(20, w - 20), rnd.uniform(14, 230), rnd.uniform(.8, 2.2)
-            body.append(f'<circle class="twinkle" style="animation-delay:-{rnd.uniform(0, 3):.1f}s" cx="{sx:.0f}" cy="{sy:.0f}" r="{r:.1f}" fill="#F3EEE2"/>')
-        body.append('<circle class="glow" cx="1070" cy="100" r="90" fill="url(#halo)"/>')
-        body.append('<circle cx="1070" cy="100" r="40" fill="#F3EEE2"/><circle cx="1088" cy="88" r="36" fill="#2B3550"/>')
+            x, y, delay = rnd.uniform(20, w - 20), rnd.uniform(14, 230), rnd.uniform(0, 3)
+            # The stars keep clear of the title.
+            if not (60 < x < 600 and 70 < y < 240):
+                body.append(star(x, y, i % 5 == 0, delay))
+        body.append(moon(1070, 104, 40))
     else:
-        body.append('<circle class="glow" cx="1070" cy="104" r="96" fill="url(#halo)"/>')
-        body.append('<circle cx="1070" cy="104" r="44" fill="#F6D58A"/>')
-    cloud_color = "#4A5670" if dark else "#FFFFFF"
-    body.append(f'<g class="drift" style="animation-delay:-20s" opacity=".9">{cloud(0, 120, 1.1, cloud_color)}</g>')
-    body.append(f'<g class="drift" style="animation-duration:95s;animation-delay:-70s" opacity=".7">{cloud(0, 70, .8, cloud_color)}</g>')
-    body.append(f'<path d="M0,300 C220,240 420,250 640,290 C860,330 1060,250 1280,270 V420 H0Z" fill="{hills[0]}"/>')
-    body.append(f'<path d="M0,345 C260,300 520,330 760,340 C1000,350 1140,300 1280,315 V420 H0Z" fill="{hills[1]}"/>')
-    # Flowers on the hills, kept clear of the title on the left.
+        body.append(sun(1070, 104, 40))
+    # The clouds are white: clear by day, and faint by night.
+    opacity = .10 if dark else .85
+    body.append(f'<g class="drift" style="animation-delay:-20s">{cloud(0, 120, 22, opacity)}</g>')
+    body.append(f'<g class="drift" style="animation-duration:95s;animation-delay:-70s">{cloud(0, 70, 15, opacity)}</g>')
+    body.append(f'<path d="M0,300 C220,240 420,250 640,290 C860,330 1060,250 1280,270 V420 H0Z" fill="{back}"/>')
+    body.append(f'<path d="M0,345 C260,300 520,330 760,340 C1000,350 1140,300 1280,315 V420 H0Z" fill="{middle}"/>')
+    # The theme's plants on the hills, kept clear of the title on the left.
     spots = [(560, 318), (640, 330), (720, 322), (820, 336), (900, 326), (980, 318), (1060, 330), (1150, 316), (1230, 326),
              (90, 366), (210, 372), (330, 368), (450, 374)]
-    for i, (fx, fy) in enumerate(spots):
-        petal = PETALS[i % len(PETALS)]
-        if dark:
-            petal = {"#E8A0A6": "#C98A90", "#B4A7D6": "#9B8FC0", "#E9B949": "#CFA645", "#F2B48C": "#D69C7A", "#9CC3D5": "#86AABB"}[petal]
-        body.append(flower(fx, fy, rnd.uniform(19, 27), petal, stem, rnd.uniform(0, 5)))
-    body.append(f'<path d="M0,385 C300,360 640,380 900,378 C1100,376 1200,360 1280,365 V420 H0Z" fill="{hills[2]}"/>')
+    fx, fy = flora.BASE
+    for i, (x, y) in enumerate(spots):
+        s = rnd.uniform(0.86, 1.04)
+        sx = -s if i % 3 == 1 else s
+        body.append(
+            f'<g transform="translate({x - fx * sx:.1f} {y - fy * s:.1f}) scale({sx:.3f} {s:.3f})">'
+            f'<g class="sway" style="animation-delay:-{rnd.uniform(0, 5):.1f}s"><use href="#plant-{i % 5}"/></g></g>'
+        )
+    body.append(f'<path d="M0,385 C300,360 640,380 900,378 C1100,376 1200,360 1280,365 V420 H0Z" fill="{front}"/>')
     if dark:
         for i in range(9):
-            fx, fy = rnd.uniform(520, 1250), rnd.uniform(220, 330)
-            body.append(
-                f'<g class="float" style="animation-delay:-{rnd.uniform(0, 7):.1f}s;animation-duration:{rnd.uniform(5, 9):.1f}s">'
-                f'<circle class="twinkle" style="animation-delay:-{rnd.uniform(0, 3):.1f}s" cx="{fx:.0f}" cy="{fy:.0f}" r="3.2" fill="#F6E3A1"/></g>'
-            )
+            body.append(firefly(rnd.uniform(620, 1250), rnd.uniform(220, 330), rnd))
     else:
+        colours = petals(dark)
         for i in range(9):
             px = rnd.uniform(380, 1320)
             duration = rnd.uniform(24, 34)
+            size = rnd.uniform(5, 9)
             body.append(
                 f'<g class="fall" style="animation-delay:-{rnd.uniform(0, duration):.1f}s;animation-duration:{duration:.1f}s">'
                 f'<g class="waft" style="animation-delay:-{rnd.uniform(0, 4.5):.1f}s;animation-duration:{rnd.uniform(3.5, 5.5):.1f}s">'
-                f'<g transform="translate({px:.0f} 0) scale(1.3)"><g class="tumble" style="animation-delay:-{rnd.uniform(0, 6):.1f}s">'
-                f'<path d="M0,-9 C7,-6 7,5 0,9 C-7,5 -7,-6 0,-9Z" fill="{PETALS[i % 4]}" opacity=".9"/>'
-                f'<path d="M0,-6 V6" stroke="#FFFFFF" stroke-opacity=".5" stroke-width="1.2" stroke-linecap="round"/>'
+                f'<g transform="translate({px:.0f} 0)"><g class="tumble" style="animation-delay:-{rnd.uniform(0, 6):.1f}s">'
+                f'<ellipse rx="{size:.1f}" ry="{size * 0.6:.1f}" fill="{colours[i % 5]}" fill-opacity=".75"/>'
                 "</g></g></g></g>"
             )
         # The bee wanders across, stopping to hover over a flower on the way.
         body.append("<style>" + flight_css("flight", [
             # Low under the title on the left, then up into the open sky.
-            (0.00, -90, 288), (0.14, 170, 272), (0.28, 410, 266), (0.38, 626, 246), (0.50, 640, 240),
+            (0.00, -90, 288), (0.14, 170, 272), (0.28, 410, 266), (0.38, 626, 238), (0.50, 640, 232),
             (0.60, 800, 180), (0.78, 1060, 205), (1.00, 1380, 160),
         ], 20) + "</style>")
         body.append(f'<g class="flight"><g class="bob">{bee(1.4, "banner-bee")}</g></g>')
@@ -235,38 +327,37 @@ def backdrop(content: str, label: str) -> str:
     )
 
 
+TILE_HILL = "M0,170 C60,150 160,150 220,170 V220 H0Z"
+
+
 def step_plant() -> str:
+    """The theme's own plant grows and opens."""
+    cosmos = flora.sketch(flora.COSMOS, flora.open_(1))
     return backdrop(
-        '<path d="M0,170 C60,150 160,150 220,170 V220 H0Z" fill="#9CC08E"/>'
-        '<g class="grow" style="animation-delay:-2s"><path d="M110,172 C104,150 116,128 110,98" stroke="#5B7F55" stroke-width="6" fill="none" stroke-linecap="round"/>'
-        '<ellipse cx="124" cy="140" rx="15" ry="6" fill="#5B7F55" transform="rotate(-30 124 140)"/>'
-        '<ellipse cx="96" cy="128" rx="13" ry="5" fill="#5B7F55" transform="rotate(30 96 128)"/></g>'
-        '<g class="bloom" style="animation-delay:-2s">' + "".join(
-            f'<ellipse cx="{110 + math.cos(math.radians(a)) * 15:.1f}" cy="{92 + math.sin(math.radians(a)) * 15:.1f}" rx="13" ry="8" '
-            f'fill="#E8A0A6" transform="rotate({a} {110 + math.cos(math.radians(a)) * 15:.1f} {92 + math.sin(math.radians(a)) * 15:.1f})"/>'
-            for a in range(0, 360, 60)
-        ) + '<circle cx="110" cy="92" r="9" fill="#F6E3A1"/></g>'
-        '<g transform="translate(150 66)"><circle r="20" fill="#FFFFFF" stroke="#5B7F55" stroke-width="4"/>'
-        '<path d="M0,-12 V0 L9,6" stroke="#3E3A32" stroke-width="4" fill="none" stroke-linecap="round"/></g>',
+        f'<path d="{TILE_HILL}" fill="{hills(False)[1]}"/>'
+        f'<g class="grow" style="animation-delay:-2s">{plant(cosmos, (110, 178), 1.55, ("stem",))}</g>'
+        f'<g class="bloom" style="animation-delay:-2s">{plant(cosmos, (110, 178), 1.55, ("head",))}</g>'
+        '<g transform="translate(168 62)"><circle r="18" fill="#FFFFFF" stroke="#5B7F55" stroke-width="4"/>'
+        '<path d="M0,-11 V0 L8,5" stroke="#3E3A32" stroke-width="4" fill="none" stroke-linecap="round"/></g>',
         "Plant a limit",
     )
 
 
 def step_rest() -> str:
-    petals = "".join(
-        f'<ellipse cx="{110 + math.cos(math.radians(a)) * 12:.1f}" cy="{112 + math.sin(math.radians(a)) * 6:.1f}" rx="10" ry="6" '
-        f'fill="#B4A7D6" transform="rotate({a / 3:.0f} 110 112)"/>'
-        for a in range(-60, 241, 60)
-    )
+    """The plant is dried, and sleeps under the moon until tomorrow."""
+    rnd = random.Random(3)
+    stars = "".join(star(rnd.uniform(20, 200), rnd.uniform(16, 120), i % 4 == 0, rnd.uniform(0, 3)) for i in range(12))
+    cosmos = flora.sketch(flora.COSMOS, flora.SPENT, dark=True)
     return backdrop(
-        '<rect width="220" height="220" fill="#3A4658" opacity=".12"/>'
-        '<path d="M62,36 A22,22 0 1,0 62,80 A17,22 0 1,1 62,36 Z" fill="#E9C46A"/>'
-        '<path d="M0,170 C60,150 160,150 220,170 V220 H0Z" fill="#9CC08E"/>'
-        '<path d="M110,172 C108,150 112,136 114,122 C118,110 104,108 104,112" stroke="#5B7F55" stroke-width="6" fill="none" stroke-linecap="round"/>'
-        f'<g transform="rotate(25 110 112)">{petals}<circle cx="110" cy="112" r="7" fill="#F6E3A1"/></g>'
+        f'<defs><linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{NIGHT_SKY[0]}"/>'
+        f'<stop offset="1" stop-color="{NIGHT_SKY[1]}"/></linearGradient></defs>'
+        '<rect width="220" height="220" fill="url(#night)"/>'
+        + stars + moon(66, 62, 20)
+        + f'<path d="{TILE_HILL}" fill="{hills(True)[1]}"/>'
+        + plant(cosmos, (104, 178), 1.55)
         + "".join(
-            f'<text class="rise" style="animation-delay:-{d}s" x="{132 + i * 8}" y="{96 - i * 6}" font-family="Georgia,serif" '
-            f'font-size="{18 + i * 4}" font-weight="700" fill="#6F675A">z</text>'
+            f'<text class="rise" style="animation-delay:-{d}s" x="{146 + i * 9}" y="{90 - i * 8}" font-family="Georgia,serif" '
+            f'font-size="{18 + i * 4}" font-weight="700" fill="{NIGHT_SOFT}">z</text>'
             for i, d in enumerate((0, 1, 2))
         ),
         "When time is up, the app rests",
@@ -274,11 +365,13 @@ def step_rest() -> str:
 
 
 def step_ask() -> str:
+    """A Bumblebee brings more time to a buttercup."""
+    buttercup = flora.sketch(flora.BUTTERCUP, flora.open_(1))
     return backdrop(
-        '<path d="M0,170 C60,150 160,150 220,170 V220 H0Z" fill="#9CC08E"/>'
-        + flower(80, 176, 26, "#E9B949", "#5B7F55", 1.0)
-        + '<g transform="translate(138 92)"><g class="bob">' + bee(1.3, "step-bee") + "</g></g>"
-        '<path class="pop" d="M120,48 c0,-10 14,-12 16,-2 c2,-10 16,-8 16,2 c0,10 -16,18 -16,22 c0,-4 -16,-12 -16,-22z" fill="#E8A0A6"/>',
+        f'<path d="{TILE_HILL}" fill="{hills(False)[1]}"/>'
+        f'<g class="sway" style="animation-delay:-1s">{plant(buttercup, (76, 178), 1.4, ("stem", "head"))}</g>'
+        + '<g transform="translate(150 104)"><g class="bob">' + bee(1.3, "step-bee") + "</g></g>"
+        f'<path class="pop" d="M128,48 c0,-10 14,-12 16,-2 c2,-10 16,-8 16,2 c0,10 -16,18 -16,22 c0,-4 -16,-12 -16,-22z" fill="{petals(False)[0]}"/>',
         "Ask a Bumblebee for more time",
     )
 

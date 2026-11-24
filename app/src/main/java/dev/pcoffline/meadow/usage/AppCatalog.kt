@@ -4,11 +4,13 @@ import dev.pcoffline.meadow.data.Sites
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.telecom.TelecomManager
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.createBitmap
 
@@ -19,6 +21,7 @@ class AppCatalog(private val context: Context) {
     private val pm: PackageManager = context.packageManager
     private val labelCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val iconCache = LruCache<String, ImageBitmap>(120)
+    private val colourCache = java.util.concurrent.ConcurrentHashMap<String, IconColour>()
 
     @Volatile private var appsCache: List<InstalledApp>? = null
     @Volatile private var launchableCache: Set<String>? = null
@@ -88,6 +91,19 @@ class AppCatalog(private val context: Context) {
         return bitmap.asImageBitmap().also { iconCache.put(packageName, it) }
     }
 
+    /** The colour that the app's icon shows most, or null when the app has no icon here. Read once in each run. */
+    fun iconColour(packageName: String): IconColour? {
+        colourCache[packageName]?.let { return it }
+        val icon = icon(packageName)?.asAndroidBitmap() ?: return null
+        val pixels = runCatching {
+            // A hardware bitmap can't be read pixel by pixel.
+            val readable = if (icon.config == Bitmap.Config.HARDWARE) icon.copy(Bitmap.Config.ARGB_8888, false) else icon
+            val small = Bitmap.createScaledBitmap(readable, COLOUR_SIZE, COLOUR_SIZE, true)
+            IntArray(COLOUR_SIZE * COLOUR_SIZE).also { small.getPixels(it, 0, COLOUR_SIZE, 0, 0, COLOUR_SIZE, COLOUR_SIZE) }
+        }.getOrNull() ?: return null
+        return IconColour.of(pixels).also { colourCache[packageName] = it }
+    }
+
     /** Forgets cached app lists; called when apps are installed or removed. */
     fun invalidate() {
         appsCache = null
@@ -98,6 +114,9 @@ class AppCatalog(private val context: Context) {
 
     private companion object {
         const val ICON_DP = 56
+
+        /** The icon is read at this size for its colour: enough for its colours, few pixels to read. */
+        const val COLOUR_SIZE = 32
         val ALWAYS_ALLOWED = setOf(
             "com.android.phone",
             "com.android.server.telecom",

@@ -8,11 +8,13 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -88,6 +90,15 @@ class PackageQueriesTest {
         catalog.invalidate()
         assertTrue(first !== catalog.launchableApps())
         assertEquals(first, catalog.launchableApps())
+    }
+
+    @Test
+    fun `the catalog reads the colour of an app's icon, and none for an app that isn't here`() {
+        shadowOf(pm).setApplicationIcon(PKG, ColorDrawable(0xFFFF0000.toInt()))
+        val catalog = AppCatalog(app)
+        val colour = catalog.iconColour(PKG)!!
+        assertTrue("$colour is red", !colour.grey && colour.h in 20f..40f)
+        assertNull(catalog.iconColour("com.example.missing"))
     }
 
     private companion object {

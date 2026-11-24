@@ -48,7 +48,7 @@ class ThemeContrastTest {
     fun `every text colour is readable on every surface`() = assertNone(
         failures { out, theme, dark ->
             val scheme = colorSchemeFor(theme, dark)
-            val surfaces = scheme.surfaceRoles(gardenColorsFor(theme, dark))
+            val surfaces = scheme.surfaceRoles(gardenColors(theme, dark))
             for ((text, fg) in scheme.textRoles) for ((surface, bg) in surfaces) {
                 // With headroom over WCAG's 4.5:1, so text still passes once drawn (see TEXT_TARGET).
                 out.require("${name(theme, dark)} $text on $surface", fg, bg, TEXT_TARGET)
@@ -72,7 +72,7 @@ class ThemeContrastTest {
                 "inverseOnSurface on inverseSurface (snackbars)" to (s.inverseOnSurface to s.inverseSurface),
                 "inversePrimary on inverseSurface (snackbar actions)" to (s.inversePrimary to s.inverseSurface),
             )
-            val g = gardenColorsFor(theme, dark)
+            val g = gardenColors(theme, dark)
             for ((label, colors) in pairs + ("onBetter on better (less screen time)" to (g.onBetter to g.better))) {
                 out.require("${name(theme, dark)} $label", colors.first, colors.second, 4.5f)
             }
@@ -84,7 +84,7 @@ class ThemeContrastTest {
         failures { out, theme, dark ->
             val scheme = colorSchemeFor(theme, dark)
             // Outlined text fields, switches, radio buttons and segmented buttons are found by their edge.
-            for ((surface, bg) in scheme.surfaceRoles(gardenColorsFor(theme, dark))) {
+            for ((surface, bg) in scheme.surfaceRoles(gardenColors(theme, dark))) {
                 out.require("${name(theme, dark)} outline on $surface", scheme.outline, bg, 3f)
             }
         },
@@ -95,7 +95,7 @@ class ThemeContrastTest {
         failures { out, theme, dark ->
             val s = colorSchemeFor(theme, dark)
             // Filled buttons, checked checkboxes and switches, and progress are found by their fill.
-            for ((surface, bg) in s.surfaceRoles(gardenColorsFor(theme, dark))) {
+            for ((surface, bg) in s.surfaceRoles(gardenColors(theme, dark))) {
                 out.require("${name(theme, dark)} primary fill on $surface", s.primary, bg, 3f)
             }
         },
@@ -105,7 +105,7 @@ class ThemeContrastTest {
     fun `charts and progress stand out from every surface`() = assertNone(
         failures { out, theme, dark ->
             val s = colorSchemeFor(theme, dark)
-            val garden = gardenColorsFor(theme, dark)
+            val garden = gardenColors(theme, dark)
             // Bars and progress fills carry information (WCAG 1.4.11), unlike the decorative flowers.
             val fills = mapOf("growth" to garden.growth, "growthHigh" to garden.growthHigh, "error (a full bar)" to s.error)
             for ((fill, color) in fills) for ((surface, bg) in s.surfaceRoles(garden)) {

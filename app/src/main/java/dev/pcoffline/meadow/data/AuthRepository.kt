@@ -55,10 +55,6 @@ class AuthRepository(private val backend: Backend, private val store: LocalStore
         withFreshConnection { backend.auth.signInWithEmailAndPassword(email.trim(), password) }
     }
 
-    suspend fun signUp(email: String, password: String) {
-        withFreshConnection { backend.auth.createUserWithEmailAndPassword(email.trim(), password) }
-    }
-
     /** Starts without an email: an anonymous account plus a profile. */
     suspend fun startWithoutEmail(displayName: String, flower: String, termsVersion: Int) {
         if (displayName.isBlank()) throw FriendlyException(R.string.error_name_required)

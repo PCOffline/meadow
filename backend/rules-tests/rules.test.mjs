@@ -226,6 +226,23 @@ describe("limits", () => {
     await assertFails(setDoc(ref, { ...limit(90, 0), label: "Calculator" }));
   });
 
+  test("a limit can hold the plant chosen for it, which changes without a Bumblebee's yes", async () => {
+    await seed();
+    const ref = doc(as("sam"), "users/sam/limits/com.insta");
+    await assertSucceeds(updateDoc(ref, { plant: 4 }));
+    await assertSucceeds(updateDoc(ref, { plant: 0 }));
+    await assertSucceeds(updateDoc(ref, { plant: deleteField() }));
+    await assertSucceeds(setDoc(ref, { ...limit(30, 300), plant: 2 }));
+    await assertFails(updateDoc(ref, { plant: 5 }));
+    await assertFails(updateDoc(ref, { plant: -1 }));
+    await assertFails(updateDoc(ref, { plant: 1.5 }));
+    await assertFails(updateDoc(ref, { plant: "Cosmos" }));
+    await assertFails(updateDoc(ref, { plant: null }));
+    // A plant doesn't make a looser limit pass.
+    await assertFails(setDoc(ref, { ...limit(45, 300), plant: 1 }));
+    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.tok"), { ...limit(15), packageName: "com.tok", plant: 3 }));
+  });
+
   test("without Bumblebees you can change anything", async () => {
     await seed({ samHasBee: false });
     const ref = doc(as("sam"), "users/sam/limits/com.insta");

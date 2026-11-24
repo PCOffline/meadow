@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.home
 
+import dev.pcoffline.meadow.ui.components.rememberIconColour
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -375,8 +376,9 @@ private val SUN_ABOVE_TOTAL = 44.dp
 
 @Composable
 private fun FlowerTile(budget: AppBudget, modifier: Modifier, onAsk: (() -> Unit)?, onClick: () -> Unit) {
-    // An app keeps its place in each theme's five plants: a new theme gives it that theme's plant.
-    val plant = plantFor(budget.limit.packageName, Garden.theme)
+    // A chosen plant keeps its place in each theme's five. With no plant chosen, the plant is the
+    // one in the theme nearest in colour to the app's icon.
+    val plant = plantFor(budget.limit, Garden.theme, rememberIconColour(budget.limit.packageName))
     // A long press offers the limit's choices: share it as saved, or change it. A screen reader
     // offers sharing as an action on the card.
     var menu by remember { mutableStateOf(false) }

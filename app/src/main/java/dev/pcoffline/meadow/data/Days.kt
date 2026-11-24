@@ -1,7 +1,6 @@
 package dev.pcoffline.meadow.data
 
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
@@ -23,8 +22,6 @@ object Days {
     fun endMillis(date: LocalDate): Long = startMillis(date.plusDays(1))
 
     fun weekStart(date: LocalDate, first: DayOfWeek = DayOfWeek.MONDAY): LocalDate = date.with(TemporalAdjusters.previousOrSame(first))
-
-    fun dateOf(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
 
     /**
      * The day weeks start on where the phone is set to, including a first day picked in the

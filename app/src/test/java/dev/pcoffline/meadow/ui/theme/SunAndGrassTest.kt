@@ -41,7 +41,7 @@ class SunAndGrassTest {
         val green = hueOf(Color(0xFF8DB57A))
         GardenTheme.entries.forEach { theme ->
             listOf(false, true).forEach { dark ->
-                val garden = gardenColorsFor(theme, dark)
+                val garden = gardenColors(theme, dark)
                 // At most 8 and 12 degrees, give or take a degree of rounding to 8-bit colour.
                 assertTrue("$theme sun: ${hueOf(garden.sun)}", apart(hueOf(garden.sun), gold) <= 9f)
                 assertTrue("$theme grass: ${hueOf(garden.grass)}", apart(hueOf(garden.grass), green) <= 13f)
@@ -52,7 +52,7 @@ class SunAndGrassTest {
     @Test
     fun `the sun is no longer a petal colour`() {
         GardenTheme.entries.forEach { theme ->
-            val garden = gardenColorsFor(theme, false)
+            val garden = gardenColors(theme, false)
             assertTrue(theme.name, garden.petals.none { it == garden.sun })
         }
     }
@@ -66,7 +66,7 @@ class SunAndGrassTest {
     @Test
     fun `every theme's afternoon sky is a clear pale colour, not grey`() {
         GardenTheme.entries.forEach { theme ->
-            val sky = tinted(AfternoonSky, gardenColorsFor(theme, dark = false))
+            val sky = tinted(AfternoonSky, gardenColors(theme, dark = false))
             assertTrue("$theme sky is greyish: $sky", saturation(sky) >= 0.25f)
             assertTrue("$theme sky is too dark for the ink on it: $sky", lightness(sky) >= 0.8f)
         }

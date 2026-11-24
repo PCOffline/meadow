@@ -188,8 +188,3 @@ private val ERROR_DIALOG_BUTTONS = listOf("android:id/aerr_close")
 
 private fun isDialog(node: SemanticsNode): Boolean = SemanticsProperties.IsDialog in node.config || node.children.any(::isDialog)
 
-/** Fails with every piece of text drawn too faintly. */
-fun SemanticsNodeInteractionsProvider.assertReadable() {
-    val problems = contrastProblems()
-    if (problems.isNotEmpty()) throw AssertionError("Contrast problems:\n" + problems.joinToString("\n") { "- $it" })
-}

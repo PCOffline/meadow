@@ -2,6 +2,7 @@
 
 package dev.pcoffline.meadow.enforcement
 
+import dev.pcoffline.meadow.ui.components.rememberIconColour
 import android.app.ActivityOptions
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -332,7 +333,7 @@ internal fun RestContent(pkg: String, state: RestState, onHome: () -> Unit = {},
                     Box {
                         BloomFlower(
                             // The app's own plant, as in the garden: in bloom when it is open again.
-                            if (state.unlocked) 0.9f else 0f, plantFor(pkg, Garden.theme), Modifier.size(110.dp, 150.dp),
+                            if (state.unlocked) 0.9f else 0f, plantFor(pkg, Garden.theme, state.budget?.limit?.plant, rememberIconColour(pkg)), Modifier.size(110.dp, 150.dp),
                             asleep = !state.unlocked && state.budget?.sleeping == true,
                         )
                         if (!state.unlocked) SleepyZs(Modifier.align(Alignment.TopEnd))

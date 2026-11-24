@@ -75,9 +75,9 @@ class AuthRepositoryTest : EmulatorTest() {
     }
 
     @Test
-    fun `signing up and in with a password, and a wrong password refused`() = onBackend {
+    fun `a password signs in, and a wrong one is refused`() = onBackend {
         val email = newEmail()
-        auth.signUp(email, "longenough")
+        signUp(email, "longenough")
         val uid = backend.uid
         backend.auth.signOut()
 
@@ -90,7 +90,7 @@ class AuthRepositoryTest : EmulatorTest() {
     @Test
     fun `a sign-in link signs in, once, and is kept until then`() = onBackend {
         val email = newEmail()
-        auth.signUp(email, "longenough")
+        signUp(email, "longenough")
         val uid = backend.uid
         backend.auth.signOut()
 
@@ -123,7 +123,7 @@ class AuthRepositoryTest : EmulatorTest() {
     @Test
     fun `a link for an address that has a garden can't take over a start that has its own`() = onBackend {
         val email = newEmail()
-        auth.signUp(email, "longenough")
+        signUp(email, "longenough")
         val owner = backend.uid
         backend.auth.signOut()
 
@@ -137,7 +137,7 @@ class AuthRepositoryTest : EmulatorTest() {
     @Test
     fun `a link for an address that has a garden signs an unused start in to it`() = onBackend {
         val email = newEmail()
-        auth.signUp(email, "longenough")
+        signUp(email, "longenough")
         val owner = backend.uid
         backend.auth.signOut()
 
@@ -167,7 +167,7 @@ class AuthRepositoryTest : EmulatorTest() {
         assertEquals(R.string.error_email_required, error.messageRes)
         onBackend {
             val email = newEmail()
-            auth.signUp(email, "longenough")
+            signUp(email, "longenough")
             auth.sendPasswordReset(email)
         }
     }
@@ -175,7 +175,7 @@ class AuthRepositoryTest : EmulatorTest() {
     @Test
     fun `a link for the address already signed in changes nothing`() = onBackend {
         val email = newEmail()
-        auth.signUp(email, "longenough")
+        signUp(email, "longenough")
         val uid = backend.uid
         auth.finishSignInLink(linkFrom(email) { auth.sendSignInLink(email) }, email.uppercase())
         assertEquals(uid, backend.uid)
@@ -184,10 +184,10 @@ class AuthRepositoryTest : EmulatorTest() {
     @Test
     fun `a link for another address signs the person signed in out first`() = onBackend {
         val other = newEmail()
-        auth.signUp(other, "longenough")
+        signUp(other, "longenough")
         val owner = backend.uid
         auth.signOut()
-        auth.signUp(newEmail(), "longenough")
+        signUp(newEmail(), "longenough")
 
         auth.finishSignInLink(linkFrom(other) { auth.sendSignInLink(other) }, other)
         assertEquals(owner, backend.uid)

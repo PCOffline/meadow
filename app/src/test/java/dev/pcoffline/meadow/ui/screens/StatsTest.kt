@@ -30,7 +30,7 @@ import dev.pcoffline.meadow.ui.stats.StatsContent
 import dev.pcoffline.meadow.ui.stats.StatsUiState
 import dev.pcoffline.meadow.ui.theme.GardenTheme
 import dev.pcoffline.meadow.ui.theme.colorSchemeFor
-import dev.pcoffline.meadow.ui.theme.gardenColorsFor
+import dev.pcoffline.meadow.ui.theme.gardenColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import dev.pcoffline.meadow.ui.components.StalkBarChart
@@ -65,7 +65,7 @@ class StatsTest : ScreenTest() {
     @Test
     fun `less screen time than before is green`() {
         show { StatsContent(week) }
-        assertClose(gardenColorsFor(GardenTheme.MEADOW, dark = false).better, pillColour("less than"))
+        assertClose(gardenColors(GardenTheme.MEADOW, dark = false).better, pillColour("less than"))
     }
 
     @Test

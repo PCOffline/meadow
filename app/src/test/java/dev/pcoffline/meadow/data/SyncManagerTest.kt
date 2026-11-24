@@ -34,7 +34,6 @@ class SyncManagerTest : EmulatorTest() {
         onBackend {
             val ready = sync.profile.firstWhere { it is ProfileState.Ready } as ProfileState.Ready
             assertEquals("Robin", ready.profile.displayName)
-            assertEquals("Robin", sync.currentProfile?.displayName)
             sync.accountConfirmed.firstWhere { it }
         }
 
@@ -64,7 +63,7 @@ class SyncManagerTest : EmulatorTest() {
     @Test
     fun `an account without a garden reads as missing`() {
         onBackend {
-            auth.signUp(newEmail(), PASSWORD)
+            signUp(newEmail())
             sync.profile.firstWhere { it == ProfileState.Missing }
         }
     }
@@ -74,7 +73,7 @@ class SyncManagerTest : EmulatorTest() {
         onBackend {
             sync.profile.firstWhere { it == ProfileState.SignedOut }
             sync.beginLeaving()
-            auth.signUp(newEmail(), PASSWORD)
+            signUp(newEmail())
             // Give the listener time to answer; it must not say the garden is missing.
             delay(SETTLE_MS)
             assertTrue(sync.profile.value != ProfileState.Missing)

@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
  * A committed limit for one app. A value of 0 means "no limit" for that period; a null
  * [schedule] means the app may be used at any hour. A day in [dayMinutes] has its own daily limit
  * instead of [dailyMinutes], and every one of [caps] applies on top: the app rests once any of
- * them is used up.
+ * them is used up. [plant] is the plant that the person chose: its place in each theme's five
+ * plants. A null [plant] is the plant nearest in colour to the app's icon.
  */
 @Serializable
 data class AppLimit(
@@ -17,7 +18,11 @@ data class AppLimit(
     val schedule: Schedule? = null,
     val dayMinutes: Map<Int, Int> = emptyMap(),
     val caps: List<TimeCap> = emptyList(),
+    val plant: Int? = null,
 )
+
+/** How many plants each theme grows. A limit's [AppLimit.plant] is a place in them. */
+const val PLANTS_PER_THEME = 5
 
 /** Extra minutes a Bumblebee granted for a single day. */
 @Serializable

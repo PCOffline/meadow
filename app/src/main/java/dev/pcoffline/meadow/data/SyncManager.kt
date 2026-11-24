@@ -40,8 +40,6 @@ class SyncManager(
     private val _profile = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profile: StateFlow<ProfileState> = _profile.asStateFlow()
 
-    val currentProfile: UserProfile? get() = (profile.value as? ProfileState.Ready)?.profile
-
     /** Bumped to listen again after the profile couldn't be loaded. */
     private val attempt = MutableStateFlow(0)
 

@@ -111,13 +111,17 @@ abstract class EmulatorTest {
     /** Someone with a garden and a password, as other people find them. */
     protected data class Person(val uid: String, val email: String, val friendCode: String)
 
-    /** A new person with a garden, signed in. */
+    /** Makes an account for [email] with a password, and signs in to it. The app itself never does: it starts without one. */
+    protected suspend fun signUp(email: String, password: String = PASSWORD) {
+        backend.auth.createUserWithEmailAndPassword(email, password).await()
+    }
+
     /** A new person with a garden, who accepted the terms in [termsVersion]. They stay signed in. */
     protected fun person(name: String, termsVersion: Int = LegalDoc.CURRENT_VERSION): Person = onBackend {
         backend.auth.signOut()
         val email = newEmail()
         val auth = AuthRepository(backend, store)
-        auth.signUp(email, PASSWORD)
+        signUp(email)
         auth.createProfile(name, "🌼", termsVersion)
         val uid = backend.requireUid()
         // The backend writes the friend code. A single read can come before the phone sees it.

@@ -1,7 +1,12 @@
 package dev.pcoffline.meadow.ui.components.flora
 
 import androidx.compose.runtime.Immutable
+import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.PLANTS_PER_THEME
+import dev.pcoffline.meadow.usage.IconColour
 import dev.pcoffline.meadow.ui.theme.GardenTheme
+import kotlin.math.abs
+import kotlin.math.sin
 
 /** How a plant is built. Each form has its own outline, so a plant is told by its shape as well as its colour. */
 enum class Form { RAY, ROSETTE, CUP, POMPOM, LOTUS, SPIKE, GLOBE, RACEME, MUSHROOM }
@@ -225,5 +230,37 @@ internal val Plants = mapOf(
 /** The five plants that [theme] grows, its own first. */
 fun plantsOf(theme: GardenTheme): List<Plant> = Plants.getValue(theme)
 
-/** The plant that an app keeps in each theme: the same place in each theme's five, from its [packageName]. */
-fun plantFor(packageName: String, theme: GardenTheme): Plant = plantsOf(theme).let { it[(packageName.hashCode() and 0x7fffffff) % it.size] }
+/** The place in each theme's five plants that an app's [packageName] gives it, when its icon has no colour. */
+fun namedPlace(packageName: String): Int = (packageName.hashCode() and 0x7fffffff) % PLANTS_PER_THEME
+
+/**
+ * The place of the plant in [theme] whose petals are nearest to [icon] in colour. Hue counts most:
+ * it is compared at one chroma for all, and lightness and chroma count half. With no colour (a
+ * grey icon, or none), it is the place that the app's [packageName] gives.
+ */
+fun defaultPlace(packageName: String, theme: GardenTheme, icon: IconColour?): Int {
+    if (icon == null || icon.grey) return namedPlace(packageName)
+    return plantsOf(theme).indices.minBy { place ->
+        val petal = plantsOf(theme)[place].petal
+        val turn = Math.toRadians(((petal.h - icon.h + 540f) % 360f - 180f).toDouble())
+        val hue = 2 * HUE_CHROMA * sin(abs(turn) / 2)
+        val dl = HALF * (petal.l - icon.l)
+        val dc = HALF * (petal.c - icon.c)
+        hue * hue + dl * dl + dc * dc
+    }
+}
+
+/** The chroma at which hues are compared: about that of the plants' petals. */
+private const val HUE_CHROMA = 0.15
+
+private const val HALF = 0.5
+
+/**
+ * The plant that an app keeps in [theme]. It is in the [chosen] place of the theme's five. With
+ * no choice, it is the plant nearest in colour to the app's [icon].
+ */
+fun plantFor(packageName: String, theme: GardenTheme, chosen: Int? = null, icon: IconColour? = null): Plant =
+    plantsOf(theme)[chosen?.takeIf { it in 0 until PLANTS_PER_THEME } ?: defaultPlace(packageName, theme, icon)]
+
+/** The plant of [limit] in [theme], for an app whose icon is [icon]. */
+fun plantFor(limit: AppLimit, theme: GardenTheme, icon: IconColour? = null): Plant = plantFor(limit.packageName, theme, limit.plant, icon)
