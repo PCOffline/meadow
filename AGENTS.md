@@ -28,6 +28,15 @@ Each branch does one task. It changes only what the task needs, and the tests fo
 - Fix an unrelated problem on a branch and pull request of its own.
 - Keep the diff as small as the task permits.
 
+## Mockups
+
+Before you write code for new UI, make a mockup of it. New UI is a new screen, dialog, card or
+control, or a new layout of one that exists.
+
+- Show the mockup to the person who asked for the change. Wait for their review.
+- Draw each state and each case that the change shows. Use the app's own colours, fonts and words.
+- Change the mockup until the person accepts it. Then build what they accepted.
+
 ## Pull requests
 
 Give each pull request the shape of Matt Pocock's
