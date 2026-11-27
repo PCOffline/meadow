@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -640,13 +641,18 @@ internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: 
             textAlign = TextAlign.Center,
             maxLines = 1,
             color = if (clock && enabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
-            // A rounded, tinted button like the − and + beside it, so it reads as one to tap.
+            // A rounded, tinted button like the − and + beside it, so it reads as one to tap. Its
+            // touch target is 48dp tall, round the smaller tint.
             modifier = Modifier.padding(horizontal = 8.dp)
                 .then(
                     if (clock) {
-                        Modifier.clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f))
+                        Modifier.heightIn(min = 48.dp).clip(MaterialTheme.shapes.medium)
                             .clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true }
+                            .wrapContentHeight()
+                            .background(
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f),
+                                MaterialTheme.shapes.medium,
+                            )
                     } else {
                         Modifier
                     },
