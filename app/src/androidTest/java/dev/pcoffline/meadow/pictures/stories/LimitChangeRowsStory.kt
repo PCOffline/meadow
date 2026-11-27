@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import dev.pcoffline.meadow.R
@@ -81,7 +82,8 @@ class LimitChangeRowsStory : Story("See what a limit change changes") {
         }
         step("Ana opens her Instagram limit. Her open question lists only what changes.") {
             compose.runOnIdle { where = Where.EDITOR }
-            desc("Daily: from 30m").performScrollTo()
+            // Withdraw ends the card, so the whole card shows above it.
+            compose.onNodeWithText(compose.activity.getString(R.string.request_withdraw)).performScrollTo()
         }
         step("A question asked before this change shows the new limit alone.") {
             compose.runOnIdle { where = Where.OLDER }
