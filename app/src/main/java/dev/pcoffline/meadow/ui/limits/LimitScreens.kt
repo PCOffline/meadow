@@ -106,10 +106,14 @@ import dev.pcoffline.meadow.ui.requests.BumblebeePicker
 import dev.pcoffline.meadow.ui.requests.pendingRequestFor
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
 import dev.pcoffline.meadow.ui.requestSummary
+import dev.pcoffline.meadow.ui.requests.LimitLines
+import dev.pcoffline.meadow.ui.requests.LineChange
+import dev.pcoffline.meadow.ui.requests.limitLines
 import dev.pcoffline.meadow.ui.ActionState
 import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.sameUncomparable
 import dev.pcoffline.meadow.ui.minutesText
@@ -575,11 +579,19 @@ private fun PendingCard(request: LimitRequest, action: ActionState) {
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
-        Text(
-            stringResource(R.string.limit_editor_pending_body, requestSummary(request).replaceFirstChar { it.uppercase() }),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-        )
+        val previous = request.previous
+        if (request.type == RequestType.CHANGE_LIMIT && previous != null) {
+            // Only what changes: the rest of the limit is in the cards above.
+            val res = LocalResources.current
+            val lines = remember(request, res) { res.limitLines(request.proposed, previous).filter { it.change != LineChange.SAME } }
+            LimitLines(lines, Modifier.padding(top = 8.dp))
+        } else {
+            Text(
+                stringResource(R.string.limit_editor_pending_body, requestSummary(request).replaceFirstChar { it.uppercase() }),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+        }
         TextButton(
             onClick = { action.run(successMessage = withdrawn) { AppGraph.requests.cancel(request.id) } },
             enabled = !action.busy,

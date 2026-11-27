@@ -200,7 +200,13 @@ data class LimitRequest(
     /** Minutes spent on the app that day when asking, and minutes the day allowed in all. */
     val usedMinutes: Int? = null,
     val allowedMinutes: Int? = null,
-)
+    /** For a change: the limit as it was when asked. Null for other requests and older changes. */
+    val previous: AppLimit? = null,
+) {
+    /** For a change: the limit asked for. */
+    val proposed: AppLimit
+        get() = AppLimit(packageName.orEmpty(), appName.orEmpty(), dailyMinutes, weeklyMinutes, schedule, dayMinutes, caps)
+}
 
 enum class InviteStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }
 
