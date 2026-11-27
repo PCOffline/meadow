@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Timestamp } from "firebase-admin/firestore";
-import { appRateKey, isAroundToday, isStale, pickApprovers, REQUEST_TTL_MS, usageLine } from "./requests";
+import { appRateKey, isAroundToday, isStale, pickApprovers, previousLimit, REQUEST_TTL_MS, usageLine } from "./requests";
 
 test("requests are for today, give or take a time zone", () => {
   const now = Date.parse("2026-10-12T23:30:00Z");
@@ -37,4 +37,28 @@ test("Bumblebees see how the day stands", () => {
   assert.equal(usageLine({ usedMinutes: 45, allowedMinutes: 60 }), "Used 45m of 1h today.");
   assert.equal(usageLine({ usedMinutes: 90, allowedMinutes: 0 }), "Used 1h 30m today.");
   assert.equal(usageLine({ usedMinutes: null, allowedMinutes: 60 }), null);
+});
+
+test("previousLimit keeps a stored limit as a request shows it, and drops what's malformed", () => {
+  assert.deepEqual(
+    previousLimit({
+      dailyMinutes: 30,
+      weeklyMinutes: 180,
+      schedule: { "6": [{ from: 720, to: 960 }, { from: 600, to: 720 }], "7": [] },
+      dayMinutes: { "7": 60 },
+      caps: [{ days: [5, 1], from: 600, to: 960, minutes: 20 }],
+      plant: 2,
+    }),
+    {
+      dailyMinutes: 30,
+      weeklyMinutes: 180,
+      schedule: { "6": [{ from: 600, to: 960 }], "7": [] },
+      dayMinutes: { "7": 60 },
+      caps: [{ days: [1, 5], from: 600, to: 960, minutes: 20 }],
+    },
+  );
+  assert.deepEqual(
+    previousLimit({ dailyMinutes: "lots", schedule: { "9": [] }, dayMinutes: { "1": -5 }, caps: "none" }),
+    { dailyMinutes: 0, weeklyMinutes: 0, schedule: null, dayMinutes: null, caps: null },
+  );
 });

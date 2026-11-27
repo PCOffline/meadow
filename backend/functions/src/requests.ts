@@ -5,7 +5,7 @@ import { inChunks } from "./chunks";
 import { chatNotes, errors, pushes } from "./copy";
 import { chats, consumeRates, db, inboxRef, loadPerson, notify, parse, postToChat, requests, requireAuth, users } from "./db";
 import { chatIdFor, formatMinutes, type RequestType, storedAppName, summarize } from "./format";
-import { type Cap, CapsSchema, type DayMinutes, DayMinutesSchema, isLimitStricter, normalize, normalizeCaps, normalizeDayMinutes, type Schedule } from "./schedule";
+import { type Cap, CapsSchema, type DayMinutes, DayMinutesSchema, isLimitStricter, normalize, normalizeCaps, normalizeDayMinutes, type Schedule, ScheduleSchema } from "./schedule";
 import { ApplySuggestionInput, CreateRequestInput, DecideRequestInput, LimitCardSchema, RequestIdInput, SaveLimitInput } from "./schemas";
 
 const MAX_PENDING = 10;
@@ -36,6 +36,11 @@ export interface RequestDoc {
   /** Days with their own daily limit, and caps within hours; missing on older requests. */
   dayMinutes?: DayMinutes | null;
   caps?: Cap[] | null;
+  /**
+   * A change's limit as it was when asked, so a Bumblebee sees what changes. Null for other
+   * kinds of request; missing on older ones.
+   */
+  previous?: LimitShape | null;
   message: string;
   status: RequestStatus;
   approverIds: string[];
@@ -86,6 +91,7 @@ function inboxCopy(id: string, r: RequestDoc, requesterFlower: string) {
     schedule: r.schedule,
     dayMinutes: r.dayMinutes ?? null,
     caps: r.caps ?? null,
+    previous: r.previous ?? null,
     message: r.message,
     status: r.status,
     dayKey: r.dayKey,
@@ -167,6 +173,7 @@ export const createRequest = onCall(async (call) => {
       schedule: input.type === "change_limit" ? normalize(input.schedule) : null,
       dayMinutes: input.type === "change_limit" ? normalizeDayMinutes(input.dayMinutes) : null,
       caps: input.type === "change_limit" ? normalizeCaps(input.caps) : null,
+      previous: input.type === "change_limit" ? previousLimit(limit.data() ?? {}) : null,
       message: input.message,
       status: "pending",
       approverIds,
@@ -388,6 +395,30 @@ function storedLimit(old: DocumentData) {
     schedule: old.schedule ?? null,
     dayMinutes: DayMinutesSchema.safeParse(old.dayMinutes).data ?? null,
     caps: CapsSchema.safeParse(old.caps).data ?? null,
+  };
+}
+
+/** Everything a limit holds back, as a request stores it. */
+export type LimitShape = {
+  dailyMinutes: number;
+  weeklyMinutes: number;
+  schedule: Schedule | null;
+  dayMinutes: DayMinutes | null;
+  caps: Cap[] | null;
+};
+
+/**
+ * A stored limit as a request keeps it, to show what a change changes. Anything malformed is
+ * left out, as the phone reads it.
+ */
+export function previousLimit(old: DocumentData): LimitShape {
+  const stored = storedLimit(old);
+  return {
+    dailyMinutes: typeof stored.dailyMinutes === "number" ? stored.dailyMinutes : 0,
+    weeklyMinutes: typeof stored.weeklyMinutes === "number" ? stored.weeklyMinutes : 0,
+    schedule: normalize(ScheduleSchema.safeParse(stored.schedule).data ?? null),
+    dayMinutes: normalizeDayMinutes(stored.dayMinutes),
+    caps: normalizeCaps(stored.caps),
   };
 }
 
