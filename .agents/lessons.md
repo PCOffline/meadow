@@ -96,6 +96,9 @@ Write the rule that prevents the mistake in each task, not the story of this one
   URL. Search the log for `FAILED` and `error`: its tail is the clean-up.
 - Keep the `<!-- pictures: start ... -->` and `<!-- pictures: end -->` lines when you change a
   pull request description. The Pictures workflow writes between them.
+- Write no Pictures markers of your own in a new description. The workflow finds its exact start
+  line (`START` in `.github/scripts/pr_pictures.py`) and the first end line. Another pair makes it
+  add a second Pictures section on each run.
 - When a change stores new data, compare it with `legal/privacy_notice.md`. Say in the pull
   request what the notice says about it.
 
