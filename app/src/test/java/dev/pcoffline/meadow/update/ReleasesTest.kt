@@ -142,6 +142,39 @@ class ReleasesTest {
     }
 
     @Test
+    fun `notes with a part for people show only that part, as plain lines`() {
+        val body = """
+            <!-- for people: start -->
+            Your garden now waters itself.
+
+            ### New
+            - Water the garden from the rest screen (#7)
+            ### Fixed
+            - A plant grows again after a long night (#8) (#9)
+            <!-- for people: end -->
+
+            ## Highlights
+            ### Water the garden
+            <img src="https://example.com/after/1.png" width="300" alt="Water a plant">
+
+            ## All changes
+            - feat(app): water the garden (#7)
+        """.trimIndent()
+        assertEquals(
+            listOf(
+                "Your garden now waters itself.",
+                "New",
+                "• Water the garden from the rest screen",
+                "Fixed",
+                "• A plant grows again after a long night",
+            ),
+            Releases.notesForPeople(body).lines(),
+        )
+        // Without its end line, the part isn't trusted, and the notes read as GitHub's.
+        assertEquals("• Water the garden", Releases.notesForPeople("<!-- for people: start -->\n- feat: water the garden"))
+    }
+
+    @Test
     fun `Meadow's own APK is picked, and a digest that isn't SHA-256 is no checksum`() {
         val release = GitHubRelease(
             tag = "v9.0.0",
