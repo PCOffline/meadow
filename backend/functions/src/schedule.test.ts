@@ -26,6 +26,9 @@ test("windows must end after they start and days must be real", () => {
   assert.equal(ScheduleSchema.safeParse({ "1": [{ from: 600, to: 600 }] }).success, false);
   assert.equal(ScheduleSchema.safeParse({ "8": [] }).success, false);
   assert.equal(ScheduleSchema.safeParse({ "1": [{ from: 0, to: 1440 }] }).success, true);
+  const stretches = (n: number) => Array.from({ length: n }, (_, i) => ({ from: i * 120, to: i * 120 + 60 }));
+  assert.equal(ScheduleSchema.safeParse({ "1": stretches(8) }).success, true, "a day can have 8 stretches");
+  assert.equal(ScheduleSchema.safeParse({ "1": stretches(9) }).success, false, "but not 9");
   assert.deepEqual(normalize({ "1": [{ from: 700, to: 800 }, { from: 600, to: 750 }] }), { "1": [{ from: 600, to: 800 }] });
 });
 

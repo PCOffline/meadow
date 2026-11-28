@@ -12,7 +12,7 @@ export type Schedule = Partial<Record<Day, Window[]>>;
 export const DAYS = ["1", "2", "3", "4", "5", "6", "7"] as const;
 type Day = (typeof DAYS)[number];
 const MINUTES_IN_DAY = 1440;
-export const MAX_WINDOWS = 4;
+export const MAX_WINDOWS = 8;
 
 const windowSchema = z.object({
   from: z.number().int().min(0).max(MINUTES_IN_DAY),
