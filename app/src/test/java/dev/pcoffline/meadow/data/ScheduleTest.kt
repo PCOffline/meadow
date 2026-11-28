@@ -144,15 +144,18 @@ class ScheduleTest {
     }
 
     @Test
-    fun `a cap needs days, a window that ends after it starts, and fewer minutes than the window`() {
+    fun `a cap needs days, hours of up to a day that end after they start, and fewer minutes than its hours`() {
         assertThrows(IllegalArgumentException::class.java) { TimeCap(emptyList(), 60, 120, 30) }
         assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(0), 60, 120, 30) }
         assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(8), 60, 120, 30) }
         assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), -1, 120, 30) }
-        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 1441, 30) }
+        // A cap can go past midnight, but lasts a day at most, and starts before midnight.
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 1501, 30) }
+        assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 1440, 1500, 30) }
         assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 120, 60, 30) }
         assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 120, 0) }
         assertThrows(IllegalArgumentException::class.java) { TimeCap(listOf(1), 60, 120, 60) }
         TimeCap(listOf(1, 7), 0, 1440, 1439)
+        TimeCap(listOf(5), 1320, 1560, 30)
     }
 }
