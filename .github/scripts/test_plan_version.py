@@ -102,6 +102,24 @@ class PlanVersionTest(unittest.TestCase):
         self.assertEqual("0.3.5", self.auto("app", sha)["version"])
         self.assertEqual("0.3.0", self.auto("backend", sha)["version"])
 
+    def test_a_change_to_the_app_tests_alone_makes_no_release(self):
+        self.commit("app/src/main/a.kt")
+        self.git("tag", "v0.3.4")
+        for path in ("app/src/test/a.kt", "app/src/testDebug/a.kt", "app/src/androidTest/a.kt", "app/src/sharedTest/a.kt"):
+            sha = self.commit(path, "test: a story")
+            self.assertEqual("false", self.auto("app", sha)["ship"], path)
+            self.assertEqual("false", plan("app", "workflow_dispatch", "", sha, "")["ship"], path)
+        # A commit that changes the app and its tests counts.
+        with open("app/src/main/a.kt", "a") as f:
+            f.write("x\n")
+        self.assertEqual("0.3.5", self.auto("app", self.commit("app/src/test/a.kt", "fix: a crash"))["version"])
+
+    def test_commits_to_the_app_tests_alone_dont_choose_the_part(self):
+        self.commit("app/src/main/a.kt")
+        self.git("tag", "v0.3.4")
+        self.commit("app/src/androidTest/Story.kt", "feat(app): a story [major]")
+        self.assertEqual("0.3.5", self.auto("app", self.commit("app/src/main/a.kt", "fix(app): a crash"))["version"])
+
     def test_commits_alone_never_leave_0_x(self):
         self.commit("app/a.kt")
         self.git("tag", "v0.9.3")

@@ -16,8 +16,9 @@ commit messages).
 - By hand, choosing a part: raises exactly that part, major included (0.9.3 → 1.0.0).
 - By hand, auto: as below, but the backend deploys even when unchanged, as the version it has.
 - Automatically, after Build passes on main: ships only when the component changed since its last
-  tag, unless the last commit says [skip release] (app) or [skip deploy] (backend). Commits that
-  touch the component decide the part, by their Conventional Commits type or a marker:
+  tag, unless the last commit says [skip release] (app) or [skip deploy] (backend). A change to the
+  app's tests or Pictures stories alone (Component.exclude) doesn't count. Commits that touch the
+  component decide the part, by their Conventional Commits type or a marker:
   `type!:`, a `BREAKING CHANGE:` footer, [major] or [breaking] for incompatible changes; `feat`
   or [minor] for new features; anything else a patch.
 
@@ -42,14 +43,23 @@ class Component:
     prefix: str
     paths: tuple[str, ...]
     skip_marker: str
+    # Paths in [paths] whose changes don't count, such as the app's tests.
+    exclude: tuple[str, ...] = ()
+
+    @property
+    def pathspecs(self) -> tuple[str, ...]:
+        """The git pathspecs of the changes that count: [paths] without [exclude]."""
+        return (*self.paths, *(f":(exclude){p}" for p in self.exclude))
 
 
 COMPONENTS = {
     # The APK. It bundles the legal documents and is built for the region in backend/functions/.env.
+    # The tests and the Pictures stories aren't in the APK: a change to them alone makes no release.
     "app": Component(
         "v",
         ("app/", "gradle/", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "legal/", "backend/functions/.env"),
         "[skip release]",
+        exclude=("app/src/test/", "app/src/testDebug/", "app/src/androidTest/", "app/src/sharedTest/"),
     ),
     # Rules, indexes, functions, hosting (with the legal pages) and the Storage lifecycle rule.
     "backend": Component("backend-v", ("backend/", "legal/"), "[skip deploy]"),
@@ -139,7 +149,7 @@ def plan(name: str, event: str, ref_name: str, sha: str, bump: str) -> dict[str,
 
     already = last is not None and is_ancestor(sha, last[0])
     since = f"{last[0]}..{sha}" if last else sha
-    changed = bool(git("log", "--format=%H", since, "--", *component.paths)) if not already else False
+    changed = bool(git("log", "--format=%H", since, "--", *component.pathspecs)) if not already else False
 
     if event == "workflow_run":
         if component.skip_marker in git("log", "-1", "--format=%B", sha):
@@ -162,7 +172,7 @@ def plan(name: str, event: str, ref_name: str, sha: str, bump: str) -> dict[str,
         first = (1, 0, 0) if bump == "major" else FIRST_VERSION
         return result(True, "first version", text(first), component.prefix + text(first))
 
-    part = bump if chosen else bump_from_messages(git("log", "--format=%B%x00", since, "--", *component.paths))
+    part = bump if chosen else bump_from_messages(git("log", "--format=%B%x00", since, "--", *component.pathspecs))
     version, raised = bumped(last[1], part, chosen)
     how = "chosen" if chosen else "from the commits"
     reason = f"{raised} after {last[0]}, {how}" + (" (a major change, kept below 1.0.0)" if raised != part else "")
