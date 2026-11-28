@@ -16,7 +16,7 @@ name: Deliver
 # By hand: Actions → Deliver → Run workflow on main, choosing for each which part to raise
 # (major included, which is how a version leaves 0.x), or auto to read it from the commits.
 # By tag: pushing a tag like v1.2.0 releases exactly that version of the app (no deploy).
-# Each release's notes come from its pull requests (.github/scripts/release_notes.py).
+# Each release's notes come from the release notes of its pull requests (.github/scripts/release_notes.py).
 on:
   # Runs with this repository's secrets after Build. The jobs only act on pushes to this
   # repository's main (see their conditions), never on pull requests or forks.
@@ -221,22 +221,14 @@ jobs:
             echo "::error::Build hasn't passed on $SHA. Wait for it to pass, then try again."
             exit 1
           fi
-      # Claude writes the notes from the released pull requests, with their pictures, when the
-      # ANTHROPIC_API_KEY secret is set. Without it, the notes list the changes by type. This runs
-      # before the signing key is on the runner, so the package it installs never runs beside it.
+      # The notes come from the release notes in the released pull requests' descriptions.
       - name: Write the release notes
         if: steps.plan.outputs.ship == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.plan.outputs.tag }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL }}
         run: |
-          python3 -m venv "$RUNNER_TEMP/notes"
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
-            "$RUNNER_TEMP/notes/bin/pip" install --quiet anthropic==2.14.0
-          fi
-          "$RUNNER_TEMP/notes/bin/python" .github/scripts/release_notes.py "$TAG" > "$RUNNER_TEMP/release-notes.md"
+          python3 .github/scripts/release_notes.py "$TAG" > "$RUNNER_TEMP/release-notes.md"
           cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         if: steps.plan.outputs.ship == 'true'

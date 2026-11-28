@@ -1,29 +1,44 @@
-"""Writes the notes of an app release, for the Deliver workflow.
+"""Writes and checks the notes of app releases. The authors of the pull requests write them.
 
-    python3 release_notes.py <tag>        (prints the notes as Markdown)
+    release_notes.py <tag>                 prints the notes of a new release, for Deliver
+    release_notes.py check                 checks a pull request's release note, for CI
+    release_notes.py overview <tag> <text> puts a new overview in a published release
 
-Environment: GITHUB_REPOSITORY, SHA (the released commit; HEAD when empty), GH_TOKEN (to read the
-pull requests with `gh`), ANTHROPIC_API_KEY (optional), RELEASE_NOTES_MODEL (optional).
+Each pull request that changes the app has a "Release note" section in its description
+(.github/pull_request_template.md, and "Release notes" in AGENTS.md):
 
-The notes cover each commit since the latest app tag that changed the app (the paths in
-plan_version.py). Each commit is a squashed pull request, so this reads the pull request too: its
-description and the pictures that the Pictures workflow put in it.
+    ## Release note
+    Kind: new | improved | fixed | none
+    Highlight: yes | no
+    Note: one line that people read, up to NOTE_MAX characters.
+    Detail: for a highlight only, up to DETAIL_MAX characters.
 
-With ANTHROPIC_API_KEY, Claude writes the notes: an overview, the highlights with their pictures,
-and what is new, improved and fixed. Without it, or when the call fails, the notes list each
-change by its Conventional Commits type. The release never waits for, or fails on, the notes.
+`<tag>` reads each commit since the latest app tag that changed the app (the paths in
+plan_version.py). Each is a squashed pull request, so it reads the pull request with `gh`: its
+release note and the pictures that the Pictures workflow put in its description. A pull request
+with no release note, such as one from a bot or from before this rule, counts by its
+Conventional Commits type: feat is new, perf is improved, fix is fixed, and the rest is none.
+Environment: GITHUB_REPOSITORY, SHA (the released commit; HEAD when empty), GH_TOKEN.
 
 The notes have three parts:
-- the part for people, between FOR_PEOPLE_START and FOR_PEOPLE_END. The app shows it
-  (Releases.notesForPeople in app/src/main/java/dev/pcoffline/meadow/update/Releases.kt);
-- the highlights, each with a picture from its pull request;
+- the part for people, between FOR_PEOPLE_START and FOR_PEOPLE_END: an overview, then what is
+  new, improved and fixed. The app shows it (Releases.notesForPeople). A release with nothing
+  for people leaves this part empty, so the app shows no notes;
+- the highlights, at most MAX_HIGHLIGHTS, each with its detail and pictures;
 - every change, with its pull request, and a link to the full comparison.
+
+Deliver writes an overview that counts the changes. The release-overview skill
+(.claude/skills/release-overview/SKILL.md) can write a better one by hand, with `overview`.
+
+`check` reads BODY (the description), AUTHOR (the pull request's author) and the changed files
+on stdin. A pull request that doesn't change the app, or that a bot opened, needs no note.
 """
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 
 from plan_version import COMPONENTS, git, latest
@@ -32,18 +47,35 @@ from pr_pictures import START as PICTURES_START
 
 FOR_PEOPLE_START = "<!-- for people: start -->"
 FOR_PEOPLE_END = "<!-- for people: end -->"
-MODEL = "claude-opus-5-5"
-PICTURE_WIDTH = 300
+NOTE_MAX = 100
+DETAIL_MAX = 300
+OVERVIEW_MAX_WORDS = 40
+MAX_HIGHLIGHTS = 3
 MAX_PICTURES = 3
+PICTURE_WIDTH = 300
+
+KINDS = ("new", "improved", "fixed", "none")
+SECTIONS = (("new", "New"), ("improved", "Improved"), ("fixed", "Fixed"))
+# How the overview counts each kind: one, many.
+COUNTED = {"new": ("new feature", "new features"), "improved": ("improvement", "improvements"), "fixed": ("fix", "fixes")}
+BY_TYPE = {"feat": "new", "perf": "improved", "fix": "fixed"}
 
 # "feat(chat)!: open at what's new (#12)": the type, and the summary without the pull request.
 SUBJECT = re.compile(r"^(?P<type>[a-z]+)(\([^)\n]*\))?!?:\s+(?P<summary>.+?)(\s+\(#\d+\))*$", re.IGNORECASE)
 PULL_REQUEST = re.compile(r"\(#(\d+)\)\s*$")
 # The Pictures workflow writes each picture as <img src="..." width="300" alt="...">.
 IMAGE = re.compile(r'<img\s+src="(?P<url>[^"]+)"[^>]*?alt="(?P<alt>[^"]*)"')
+COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+HEADING = re.compile(r"^##\s+release note\s*$", re.IGNORECASE | re.MULTILINE)
+FIELD = re.compile(r"^(?P<name>kind|highlight|note|detail):[ \t]*(?P<value>.*)$", re.IGNORECASE)
 
-KINDS = {"feat": "new", "perf": "improved", "fix": "fixed"}
-SECTIONS = (("new", "New"), ("improved", "Improved"), ("fixed", "Fixed"))
+
+@dataclass
+class Note:
+    kind: str
+    highlight: str
+    text: str
+    detail: str
 
 
 @dataclass
@@ -55,35 +87,88 @@ class Picture:
 @dataclass
 class Change:
     subject: str
-    message: str
     number: int | None = None
     title: str = ""
-    description: str = ""
+    note: Note | None = None
     pictures: list[Picture] = field(default_factory=list)
 
     @property
     def kind(self) -> str:
+        if self.note:
+            return self.note.kind
         match = SUBJECT.match(self.title or self.subject)
-        return match["type"].lower() if match else ""
+        return BY_TYPE.get(match["type"].lower(), "none") if match else "none"
 
     @property
-    def summary(self) -> str:
-        """The subject as people read it: no type, no pull request, a capital first letter."""
+    def text(self) -> str:
+        """What people read: the note, or else the summary of the title with a capital letter."""
+        if self.note:
+            return self.note.text
         line = self.title or self.subject
         match = SUBJECT.match(line)
-        text = match["summary"] if match else PULL_REQUEST.sub("", line).strip()
-        return text[:1].upper() + text[1:]
+        summary = match["summary"] if match else PULL_REQUEST.sub("", line).strip()
+        return summary[:1].upper() + summary[1:]
+
+    @property
+    def highlight(self) -> bool:
+        return bool(self.note and self.note.kind != "none" and self.note.highlight == "yes")
+
+
+def parse_note(description: str) -> Note | None:
+    """The release note in [description], or None when it has no "Release note" section."""
+    text = COMMENT.sub("", description)
+    heading = HEADING.search(text)
+    if heading is None:
+        return None
+    section = text[heading.end() :]
+    if (following := re.search(r"^##\s", section, re.MULTILINE)) is not None:
+        section = section[: following.start()]
+    fields = {}
+    for line in section.splitlines():
+        if (match := FIELD.match(line.strip())) is not None:
+            fields[match["name"].lower()] = match["value"].strip()
+    return Note(fields.get("kind", "").lower(), fields.get("highlight", "").lower(), fields.get("note", ""), fields.get("detail", ""))
+
+
+def problems(note: Note | None) -> list[str]:
+    """What is wrong with [note], in words that tell the author what to change."""
+    if note is None:
+        return ["Add a \"## Release note\" section to the description, as in .github/pull_request_template.md."]
+    found = []
+    if note.kind not in KINDS:
+        found.append(f"Set Kind to one of: {', '.join(KINDS)}.")
+    if note.highlight not in ("yes", "no"):
+        found.append("Set Highlight to yes or no.")
+    if note.kind == "none":
+        if note.highlight == "yes" or note.text or note.detail:
+            found.append("Leave Note and Detail empty and set Highlight to no when Kind is none.")
+        return found
+    if not note.text:
+        found.append("Write the Note: one line that says what people see or can do now.")
+    elif len(note.text) > NOTE_MAX:
+        found.append(f"Shorten the Note to {NOTE_MAX} characters or fewer. It has {len(note.text)}.")
+    if note.highlight == "yes" and not note.detail:
+        found.append("Write the Detail of the highlight: two or three short sentences.")
+    if note.highlight == "yes" and len(note.detail) > DETAIL_MAX:
+        found.append(f"Shorten the Detail to {DETAIL_MAX} characters or fewer. It has {len(note.detail)}.")
+    if note.highlight == "no" and note.detail:
+        found.append("Leave Detail empty, or set Highlight to yes.")
+    return found
+
+
+def changes_app(files: list[str]) -> bool:
+    paths = COMPONENTS["app"].paths
+    return any(f == p or (p.endswith("/") and f.startswith(p)) for f in files for p in paths)
 
 
 def changes_since(previous: str | None, sha: str) -> list[Change]:
     """The commits after [previous] up to [sha] that changed the app, oldest first."""
     since = f"{previous}..{sha}" if previous else sha
-    log = git("log", "--reverse", "--format=%B%x00", since, "--", *COMPONENTS["app"].paths)
+    subjects = git("log", "--reverse", "--format=%s", since, "--", *COMPONENTS["app"].paths)
     changes = []
-    for message in filter(None, (m.strip() for m in log.split("\0"))):
-        subject = message.splitlines()[0]
+    for subject in filter(None, subjects.splitlines()):
         number = PULL_REQUEST.search(subject)
-        changes.append(Change(subject, message, int(number[1]) if number else None))
+        changes.append(Change(subject, int(number[1]) if number else None))
     return changes
 
 
@@ -103,17 +188,8 @@ def pictures_in(description: str) -> list[Picture]:
     return pictures
 
 
-def without_pictures(description: str) -> str:
-    start = description.find(PICTURES_START)
-    if start < 0:
-        return description.strip()
-    end = description.find(PICTURES_END, start)
-    rest = description[end + len(PICTURES_END) :] if end >= 0 else ""
-    return (description[:start] + rest).strip()
-
-
 def read_pull_request(repo: str, change: Change) -> None:
-    """Adds the title, description and pictures of [change]'s pull request, when it has one."""
+    """Adds the title, release note and pictures of [change]'s pull request, when it has one."""
     if change.number is None:
         return
     found = subprocess.run(
@@ -126,180 +202,106 @@ def read_pull_request(repo: str, change: Change) -> None:
     pull = json.loads(found.stdout)
     body = pull.get("body") or ""
     change.title = pull.get("title") or ""
-    change.description = without_pictures(body)
+    note = parse_note(body)
+    # A note with problems got past the check (or came before it): the type decides instead.
+    change.note = note if note is not None and not problems(note) else None
     change.pictures = pictures_in(body)
 
 
-# What Claude returns. Structured outputs keep it to this shape.
-SCHEMA = {
-    "type": "object",
-    "properties": {
-        "overview": {"type": "string"},
-        "highlights": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "text": {"type": "string"},
-                    "change": {"type": "integer"},
-                    "pictures": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["title", "text", "change", "pictures"],
-                "additionalProperties": False,
-            },
-        },
-        **{
-            key: {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {"text": {"type": "string"}, "changes": {"type": "array", "items": {"type": "integer"}}},
-                    "required": ["text", "changes"],
-                    "additionalProperties": False,
-                },
-            }
-            for key, _ in SECTIONS
-        },
-    },
-    "required": ["overview", "highlights", *(key for key, _ in SECTIONS)],
-    "additionalProperties": False,
-}
-
-SYSTEM = """You write the release notes of Meadow, an Android app that helps people keep their \
-phone use calm. People read the notes before they update: in the app, and on the GitHub release.
-
-You get each change in the release: its pull request number, title, description, commit message \
-and pictures. Write:
-- overview: two to four sentences that say what this release brings, as a whole.
-- highlights: the changes that people will notice most. Usually one to three; none when the \
-release has only small fixes. Each has a short title, two to four sentences of text, the pull \
-request number in "change", and up to three picture URLs from that change's own pictures, in the \
-order that tells the change best. Choose pictures that show the change itself.
-- new: each new feature, one line each.
-- improved: each change that makes something that exists work better or faster, one line each.
-- fixed: each bug fix, one line each, said as what works now.
-Each line lists the pull request numbers that it comes from in "changes". Put each change in one \
-list only. Leave out changes that people can't see or feel: tests, refactors, builds, docs, CI and \
-dependency updates. A highlight can also have a line in its list.
-
-Write as Meadow's app text: warm, calm and plain. Use ASD-STE100 Simplified Technical English: \
-short sentences, the active voice, simple tenses and common words. Describe what people see and \
-do. Leave out code, file names, services, error codes and how a feature works. Use sentence case, \
-no emojis, no dashes, no sales words and no exclamation marks. Write "you" for the person who \
-reads. Use only facts from the changes."""
+def counted(changes: list[Change]) -> str:
+    """"This update has 2 new features and 1 fix.", or "" when nothing is for people."""
+    parts = []
+    for kind, (one, many) in COUNTED.items():
+        if n := sum(c.kind == kind for c in changes):
+            parts.append(f"{n} {one if n == 1 else many}")
+    if not parts:
+        return ""
+    listed = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    return f"This update has {listed}."
 
 
-def ask_claude(changes: list[Change], version: str) -> dict | None:
-    """Claude's notes, or None when there's no key, no SDK, or the call fails."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("::notice::No ANTHROPIC_API_KEY, so the notes list the changes by their type", file=sys.stderr)
-        return None
-    try:
-        import anthropic
-    except ImportError:
-        print("::warning::The anthropic package isn't installed, so the notes list the changes by their type", file=sys.stderr)
-        return None
-    request = [
-        {
-            "change": c.number,
-            "title": c.title or c.subject,
-            "description": c.description,
-            "commit message": c.message,
-            "pictures": [{"url": p.url, "caption": p.caption} for p in c.pictures],
-        }
-        for c in changes
-    ]
-    try:
-        response = anthropic.Anthropic().messages.create(
-            model=os.environ.get("RELEASE_NOTES_MODEL") or MODEL,
-            max_tokens=16000,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": f"Meadow {version}. The changes:\n\n{json.dumps(request, indent=1)}"}],
-            output_config={"format": {"type": "json_schema", "schema": SCHEMA}},
-        )
-    except anthropic.APIError as e:
-        print(f"::warning::Claude couldn't write the notes ({e}), so they list the changes by their type", file=sys.stderr)
-        return None
-    if response.stop_reason != "end_turn":
-        print(f"::warning::Claude stopped ({response.stop_reason}), so the notes list the changes by their type", file=sys.stderr)
-        return None
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        print("::warning::Claude's notes weren't JSON, so they list the changes by their type", file=sys.stderr)
-        return None
-
-
-def by_type(changes: list[Change]) -> dict:
-    """Notes without Claude: features, improvements and fixes by their type. Each feature with
-    pictures is a highlight."""
-    notes: dict = {"overview": "", "highlights": [], **{key: [] for key, _ in SECTIONS}}
-    for c in changes:
-        if (section := KINDS.get(c.kind)) is None:
-            continue
-        notes[section].append({"text": c.summary, "changes": [c.number] if c.number else []})
-        if section == "new" and c.pictures and c.number:
-            notes["highlights"].append({"title": c.summary, "text": "", "change": c.number, "pictures": [c.pictures[0].url]})
-    return notes
-
-
-def checked(notes: dict, changes: list[Change]) -> dict:
-    """[notes] with only real pull requests, and only pictures from the highlight's own one."""
-    by_number = {c.number: c for c in changes if c.number}
-    for key, _ in SECTIONS:
-        for line in notes.get(key, []):
-            line["changes"] = [n for n in line.get("changes", []) if n in by_number]
-    highlights = []
-    for h in notes.get("highlights", []):
-        change = by_number.get(h.get("change"))
-        if change is None:
-            continue
-        own = {p.url: p for p in change.pictures}
-        h["pictures"] = [own[url] for url in dict.fromkeys(h.get("pictures", [])) if url in own][:MAX_PICTURES]
-        highlights.append(h)
-    notes["highlights"] = highlights
-    return notes
-
-
-def links(numbers: list[int]) -> str:
-    return "".join(f" (#{n})" for n in numbers)
-
-
-def render(notes: dict, changes: list[Change], repo: str, previous: str | None, tag: str) -> str:
+def render(changes: list[Change], repo: str, previous: str | None, tag: str) -> str:
     lines = [FOR_PEOPLE_START]
-    if overview := notes.get("overview", "").strip():
+    if overview := counted(changes):
         lines += [overview, ""]
-    for key, heading in SECTIONS:
-        if items := notes.get(key):
-            lines += [f"### {heading}", *(f"- {i['text'].strip()}{links(i['changes'])}" for i in items), ""]
-    if lines == [FOR_PEOPLE_START]:
-        lines += ["Small changes that keep Meadow running well.", ""]
+        for kind, heading in SECTIONS:
+            if items := [c for c in changes if c.kind == kind]:
+                lines += [f"### {heading}", *(f"- {c.text}" + (f" (#{c.number})" if c.number else "") for c in items), ""]
     lines += [FOR_PEOPLE_END, ""]
 
-    if notes.get("highlights"):
+    if highlights := [c for c in changes if c.highlight][:MAX_HIGHLIGHTS]:
         lines += ["## Highlights", ""]
-        for h in notes["highlights"]:
-            lines += [f"### {h['title'].strip()}", ""]
-            if text := h.get("text", "").strip():
-                lines += [f"{text} (#{h['change']})", ""]
-            if h["pictures"]:
-                lines += [
-                    " ".join(f'<img src="{p.url}" width="{PICTURE_WIDTH}" alt="{p.caption}">' for p in h["pictures"]),
-                    "",
-                ]
+        for c in highlights:
+            lines += [f"### {c.text}", "", f"{c.note.detail} (#{c.number})", ""]  # type: ignore[union-attr]
+            if c.pictures:
+                pictures = c.pictures[:MAX_PICTURES]
+                lines += [" ".join(f'<img src="{p.url}" width="{PICTURE_WIDTH}" alt="{p.caption}">' for p in pictures), ""]
 
-    lines += ["## All changes", "", *(f"- {c.title or c.subject}" + ("" if c.number is None or c.title == "" else f" (#{c.number})") for c in changes), ""]
+    lines += ["## All changes", ""]
+    lines += [f"- {c.title} (#{c.number})" if c.title else f"- {c.subject}" for c in changes]
+    lines.append("")
     if previous:
         lines.append(f"**Full comparison**: https://github.com/{repo}/compare/{previous}...{tag}")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit(f"Usage: {sys.argv[0]} <tag>")
-    tag = sys.argv[1]
+def overview_problems(text: str) -> list[str]:
+    found = []
+    if not text.strip():
+        found.append("Write the overview.")
+    if "\n" in text.strip():
+        found.append("Write the overview as one paragraph.")
+    if (words := len(text.split())) > OVERVIEW_MAX_WORDS:
+        found.append(f"Shorten the overview to {OVERVIEW_MAX_WORDS} words or fewer. It has {words}.")
+    return found
+
+
+def with_overview(body: str, text: str) -> str:
+    """[body] with [text] as the overview of its part for people, in place of the one it has."""
+    body = body.replace("\r\n", "\n")
+    start = body.find(FOR_PEOPLE_START)
+    end = body.find(FOR_PEOPLE_END, start + 1)
+    if start < 0 or end < 0:
+        raise ValueError("These notes have no part for people.")
+    lines = body[start + len(FOR_PEOPLE_START) : end].strip().splitlines()
+    first = next((i for i, line in enumerate(lines) if line.startswith("### ")), None)
+    if first is None:
+        raise ValueError("This release has nothing for people, so it has no overview.")
+    part = "\n".join([text.strip(), "", *lines[first:]])
+    return f"{body[:start]}{FOR_PEOPLE_START}\n{part}\n\n{body[end:]}"
+
+
+def check() -> None:
+    files = sys.stdin.read().split()
+    if not changes_app(files):
+        print("The app doesn't change, so this pull request needs no release note.")
+        return
+    if os.environ.get("AUTHOR", "").endswith("[bot]"):
+        print("A bot opened this pull request, so its type decides its release note.")
+        return
+    if found := problems(parse_note(os.environ.get("BODY", ""))):
+        for problem in found:
+            print(f"::error::{problem}")
+        raise SystemExit(1)
+    print("The release note is good.")
+
+
+def overview(tag: str, text: str) -> None:
+    if found := overview_problems(text):
+        raise SystemExit("\n".join(found))
+    body = subprocess.run(["gh", "release", "view", tag, "--json", "body", "--jq", ".body"], capture_output=True, text=True, check=True).stdout
+    try:
+        notes = with_overview(body, text)
+    except ValueError as e:
+        raise SystemExit(str(e)) from e
+    with tempfile.NamedTemporaryFile("w", suffix=".md") as f:
+        f.write(notes)
+        f.flush()
+        subprocess.run(["gh", "release", "edit", tag, "--notes-file", f.name], check=True)
+    sys.stdout.write(notes[notes.index(FOR_PEOPLE_START) : notes.index(FOR_PEOPLE_END) + len(FOR_PEOPLE_END)] + "\n")
+
+
+def release(tag: str) -> None:
     repo = os.environ["GITHUB_REPOSITORY"]
     sha = os.environ.get("SHA") or git("rev-parse", "HEAD")
     last = latest(COMPONENTS["app"], exclude=tag)
@@ -307,8 +309,19 @@ def main() -> None:
     changes = changes_since(previous, sha)
     for change in changes:
         read_pull_request(repo, change)
-    notes = ask_claude(changes, tag.removeprefix("v")) or by_type(changes)
-    sys.stdout.write(render(checked(notes, changes), changes, repo, previous, tag))
+    sys.stdout.write(render(changes, repo, previous, tag))
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    if args == ["check"]:
+        check()
+    elif len(args) == 3 and args[0] == "overview":
+        overview(args[1], args[2])
+    elif len(args) == 1 and args[0] not in ("check", "overview"):
+        release(args[0])
+    else:
+        raise SystemExit(__doc__)
 
 
 if __name__ == "__main__":

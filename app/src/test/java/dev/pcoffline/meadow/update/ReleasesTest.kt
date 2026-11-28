@@ -170,6 +170,8 @@ class ReleasesTest {
             ),
             Releases.notesForPeople(body).lines(),
         )
+        // A release with nothing for people has an empty part, and shows no notes.
+        assertEquals("", Releases.notesForPeople("<!-- for people: start -->\n<!-- for people: end -->\n\n## All changes\n\n- feat(app): water the garden (#7)"))
         // Without its end line, the part isn't trusted, and the notes read as GitHub's.
         assertEquals("• Water the garden", Releases.notesForPeople("<!-- for people: start -->\n- feat: water the garden"))
     }

@@ -334,9 +334,10 @@ proposes updates each week.
 | Workflow | When it runs | What it does | Secrets it needs |
 |---|---|---|---|
 | **Build** (`build.yml`) | Each pull request and each push to `main`. For a different branch, start it from the Actions tab | Builds the app and runs unit tests and lint. Tests the functions, security rules and hosting pages. Runs integration tests on the Firebase emulators and end-to-end tests on an Android emulator | None. With `GOOGLE_SERVICES_JSON`, it builds for your backend. Without it, it builds the "Meadow can't start" version |
-| **Deliver** (`deliver.yml`) | After Build passes on `main` (when on, see 7.5 and 7.6), when you push a tag like `v0.4.0`, or by hand | Deploys the backend to Firebase. Then it tests, builds and signs the release APK, and publishes it on the Releases page of your fork | The five secrets in 7.4 to release, and `ANTHROPIC_API_KEY` for notes by Claude. The Google Cloud access in 7.6 to deploy |
+| **Deliver** (`deliver.yml`) | After Build passes on `main` (when on, see 7.5 and 7.6), when you push a tag like `v0.4.0`, or by hand | Deploys the backend to Firebase. Then it tests, builds and signs the release APK, and publishes it on the Releases page of your fork | The five secrets in 7.4 to release. The Google Cloud access in 7.6 to deploy |
 | **Screenshots** (`screenshots.yml`) | Pushes to `main` that change the app's screens, or by hand | Makes the README images again, commits them to the branch, and runs Build on that commit | None |
 | **Pictures** (`pictures.yml`) | Each pull request that changes the app's screens | Draws the pull request's stories and each screen of the debug gallery on an Android emulator, for the pull request and its base. Publishes them on the branch `pictures/pr-<number>` and puts them in the pull request's description | None |
+| **Release note** (`release-note.yml`) | Each pull request, and each change to its description | Checks the **Release note** section of a pull request that changes the app. Deliver makes the release notes from these sections | None |
 
 Until you turn on automatic deploys (7.6), deploy the backend from your computer (step 4) each
 time `backend/` changes.
@@ -367,7 +368,6 @@ each of these secrets:
 | `MEADOW_KEYSTORE_PASSWORD` | The keystore password |
 | `MEADOW_KEY_ALIAS` | The key alias, for example `meadow` |
 | `MEADOW_KEY_PASSWORD` | The key password |
-| `ANTHROPIC_API_KEY` | Optional. A [Claude API](https://platform.claude.com) key, so that Claude writes the release notes (7.5) |
 
 ### 7.5 Publish releases
 
@@ -427,13 +427,22 @@ Each release has notes in three parts:
 - the highlights, each with pictures from the Pictures workflow of its pull request;
 - every change, with its pull request.
 
-The notes come from each pull request that changed the app since the latest release: its title,
-description, commit message and pictures (`.github/scripts/release_notes.py`). With the
-`ANTHROPIC_API_KEY` secret, Claude writes them. The repository variable `RELEASE_NOTES_MODEL`
-sets the model; without it, Deliver uses the model in the script. Each release sends these pull
-requests to the Claude API. Without the secret, or when the call fails, the notes list the
-changes by their type, and the features with pictures are the highlights. The release goes on in
-each case. The run's summary shows the notes.
+The notes come from the **Release note** section of each pull request that changed the app since
+the latest release (`.github/scripts/release_notes.py`). AGENTS.md says how to write it, and the
+**Release note** workflow checks it. A pull request without the section, such as one from
+Dependabot, counts by its Conventional Commits type. The overview counts the changes. A release
+with nothing for people has an empty part for people, and the app shows no notes. The run's
+summary shows the notes.
+
+To write a better overview after a release, ask a coding agent to use the **release-overview**
+skill (`.claude/skills/release-overview/SKILL.md`). Or write it yourself and run:
+
+```bash
+python3 .github/scripts/release_notes.py overview v0.4.0 "Your garden waters itself now."
+```
+
+The command needs the [GitHub CLI](https://cli.github.com), signed in with access to edit
+releases. The overview is one paragraph of 40 words or fewer.
 
 Release builds look for updates on the repository that built them. Thus copies from your fork
 update from the releases of your fork. People can turn off these checks in Settings. If you

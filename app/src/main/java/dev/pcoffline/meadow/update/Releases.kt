@@ -78,7 +78,8 @@ object Releases {
     /**
      * A release's notes as people read them in Settings. Deliver writes a part for people: an
      * overview, then a heading and a list for each kind of change. This keeps that part, with each
-     * heading as a line, each item as a bullet, and no pull request numbers. Older releases have
+     * heading as a line, each item as a bullet, and no pull request numbers. The part is empty for
+     * a release with nothing for people, so the notes are empty too. Older releases have
      * GitHub's notes, written for developers. From those, this keeps what changed for people, a
      * line each. Empty when nothing is left.
      */
