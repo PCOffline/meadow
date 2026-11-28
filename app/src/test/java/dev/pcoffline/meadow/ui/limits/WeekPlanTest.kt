@@ -140,4 +140,21 @@ class WeekPlanTest {
         assertEquals(listOf(cap to (0 until 120)), WeekPlan.capPartsOn(listOf(cap), 6))
         assertEquals(emptyList<Pair<TimeCap, IntRange>>(), WeekPlan.capPartsOn(listOf(cap), 7))
     }
+
+    @Test
+    fun `Hours with nothing to bring back leaves the day allowed all day, and resting days stay resting`() {
+        val schedule = Schedule(mapOf(1 to emptyList(), 2 to listOf(w(600, 960))))
+        assertNull(WeekPlan.setMode(schedule, 2, DayMode.HOURS, emptyList())!!.days[2])
+        // Removing a stretch on another day leaves a resting day as it is.
+        assertEquals(emptyList<TimeWindow>(), WeekPlan.remove(schedule, Stretch(2, 600, 960))!!.days[1])
+        assertEquals(emptyList<Stretch>(), WeekPlan.stretchesOn(schedule, 1))
+        assertEquals(emptyList<Stretch>(), WeekPlan.stretches(null))
+    }
+
+    @Test
+    fun `a stretch past midnight into a resting day gives that day its early hours`() {
+        val schedule = WeekPlan.add(Schedule(mapOf(6 to emptyList())), listOf(5), 1320, 1560)!!
+        assertEquals(listOf(w(0, 120)), schedule.days[6])
+        assertEquals(listOf(Stretch(5, 1320, 1560)), WeekPlan.stretches(schedule))
+    }
 }

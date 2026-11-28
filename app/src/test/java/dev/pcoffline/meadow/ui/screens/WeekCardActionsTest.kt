@@ -239,4 +239,56 @@ class WeekCardActionsTest : ScreenTest() {
         node(R.string.action_cancel).performClick()
         assertTrue(limit.caps.isEmpty())
     }
+
+    @Test
+    fun `Redraw on a cap draws its new hours`() {
+        limit = limit.copy(caps = listOf(TimeCap(listOf(1), 840, 1320, 30)))
+        card()
+        tap(1, 16f)
+        node(R.string.week_redraw).performClick()
+        day(1).performTouchInput {
+            down(Offset(center.x, height * 15f / 24f))
+            moveTo(Offset(center.x, height * 17f / 24f))
+            moveTo(Offset(center.x, height * 18f / 24f))
+            up()
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(TimeCap(listOf(1), 900, 1080, 30)), limit.caps)
+    }
+
+    @Test
+    fun `with no daily limit, a day's own limit has nothing to reset to, and the weekly limit is typed`() {
+        limit = limit.copy(daily = 0, schedule = null)
+        card()
+        node(R.string.limit_editor_pick_one).assertDoesNotExist()
+        compose.onNodeWithContentDescription(text(R.string.week_allow_all)).assertIsNotEnabled()
+        day(6).act(R.string.week_day_limit)
+        compose.onNode(hasText(text(R.string.keypad_reset, "30m"))).assertDoesNotExist()
+        type("4", "5")
+        node(R.string.action_ok).performClick()
+        assertEquals(45, limit.dayMinutes[6])
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_weekly)} 3h").performClick()
+        type("5", "00")
+        node(R.string.action_ok).performClick()
+        assertEquals(300, limit.weekly)
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h891dp-xxhdpi")
+    fun `on a narrow phone, each day's row says its hours, its caps and its own limit`() {
+        limit = limit.copy(
+            schedule = Schedule(mapOf(1 to listOf(TimeWindow(600, 1320)), 2 to emptyList())),
+            caps = listOf(TimeCap(listOf(1), 840, 1320, 30)),
+            dayMinutes = mapOf(1 to 60, 2 to 0),
+        )
+        card()
+        compose.onNode(hasText(text(R.string.week_day_resting))).assertExists()
+        compose.onAllNodes(hasText(text(R.string.week_day_all))).fetchSemanticsNodes().let { assertTrue(it.size >= 5) }
+        compose.onNode(hasText(text(R.string.limit_daily, "1h"))).assertExists()
+        compose.onNode(hasText(text(R.string.week_a11y_no_daily))).assertExists()
+        // A tap on a day's row shows its actions.
+        compose.onNode(hasText(dayName(3))).performClick()
+        node(R.string.week_day_hours).assertExists()
+        assertAccessible()
+    }
 }
