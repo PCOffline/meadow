@@ -83,6 +83,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -325,7 +326,7 @@ fun WeekCard(
         }
         if (redrawing != null) RedrawBar { redrawing = null }
         if (asList) {
-            WeekList(limit, days, picked, enabled, ::dayDescription) { day -> picked = if ((picked as? Picked.Day)?.day == day) null else Picked.Day(day) }
+            WeekList(limit, days, picked, enabled, ::dayDescription, ::dayActions) { day -> picked = if ((picked as? Picked.Day)?.day == day) null else Picked.Day(day) }
         } else {
             DayNames(days, limit, picked, enabled) { day -> picked = if ((picked as? Picked.Day)?.day == day) null else Picked.Day(day) }
             Box {
@@ -599,7 +600,15 @@ private fun DayNames(days: List<Int>, limit: WeekLimit, picked: Picked?, enabled
  * A tap on a day shows its actions.
  */
 @Composable
-private fun WeekList(limit: WeekLimit, days: List<Int>, picked: Picked?, enabled: Boolean, describe: (Int) -> String, onPick: (Int) -> Unit) {
+private fun WeekList(
+    limit: WeekLimit,
+    days: List<Int>,
+    picked: Picked?,
+    enabled: Boolean,
+    describe: (Int) -> String,
+    actions: (Int) -> List<CustomAccessibilityAction>,
+    onPick: (Int) -> Unit,
+) {
     val locale = currentLocale()
     val res = LocalResources.current
     Column {
@@ -608,7 +617,10 @@ private fun WeekList(limit: WeekLimit, days: List<Int>, picked: Picked?, enabled
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     .selectable(selected = (picked as? Picked.Day)?.day == day, enabled = enabled, role = Role.Button) { onPick(day) }
-                    .semantics { contentDescription = describe(day) }
+                    .semantics {
+                        contentDescription = describe(day)
+                        customActions = actions(day)
+                    }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.Top,
             ) {

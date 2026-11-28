@@ -107,7 +107,8 @@ class LimitLinesTest {
         // Fri 22:00–24:00 and Sat 00:00–02:00 are one stretch: Fri 10:00 to 02:00.
         val new = base.copy(schedule = Schedule(mapOf(5 to listOf(TimeWindow(600, 1440)), 6 to listOf(TimeWindow(0, 120), TimeWindow(360, 1320)))))
         assertEquals(
-            listOf("Other days | SAME | All day", "Hours, Fri | CHANGED | 10:00–22:00 → 10:00–02:00", "Hours, Sat | SAME | 06:00–22:00"),
+            // Two sets of days don't change (all day, and Saturday's hours), so each has its own row.
+            listOf("Hours, Mon, Tue, Wed, Thu, Sun | SAME | All day", "Hours, Fri | CHANGED | 10:00–22:00 → 10:00–02:00", "Hours, Sat | SAME | 06:00–22:00"),
             rows(new, old).filter { it.startsWith("Hours") || it.startsWith("Other") }.sortedBy { it.startsWith("Hours, Sat") },
         )
     }

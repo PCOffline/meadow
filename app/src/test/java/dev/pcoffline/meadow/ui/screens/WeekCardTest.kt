@@ -46,7 +46,7 @@ import java.util.Locale
  * Fine-tune, picking and drawing on the grid. Dialogs open here, so this class has no qualifiers.
  */
 @RunWith(AndroidJUnit4::class)
-@Config(application = Application::class)
+@Config(application = Application::class, qualifiers = "w411dp-h891dp-xxhdpi")
 class WeekCardTest : ScreenTest() {
     private val weekdays = Schedule((1..5).associateWith { listOf(TimeWindow(600, 1320)) })
     private var limit by mutableStateOf(WeekLimit(weekdays, emptyList(), 30, 180, emptyMap()))
@@ -219,6 +219,16 @@ class WeekCardTest : ScreenTest() {
         assertTrue(said, said.startsWith(dayName(1) + "."))
         assertTrue(said, said.contains(text(R.string.week_a11y_daily, "1h")))
         assertTrue(said, said.contains("30m"))
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h891dp-xxhdpi")
+    fun `on a narrow phone, the week is a list of days, each with the day's actions`() {
+        card()
+        compose.onNode(hasText(dayName(6))).assertExists()
+        day(6).act(R.string.week_day_resting)
+        assertEquals(emptyList<TimeWindow>(), limit.schedule!!.days[6])
+        assertAccessible()
     }
 
     @Test

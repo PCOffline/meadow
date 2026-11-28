@@ -2,6 +2,7 @@
 
 package dev.pcoffline.meadow.ui.screens
 
+import dev.pcoffline.meadow.ui.clockText
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.click
@@ -347,11 +348,11 @@ class LimitFlowTest : ScreenTest() {
     @Test
     fun `a day's own limit shows under its name`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 30, 0, dayMinutes = mapOf(6 to 120, 7 to 0))))
-        // Saturday's two hours, and no limit on Sunday.
-        compose.onAllNodesWithText("2h", useUnmergedTree = true).assertCountEquals(1)
-        compose.onAllNodesWithText(text(R.string.week_no_limit_day), useUnmergedTree = true).assertCountEquals(1)
-        val said = gridDay(6).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
-        assertTrue(said, said.contains(text(R.string.week_a11y_daily, "2h")))
+        // Saturday's two hours, and no limit on Sunday, in what a screen reader says.
+        val saturday = gridDay(6).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
+        assertTrue(saturday, saturday.contains(text(R.string.week_a11y_daily, "2h")))
+        val sunday = gridDay(7).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
+        assertTrue(sunday, sunday.contains(text(R.string.week_a11y_no_daily)))
     }
     @Test
     fun `a cap within hours is added from a day's actions, and only one that makes sense saves`() {
@@ -365,7 +366,7 @@ class LimitFlowTest : ScreenTest() {
         compose.onNodeWithContentDescription("Monday").performClick()
         node(R.string.action_ok).assertIsEnabled().performClick()
         val said = gridDay(1).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
-        assertTrue(said, said.contains(text(R.string.week_a11y_cap, "30m", "10:00–16:00")))
+        assertTrue(said, said.contains(text(R.string.week_a11y_cap, "30m", text(R.string.schedule_window, clockText(600), clockText(960)))))
         // A new cap is stricter: no asking.
         node(R.string.limit_editor_loosens_title).assertDoesNotExist()
         assertAccessible()

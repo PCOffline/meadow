@@ -88,7 +88,8 @@ class RequestChangesTest : ScreenTest() {
             }
         }
         compose.onNodeWithContentDescription("Daily: from 30m to 45m").performScrollTo().assertExists()
-        compose.onAllNodesWithContentDescription("Weekly", substring = true).assertCountEquals(0)
+        // Only the rows that change: no row for the weekly limit, which stays.
+        compose.onAllNodesWithContentDescription("Weekly:", substring = true).assertCountEquals(0)
         compose.onAllNodes(hasText("still waiting", substring = true)).assertCountEquals(0)
         node(R.string.request_withdraw).performScrollTo().assertExists()
         assertAccessible()

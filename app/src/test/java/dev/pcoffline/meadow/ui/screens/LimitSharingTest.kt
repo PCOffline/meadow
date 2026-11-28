@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.screens
 
+import androidx.compose.ui.test.onNodeWithContentDescription
 import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
@@ -170,7 +171,7 @@ class LimitSharingTest : ScreenTest() {
         }
         node(R.string.limit_copy_replaces, "Instagram").assertExists()
         node(R.string.limit_copy_other_app).assertExists()
-        assertTrue("starts at 45m", compose.onAllNodes(hasText("45m")).fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} 45m").assertExists()
         node(R.string.action_save).performScrollTo().assertIsEnabled()
         assertAccessible(requireHeading = false)
     }

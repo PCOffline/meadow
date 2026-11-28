@@ -133,7 +133,9 @@ fun Resources.limitLines(new: AppLimit, old: AppLimit?): List<LimitLine> {
             // A day whose only hours go on from the day before has none of its own.
             return (if (mode == DayMode.HOURS && stretches.isEmpty()) DayMode.RESTING else mode) to stretches
         }
-        val groups = groupDays((1..7).toList()) { on(was, it) to on(new, it) }
+        // Days with the same hours share a row: the key leaves out which day a stretch is on.
+        fun key(day: Pair<DayMode, List<Stretch>>) = day.first to day.second.map { it.from to it.to }
+        val groups = groupDays((1..7).toList()) { key(on(was, it)) to key(on(new, it)) }
         val someChange = groups.any { (_, pair) -> pair.first != pair.second }
         val sameGroups = groups.count { (_, pair) -> pair.first == pair.second }
         for ((days, pair) in groups) {
@@ -143,7 +145,7 @@ fun Resources.limitLines(new: AppLimit, old: AppLimit?): List<LimitLine> {
                 else -> getString(R.string.limit_line_hours_on, dayNames(days))
             }
             val day = days.first()
-            line(label, hoursText(pair.first).capitalized(), hoursText(pair.second).capitalized(), LinePart.HOURS, Bars(bar(was, day), bar(new, day)))
+            line(label, hoursText(on(was, day)).capitalized(), hoursText(on(new, day)).capitalized(), LinePart.HOURS, Bars(bar(was, day), bar(new, day)))
         }
     }
     val cap = getString(R.string.limit_line_cap)
