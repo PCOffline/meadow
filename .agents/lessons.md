@@ -108,8 +108,11 @@ Write the rule that prevents the mistake in each task, not the story of this one
   `dl.google.com`, install the platform that `compileSdk` in `app/build.gradle.kts` names, and
   write `sdk.dir` in `local.properties`.
 - Run the first build in the background. It takes more than 10 minutes.
-- Maven Central sometimes returns 404 through the proxy for a file that exists. Run the same
-  Gradle command again with `--max-workers=2`, up to three times.
+- Maven Central sometimes returns 404, or 429 (too many requests), through the proxy for a file
+  that exists. Run the same Gradle command again with `--max-workers=2`. After a 429, wait about
+  three minutes between tries: a run in the background with `sleep` between tries does this.
+- Edit no source file while a Gradle run in the background compiles. The run compiles the half
+  done edit and fails. Start the run after the edits it is to test.
 - The Functions emulator can't register its triggers here, so each `EmulatorTest` skips. CI runs
   them: say so in the pull request.
 - Run a failing test on `origin/main` in a `git worktree` before you call the failure old.
