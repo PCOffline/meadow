@@ -232,7 +232,7 @@ def render(changes: list[Change], repo: str, previous: str | None, tag: str) -> 
     if highlights := [c for c in changes if c.highlight][:MAX_HIGHLIGHTS]:
         lines += ["## Highlights", ""]
         for c in highlights:
-            lines += [f"### {c.text}", "", f"{c.note.detail} (#{c.number})", ""]  # type: ignore[union-attr]
+            lines += [f"### {c.text.rstrip('.')}", "", f"{c.note.detail} (#{c.number})", ""]  # type: ignore[union-attr]
             if c.pictures:
                 pictures = c.pictures[:MAX_PICTURES]
                 lines += [" ".join(f'<img src="{p.url}" width="{PICTURE_WIDTH}" alt="{p.caption}">' for p in pictures), ""]

@@ -172,7 +172,7 @@ class RenderTest(unittest.TestCase):
             people,
         )
         self.assertIn(
-            "## Highlights\n\n### Water your garden from the rest screen.\n\n"
+            "## Highlights\n\n### Water your garden from the rest screen\n\n"
             "Tap a plant to water it. It grows a little each day that you rest. (#7)\n\n"
             f'<img src="{URL}/after/stories/garden/01.png" width="300" alt="Open the garden"> '
             f'<img src="{URL}/after/stories/garden/02.png" width="300" alt="Water a plant">\n',
