@@ -51,6 +51,14 @@ class LimitChangeJourneyTest : EndToEndTest() {
         return id
     }
 
+    /** Types 1h for the daily limit, which reads 30m, on the keypad. */
+    private fun doubleTheDailyLimit() {
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} ${app.resources.minutesText(30)}")
+            .performScrollTo().performClick()
+        listOf("1", "00").forEach { inDialog(it).performClick() }
+        inDialog(text(R.string.action_ok)).performClick()
+    }
+
     @Test
     fun looseningWaitsForAYesAndRemovingCanHearNotToday() {
         val kai = EmulatorFriend.create(app, "Kai", "🌷").also(people::add)
@@ -68,7 +76,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
 
             // Doubling the daily time asks Sam instead of saving.
             openTheLimit()
-            compose.onNode(hasText(app.resources.minutesText(60)) and hasClickAction()).performScrollTo().performClick()
+            doubleTheDailyLimit()
             waitFor(R.string.limit_editor_loosens_title)
             typeInto(hasSetTextAction() and hasText(text(R.string.limit_editor_note)), "Visiting Grandma")
             tapWhenEnabled(R.string.limit_editor_ask)
@@ -90,7 +98,7 @@ class LimitChangeJourneyTest : EndToEndTest() {
             waitForSnackbarToGo(R.string.request_withdrawn)
 
             // Asked again, Sam says yes: the new limit reaches the backend and this phone.
-            compose.onNode(hasText(app.resources.minutesText(60)) and hasClickAction()).performScrollTo().performClick()
+            doubleTheDailyLimit()
             tapWhenEnabled(R.string.limit_editor_ask)
             waitFor(R.string.limit_editor_requested)
             val second = nextRequest(sam, setOf(first))
