@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui.screens
 
+import dev.pcoffline.meadow.ui.clockText
 import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
@@ -173,7 +174,8 @@ class WeekCardTest : ScreenTest() {
         card()
         // Monday's stretch is 10:00 to 22:00: the middle of the day is in it.
         day(1).performTouchInput { click(center) }
-        compose.onNode(hasText("Mon 10:00 – Mon 22:00", substring = true)).assertExists()
+        val mon = DayOfWeek.MONDAY.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        compose.onNode(hasText(text(R.string.week_stretch, mon, clockText(600), mon, clockText(1320)))).assertExists()
         assertAccessible()
         node(R.string.week_remove).performClick()
         assertNull(limit.schedule!!.days[1])
