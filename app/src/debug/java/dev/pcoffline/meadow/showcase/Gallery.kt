@@ -43,6 +43,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.pcoffline.meadow.R
 import dev.pcoffline.meadow.data.AppLimit
+import dev.pcoffline.meadow.data.UserProfile
+import dev.pcoffline.meadow.data.TimeCap
+import dev.pcoffline.meadow.data.RequestType
+import dev.pcoffline.meadow.data.LimitRequest
 import dev.pcoffline.meadow.data.BeeStats
 import dev.pcoffline.meadow.data.Connectivity
 import dev.pcoffline.meadow.data.Schedule
@@ -253,9 +257,31 @@ private object Demo {
     val youtube = AppLimit("demo.youtube", "YouTube", 60, 0)
     private val youtubeBudget get() = AppBudget(youtube, 52 * MIN, 240 * MIN, 0, 0)
 
-    fun editor(bumblebees: Int, existing: AppLimit? = youtube, pending: Boolean = false) = LimitEditorState(
+    fun editor(bumblebees: Int, existing: AppLimit? = youtube, pending: Boolean = false, waiting: LimitRequest? = null) = LimitEditorState(
         existing = existing, appName = "YouTube", budget = youtubeBudget, bumblebeeCount = bumblebees,
-        pending = DemoGarden.waitingAsk.copy(packageName = "demo.youtube", appName = "YouTube").takeIf { pending }, loaded = true,
+        pending = waiting ?: DemoGarden.waitingAsk.copy(packageName = "demo.youtube", appName = "YouTube").takeIf { pending }, loaded = true,
+    )
+
+    /** Ana's Instagram limit as it is, and her question to change it. */
+    private val anaLimit = AppLimit(
+        "demo.instagram", "Instagram", 30, 180,
+        schedule = Schedule((1..7).associateWith { if (it == 7) emptyList() else listOf(TimeWindow(10 * 60, 16 * 60)) }),
+        caps = listOf(TimeCap(listOf(7), 8 * 60, 12 * 60, 60)),
+    )
+    val changeFromAna = DemoGarden.askFromAna.copy(
+        id = "r4", type = RequestType.CHANGE_LIMIT, minutes = 0, dailyMinutes = 45, weeklyMinutes = 180,
+        schedule = Schedule((1..7).associateWith { if (it == 6) listOf(TimeWindow(10 * 60, 20 * 60)) else if (it == 7) listOf(TimeWindow.ALL_DAY) else listOf(TimeWindow(10 * 60, 16 * 60)) }),
+        caps = listOf(TimeCap(listOf(1, 2, 3, 4, 5), 18 * 60, 22 * 60, 30)),
+        message = "Weekends are for long calls with family.", usedMinutes = 25, allowedMinutes = 30, previous = anaLimit,
+    )
+
+    /** The same question, as one asked before Meadow kept the limit as it was. */
+    val olderChangeFromAna = changeFromAna.copy(previous = null)
+
+    /** Robin's own question to change YouTube's limit, still waiting. */
+    val waitingChange = changeFromAna.copy(
+        id = "r5", requesterId = DemoGarden.robin.uid, requesterName = DemoGarden.robin.displayName,
+        packageName = "demo.youtube", appName = "YouTube", message = "", previous = youtube.copy(schedule = anaLimit.schedule, caps = anaLimit.caps),
     )
 
     private val rest = DemoGarden.rest
@@ -337,6 +363,9 @@ internal object Scenarios {
 
         Scenario("Chats", "A conversation") { Page { ChatDemo() } },
         Scenario("Chats", "A message that didn't send") { Page { ChatDemo(error = "Something went wrong. Try again.") } },
+        Scenario("Chats", "A change to a limit, with what changes") { Page { ChatDemo(request = Demo.changeFromAna, from = d.ana) } },
+        Scenario("People", "A change to a limit, with what changes") { ChangeDemo(Demo.changeFromAna) },
+        Scenario("People", "A change asked before Meadow kept the old limit") { ChangeDemo(Demo.olderChangeFromAna) },
         Scenario("Chats", "A closed chat") { Page { ChatContent(d.robin, null, emptyList()) } },
         Scenario("Chats", "Loading") { Page { ChatContent(d.robin, null, emptyList(), loading = true) } },
 
@@ -347,6 +376,9 @@ internal object Scenarios {
         },
         Scenario("Limit", "Tending one, with Bumblebees (loosening asks)") { EditorDemo(Demo.editor(bumblebees = 2)) },
         Scenario("Limit", "Waiting on a question") { EditorDemo(Demo.editor(bumblebees = 2, pending = true)) },
+        Scenario("Limit", "Waiting on a change, with what changes") {
+            EditorDemo(Demo.editor(bumblebees = 2, existing = Demo.waitingChange.previous, waiting = Demo.waitingChange))
+        },
 
         Scenario("Resting app", "Time's up today") { RestContent("demo.tiktok", d.rest) },
         Scenario("Resting app", "This week's time is used") { RestContent("demo.tiktok", Demo.restWeek) },
@@ -381,10 +413,18 @@ private fun FriendDemo(page: SharedPage, waiting: Boolean = false) {
 }
 
 @Composable
-private fun ChatDemo(error: String? = null) {
+private fun ChatDemo(error: String? = null, request: LimitRequest = DemoGarden.request, from: UserProfile = DemoGarden.robin) {
     ChatContent(DemoGarden.robin, DemoGarden.chat, DemoGarden.messages, error = error, requestCard = { _, _ ->
-        RequestCard(DemoGarden.request, DemoGarden.robin.uid, Modifier.padding(horizontal = 12.dp), compact = true)
+        RequestCard(request.copy(requesterId = from.uid, requesterName = from.displayName), DemoGarden.robin.uid, Modifier.padding(horizontal = 12.dp), compact = true)
     })
+}
+
+/** People, with one question waiting for Robin: [request]. */
+@Composable
+private fun ChangeDemo(request: LimitRequest) {
+    WithTabs(Tab.PEOPLE) {
+        PeopleContent(DemoGarden.robin, DemoGarden.people.copy(incomingRequests = listOf(request), incomingInvites = emptyList(), outgoingRequests = emptyList()))
+    }
 }
 
 @Composable

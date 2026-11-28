@@ -725,6 +725,10 @@ describe("requests", () => {
     const [push] = await outbox(bee.uid, "request_new");
     assert.match(push.title + push.body, /2h at weekends/);
     assert.deepEqual((await read(`users/${bee.uid}/inbox/${requestId}`)).dayMinutes, { "6": 120, "7": 120 });
+    // The limit as it was, so the Bumblebee sees what changes.
+    const previous = { dailyMinutes: 30, weeklyMinutes: 0, schedule: null, dayMinutes: { "6": 10 }, caps: [{ ...cap, days: [1, 2, 3, 4, 5], minutes: 15 }] };
+    assert.deepEqual((await read(`users/${bee.uid}/inbox/${requestId}`)).previous, previous);
+    assert.deepEqual((await read(`requests/${requestId}`)).previous, previous);
     await bee.call("decideRequest", { requestId, approve: true });
     limit = await read(path);
     assert.deepEqual(limit.dayMinutes, { "6": 120, "7": 120 });
@@ -741,6 +745,7 @@ describe("requests", () => {
     assert.doesNotMatch(push.title + push.body, /Calculator/);
     assert.equal((await read(`users/${bee.uid}/inbox/${requestId}`)).appName, "Instagram");
     assert.equal((await read(`requests/${requestId}`)).appName, "Instagram");
+    assert.equal((await read(`requests/${requestId}`)).previous, null, "only a change keeps the limit as it was");
     const chatId = [sam.uid, bee.uid].sort().join("_");
     const notes = await admin(async (db) => (await getDocs(collection(db, `chats/${chatId}/messages`))).docs.map((d) => d.get("text")));
     assert.ok(notes.some((t) => /removing the limit on Instagram/.test(t)), notes.join(" | "));

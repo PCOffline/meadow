@@ -205,6 +205,7 @@ fun DocumentSnapshot.toRequest() = LimitRequest(
     decidedAtMillis = millis("decidedAt"),
     usedMinutes = getLong("usedMinutes")?.toInt(),
     allowedMinutes = getLong("allowedMinutes")?.toInt(),
+    previous = getString("packageName")?.let { pkg -> limitShapeOrNull(get("previous"), pkg, getString("appName") ?: pkg) },
 )
 
 fun DocumentSnapshot.toInvite() = Invite(
@@ -273,10 +274,16 @@ fun DocumentSnapshot.toMessage() = ChatMessage(
 fun limitOrNull(raw: Any?): AppLimit? {
     val map = raw as? Map<*, *> ?: return null
     val pkg = map["packageName"] as? String ?: return null
+    return limitShapeOrNull(map, pkg, map["appName"] as? String ?: pkg)
+}
+
+/** What a limit holds back, stored as a map without its app, for [packageName]; null when it isn't one. */
+fun limitShapeOrNull(raw: Any?, packageName: String, appName: String): AppLimit? {
+    val map = raw as? Map<*, *> ?: return null
     fun int(key: String) = (map[key] as? Number)?.toInt() ?: 0
     return AppLimit(
-        packageName = pkg,
-        appName = map["appName"] as? String ?: pkg,
+        packageName = packageName,
+        appName = appName,
         dailyMinutes = int("dailyMinutes"),
         weeklyMinutes = int("weeklyMinutes"),
         schedule = Schedule.fromFirestore(map["schedule"]),

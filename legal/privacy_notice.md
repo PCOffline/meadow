@@ -1,6 +1,6 @@
 # Privacy notice
 
-Version 4 · updated 28 October 2026
+Version 5 · updated 27 November 2026
 
 Meadow helps you keep the app time limits you choose, with the help of friends you trust (your Bumblebees). This notice explains what Meadow collects, why, who can see it, and the choices you have. We've tried to keep it short and plain.
 
@@ -25,7 +25,7 @@ Meadow is an open-source project. Its source code is public at github.com/PCOffl
 | Your name, picture (emoji or photo), short bio and friend code | So your Bumblebees know who you are |
 | Your email address, if you add one, and how you sign in (password or emailed link) | To sign you in and recover your garden |
 | Your limits (the app's or website's name, minutes and allowed hours) | So they can't be loosened without a Bumblebee's yes. Your Bumblebees see them only if you turn that on |
-| Requests, answers, and chat messages, including photos and GIFs you send. A request includes how long you've used that app today and how much today allows | So you and your Bumblebees can talk and decide |
+| Requests, answers, and chat messages, including photos and GIFs you send. A request includes how long you've used that app today and how much today allows. A request to change a limit also includes that limit as it is when you ask | So you and your Bumblebees can talk and decide, and see what a change changes |
 | Today's screen time, and today's top apps with their minutes, each shared on its own | So your Bumblebees can see how you're doing. **Optional, off unless you turn it on** |
 | Your progress: this week's screen time compared with last week's, how many weeks in a row it went down, and on how many of the last 7 days you kept your limits | So your Bumblebees can see how you're doing over time. **Optional, off unless you turn it on** |
 | When your phone last checked in | So Meadow can tell your Bumblebees, without details, if it may have stopped working. Only Meadow's servers read it |
@@ -37,7 +37,7 @@ We don't sell your data, show ads, or use analytics or tracking tools.
 
 ## Who can see what
 
-- **Your Bumblebees** can see your name, picture, bio, the requests you send them and emergency unlocks. They see each of these only if you turn it on: your limits, today's screen time, today's top apps and your progress. Nothing is shared until you choose; Meadow asks while setting up. If Meadow may have stopped working on your phone, they're told that, but not why.
+- **Your Bumblebees** can see your name, picture, bio, the requests you send them and emergency unlocks. A request to change a limit shows them that limit as it is, also when you don't share your limits. They see each of these only if you turn it on: your limits, today's screen time, today's top apps and your progress. Nothing is shared until you choose; Meadow asks while setting up. If Meadow may have stopped working on your phone, they're told that, but not why.
 - **Each Bumblebee** only sees the requests sent to them. They don't learn who else was asked, or who answered.
 - **Nobody** can see who your other Bumblebees are, or whose garden you look after. Adding or removing a Bumblebee is your own business; only the person affected is told.
 - **Nobody** sees your settings, strict mode or protection status.

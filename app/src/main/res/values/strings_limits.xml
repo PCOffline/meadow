@@ -11,6 +11,22 @@
         <item quantity="other">%1$d more minutes on %2$s</item>
     </plurals>
     <string name="request_change_limit">a new limit for %1$s: %2$s</string>
+    <string name="request_change_limit_title">a new limit for %1$s</string>
+    <!-- The rows of a limit in a request: what each part is, and what a change does to it. -->
+    <string name="limit_line_daily">Daily</string>
+    <string name="limit_line_daily_on">Daily, %1$s</string>
+    <string name="limit_line_weekly">Weekly</string>
+    <string name="limit_line_hours">Hours</string>
+    <string name="limit_line_hours_on">Hours, %1$s</string>
+    <string name="limit_line_other_days">Other days</string>
+    <string name="limit_line_cap">Cap</string>
+    <string name="limit_line_new">New</string>
+    <string name="limit_line_removed">Removed</string>
+    <string name="limit_line_changed_description">%1$s: from %2$s to %3$s</string>
+    <string name="limit_line_same_description">%1$s: %2$s, no change</string>
+    <string name="limit_line_description">%1$s: %2$s</string>
+    <string name="limit_line_new_description">New cap: %1$s</string>
+    <string name="limit_line_removed_description">Removed cap: %1$s</string>
     <string name="request_remove_limit">removing the limit on %1$s</string>
     <string name="request_disable_strict_mode">turning off strict mode</string>
 

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -106,10 +107,14 @@ import dev.pcoffline.meadow.ui.requests.BumblebeePicker
 import dev.pcoffline.meadow.ui.requests.pendingRequestFor
 import dev.pcoffline.meadow.ui.requests.rememberBeePicks
 import dev.pcoffline.meadow.ui.requestSummary
+import dev.pcoffline.meadow.ui.requests.LimitLines
+import dev.pcoffline.meadow.ui.requests.LineChange
+import dev.pcoffline.meadow.ui.requests.limitLines
 import dev.pcoffline.meadow.ui.ActionState
 import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.sameUncomparable
 import dev.pcoffline.meadow.ui.minutesText
@@ -575,11 +580,19 @@ private fun PendingCard(request: LimitRequest, action: ActionState) {
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
-        Text(
-            stringResource(R.string.limit_editor_pending_body, requestSummary(request).replaceFirstChar { it.uppercase() }),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-        )
+        val previous = request.previous
+        if (request.type == RequestType.CHANGE_LIMIT && previous != null) {
+            // Only what changes: the rest of the limit is in the cards above.
+            val res = LocalResources.current
+            val lines = remember(request, res) { res.limitLines(request.proposed, previous).filter { it.change != LineChange.SAME } }
+            LimitLines(lines, Modifier.padding(top = 8.dp))
+        } else {
+            Text(
+                stringResource(R.string.limit_editor_pending_body, requestSummary(request).replaceFirstChar { it.uppercase() }),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+        }
         TextButton(
             onClick = { action.run(successMessage = withdrawn) { AppGraph.requests.cancel(request.id) } },
             enabled = !action.busy,
@@ -628,13 +641,18 @@ internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: 
             textAlign = TextAlign.Center,
             maxLines = 1,
             color = if (clock && enabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
-            // A rounded, tinted button like the − and + beside it, so it reads as one to tap.
+            // A rounded, tinted button like the − and + beside it, so it reads as one to tap. Its
+            // touch target is 48dp tall, round the smaller tint.
             modifier = Modifier.padding(horizontal = 8.dp)
                 .then(
                     if (clock) {
-                        Modifier.clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f))
+                        Modifier.heightIn(min = 48.dp).clip(MaterialTheme.shapes.medium)
                             .clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true }
+                            .wrapContentHeight()
+                            .background(
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f),
+                                MaterialTheme.shapes.medium,
+                            )
                     } else {
                         Modifier
                     },

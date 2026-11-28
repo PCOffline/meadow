@@ -111,6 +111,21 @@ class FirestoreReadsTest {
     }
 
     @Test
+    fun `a change request reads the limit as it was, under its own app, and an older one has none`() {
+        val change = doc(
+            mapOf(
+                "type" to "change_limit", "packageName" to "com.insta", "appName" to "Instagram", "dailyMinutes" to 45L,
+                "previous" to mapOf("dailyMinutes" to 30L, "weeklyMinutes" to 180L, "caps" to listOf(mapOf("days" to listOf(6L), "from" to 600L, "to" to 960L, "minutes" to 20L))),
+            ),
+        ).toRequest()
+        assertEquals(AppLimit("com.insta", "Instagram", 30, 180, caps = listOf(TimeCap(listOf(6), 600, 960, 20))), change.previous)
+        assertEquals(AppLimit("com.insta", "Instagram", 45, 0), change.proposed)
+        assertNull(doc(mapOf("type" to "change_limit", "packageName" to "com.insta", "previous" to null)).toRequest().previous)
+        assertNull(doc(mapOf("type" to "change_limit", "packageName" to "com.insta")).toRequest().previous)
+        assertNull(doc(mapOf("type" to "change_limit", "previous" to mapOf("dailyMinutes" to 30L))).toRequest().previous)
+    }
+
+    @Test
     fun `an invite reads its status, and anything else is still waiting`() {
         val empty = doc(emptyMap(), id = "i1").toInvite()
         assertEquals(Invite("i1", "", "Friend", "🌼", "", "Friend", InviteStatus.PENDING, 0L, offer = false), empty)

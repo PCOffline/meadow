@@ -22,8 +22,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 Each branch does one task. It changes only what the task needs, and the tests for it.
 
-- Open the pull request when you push the branch for the first time. Then CI and review start
-  at once.
+- Open the pull request when you push the branch for the first time. Open it as ready for
+  review. Then CI and review start at once.
 - Put refactors, renames, formatting and dependency updates on a branch of their own.
 - Fix an unrelated problem on a branch and pull request of its own.
 - Keep the diff as small as the task permits.

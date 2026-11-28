@@ -21,6 +21,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,6 +55,15 @@ import dev.pcoffline.meadow.ui.relativeTime
 import dev.pcoffline.meadow.ui.rememberAction
 import dev.pcoffline.meadow.ui.requestSummary
 import kotlinx.coroutines.flow.flowOf
+
+/** A change's rows follow the title, so the title names only the app. */
+@Composable
+private fun cardTitle(request: LimitRequest): String =
+    if (request.type == RequestType.CHANGE_LIMIT) {
+        stringResource(R.string.request_change_limit_title, request.appName ?: stringResource(R.string.request_an_app))
+    } else {
+        requestSummary(request)
+    }
 
 @Composable
 fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modifier, compact: Boolean = false) {
@@ -77,9 +88,15 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(requestSummary(request).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
+                Text(cardTitle(request).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleMedium)
             }
             StatusPill(request.status)
+        }
+        if (request.type == RequestType.CHANGE_LIMIT) {
+            val res = LocalResources.current
+            val lines = remember(request, res) { res.limitLines(request.proposed, request.previous) }
+            HorizontalDivider(Modifier.padding(top = 10.dp, bottom = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            LimitLines(lines)
         }
         usageText(request)?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
