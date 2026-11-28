@@ -399,7 +399,9 @@ There are three ways to release.
 **Automatically.** In **Settings → Secrets and variables → Actions → Variables**, add
 `AUTO_RELEASE` with the value `true`. Then each push to `main` that passes Build and changes the
 app publishes a release. Changes that don't touch the app (docs, the backend code, workflows)
-don't make a release. `[skip release]` in the message of the last commit stops one release.
+don't make a release. Changes to the app's tests and Pictures stories (`app/src/test/`,
+`app/src/testDebug/`, `app/src/androidTest/` and `app/src/sharedTest/`) don't make a release
+either. `[skip release]` in the message of the last commit stops one release.
 
 **By hand.** Open **Actions → Deliver → Run workflow** on `main`. Under *Publish an APK* and
 *Deploy the backend*, choose the part of each version to increase (*patch*, *minor* or *major*).

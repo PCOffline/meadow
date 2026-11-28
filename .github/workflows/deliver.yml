@@ -9,8 +9,9 @@ name: Deliver
 # Automatically, once Build passes on main:
 # - deploys when the repository variable AUTO_DEPLOY is "true" and backend/ or legal/ changed since
 #   the last deploy. A commit message with [skip deploy] skips one.
-# - releases when AUTO_RELEASE is "true" and the app changed since the last release. It waits for
-#   the deploy, so a new app never meets an old backend. [skip release] skips one.
+# - releases when AUTO_RELEASE is "true" and the app changed since the last release. A change to
+#   the app's tests or Pictures stories alone doesn't count. It waits for the deploy, so a new app
+#   never meets an old backend. [skip release] skips one.
 # Each raises its patch version; [minor] in a commit that changed it raises the minor, and [major]
 # or [breaking] the major, except below 1.0.0, where it raises the minor (SemVer's rule for 0.x).
 # By hand: Actions → Deliver → Run workflow on main, choosing for each which part to raise
