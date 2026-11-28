@@ -45,9 +45,10 @@ It can also show the weather outside.
 
 ## Limits for your week
 
-Give each app a daily limit, a weekly limit, or both. Give some days more time, for example
-the weekend. Choose the hours an app can open. Limit websites the same way. Share a limit with
-a friend, from its card in the garden or from the editor.
+Give each app a daily limit, a weekly limit, or both. Set them on one view of your week: draw
+the hours an app can open, add caps within those hours, and give some days a limit of their own.
+Hours and caps can go past midnight. Limit websites the same way. Share a limit with a friend,
+from its card in the garden or from the editor.
 
 <p align="center">
   <img src="docs/images/screen-limit.png" alt="The limit for YouTube: one hour each day, with the time used today" width="250">

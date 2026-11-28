@@ -56,6 +56,8 @@ class LimitEditorScreenTest : EmulatorTest() {
     fun startTheApp() {
         AppGraph.init(app)
         AppGraph.store.clearAll()
+        // The guide to the week shows by itself once; these tests start past it.
+        AppGraph.store.setWeekGuideSeen()
         AppGraph.backendReady = true
         AppSync.startOnce()
     }

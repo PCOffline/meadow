@@ -171,6 +171,23 @@ class LocalStore(context: Context) {
         _sharingChosen.value = true
     }
 
+    private val _weekGuideSeen = MutableStateFlow(prefs.getBoolean(KEY_WEEK_GUIDE_SEEN, false))
+
+    /** Whether the guide to the week card was shown on this phone, so it shows by itself only once. */
+    val weekGuideSeen: StateFlow<Boolean> = _weekGuideSeen.asStateFlow()
+
+    fun setWeekGuideSeen() {
+        prefs.edit { putBoolean(KEY_WEEK_GUIDE_SEEN, true) }
+        _weekGuideSeen.value = true
+    }
+
+    /** How far a drag on [packageName]'s week moves, in minutes, as last chosen on this phone; null until chosen. */
+    fun dragStep(packageName: String): Int? = prefs.getInt(KEY_DRAG_STEP + packageName, 0).takeIf { it > 0 }
+
+    fun setDragStep(packageName: String, minutes: Int) {
+        prefs.edit { putInt(KEY_DRAG_STEP + packageName, minutes) }
+    }
+
     /** The address a sign-in link was last sent to from this phone, to finish signing in with it. */
     var pendingLinkEmail: String?
         get() = prefs.getString(KEY_LINK_EMAIL, null)
@@ -222,6 +239,7 @@ class LocalStore(context: Context) {
         _pendingInvite.value = null
         _privacy.value = Privacy()
         _sharingChosen.value = false
+        _weekGuideSeen.value = false
         _theme.value = null
         _darkMode.value = null
         _iconColours.value = emptyMap()
@@ -338,5 +356,7 @@ class LocalStore(context: Context) {
         const val KEY_NOTIFIED_UPDATE = "notified_update"
         const val KEY_LINK_EMAIL = "link_email"
         const val KEY_SHARING_CHOSEN = "sharing_chosen"
+        const val KEY_WEEK_GUIDE_SEEN = "week_guide_seen"
+        const val KEY_DRAG_STEP = "drag_step_"
     }
 }

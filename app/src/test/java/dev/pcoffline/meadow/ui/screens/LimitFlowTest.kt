@@ -1,5 +1,14 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
 package dev.pcoffline.meadow.ui.screens
 
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
+import androidx.compose.ui.test.click
+import androidx.compose.ui.semantics.SemanticsProperties
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 import dev.pcoffline.meadow.ui.limits.AppPickerScreen
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -94,6 +103,24 @@ class LimitFlowTest : ScreenTest() {
         }
     }
 
+    /** Opens the keypad of the daily limit, which reads [now], types [keys] and OK. */
+    private fun typeDaily(now: String, vararg keys: String) {
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} $now").performScrollTo().performClick()
+        keys.forEach { compose.onNode(hasText(it)).performClick() }
+        node(R.string.action_ok).performClick()
+    }
+
+    /** Turns the daily limit, which reads [now], off on its keypad. */
+    private fun noDaily(now: String = "30m") {
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} $now").performScrollTo().performClick()
+        node(R.string.keypad_no_limit).performClick()
+    }
+
+    /** [day]'s column in the week's grid, which a screen reader reads with the day's actions. */
+    private fun gridDay(day: Int) = compose.onNode(
+        hasContentDescription(DayOfWeek.of(day).getDisplayName(TextStyle.FULL, Locale.getDefault()) + ".", substring = true),
+    )
+
     @Test
     fun `a saved limit can be shared at any time, as saved`() {
         val saved = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)
@@ -112,12 +139,11 @@ class LimitFlowTest : ScreenTest() {
     fun `with unsaved changes, sharing waits until they're saved or undone`() {
         editorWithShare(AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0))
         val share = compose.onNodeWithContentDescription(text(R.string.limit_share))
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more)).onFirst().performClick()
+        typeDaily("30m", "4", "5")
         share.assertIsNotEnabled()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less)).onFirst().performClick()
+        typeDaily("45m", "3", "0")
         share.assertIsEnabled()
     }
-
     @Test
     fun `a saved limit the editor puts in its own terms can still be shared`() {
         // Hours given as two windows that touch: the editor shows them as one.
@@ -139,12 +165,11 @@ class LimitFlowTest : ScreenTest() {
         node(R.string.limit_editor_pick_one).assertDoesNotExist()
 
         // Daily is on for a new limit; turning it off leaves nothing to plant.
-        compose.onNodeWithText(text(R.string.limit_editor_daily)).performClick()
+        noDaily()
         node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
         node(R.string.limit_editor_pick_one).performScrollTo().assertExists()
         assertAccessible()
     }
-
     @Test
     fun `a new limit says loosening it will need a Bumblebee, when there is one`() {
         editor(LimitEditorState(bumblebeeCount = 1))
@@ -169,10 +194,10 @@ class LimitFlowTest : ScreenTest() {
         editor(LimitEditorState(existing = limit, bumblebeeCount = 1, pendingKnown = false))
         node(R.string.limit_editor_ask_remove).performScrollTo().assertIsNotEnabled()
         // Looser: asking a Bumblebee waits too.
-        repeat(2) { compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick() }
+        typeDaily("30m", "4", "0")
         node(R.string.limit_editor_ask).performScrollTo().assertIsNotEnabled()
         // Tighter needs nobody's yes, so it can be saved meanwhile.
-        repeat(4) { compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick() }
+        typeDaily("40m", "2", "0")
         node(R.string.action_save).performScrollTo().assertIsEnabled()
     }
 
@@ -226,87 +251,6 @@ class LimitFlowTest : ScreenTest() {
     }
 
     @Test
-    fun `a tap steps once, and holding keeps stepping`() {
-        editor(LimitEditorState())
-        val more = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))
-        more[0].performClick()
-        compose.onNodeWithText(app.resources.minutesText(35)).assertExists()
-
-        compose.mainClock.autoAdvance = false
-        more[0].performTouchInput { down(center) }
-        compose.mainClock.advanceTimeBy(1_500)
-        more[0].performTouchInput { up() }
-        compose.mainClock.autoAdvance = true
-        compose.waitForIdle()
-        // Held for well past the start delay: several more steps than the one a tap gives.
-        assertTrue((50..16 * 60 step 5).any { shows(app.resources.minutesText(it)) })
-    }
-
-    @Test
-    fun `the stepper's buttons stay put as the value grows from whole hours to hours and minutes`() {
-        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 0, weeklyMinutes = 5 * 60)))
-        val less = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0]
-        val more = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0]
-        val before = less.fetchSemanticsNode().boundsInRoot to more.fetchSemanticsNode().boundsInRoot
-        more.performClick()
-        compose.onNodeWithText(app.resources.minutesText(5 * 60 + 30)).assertExists()
-        assertEquals(before, less.fetchSemanticsNode().boundsInRoot to more.fetchSemanticsNode().boundsInRoot)
-    }
-
-    @Test
-    fun `the daily presets sit in even columns, centred under the stepper`() {
-        editor(LimitEditorState())
-        val chips = listOf(15, 30, 45, 60, 90, 120).map {
-            compose.onNode(hasText(app.resources.minutesText(it)) and isSelectable()).fetchSemanticsNode().boundsInRoot
-        }
-        assertEquals("every chip is as wide as the others", 1, chips.map { it.width }.distinct().size)
-        val rows = chips.groupBy { it.top }.values
-        assertTrue("three in each row: ${rows.map { it.size }}", rows.all { it.size == 3 })
-        val less = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].fetchSemanticsNode().boundsInRoot
-        val more = compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].fetchSemanticsNode().boundsInRoot
-        val stepper = (less.left + more.right) / 2
-        rows.forEach { row -> assertEquals(stepper, (row.minOf { it.left } + row.maxOf { it.right }) / 2, 2f) }
-    }
-
-    @Test
-    fun `with large text, the presets take fewer columns rather than cutting off their lengths`() {
-        show {
-            val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 3f)) {
-                LimitEditor(pkg, LimitEditorState(appName = "Instagram", loaded = true), onDone = {})
-            }
-        }
-        val chips = listOf(15, 30, 45, 60, 90, 120).map {
-            compose.onNode(hasText(app.resources.minutesText(it)) and isSelectable()).fetchSemanticsNode().boundsInRoot
-        }
-        val rows = chips.groupBy { it.top }.values
-        assertTrue("fewer than three in a row: ${rows.map { it.size }}", rows.all { it.size < 3 })
-        assertEquals("still even columns", 1, chips.map { it.width }.distinct().size)
-    }
-
-    @Test
-    fun `at large text, each preset shows its whole length on one line`() {
-        var fontScale by mutableStateOf(1f)
-        show {
-            val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = fontScale)) {
-                LimitEditor(pkg, LimitEditorState(appName = "Instagram", loaded = true), onDone = {})
-            }
-        }
-        listOf(1.5f, 2f).forEach { scale ->
-            fontScale = scale
-            compose.waitForIdle()
-            listOf(15, 30, 45, 60, 90, 120).map { app.resources.minutesText(it) }.forEach { label ->
-                compose.onAllNodes(hasText(label), useUnmergedTree = true).fetchSemanticsNodes().forEach { node ->
-                    val layouts = mutableListOf<TextLayoutResult>()
-                    node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
-                    assertEquals("\"$label\" at ${scale}x", label.length, layouts.single().getLineEnd(0))
-                }
-            }
-        }
-    }
-
-    @Test
     fun `the editor has no Share button, as the note that says it's saved shares the limit`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)))
         compose.onAllNodes(hasText("Share", substring = true)).assertCountEquals(0)
@@ -327,12 +271,23 @@ class LimitFlowTest : ScreenTest() {
         node(R.string.limit_editor_ask_remove).performScrollTo().assertIsNotEnabled()
 
         // Loosening would be too; tightening needs no question, so it stays possible.
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick()
+        typeDaily("30m", "4", "5")
         node(R.string.limit_editor_ask).performScrollTo().assertIsNotEnabled()
         node(R.string.limit_editor_loosens_title).assertDoesNotExist()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
+        typeDaily("45m", "2", "0")
         node(R.string.action_save).performScrollTo().assertIsEnabled()
+        assertAccessible()
+    }
+
+    @Test
+    fun `while a change to the limit waits, the week shows the limit as it is and can't be changed`() {
+        val change = pendingRequest().copy(type = RequestType.CHANGE_LIMIT, dailyMinutes = 45, previous = AppLimit(pkg, "Instagram", 30, 0))
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1, pending = change))
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} 30m").performScrollTo().performClick()
+        node(R.string.action_ok).assertDoesNotExist()
+        node(R.string.week_as_now).performScrollTo().assertExists()
+        // The waiting card lists what changes, and can take the question back.
+        node(R.string.request_withdraw).assertExists()
         assertAccessible()
     }
 
@@ -341,12 +296,12 @@ class LimitFlowTest : ScreenTest() {
         Connectivity.set(false)
         try {
             editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1))
-            compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less))[0].performClick()
+            typeDaily("30m", "2", "5")
             node(R.string.action_save).performScrollTo().assertIsEnabled()
             node(R.string.offline_needs_connection).assertDoesNotExist()
 
             // Up past where it was: a looser limit, which only a Bumblebee's yes allows.
-            repeat(2) { compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick() }
+            typeDaily("25m", "3", "5")
             node(R.string.offline_needs_connection).performScrollTo().assertExists()
             node(R.string.limit_editor_ask).performScrollTo().assertIsNotEnabled()
         } finally {
@@ -359,7 +314,7 @@ class LimitFlowTest : ScreenTest() {
         Connectivity.set(false)
         try {
             editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0)))
-            compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more))[0].performClick()
+            typeDaily("30m", "3", "5")
             node(R.string.action_save).performScrollTo().assertIsEnabled()
             node(R.string.limit_editor_remove).performScrollTo().assertIsEnabled()
             node(R.string.offline_needs_connection).assertDoesNotExist()
@@ -371,92 +326,78 @@ class LimitFlowTest : ScreenTest() {
     private fun chip(day: String) = compose.onNodeWithContentDescription(day)
 
     @Test
-    fun `some days can have their own limit, picked together, and more time on them asks first`() {
+    fun `some days can have their own limit, and more time on them asks first`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 30, weeklyMinutes = 0), bumblebeeCount = 1))
-        node(R.string.limit_editor_days_add).performScrollTo().performClick()
-        // No days picked yet: nothing changes.
         node(R.string.limit_editor_loosens_title).assertDoesNotExist()
-        chip("Saturday").performScrollTo().performClick()
-        chip("Sunday").performScrollTo().performClick()
-        // An hour on weekends is more than the everyday 30m.
+        // An hour on Saturday is more than the everyday 30m.
+        gridDay(6).performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_day_limit))
+        listOf("1", "00").forEach { compose.onNode(hasText(it)).performClick() }
+        node(R.string.action_ok).performClick()
         node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
-        node(R.string.limit_editor_days_no_limit).performScrollTo().performClick()
-        node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
-        // Every day is taken once picked, so another group can't pick the weekend again.
-        node(R.string.limit_editor_days_add).performScrollTo().performClick()
-        compose.onAllNodesWithContentDescription("Saturday")[1].assertIsNotEnabled()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_days_remove))[0].performClick()
-        compose.onAllNodesWithContentDescription(text(R.string.limit_editor_days_remove))[0].performClick()
+        // Back to the everyday limit: nothing to ask.
+        gridDay(6).performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_day_limit))
+        node(R.string.keypad_reset, "30m").performClick()
         node(R.string.limit_editor_loosens_title).assertDoesNotExist()
+        // No limit on Sunday is looser too.
+        gridDay(7).performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_day_limit))
+        node(R.string.keypad_no_limit).performClick()
+        node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
         assertAccessible()
     }
-
     @Test
-    fun `a day's own limit shows with its days picked`() {
-        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 30, 0, dayMinutes = mapOf(6 to 120, 7 to 120))))
-        chip("Saturday").performScrollTo().assertIsSelected()
-        chip("Sunday").assertIsSelected()
-        chip("Monday").assertIsNotSelected()
-        // Their two hours, beside the everyday presets' "2h".
-        compose.onAllNodesWithText("2h").assertCountEquals(2)
+    fun `a day's own limit shows under its name`() {
+        editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 30, 0, dayMinutes = mapOf(6 to 120, 7 to 0))))
+        // Saturday's two hours, and no limit on Sunday.
+        compose.onAllNodesWithText("2h", useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodesWithText(text(R.string.week_no_limit_day), useUnmergedTree = true).assertCountEquals(1)
+        val said = gridDay(6).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
+        assertTrue(said, said.contains(text(R.string.week_a11y_daily, "2h")))
     }
-
     @Test
-    fun `a cap within hours is added from a dialog that only saves one that makes sense`() {
+    fun `a cap within hours is added from a day's actions, and only one that makes sense saves`() {
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", dailyMinutes = 60, weeklyMinutes = 0), bumblebeeCount = 1))
-        node(R.string.limit_editor_cap_add).performScrollTo().performClick()
+        gridDay(1).performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_add_cap))
         node(R.string.limit_editor_cap_title).assertExists()
-        // Nothing picked to start with.
-        node(R.string.limit_editor_cap_pick_days).assertExists()
+        // Monday is picked; with no day, nothing saves.
+        compose.onNodeWithContentDescription("Monday").performClick()
+        node(R.string.fine_tune_pick_day).assertExists()
         node(R.string.action_ok).assertIsNotEnabled()
-        chip("Monday").performClick()
-        node(R.string.limit_editor_cap_pick_hours).assertExists()
-        node(R.string.action_ok).assertIsNotEnabled()
-        node(R.string.cap_template_afternoons).performClick()
+        compose.onNodeWithContentDescription("Monday").performClick()
         node(R.string.action_ok).assertIsEnabled().performClick()
-        compose.onNodeWithText("Up to 30m", substring = true).performScrollTo().assertExists()
-        compose.onNodeWithText(text(R.string.days_some, "Mon"), substring = true, ignoreCase = true).assertExists()
+        val said = gridDay(1).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
+        assertTrue(said, said.contains(text(R.string.week_a11y_cap, "30m", "10:00–16:00")))
         // A new cap is stricter: no asking.
         node(R.string.limit_editor_loosens_title).assertDoesNotExist()
         assertAccessible()
     }
-
     @Test
     fun `removing a cap loosens the limit`() {
         val cap = TimeCap(listOf(1, 2, 3, 4, 5), 600, 960, 30)
         editor(LimitEditorState(existing = AppLimit(pkg, "Instagram", 60, 0, caps = listOf(cap)), bumblebeeCount = 1))
-        compose.onNodeWithText("Up to 30m", substring = true).performScrollTo().assertExists()
+        // A tap in the cap's hours picks it: 13:00 on Monday.
+        gridDay(1).performScrollTo().performTouchInput { click(androidx.compose.ui.geometry.Offset(center.x, height * 13f / 24f)) }
         compose.onNodeWithText(text(R.string.days_weekdays), substring = true, ignoreCase = true).assertExists()
-        compose.onNodeWithContentDescription(text(R.string.limit_editor_cap_remove)).performClick()
+        node(R.string.week_remove).performClick()
         node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
     }
-
     @Test
     fun `a cap alone is enough to plant a limit`() {
         editor(LimitEditorState())
-        compose.onNodeWithText(text(R.string.limit_editor_daily)).performClick()
+        noDaily()
         node(R.string.limit_editor_plant).performScrollTo().assertIsNotEnabled()
-        node(R.string.limit_editor_cap_add).performScrollTo().performClick()
-        node(R.string.cap_template_weekdays).performClick()
-        node(R.string.cap_template_evenings).performClick()
+        gridDay(1).performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_add_cap))
         node(R.string.action_ok).performClick()
         node(R.string.limit_editor_plant).performScrollTo().assertIsEnabled()
         node(R.string.limit_editor_pick_one).assertDoesNotExist()
     }
-
     @Test
-    fun `the daily limit can be picked as hours and minutes`() {
+    fun `the daily limit is typed as hours and minutes, and minutes over 59 count as hours`() {
         editor(LimitEditorState())
-        val pick = text(R.string.limit_editor_pick_time)
-        compose.onAllNodes(SemanticsMatcher("opens the length picker") { it.config.getOrNull(SemanticsActions.OnClick)?.label == pick })
-            .onFirst().performClick()
-        // The dialog is titled with what it sets, and keeps the value when confirmed.
-        compose.onAllNodesWithText(text(R.string.limit_editor_daily)).assertCountEquals(2)
-        node(R.string.action_ok).performClick()
-        compose.onAllNodesWithText(text(R.string.limit_editor_daily)).assertCountEquals(1)
-        compose.onAllNodesWithText("30m").assertCountEquals(2)
+        typeDaily("30m", "1", "3", "0")
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} 1h 30m").assertExists()
+        typeDaily("1h 30m", "9", "0")
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} 1h 30m").assertExists()
     }
-
     @Test
     fun `a limit set only by hours says when it closes`() {
         val hoursOnly = AppBudget(

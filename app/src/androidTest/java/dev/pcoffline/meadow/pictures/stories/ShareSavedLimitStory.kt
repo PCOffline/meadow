@@ -1,12 +1,11 @@
 package dev.pcoffline.meadow.pictures.stories
 
+import androidx.compose.ui.test.hasText
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import dev.pcoffline.meadow.R
@@ -22,6 +21,13 @@ import org.junit.Test
 class ShareSavedLimitStory : Story("Share a saved limit at any time") {
     private fun text(id: Int) = compose.activity.getString(id)
 
+    /** Types [keys] for the daily limit, which reads [now], on the keypad. */
+    private fun typeDaily(now: String, vararg keys: String) {
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} $now").performClick()
+        keys.forEach { compose.onNode(hasText(it)).performClick() }
+        compose.onNode(hasText(text(R.string.action_ok))).performClick()
+    }
+
     @Test
     fun story() {
         val saved = AppLimit("com.instagram.android", "Instagram", dailyMinutes = 30, weeklyMinutes = 0)
@@ -34,10 +40,10 @@ class ShareSavedLimitStory : Story("Share a saved limit at any time") {
             ShareCommitmentHost()
         }
         step("A change that isn't saved turns Share off.") {
-            compose.onAllNodesWithContentDescription(text(R.string.limit_editor_more)).onFirst().performClick()
+            typeDaily("30m", "4", "5")
         }
         step("Undone, Share is on again.") {
-            compose.onAllNodesWithContentDescription(text(R.string.limit_editor_less)).onFirst().performClick()
+            typeDaily("45m", "3", "0")
         }
         step("Share opens the share sheet with the limit as saved.") {
             compose.onNodeWithContentDescription(text(R.string.limit_share)).performClick()

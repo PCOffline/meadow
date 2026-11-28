@@ -73,6 +73,12 @@ abstract class EndToEndTest {
         assumeTrue("Build with -Pmeadow.emulatorHost to run end-to-end tests", BuildConfig.EMULATOR_HOST.isNotEmpty())
     }
 
+    /** The guide to the week card shows by itself once; journeys start past it. WeekGuideTest shows it. */
+    @Before
+    fun skipWeekGuide() {
+        AppGraph.store.setWeekGuideSeen()
+    }
+
     /** An Espresso failure also says which window had focus at that moment, before the activity closes. */
     @Before
     fun reportFocusOnFailure() {
