@@ -7,7 +7,6 @@ from unittest import mock
 
 from pr_pictures import END, START
 from release_notes import (
-    DETAIL_MAX,
     FOR_PEOPLE_END,
     FOR_PEOPLE_START,
     NOTE_MAX,
@@ -47,8 +46,9 @@ The garden wakes.
 Kind: new
 <!-- Highlight: yes or no. -->
 Highlight: yes
-Note: Water your garden from the rest screen.
-Detail: Tap a plant to water it. It grows a little each day that you rest.
+Note: You can now water your garden from the rest screen.
+Picture: 2
+Replaces: #5, #6
 
 ## Evidence
 
@@ -58,14 +58,13 @@ Kind: fixed
 
 class NoteTest(unittest.TestCase):
     def test_the_fields_come_from_the_release_note_section_only(self):
-        self.assertEqual(
-            Note("new", "yes", "Water your garden from the rest screen.", "Tap a plant to water it. It grows a little each day that you rest."),
-            parse_note(TEMPLATE),
-        )
-        self.assertEqual([], problems(parse_note(TEMPLATE)))
+        note = parse_note(TEMPLATE)
+        self.assertEqual(Note("new", "yes", "You can now water your garden from the rest screen.", "2", "#5, #6"), note)
+        self.assertEqual([5, 6], note.replaced)
+        self.assertEqual([], problems(note))
 
     def test_the_template_comments_are_not_fields(self):
-        self.assertEqual(Note("none", "no", "", ""), parse_note("## Release note\n<!--\nKind: new\n-->\nKind: None\nHighlight: No\nNote:\n"))
+        self.assertEqual(Note("none", "no", ""), parse_note("## Release note\n<!--\nKind: new\n-->\nKind: None\nHighlight: No\nNote:\n"))
 
     def test_a_description_without_the_section_has_no_note(self):
         self.assertIsNone(parse_note("## Summary\nKind: new"))
@@ -75,17 +74,19 @@ class NoteTest(unittest.TestCase):
         def says(note, words):
             self.assertTrue(any(words in p for p in problems(note)), problems(note))
 
-        says(Note("feature", "no", "A", ""), "Set Kind")
-        says(Note("new", "maybe", "A", ""), "Set Highlight")
-        says(Note("new", "no", "", ""), "Write the Note")
-        says(Note("new", "no", "x" * (NOTE_MAX + 1), ""), f"{NOTE_MAX} characters or fewer")
-        says(Note("new", "yes", "A", ""), "Write the Detail")
-        says(Note("new", "yes", "A", "x" * (DETAIL_MAX + 1)), f"{DETAIL_MAX} characters or fewer")
-        says(Note("new", "no", "A", "More"), "Leave Detail empty")
-        says(Note("none", "no", "A", ""), "Leave Note and Detail empty")
-        says(Note("none", "yes", "", ""), "Leave Note and Detail empty")
-        self.assertEqual([], problems(Note("none", "no", "", "")))
-        self.assertEqual([], problems(Note("fixed", "no", "x" * NOTE_MAX, "")))
+        says(Note("feature", "no", "A"), "Set Kind")
+        says(Note("new", "maybe", "A"), "Set Highlight")
+        says(Note("new", "no", ""), "Write the Note")
+        says(Note("new", "no", "x" * (NOTE_MAX + 1)), f"{NOTE_MAX} characters or fewer")
+        says(Note("new", "no", "A", "2"), "Leave Picture empty")
+        says(Note("new", "yes", "A", "last"), "number of a story step, or to video")
+        says(Note("new", "no", "A", replaces="the limit one"), "pull request numbers")
+        says(Note("none", "no", "A"), "Leave Note, Picture and Replaces empty")
+        says(Note("none", "yes", ""), "Leave Note, Picture and Replaces empty")
+        says(Note("none", "no", "", replaces="#2"), "Leave Note, Picture and Replaces empty")
+        self.assertEqual([], problems(Note("none", "no", "")))
+        self.assertEqual([], problems(Note("fixed", "no", "x" * NOTE_MAX, replaces="219 #220")))
+        self.assertEqual([], problems(Note("new", "yes", "A", "video")))
 
 
 class CheckTest(unittest.TestCase):
@@ -136,8 +137,8 @@ class RenderTest(unittest.TestCase):
         return [
             Change("feat(app): water the garden (#7)", 7, "feat(app): water the garden", parse_note(TEMPLATE), pictures_in(PICTURES)),
             Change("fix: a plant that didn't grow (#8)", 8),
-            Change("perf: open faster (#9)", 9, note=Note("improved", "no", "Meadow opens faster.", "")),
-            Change("feat: cover the garden with tests (#10)", 10, note=Note("none", "no", "", "")),
+            Change("perf: open faster (#9)", 9, note=Note("improved", "no", "Meadow opens faster.")),
+            Change("feat: cover the garden with tests (#10)", 10, note=Note("none", "no", "")),
             Change("chore: tidy", None),
             Change("build(deps): bump kotlin (#11)", 11),
         ]
@@ -146,7 +147,7 @@ class RenderTest(unittest.TestCase):
         kinds = [(c.kind, c.text) for c in self.changes()]
         self.assertEqual(
             [
-                ("new", "Water your garden from the rest screen."),
+                ("new", "You can now water your garden from the rest screen."),
                 ("fixed", "A plant that didn't grow"),
                 ("improved", "Meadow opens faster."),
                 ("none", ""),
@@ -166,16 +167,14 @@ class RenderTest(unittest.TestCase):
         people = text[text.index(FOR_PEOPLE_START) : text.index(FOR_PEOPLE_END)]
         self.assertEqual(
             f"{FOR_PEOPLE_START}\nThis update has 1 new feature, 1 improvement and 1 fix.\n\n"
-            "### New\n- Water your garden from the rest screen. (#7)\n\n"
+            "### New\n- You can now water your garden from the rest screen. (#7)\n\n"
             "### Improved\n- Meadow opens faster. (#9)\n\n"
             "### Fixed\n- A plant that didn't grow (#8)\n\n",
             people,
         )
         self.assertIn(
-            "## Highlights\n\n### Water your garden from the rest screen\n\n"
-            "Tap a plant to water it. It grows a little each day that you rest. (#7)\n\n"
-            f'<img src="{URL}/after/stories/garden/01.png" width="300" alt="Open the garden"> '
-            f'<img src="{URL}/after/stories/garden/02.png" width="300" alt="Water a plant">\n',
+            "## Highlights\n\n### You can now water your garden from the rest screen (#7)\n\n"
+            f'<img src="{URL}/after/stories/garden/02.png" width="300" alt="Water a plant">\n\n## All changes',
             text,
         )
         self.assertIn("## All changes\n\n- feat(app): water the garden (#7)\n- fix: a plant that didn't grow (#8)\n", text)
@@ -189,13 +188,42 @@ class RenderTest(unittest.TestCase):
         self.assertNotIn("Highlights", text)
         self.assertNotIn("Full comparison", text)
 
-    def test_at_most_three_highlights_and_three_pictures_each(self):
+    def test_at_most_three_highlights_with_one_picture_each(self):
         pictures = [Picture(f"https://x/after/{i}.png", str(i)) for i in range(5)]
-        note = Note("new", "yes", "A", "B")
-        changes = [Change(f"feat: {i} (#{i})", i, note=note, pictures=pictures) for i in range(1, 6)]
+        changes = [Change(f"feat: {i} (#{i})", i, note=Note("new", "yes", f"A{i}"), pictures=pictures) for i in range(1, 6)]
         text = render(changes, "o/r", None, "v1.0.0")
-        self.assertEqual(3, text.count("\nB (#"))
-        self.assertEqual(9, text.count("<img"))
+        self.assertEqual(["### A1 (#1)", "### A2 (#2)", "### A3 (#3)"], [line for line in text.splitlines() if line.startswith("### A")])
+        self.assertEqual(3, text.count("<img"))
+
+    def test_the_picture_is_the_one_named_else_the_first_step_else_the_first(self):
+        story = [
+            Picture("https://x/after/stories/S/story.webp", "video"),
+            Picture("https://x/after/stories/S/01.png", "one"),
+            Picture("https://x/after/stories/S/02.png", "two"),
+            Picture("https://x/after/gallery/day/a.png", "screen"),
+        ]
+
+        def chosen(picture, pictures=story):
+            return Change("feat: a (#1)", 1, note=Note("new", "yes", "A", picture), pictures=pictures).picture.caption
+
+        self.assertEqual("two", chosen("2"))
+        self.assertEqual("video", chosen("video"))
+        self.assertEqual("one", chosen(""))
+        self.assertEqual("one", chosen("9"))
+        self.assertEqual("screen", chosen("", story[3:]))
+        self.assertIsNone(Change("feat: a (#1)", 1, note=Note("new", "yes", "A")).picture)
+
+    def test_a_note_that_replaces_another_in_the_release_hides_it(self):
+        first = Change("feat: rows (#219)", 219, note=Note("new", "yes", "See what a change changes."))
+        later = Change("feat: week (#221)", 221, note=Note("new", "yes", "Set your limits on one week.", replaces="#219"))
+        text = render([first, later], "o/r", "v0.6.1", "v0.7.0")
+        people = text[: text.index(FOR_PEOPLE_END)]
+        self.assertIn("This update has 1 new feature.\n\n### New\n- Set your limits on one week. (#221)\n", people)
+        self.assertNotIn("#219", people)
+        self.assertEqual(["### Set your limits on one week (#221)"], [line for line in text.splitlines() if line.startswith("### S")])
+        self.assertIn("- feat: rows (#219)\n- feat: week (#221)\n", text)
+        # When the replaced one shipped before, the note just adds its line.
+        self.assertIn("- Set your limits on one week. (#221)", render([later], "o/r", "v0.7.0", "v0.8.0"))
 
 
 class OverviewTest(unittest.TestCase):

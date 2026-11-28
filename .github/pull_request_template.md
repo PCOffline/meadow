@@ -22,14 +22,17 @@ Remove this section for a change that people don't see.
 <!--
 Deliver puts this in the release notes ("Release notes" in AGENTS.md). Write it in app text.
 - Kind: new, improved, fixed, or none for a change that people don't see (tests, CI, docs).
-- Highlight: yes for a change that people notice at once. Its pictures show in the notes.
+- Highlight: yes for a change that people notice at once. It shows with its note as the title.
 - Note: one line, 100 characters or fewer, of what people see or can do now. Empty for none.
-- Detail: for a highlight only. Two or three short sentences, 300 characters or fewer.
+- Picture: for a highlight only. The story step to show (1, 2...) or video. Empty for step 1.
+- Replaces: the pull requests in the same release whose notes this note replaces (#219).
+  Write the note to cover them too. Empty for none.
 -->
 Kind: none
 Highlight: no
 Note:
-Detail:
+Picture:
+Replaces:
 
 ## Evidence
 

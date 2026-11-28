@@ -424,13 +424,15 @@ Each release has notes in three parts:
 
 - the part for people: an overview, and what is new, improved and fixed. The app shows this part
   in Settings when it offers the update;
-- the highlights, each with pictures from the Pictures workflow of its pull request;
+- the highlights, each with its note as the title and one picture from the Pictures workflow of
+  its pull request;
 - every change, with its pull request.
 
 The notes come from the **Release note** section of each pull request that changed the app since
 the latest release (`.github/scripts/release_notes.py`). AGENTS.md says how to write it, and the
 **Release note** workflow checks it. A pull request without the section, such as one from
-Dependabot, counts by its Conventional Commits type. The overview counts the changes. A release
+Dependabot, counts by its Conventional Commits type. A note can replace the notes of other pull
+requests in the same release. The overview counts the changes. A release
 with nothing for people has an empty part for people, and the app shows no notes. The run's
 summary shows the notes.
 

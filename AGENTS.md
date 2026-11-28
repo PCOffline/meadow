@@ -97,8 +97,11 @@ section is good. The template (`.github/pull_request_template.md`) has the field
   rest screen."
 - Choose `none` for each change that people don't see: tests, CI, docs, refactors and builds. A
   release with only these changes has no notes for people, and the app shows none.
-- Choose `Highlight: yes` only for a change that people notice at once. Its story's pictures show
-  in the notes, in the order of its steps.
+- Choose `Highlight: yes` only for a change that people notice at once. The notes show its note
+  as the title, and one picture from its story. Write that note as a title: "You can now see
+  exactly what changed in requests to update limits."
+- When a change builds on one that isn't released yet, name that pull request in `Replaces`.
+  Write one note that covers both. Only your note shows.
 - Give the title the type that matches the kind: `feat` for new, `perf` for improved, `fix` for
   fixed. A pull request with no section, such as one from a bot, counts by this type.
 

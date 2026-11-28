@@ -10,8 +10,9 @@ Each pull request that changes the app has a "Release note" section in its descr
     ## Release note
     Kind: new | improved | fixed | none
     Highlight: yes | no
-    Note: one line that people read, up to NOTE_MAX characters.
-    Detail: for a highlight only, up to DETAIL_MAX characters.
+    Note: one line that people read, up to NOTE_MAX characters. A highlight's title.
+    Picture: for a highlight only, and optional: a story step's number, or video.
+    Replaces: optional: the pull requests whose note this note replaces, such as #219.
 
 `<tag>` reads each commit since the latest app tag that changed the app (the paths in
 plan_version.py). Each is a squashed pull request, so it reads the pull request with `gh`: its
@@ -24,8 +25,11 @@ The notes have three parts:
 - the part for people, between FOR_PEOPLE_START and FOR_PEOPLE_END: an overview, then what is
   new, improved and fixed. The app shows it (Releases.notesForPeople). A release with nothing
   for people leaves this part empty, so the app shows no notes;
-- the highlights, at most MAX_HIGHLIGHTS, each with its detail and pictures;
+- the highlights, at most MAX_HIGHLIGHTS, each with its note as the title and one picture;
 - every change, with its pull request, and a link to the full comparison.
+
+A note that replaces another pull request's note hides that note when both are in the release.
+It changes nothing when the other pull request is in an earlier release.
 
 Deliver writes an overview that counts the changes. The release-overview skill
 (.claude/skills/release-overview/SKILL.md) can write a better one by hand, with `overview`.
@@ -48,10 +52,8 @@ from pr_pictures import START as PICTURES_START
 FOR_PEOPLE_START = "<!-- for people: start -->"
 FOR_PEOPLE_END = "<!-- for people: end -->"
 NOTE_MAX = 100
-DETAIL_MAX = 300
 OVERVIEW_MAX_WORDS = 40
 MAX_HIGHLIGHTS = 3
-MAX_PICTURES = 3
 PICTURE_WIDTH = 300
 
 KINDS = ("new", "improved", "fixed", "none")
@@ -67,7 +69,9 @@ PULL_REQUEST = re.compile(r"\(#(\d+)\)\s*$")
 IMAGE = re.compile(r'<img\s+src="(?P<url>[^"]+)"[^>]*?alt="(?P<alt>[^"]*)"')
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 HEADING = re.compile(r"^##\s+release note\s*$", re.IGNORECASE | re.MULTILINE)
-FIELD = re.compile(r"^(?P<name>kind|highlight|note|detail):[ \t]*(?P<value>.*)$", re.IGNORECASE)
+FIELD = re.compile(r"^(?P<name>kind|highlight|note|picture|replaces):[ \t]*(?P<value>.*)$", re.IGNORECASE)
+NUMBERS = re.compile(r"^(#?\d+)([\s,]+#?\d+)*$")
+STEP = re.compile(r"/stories/[^/]+/(\d+)\.png$")
 
 
 @dataclass
@@ -75,7 +79,12 @@ class Note:
     kind: str
     highlight: str
     text: str
-    detail: str
+    picture: str = ""
+    replaces: str = ""
+
+    @property
+    def replaced(self) -> list[int]:
+        return [int(n) for n in re.findall(r"\d+", self.replaces)]
 
 
 @dataclass
@@ -113,6 +122,20 @@ class Change:
     def highlight(self) -> bool:
         return bool(self.note and self.note.kind != "none" and self.note.highlight == "yes")
 
+    @property
+    def picture(self) -> Picture | None:
+        """The highlight's picture: the one its note names, else the story's first step, else the
+        first picture."""
+        chosen = self.note.picture if self.note else ""
+        steps = {int(m[1]): p for p in self.pictures if (m := STEP.search(p.url))}
+        if chosen == "video" and (video := next((p for p in self.pictures if p.url.endswith("/story.webp")), None)):
+            return video
+        if chosen.isdigit() and int(chosen) in steps:
+            return steps[int(chosen)]
+        if steps:
+            return steps[min(steps)]
+        return self.pictures[0] if self.pictures else None
+
 
 def parse_note(description: str) -> Note | None:
     """The release note in [description], or None when it has no "Release note" section."""
@@ -127,7 +150,13 @@ def parse_note(description: str) -> Note | None:
     for line in section.splitlines():
         if (match := FIELD.match(line.strip())) is not None:
             fields[match["name"].lower()] = match["value"].strip()
-    return Note(fields.get("kind", "").lower(), fields.get("highlight", "").lower(), fields.get("note", ""), fields.get("detail", ""))
+    return Note(
+        fields.get("kind", "").lower(),
+        fields.get("highlight", "").lower(),
+        fields.get("note", ""),
+        fields.get("picture", "").lower(),
+        fields.get("replaces", ""),
+    )
 
 
 def problems(note: Note | None) -> list[str]:
@@ -140,19 +169,19 @@ def problems(note: Note | None) -> list[str]:
     if note.highlight not in ("yes", "no"):
         found.append("Set Highlight to yes or no.")
     if note.kind == "none":
-        if note.highlight == "yes" or note.text or note.detail:
-            found.append("Leave Note and Detail empty and set Highlight to no when Kind is none.")
+        if note.highlight == "yes" or note.text or note.picture or note.replaces:
+            found.append("Leave Note, Picture and Replaces empty and set Highlight to no when Kind is none.")
         return found
     if not note.text:
         found.append("Write the Note: one line that says what people see or can do now.")
     elif len(note.text) > NOTE_MAX:
         found.append(f"Shorten the Note to {NOTE_MAX} characters or fewer. It has {len(note.text)}.")
-    if note.highlight == "yes" and not note.detail:
-        found.append("Write the Detail of the highlight: two or three short sentences.")
-    if note.highlight == "yes" and len(note.detail) > DETAIL_MAX:
-        found.append(f"Shorten the Detail to {DETAIL_MAX} characters or fewer. It has {len(note.detail)}.")
-    if note.highlight == "no" and note.detail:
-        found.append("Leave Detail empty, or set Highlight to yes.")
+    if note.picture and note.highlight != "yes":
+        found.append("Leave Picture empty, or set Highlight to yes.")
+    elif note.picture and note.picture != "video" and not note.picture.isdigit():
+        found.append("Set Picture to the number of a story step, or to video.")
+    if note.replaces and not NUMBERS.match(note.replaces):
+        found.append("Write Replaces as pull request numbers, such as #219, #220.")
     return found
 
 
@@ -220,22 +249,28 @@ def counted(changes: list[Change]) -> str:
     return f"This update has {listed}."
 
 
+def for_people(changes: list[Change]) -> list[Change]:
+    """[changes] without each one that a change in the same release replaces."""
+    replaced = {n for c in changes if c.note for n in c.note.replaced if n != c.number}
+    return [c for c in changes if c.number not in replaced]
+
+
 def render(changes: list[Change], repo: str, previous: str | None, tag: str) -> str:
+    shown = for_people(changes)
     lines = [FOR_PEOPLE_START]
-    if overview := counted(changes):
+    if overview := counted(shown):
         lines += [overview, ""]
         for kind, heading in SECTIONS:
-            if items := [c for c in changes if c.kind == kind]:
+            if items := [c for c in shown if c.kind == kind]:
                 lines += [f"### {heading}", *(f"- {c.text}" + (f" (#{c.number})" if c.number else "") for c in items), ""]
     lines += [FOR_PEOPLE_END, ""]
 
-    if highlights := [c for c in changes if c.highlight][:MAX_HIGHLIGHTS]:
+    if highlights := [c for c in shown if c.highlight][:MAX_HIGHLIGHTS]:
         lines += ["## Highlights", ""]
         for c in highlights:
-            lines += [f"### {c.text.rstrip('.')}", "", f"{c.note.detail} (#{c.number})", ""]  # type: ignore[union-attr]
-            if c.pictures:
-                pictures = c.pictures[:MAX_PICTURES]
-                lines += [" ".join(f'<img src="{p.url}" width="{PICTURE_WIDTH}" alt="{p.caption}">' for p in pictures), ""]
+            lines += [f"### {c.text.rstrip('.')} (#{c.number})", ""]
+            if picture := c.picture:
+                lines += [f'<img src="{picture.url}" width="{PICTURE_WIDTH}" alt="{picture.caption}">', ""]
 
     lines += ["## All changes", ""]
     lines += [f"- {c.title} (#{c.number})" if c.title else f"- {c.subject}" for c in changes]
