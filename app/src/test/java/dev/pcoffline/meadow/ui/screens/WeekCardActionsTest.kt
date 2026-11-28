@@ -162,17 +162,16 @@ class WeekCardActionsTest : ScreenTest() {
     fun `a handle moves the end of a picked stretch`() {
         card()
         tap(1, 14f)
-        // Past the touch slop, then on to 23:00.
+        // The end handle, at 22:00, two hours up: past Robolectric's touch slop (16dp), then back to 21:00.
         day(1).performTouchInput {
             down(Offset(center.x, height * 22f / 24f))
-            moveTo(Offset(center.x, height * 22.5f / 24f))
-            moveTo(Offset(center.x, height * 23.2f / 24f))
-            moveTo(Offset(center.x, height * 23.1f / 24f))
-            moveTo(Offset(center.x, height * 23f / 24f))
+            moveTo(Offset(center.x, height * 20f / 24f))
+            moveTo(Offset(center.x, height * 20.5f / 24f))
+            moveTo(Offset(center.x, height * 21f / 24f))
             up()
         }
         compose.waitForIdle()
-        assertEquals(listOf(TimeWindow(600, 1380)), limit.schedule!!.days[1])
+        assertEquals(listOf(TimeWindow(600, 1260)), limit.schedule!!.days[1])
     }
 
     @Test
