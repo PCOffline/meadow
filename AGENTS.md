@@ -89,14 +89,21 @@ the story needs to the description.
 
 ### Release notes
 
-Deliver writes the notes of each release from its pull requests (`.github/scripts/release_notes.py`).
-Claude reads each title, description and picture. Without Claude, the notes use the titles and
-the types only.
+Deliver makes the notes of each release from the **Release note** section of each pull request
+that it contains (`.github/scripts/release_notes.py`). The **Release note** check fails until the
+section is good. The template (`.github/pull_request_template.md`) has the fields and limits.
 
-- Write the summary of the title as what a person sees or can do now. For example:
-  `feat(app): water the garden from the rest screen`.
-- Give the type that people feel: `feat` for a new feature, `perf` for a faster or better one,
-  `fix` for a bug fix. Use the other types for changes that people don't see.
+- Write the note in app text, as what a person sees or can do now: "Water your garden from the
+  rest screen."
+- Choose `none` for each change that people don't see: tests, CI, docs, refactors and builds. A
+  release with only these changes has no notes for people, and the app shows none.
+- Choose `Highlight: yes` only for a change that people notice at once. Its story's pictures show
+  in the notes, in the order of its steps.
+- Give the title the type that matches the kind: `feat` for new, `perf` for improved, `fix` for
+  fixed. A pull request with no section, such as one from a bot, counts by this type.
+
+The **release-overview** skill (`.claude/skills/release-overview/SKILL.md`) writes a new
+overview for a published release.
 
 ### Spec
 
