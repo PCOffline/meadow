@@ -180,11 +180,17 @@ class WeekCardActionsTest : ScreenTest() {
         compose.onNodeWithContentDescription(text(R.string.week_steps_now, "15m")).performClick()
         compose.onNode(hasText("5m")).performClick()
         assertEquals(5, step)
-        compose.onNodeWithContentDescription(text(R.string.week_zoom_out)).performClick()
+        // Zoomed in for 5m, − and + show under the grid.
         compose.onNodeWithContentDescription(text(R.string.week_zoom_in)).performClick()
-        day(1).act(R.string.week_zoom_in)
-        day(1).act(R.string.week_zoom_out)
+        compose.onNodeWithContentDescription(text(R.string.week_zoom_out)).performClick()
         assertAccessible()
+        // Back out to the whole day, they go away.
+        compose.onNodeWithContentDescription(text(R.string.week_zoom_out)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.week_zoom_out)).assertDoesNotExist()
+        day(1).act(R.string.week_zoom_in)
+        compose.onNodeWithContentDescription(text(R.string.week_zoom_out)).assertExists()
+        day(1).act(R.string.week_zoom_out)
+        compose.onNodeWithContentDescription(text(R.string.week_zoom_in)).assertDoesNotExist()
     }
 
     @Test

@@ -152,12 +152,8 @@ object WeekPlan {
     /** [minute] moved onto the nearest [step], from 0 to [max]. */
     fun snap(minute: Int, step: Int, max: Int = 2 * DAY): Int = ((minute + step / 2) / step * step).coerceIn(0, max)
 
-    /** How many hours the grid shows at once for [step]: all day for the larger steps. */
-    fun hoursOnScreen(step: Int): Int = when {
-        step <= 5 -> 6
-        step <= 10 -> 12
-        else -> 24
-    }
+    /** How many hours the grid shows at once for [step]: all day, or half of it for 5 minutes. */
+    fun hoursOnScreen(step: Int): Int = if (step <= 5) 12 else 24
 
     /**
      * A cap's parts as the week card draws them on [day]: its own hours, and the early hours of a

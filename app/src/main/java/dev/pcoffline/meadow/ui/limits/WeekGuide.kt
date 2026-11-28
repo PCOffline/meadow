@@ -173,8 +173,12 @@ private fun SampleGrid(schedule: Schedule?, caps: List<TimeCap>, days: List<Int>
         onResize = { _, _ -> },
         dayDescription = { "" },
         dayActions = { emptyList() },
+        height = GUIDE_HEIGHT,
     )
 }
+
+/** The sample week's height: lower than the card's, so that the guide fits in its dialog. */
+private val GUIDE_HEIGHT = 216.dp
 
 /** Whether the phone's animations are off (reduced motion). */
 private fun animationsOff(context: android.content.Context): Boolean =

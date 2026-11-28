@@ -68,7 +68,17 @@ internal val AXIS_WIDTH = 36.dp
 private val DAY_GAP = 3.dp
 
 /** How tall the whole day is, when the grid shows all of it. */
-internal val GRID_HEIGHT = 216.dp
+internal val GRID_HEIGHT = 384.dp
+
+/** The least space between two hour labels on the axis. */
+private val LABEL_SPACE = 40.dp
+
+/** The hour height from which the grid draws a line at each quarter hour. */
+private val QUARTER_LINES = 64.dp
+
+/** How many hours apart the axis labels are, for hours [hourHeight] high. */
+internal fun labelEvery(hourHeight: androidx.compose.ui.unit.Dp): Int =
+    listOf(1, 2, 3, 6).first { hourHeight * it >= LABEL_SPACE || it == 6 }
 
 /** What the grid draws in, from the theme. */
 @Immutable
@@ -263,8 +273,8 @@ fun WeekGrid(
                     fun y(minute: Int) = minute / 60f * hourPx
                     val radius = CornerRadius(5.dp.toPx())
 
-                    // Hour lines and labels.
-                    val every = if (hoursShown <= 12f) 1 else 6
+                    // Hour labels, as far apart as fits: each hour, or each 2, 3 or 6 hours.
+                    val every = labelEvery(hourHeight)
                     for (h in 0..24 step every) {
                         val label = "%02d".format(h) + if (every == 1) ":00" else ""
                         val text = measurer.measure(label, TextStyle(fontSize = 10.sp, color = colors.muted))
@@ -280,8 +290,8 @@ fun WeekGrid(
                         } else {
                             stripes(left, colWidth, size.height, colors.restingA, colors.restingB, radius)
                         }
-                        // Lines at 6, 12 and 18 (each quarter hour when zoomed in).
-                        val lineStep = if (hoursShown <= 6f) 15 else 360
+                        // A line at each label (and each quarter hour when zoomed in far).
+                        val lineStep = if (hourHeight >= QUARTER_LINES) 15 else every * 60
                         var m = lineStep
                         while (m < DAY) {
                             drawLine(colors.line.copy(alpha = if (m % 60 == 0) 0.5f else 0.25f), Offset(left, y(m)), Offset(left + colWidth, y(m)), 1f)

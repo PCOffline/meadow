@@ -348,17 +348,19 @@ fun WeekCard(
                     dayDescription = ::dayDescription,
                     dayActions = ::dayActions,
                 )
-                if (hoursShown < 24f || WeekPlan.hoursOnScreen(step) < 24) {
-                    ZoomButtons(
-                        Modifier.align(Alignment.BottomEnd).padding(6.dp),
-                        onIn = { hoursShown = (hoursShown / 2).coerceAtLeast(3f) },
-                        onOut = { hoursShown = (hoursShown * 2).coerceAtMost(24f) },
-                    )
-                }
             }
         }
         if (limit.schedule == null && limit.caps.isEmpty() && enabled && !asList) Hint()
-        Legend()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Legend(Modifier.weight(1f))
+            // Only zoomed in: − and + to zoom on, or back out to the whole day.
+            if (!asList && hoursShown < 24f) {
+                ZoomButtons(
+                    onIn = { hoursShown = (hoursShown / 2).coerceAtLeast(3f) },
+                    onOut = { hoursShown = (hoursShown * 2).coerceAtMost(24f) },
+                )
+            }
+        }
         when (val p = picked) {
             is Picked.Hours -> ActionBar(Icons.Outlined.Schedule, stretchText(p.stretch), onClose = { picked = null }) {
                 Tool(Icons.Outlined.Gesture, R.string.week_redraw, enabled) { redrawing = p; picked = null }
@@ -677,14 +679,12 @@ private fun RedrawBar(onStop: () -> Unit) {
     }
 }
 
-/** − and + for the hours, for one hand or no pinch. */
+/** − and + for the hours under the grid, for one hand or no pinch. */
 @Composable
-private fun ZoomButtons(modifier: Modifier, onIn: () -> Unit, onOut: () -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), shadowElevation = 2.dp, color = Garden.colors.cardTint, modifier = modifier) {
-        Row {
-            IconButton(onClick = onOut) { Icon(Icons.Outlined.ZoomOut, contentDescription = stringResource(R.string.week_zoom_out)) }
-            IconButton(onClick = onIn) { Icon(Icons.Outlined.ZoomIn, contentDescription = stringResource(R.string.week_zoom_in)) }
-        }
+private fun ZoomButtons(onIn: () -> Unit, onOut: () -> Unit) {
+    Row {
+        IconButton(onClick = onOut) { Icon(Icons.Outlined.ZoomOut, contentDescription = stringResource(R.string.week_zoom_out)) }
+        IconButton(onClick = onIn) { Icon(Icons.Outlined.ZoomIn, contentDescription = stringResource(R.string.week_zoom_in)) }
     }
 }
 
@@ -704,9 +704,9 @@ private fun Hint() {
 
 /** What the three patterns mean. */
 @Composable
-private fun Legend() {
+private fun Legend(modifier: Modifier = Modifier) {
     val colors = weekColors()
-    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    FlowRow(modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         listOf(R.string.week_allowed to colors.allowed, R.string.week_resting to colors.restingB, R.string.week_cap to colors.cap).forEach { (label, color) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(14.dp, 10.dp).clip(RoundedCornerShape(3.dp)).background(color))

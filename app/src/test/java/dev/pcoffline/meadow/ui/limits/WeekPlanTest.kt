@@ -3,6 +3,7 @@ package dev.pcoffline.meadow.ui.limits
 import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -127,10 +128,20 @@ class WeekPlanTest {
         assertEquals(615, WeekPlan.snap(613, 5))
         assertEquals(0, WeekPlan.snap(-20, 15))
         assertEquals(2880, WeekPlan.snap(3000, 15))
-        assertEquals(6, WeekPlan.hoursOnScreen(5))
-        assertEquals(12, WeekPlan.hoursOnScreen(10))
+        assertEquals(12, WeekPlan.hoursOnScreen(5))
+        assertEquals(24, WeekPlan.hoursOnScreen(10))
         assertEquals(24, WeekPlan.hoursOnScreen(15))
         assertEquals(24, WeekPlan.hoursOnScreen(30))
+    }
+
+    @Test
+    fun `the hour labels are as far apart as fits, from each hour to each 6 hours`() {
+        // The card's grid is 384dp high: the whole day has a label each 3 hours, 12 hours each 2.
+        assertEquals(3, labelEvery(384.dp / 24))
+        assertEquals(2, labelEvery(384.dp / 12))
+        assertEquals(1, labelEvery(384.dp / 6))
+        // The guide's lower grid: each 6 hours.
+        assertEquals(6, labelEvery(216.dp / 24))
     }
 
     @Test
