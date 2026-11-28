@@ -1,0 +1,34 @@
+name: Release note
+
+# Checks the "Release note" section of each pull request's description ("Release notes" in
+# AGENTS.md). Deliver makes each release's notes from these sections
+# (.github/scripts/release_notes.py). It runs again when the description changes, so a fix to the
+# note needs no new push.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: release-note-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  check:
+    name: release note
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its first parent, the base: their difference is the change.
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check the release note
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: git diff --name-only HEAD^1 HEAD | python3 .github/scripts/release_notes.py check

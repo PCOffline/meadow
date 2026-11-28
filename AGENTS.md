@@ -87,6 +87,27 @@ Make the pictures show each detail of the change:
 A pull request from a fork gets its pictures in the workflow run's artifact. Attach the ones that
 the story needs to the description.
 
+### Release notes
+
+Deliver makes the notes of each release from the **Release note** section of each pull request
+that it contains (`.github/scripts/release_notes.py`). The **Release note** check fails until the
+section is good. The template (`.github/pull_request_template.md`) has the fields and limits.
+
+- Write the note in app text, as what a person sees or can do now: "Water your garden from the
+  rest screen."
+- Choose `none` for each change that people don't see: tests, CI, docs, refactors and builds. The
+  notes of a release with only these changes say "Improved stability and performance."
+- Choose `Highlight: yes` only for a change that people notice at once. The notes show its note
+  as the title, and one picture from its story. Write that note as a title: "You can now see
+  exactly what changed in requests to update limits."
+- When a change builds on one that isn't released yet, name that pull request in `Replaces`.
+  Write one note that covers both. Only your note shows.
+- Give the title the type that matches the kind: `feat` for new, `perf` for improved, `fix` for
+  fixed. A pull request with no section, such as one from a bot, counts by this type.
+
+The **release-overview** skill (`.claude/skills/release-overview/SKILL.md`) writes a new
+overview for a published release.
+
 ### Spec
 
 The spec says exactly what the change does, so that a reviewer can check the pictures against it.

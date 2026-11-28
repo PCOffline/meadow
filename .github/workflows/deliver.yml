@@ -17,6 +17,7 @@ name: Deliver
 # By hand: Actions → Deliver → Run workflow on main, choosing for each which part to raise
 # (major included, which is how a version leaves 0.x), or auto to read it from the commits.
 # By tag: pushing a tag like v1.2.0 releases exactly that version of the app (no deploy).
+# Each release's notes come from the release notes of its pull requests (.github/scripts/release_notes.py).
 on:
   # Runs with this repository's secrets after Build. The jobs only act on pushes to this
   # repository's main (see their conditions), never on pull requests or forks.
@@ -176,6 +177,7 @@ jobs:
     permissions:
       contents: write # creates the release and its tag
       actions: read # checks that Build passed on the commit
+      pull-requests: read # reads the released pull requests for the notes
     steps:
       - name: Only release from main
         if: github.event_name == 'workflow_dispatch' && github.ref_name != github.event.repository.default_branch
@@ -220,6 +222,15 @@ jobs:
             echo "::error::Build hasn't passed on $SHA. Wait for it to pass, then try again."
             exit 1
           fi
+      # The notes come from the release notes in the released pull requests' descriptions.
+      - name: Write the release notes
+        if: steps.plan.outputs.ship == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          python3 .github/scripts/release_notes.py "$TAG" > "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         if: steps.plan.outputs.ship == 'true'
         with:
@@ -272,11 +283,11 @@ jobs:
         run: |
           cp app/build/outputs/apk/release/app-release.apk "meadow-$VERSION.apk"
           if [ "$GITHUB_EVENT_NAME" = push ]; then
-            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --verify-tag
+            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag
           else
             # Creates the tag on the released commit. Tags made with this token don't start
             # another Deliver run.
-            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --generate-notes --target "$SHA"
+            gh release create "$TAG" "meadow-$VERSION.apk" --title "Meadow $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --target "$SHA"
           fi
       - name: Remove the signing key
         if: always()

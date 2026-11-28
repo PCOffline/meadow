@@ -337,6 +337,7 @@ proposes updates each week.
 | **Deliver** (`deliver.yml`) | After Build passes on `main` (when on, see 7.5 and 7.6), when you push a tag like `v0.4.0`, or by hand | Deploys the backend to Firebase. Then it tests, builds and signs the release APK, and publishes it on the Releases page of your fork | The five secrets in 7.4 to release. The Google Cloud access in 7.6 to deploy |
 | **Screenshots** (`screenshots.yml`) | Pushes to `main` that change the app's screens, or by hand | Makes the README images again, commits them to the branch, and runs Build on that commit | None |
 | **Pictures** (`pictures.yml`) | Each pull request that changes the app's screens | Draws the pull request's stories and each screen of the debug gallery on an Android emulator, for the pull request and its base. Publishes them on the branch `pictures/pr-<number>` and puts them in the pull request's description | None |
+| **Release note** (`release-note.yml`) | Each pull request, and each change to its description | Checks the **Release note** section of a pull request that changes the app. Deliver makes the release notes from these sections | None |
 
 Until you turn on automatic deploys (7.6), deploy the backend from your computer (step 4) each
 time `backend/` changes.
@@ -420,6 +421,31 @@ When the workflow is done, the signed APK is on the **Releases** page of your fo
 `meadow-<version>.apk`. Versions must have the form `1.2.3` and must increase with each release.
 Each installed copy updates to a new release. Thus Deliver releases only commits on `main` that
 passed Build. It also runs the tests before it puts the signing key on the runner.
+
+Each release has notes in three parts:
+
+- the part for people: what is new, improved and fixed. The app shows this part in Settings when
+  it offers the update;
+- the highlights, each with its note as the title and one picture from the Pictures workflow of
+  its pull request;
+- every change, with its pull request.
+
+The notes come from the **Release note** section of each pull request that changed the app since
+the latest release (`.github/scripts/release_notes.py`). AGENTS.md says how to write it, and the
+**Release note** workflow checks it. A pull request without the section, such as one from
+Dependabot, counts by its Conventional Commits type. A note can replace the notes of other pull
+requests in the same release. The notes of a release with nothing for people say "Improved
+stability and performance." The run's summary shows the notes.
+
+To add an overview at the top of the part for people after a release, ask a coding agent to use the **release-overview**
+skill (`.claude/skills/release-overview/SKILL.md`). Or write it yourself and run:
+
+```bash
+python3 .github/scripts/release_notes.py overview v0.4.0 "Your garden waters itself now."
+```
+
+The command needs the [GitHub CLI](https://cli.github.com), signed in with access to edit
+releases. The overview is one paragraph of 40 words or fewer.
 
 Release builds look for updates on the repository that built them. Thus copies from your fork
 update from the releases of your fork. People can turn off these checks in Settings. If you

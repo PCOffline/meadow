@@ -70,12 +70,37 @@ object Releases {
     /** The kinds of change that people see or feel. The rest (build, ci, docs, test…) is left out. */
     private val forPeople = setOf("feat", "fix", "perf")
 
+    // Deliver writes the part of the notes for people between these lines (.github/scripts/release_notes.py).
+    private const val FOR_PEOPLE_START = "<!-- for people: start -->"
+    private const val FOR_PEOPLE_END = "<!-- for people: end -->"
+    private val pullRequests = Regex("""(\s+\(#\d+\))+$""")
+
     /**
-     * A release's notes as people read them in Settings. GitHub writes them for developers: a
-     * heading, each change with its kind and author, and a link to the full list. This keeps what
-     * changed for people, a line each, and leaves out the rest. Empty when nothing is left.
+     * A release's notes as people read them in Settings. Deliver writes a part for people: an
+     * overview, then a heading and a list for each kind of change. This keeps that part, with each
+     * heading as a line, each item as a bullet, and no pull request numbers. An empty part gives
+     * empty notes. Older releases have
+     * GitHub's notes, written for developers. From those, this keeps what changed for people, a
+     * line each. Empty when nothing is left.
      */
-    fun notesForPeople(body: String): String = body.lineSequence()
+    fun notesForPeople(body: String): String {
+        val start = body.indexOf(FOR_PEOPLE_START)
+        val end = body.indexOf(FOR_PEOPLE_END, start + 1)
+        if (start < 0 || end < 0) return generatedNotesForPeople(body)
+        return body.substring(start + FOR_PEOPLE_START.length, end).lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .map { line ->
+                when {
+                    line.startsWith("#") -> line.trimStart('#').trim()
+                    bullet.containsMatchIn(line) -> "• " + line.replace(bullet, "").replace(pullRequests, "")
+                    else -> line
+                }
+            }
+            .joinToString("\n")
+    }
+
+    private fun generatedNotesForPeople(body: String): String = body.lineSequence()
         .map { it.trim() }
         .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("**") && !it.startsWith("<!--") }
         .map { it.replace(bullet, "").replace(credit, "") }
