@@ -217,57 +217,59 @@ class LimitEngine(
         }
     }
 
-    /** The tightest cap on now, with the day's extra time on top; all caps apply, so the tightest decides. */
+    /**
+     * The tightest cap on now, with the day's extra time on top; all caps apply, so the tightest
+     * decides. A cap past midnight counts use from its start the day before.
+     */
     private fun AppBudget.withCaps(limit: AppLimit, dayOfWeek: Int, minuteNow: Int, now: ZonedDateTime, bonus: Int, extra: Long): AppBudget {
-        val on = limit.caps.filter { dayOfWeek in it.days && it.window.contains(minuteNow) }
+        val today = now.toLocalDate()
+        val on = limit.caps.mapNotNull { cap -> cap.startedDaysBack(dayOfWeek, minuteNow)?.let { cap to today.minusDays(it.toLong()) } }
         if (on.isEmpty()) return this
         val pkg = limit.packageName
-        val today = now.toLocalDate()
-        val (cap, left) = on.map { cap ->
-            val used = usageWithin(listOf(cap.window), pkg) + extra
-            cap to (cap.minutes + bonus) * AppBudget.MINUTE - used
-        }.minBy { it.second }
-        val ends = TimeWindow.edge(today, cap.to, now.zone).toInstant().toEpochMilli() - now.toInstant().toEpochMilli()
+        val (cap, endsAt, left) = on.map { (cap, day) ->
+            val from = TimeWindow.edge(day, cap.from, now.zone).toInstant().toEpochMilli()
+            val to = TimeWindow.edge(day, cap.to, now.zone).toInstant().toEpochMilli()
+            val used = usageIn(listOf(from to to), pkg) + extra
+            Triple(cap, to, (cap.minutes + bonus) * AppBudget.MINUTE - used)
+        }.minBy { it.third }
+        val ends = endsAt - now.toInstant().toEpochMilli()
         return copy(capRemainingMs = left, untilCapEndsMs = ends.coerceAtLeast(0L), cap = cap)
     }
 
-    private var insideHours: Map<List<TimeWindow>, Map<String, Long>> = emptyMap()
-    private var insideHoursMeasuredAt = 0L
+    private var inSpans: Map<List<Pair<Long, Long>>, Map<String, Long>> = emptyMap()
+    private var inSpansMeasuredAt = 0L
 
     /** Today's usage inside the allowed hours, measured with usage and cached alongside it. */
-    private fun insideHoursToday(schedule: Schedule, pkg: String): Long =
-        usageWithin(schedule.windowsOn(Days.today().dayOfWeek.value), pkg)
-
-    /** [pkg]'s usage today within [windows]: a site's as measured so far, an app's as last measured. */
-    private fun usageWithin(windows: List<TimeWindow>, pkg: String): Long {
-        if (!Sites.isSite(pkg)) return usageWithin(windows)[pkg].orZero()
+    private fun insideHoursToday(schedule: Schedule, pkg: String): Long {
         val today = Days.today()
         val zone = ZoneId.systemDefault()
-        return windows.sumOf { w ->
-            val from = TimeWindow.edge(today, w.from, zone).toInstant().toEpochMilli()
-            val to = TimeWindow.edge(today, w.to, zone).toInstant().toEpochMilli()
-            sites.usageBetween(from, minOf(to, System.currentTimeMillis()))[pkg].orZero()
+        val spans = schedule.windowsOn(today.dayOfWeek.value).map { w ->
+            TimeWindow.edge(today, w.from, zone).toInstant().toEpochMilli() to TimeWindow.edge(today, w.to, zone).toInstant().toEpochMilli()
         }
+        return usageIn(spans, pkg)
     }
 
-    /** Today's usage within [windows], measured with usage and cached alongside it. */
-    private fun usageWithin(windows: List<TimeWindow>): Map<String, Long> {
-        if (insideHoursMeasuredAt != measuredAt) {
-            insideHours = emptyMap()
-            insideHoursMeasuredAt = measuredAt
+    /** [pkg]'s usage within [spans] (start to end, in epoch millis): a site's as measured so far, an app's as last measured. */
+    private fun usageIn(spans: List<Pair<Long, Long>>, pkg: String): Long {
+        if (!Sites.isSite(pkg)) return usageIn(spans)[pkg].orZero()
+        val now = System.currentTimeMillis()
+        return spans.sumOf { (from, to) -> if (from >= now) 0L else sites.usageBetween(from, minOf(to, now))[pkg].orZero() }
+    }
+
+    /** Usage within [spans], measured with usage and cached alongside it. */
+    private fun usageIn(spans: List<Pair<Long, Long>>): Map<String, Long> {
+        if (inSpansMeasuredAt != measuredAt) {
+            inSpans = emptyMap()
+            inSpansMeasuredAt = measuredAt
         }
-        val today = Days.today()
-        return insideHours[windows] ?: run {
-            val zone = ZoneId.systemDefault()
+        return inSpans[spans] ?: run {
             val totals = HashMap<String, Long>()
-            for (w in windows) {
-                val from = TimeWindow.edge(today, w.from, zone).toInstant().toEpochMilli()
+            for ((from, to) in spans) {
                 if (from >= measuredAt) continue
-                val to = TimeWindow.edge(today, w.to, zone).toInstant().toEpochMilli()
                 tracker.usageBetween(from, minOf(to, measuredAt)).orEmpty()
                     .forEach { (p, ms) -> totals[p] = totals[p].orZero() + ms }
             }
-            totals.also { insideHours = insideHours + (windows to it) }
+            totals.also { inSpans = inSpans + (spans to it) }
         }
     }
 

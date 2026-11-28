@@ -73,6 +73,10 @@ test("days and caps are checked and kept tidy", () => {
   assert.equal(CapsSchema.safeParse([{ ...cap, days: [0] }]).success, false);
   assert.equal(CapsSchema.safeParse(Array(7).fill(cap)).success, false);
   assert.equal(CapsSchema.safeParse([{ ...cap, extra: 1 }]).success, false);
+  assert.equal(CapsSchema.safeParse([{ ...cap, from: 1320, to: 1560 }]).success, true, "a cap can go past midnight");
+  assert.equal(CapsSchema.safeParse([{ ...cap, from: 600, to: 2040 }]).success, true, "a cap can last a whole day");
+  assert.equal(CapsSchema.safeParse([{ ...cap, from: 600, to: 2041 }]).success, false, "a cap lasts up to a day");
+  assert.equal(CapsSchema.safeParse([{ ...cap, from: 1440, to: 1500 }]).success, false, "a cap starts before midnight");
   assert.deepEqual(normalizeCaps([cap]), [{ days: [1, 5], from: 600, to: 960, minutes: 30 }]);
   assert.equal(normalizeCaps([]), null);
   assert.equal(normalizeCaps(null), null);
@@ -90,5 +94,6 @@ test("days, a day's own limits and caps read as words", () => {
   assert.deepEqual(describeDayMinutes({ "6": 120, "7": 120, "3": 0 }, m), ["no limit on Wed", "120m at weekends"]);
   assert.deepEqual(describeDayMinutes(null, m), []);
   assert.deepEqual(describeCaps([{ days: weekdays, from: 600, to: 960, minutes: 30 }], m), ["up to 30m 10:00–16:00 on weekdays"]);
+  assert.deepEqual(describeCaps([{ days: [5], from: 1320, to: 1560, minutes: 30 }], m), ["up to 30m 22:00–02:00 on Fri"]);
   assert.deepEqual(describeCaps(undefined, m), []);
 });

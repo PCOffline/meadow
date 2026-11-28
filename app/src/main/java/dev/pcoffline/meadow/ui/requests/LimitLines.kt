@@ -31,6 +31,7 @@ import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.data.dailyMinutesOn
+import dev.pcoffline.meadow.ui.capHoursText
 import dev.pcoffline.meadow.ui.daysText
 import dev.pcoffline.meadow.ui.minutesText
 import dev.pcoffline.meadow.ui.shortDay
@@ -92,7 +93,7 @@ fun Resources.limitLines(new: AppLimit, old: AppLimit?): List<LimitLine> {
     }
     val cap = getString(R.string.limit_line_cap)
     fun capText(c: TimeCap) =
-        getString(R.string.limit_cap, minutesText(c.minutes), windowsText(listOf(c.window)), daysText(c.days))
+        getString(R.string.limit_cap, minutesText(c.minutes), capHoursText(c), daysText(c.days))
     for (c in new.caps) {
         val text = capText(c)
         lines += if (!diff || c in was.caps) {

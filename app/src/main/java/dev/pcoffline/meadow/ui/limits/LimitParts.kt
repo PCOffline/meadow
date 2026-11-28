@@ -49,9 +49,9 @@ import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.clockText
 import dev.pcoffline.meadow.ui.currentLocale
+import dev.pcoffline.meadow.ui.capHoursText
 import dev.pcoffline.meadow.ui.daysText
 import dev.pcoffline.meadow.ui.minutesText
-import dev.pcoffline.meadow.ui.windowsText
 import kotlinx.serialization.Serializable
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -150,7 +150,7 @@ fun CapsEditor(caps: List<TimeCap>, firstDay: DayOfWeek, enabled: Boolean, onCha
     val res = LocalResources.current
     Column {
         caps.forEachIndexed { i, cap ->
-            val title = stringResource(R.string.limit_editor_cap_row, minutesText(cap.minutes), res.windowsText(listOf(cap.window)))
+            val title = stringResource(R.string.limit_editor_cap_row, minutesText(cap.minutes), res.capHoursText(cap))
             val days = res.daysText(cap.days).replaceFirstChar { it.uppercase() }
             val edit = stringResource(R.string.limit_editor_cap_edit)
             Row(

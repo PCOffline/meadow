@@ -65,7 +65,7 @@ fun Resources.limitText(
         getString(R.string.limit_on_days, if (m > 0) minutesText(m) else getString(R.string.limit_no_limit), daysText(d))
     }
     val hours = schedule?.let { scheduleText(it) }
-    val capped = caps.map { getString(R.string.limit_cap, minutesText(it.minutes), windowsText(listOf(it.window)), daysText(it.days)) }
+    val capped = caps.map { getString(R.string.limit_cap, minutesText(it.minutes), capHoursText(it), daysText(it.days)) }
     val parts = listOfNotNull(minutes) + days + listOfNotNull(hours) + capped
     return parts.reduceOrNull { all, part -> getString(R.string.limit_and_hours, all, part) } ?: getString(R.string.limit_none)
 }
@@ -97,6 +97,14 @@ fun Resources.windowsText(windows: List<TimeWindow>): String = when {
     windows == listOf(TimeWindow.ALL_DAY) -> getString(R.string.schedule_all_day)
     else -> windows.joinToString(", ") { getString(R.string.schedule_window, clockText(it.from), clockText(it.to)) }
 }
+
+/** A cap's hours: "10:00–16:00", or "22:00–02:00" past midnight. */
+fun Resources.capHoursText(cap: TimeCap): String =
+    if (cap.from == 0 && cap.to == TimeWindow.MINUTES_IN_DAY) {
+        getString(R.string.schedule_all_day)
+    } else {
+        getString(R.string.schedule_window, clockText(cap.from), clockText(cap.to))
+    }
 
 /** "only 10:00–16:00", or "set hours on each day" when days differ. */
 fun Resources.scheduleText(schedule: Schedule): String =

@@ -92,6 +92,21 @@ class SiteBudgetTest {
     }
 
     @Test
+    fun `a cap past midnight counts the site's time from its start the day before`() {
+        org.junit.Assume.assumeTrue(LocalTime.now().isAfter(LocalTime.of(0, 5)) && LocalTime.now().isBefore(LocalTime.of(23, 50)))
+        val now = LocalTime.now()
+        val minute = now.hour * 60 + now.minute
+        val yesterday = java.time.LocalDate.now().minusDays(1).dayOfWeek.value
+        // From yesterday, 5 minutes after this time, to today at the same time: on now.
+        val cap = TimeCap(listOf(yesterday), minute + 5, minute + 5 + 24 * 60, 1)
+        store.setLimits(listOf(AppLimit(site, "youtube.com", dailyMinutes = 0, weeklyMinutes = 0, caps = listOf(cap))))
+        watched(1)
+        val budget = engine.budget(site, forceRefresh = true)!!
+        assertEquals(cap, budget.cap)
+        assertTrue(budget.exhausted)
+    }
+
+    @Test
     fun `an app's limit doesn't count time on websites`() {
         store.setLimits(listOf(AppLimit("com.android.chrome", "Chrome", dailyMinutes = 1, weeklyMinutes = 0)))
         watched(2)
