@@ -378,7 +378,8 @@ class LimitFlowTest : ScreenTest() {
         // A tap in the cap's hours picks it: 13:00 on Monday.
         gridDay(1).performScrollTo().performTouchInput { click(androidx.compose.ui.geometry.Offset(center.x, height * 13f / 24f)) }
         compose.onNodeWithText(text(R.string.days_weekdays), substring = true, ignoreCase = true).assertExists()
-        node(R.string.week_remove).performClick()
+        // The taller grid can push the action bar below the screen: scroll to Remove first.
+        node(R.string.week_remove).performScrollTo().performClick()
         node(R.string.limit_editor_loosens_title).performScrollTo().assertExists()
     }
     @Test

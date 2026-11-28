@@ -64,17 +64,17 @@ class WeekViewStory : Story("Set hours, caps and limits on one week") {
                 column(1).performTouchInput { click(Offset(center.x, height * 14f / 24f)) }
             }
             step("Redraw: the old hours fade, and the bar says what to do.") {
-                compose.onNodeWithText(text(R.string.week_redraw)).performClick()
+                compose.onNodeWithText(text(R.string.week_redraw)).performScrollTo().performClick()
             }
             step("A drag from 09:00 to 17:00 puts the new hours in their place.") { draw(1, 1, 9f, 17f) }
             step("Tap Saturday's name for the whole day.") {
                 compose.onNode(hasText(short(6))).performTouchInput { click() }
             }
             step("Rest Saturday all day with one tap.") {
-                compose.onNodeWithText(text(R.string.week_day_resting)).performClick()
+                compose.onNodeWithText(text(R.string.week_day_resting)).performScrollTo().performClick()
             }
             step("Day limit opens the keypad, with quick picks.") {
-                compose.onNodeWithText(text(R.string.week_day_limit)).performClick()
+                compose.onNodeWithText(text(R.string.week_day_limit)).performScrollTo().performClick()
             }
             step("Type 1, 0, 0: one hour.") {
                 listOf("1", "0", "0").forEach { compose.onNode(hasText(it)).performClick() }
