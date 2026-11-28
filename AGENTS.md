@@ -87,6 +87,17 @@ Make the pictures show each detail of the change:
 A pull request from a fork gets its pictures in the workflow run's artifact. Attach the ones that
 the story needs to the description.
 
+### Release notes
+
+Deliver writes the notes of each release from its pull requests (`.github/scripts/release_notes.py`).
+Claude reads each title, description and picture. Without Claude, the notes use the titles and
+the types only.
+
+- Write the summary of the title as what a person sees or can do now. For example:
+  `feat(app): water the garden from the rest screen`.
+- Give the type that people feel: `feat` for a new feature, `perf` for a faster or better one,
+  `fix` for a bug fix. Use the other types for changes that people don't see.
+
 ### Spec
 
 The spec says exactly what the change does, so that a reviewer can check the pictures against it.
