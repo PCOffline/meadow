@@ -305,7 +305,7 @@ describe("limits", () => {
     }
     await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: Array(6).fill(caps[0]) }));
     // A cap past midnight ends on the next day, and lasts up to a day.
-    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: [{ ...caps[0], from: 1320, to: 1560 }] }));
+    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.night"), { ...limit(0), packageName: "com.night", caps: [{ ...caps[0], from: 1320, to: 1560 }] }));
     // Rules can't compare them: with Bumblebees, any change to them goes through the backend.
     await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: { 6: 60, 7: 60 } }));
     await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: weekend, caps }));
