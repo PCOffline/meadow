@@ -1,5 +1,6 @@
 package dev.pcoffline.meadow.ui
 
+import androidx.compose.ui.test.onNodeWithContentDescription
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarHostState
@@ -56,6 +57,8 @@ class LimitEditorScreenTest : EmulatorTest() {
     fun startTheApp() {
         AppGraph.init(app)
         AppGraph.store.clearAll()
+        // The guide to the week shows by itself once; these tests start past it.
+        AppGraph.store.setWeekGuideSeen()
         AppGraph.backendReady = true
         AppSync.startOnce()
     }
@@ -111,7 +114,9 @@ class LimitEditorScreenTest : EmulatorTest() {
         waitOnMain { shows(text(R.string.limit_editor_existing)) }
 
         // An hour a day is looser than half an hour: it needs a yes.
-        compose.onAllNodes(hasText(app.resources.minutesText(60)))[0].performScrollTo().performClick()
+        compose.onNodeWithContentDescription("${text(R.string.limit_editor_daily)} 30m").performScrollTo().performClick()
+        listOf("1", "00").forEach { compose.onNode(hasText(it)).performClick() }
+        compose.onNodeWithText(text(R.string.action_ok)).performClick()
         waitOnMain { shows(text(R.string.limit_editor_ask)) }
         compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("A long train ride")
         compose.onNodeWithText(text(R.string.limit_editor_ask)).performScrollTo().performClick()

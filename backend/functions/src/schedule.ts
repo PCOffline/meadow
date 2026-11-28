@@ -12,7 +12,7 @@ export type Schedule = Partial<Record<Day, Window[]>>;
 export const DAYS = ["1", "2", "3", "4", "5", "6", "7"] as const;
 type Day = (typeof DAYS)[number];
 const MINUTES_IN_DAY = 1440;
-export const MAX_WINDOWS = 4;
+export const MAX_WINDOWS = 8;
 
 const windowSchema = z.object({
   from: z.number().int().min(0).max(MINUTES_IN_DAY),
@@ -89,7 +89,9 @@ export const DayMinutesSchema = z.object(
 
 /**
  * At most [minutes] of use between [from] and [to] on each of [days] (1 = Monday), on top of the
- * daily limit: "up to 30 minutes between 10:00 and 16:00 on weekdays". Must match TimeCap in the app.
+ * daily limit: "up to 30 minutes between 10:00 and 16:00 on weekdays". A cap past midnight ends on
+ * the next day: 22:00–02:00 is from 1320 to 1560, one cap with one amount. Must match TimeCap in
+ * the app.
  */
 export type Cap = { days: number[]; from: number; to: number; minutes: number };
 export const MAX_CAPS = 6;
@@ -97,11 +99,12 @@ export const MAX_CAPS = 6;
 export const CapsSchema = z.array(
   z.object({
     days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
-    from: z.number().int().min(0).max(MINUTES_IN_DAY),
-    to: z.number().int().min(0).max(MINUTES_IN_DAY),
+    from: z.number().int().min(0).max(MINUTES_IN_DAY - 1),
+    to: z.number().int().min(1).max(2 * MINUTES_IN_DAY),
     minutes: z.number().int().min(1).max(MINUTES_IN_DAY),
   }).strict()
     .refine((c) => c.from < c.to, "A time window must end after it starts.")
+    .refine((c) => c.to - c.from <= MINUTES_IN_DAY, "A cap can last up to a day.")
     .refine((c) => c.minutes < c.to - c.from, "A cap must be shorter than its hours."),
 ).max(MAX_CAPS);
 
@@ -175,5 +178,5 @@ export function describeDayMinutes(days: DayMinutes | null | undefined, format: 
 
 /** "up to 30m 10:00–16:00 on weekdays". */
 export function describeCaps(caps: Cap[] | null | undefined, format: (m: number) => string): string[] {
-  return (caps ?? []).map((c) => `up to ${format(c.minutes)} ${clock(c.from)}–${clock(c.to)} ${describeDays(c.days)}`);
+  return (caps ?? []).map((c) => `up to ${format(c.minutes)} ${clock(c.from)}–${clock(c.to % MINUTES_IN_DAY)} ${describeDays(c.days)}`);
 }

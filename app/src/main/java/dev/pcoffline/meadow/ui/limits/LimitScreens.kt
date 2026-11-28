@@ -100,6 +100,7 @@ import dev.pcoffline.meadow.ui.components.MeadowCard
 import dev.pcoffline.meadow.ui.components.Pill
 import dev.pcoffline.meadow.ui.durationText
 import dev.pcoffline.meadow.data.Schedule
+import dev.pcoffline.meadow.data.holdsBack
 import dev.pcoffline.meadow.data.TimeWindow
 import dev.pcoffline.meadow.ui.components.ShareCommitment
 import dev.pcoffline.meadow.ui.requests.BeePicks
@@ -113,6 +114,7 @@ import dev.pcoffline.meadow.ui.requests.limitLines
 import dev.pcoffline.meadow.ui.ActionState
 import androidx.compose.ui.platform.LocalResources
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import dev.pcoffline.meadow.data.RequestType
 import dev.pcoffline.meadow.data.TimeCap
@@ -285,7 +287,7 @@ fun LimitEditorScreen(
             onBack = onDone,
         ) { if (start == null) ShareLimitButton(state.existing, unsaved) }
         if (state.loaded) {
-            LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp, notHere = notHere, onUnsaved = { unsaved = it })
+            LimitEditor(packageName, state, onDone, start = start, onChangeApp = onChangeApp, notHere = notHere, onUnsaved = { unsaved = it }, firstTimeGuide = true)
         } else {
             Loading()
         }
@@ -340,27 +342,30 @@ internal fun LimitEditor(
     save: suspend (limit: AppLimit, message: String, approverIds: List<String>?) -> ChangeOutcome = AppGraph.limits::save,
     // Told whether the fields differ from the saved limit, so sharing the saved one can wait.
     onUnsaved: (Boolean) -> Unit = {},
+    // The editor screen shows the guide to the week by itself, once on each phone.
+    firstTimeGuide: Boolean = false,
 ) {
     val existing = state.existing
     val from = start ?: existing
-    var dailyOn by rememberSaveable { mutableStateOf(from == null || from.dailyMinutes > 0) }
-    var daily by rememberSaveable { mutableIntStateOf(from?.dailyMinutes?.takeIf { it > 0 } ?: 30) }
-    var weeklyOn by rememberSaveable { mutableStateOf((from?.weeklyMinutes ?: 0) > 0) }
-    var weekly by rememberSaveable { mutableIntStateOf(from?.weeklyMinutes?.takeIf { it > 0 } ?: 180) }
-    var hoursOn by rememberSaveable { mutableStateOf(from?.schedule != null) }
-    // Kept as JSON so it survives rotation.
-    var scheduleJson by rememberSaveable {
-        mutableStateOf(ScheduleJson.encodeToString(Schedule.serializer(), from?.schedule ?: Schedule.everyDay(TimeWindow(0, 22 * 60))))
+    // A new limit starts with 30m a day and nothing else; kept as JSON so it survives rotation.
+    var weekJson by rememberSaveable {
+        mutableStateOf(
+            ScheduleJson.encodeToString(
+                WeekLimitSerializer,
+                WeekLimitState(from?.dailyMinutes ?: 30, from?.weeklyMinutes ?: 0, from?.schedule, from?.dayMinutes.orEmpty(), from?.caps.orEmpty()),
+            ),
+        )
     }
-    val schedule = ScheduleJson.decodeFromString(Schedule.serializer(), scheduleJson)
-    var groupsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(GroupsSerializer, dayGroups(from?.dayMinutes.orEmpty()))) }
-    val groups = ScheduleJson.decodeFromString(GroupsSerializer, groupsJson)
-    var capsJson by rememberSaveable { mutableStateOf(ScheduleJson.encodeToString(CapsSerializer, from?.caps.orEmpty())) }
-    val caps = ScheduleJson.decodeFromString(CapsSerializer, capsJson)
+    val week = ScheduleJson.decodeFromString(WeekLimitSerializer, weekJson)
+    val schedule = week.schedule
+    val caps = week.caps
+    var step by rememberSaveable { mutableIntStateOf(AppGraph.store.dragStep(packageName) ?: DEFAULT_DRAG_STEP) }
+    val guideSeen by AppGraph.store.weekGuideSeen.collectAsStateWithLifecycle()
+    var guide by rememberSaveable { mutableStateOf(false) }
     // A copied or suggested limit keeps the plant of the limit here: each person chooses their own.
     var plant by rememberSaveable { mutableStateOf(if (sendTo == null) existing?.plant else null) }
     val icon = rememberIconColour(packageName)
-    val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
+    val weekRule by AppGraph.store.weekRule.collectAsStateWithLifecycle()
     var message by rememberSaveable { mutableStateOf("") }
     var removeNote by rememberSaveable { mutableStateOf("") }
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
@@ -372,9 +377,9 @@ internal fun LimitEditor(
     val hasBees = state.bumblebeeCount > 0 && !suggesting
 
     val proposed = AppLimit(
-        packageName, state.appName, if (dailyOn) daily else 0, if (weeklyOn) weekly else 0,
-        schedule = if (hoursOn) schedule else null,
-        dayMinutes = if (dailyOn) groups.toDayMinutes() else emptyMap(),
+        packageName, state.appName, week.daily, week.weekly,
+        schedule = schedule,
+        dayMinutes = week.dayMinutes,
         caps = caps,
         plant = if (sendTo == null) plant else null,
     )
@@ -392,7 +397,7 @@ internal fun LimitEditor(
     // until it's known whether there is one).
     val waiting = state.pending
     val askBlocked = waiting != null || !state.pendingKnown
-    val anyLimitOn = dailyOn || weeklyOn || hoursOn || caps.isNotEmpty()
+    val anyLimitOn = proposed.holdsBack
     val planted = stringResource(R.string.limit_editor_planted)
     val updated = stringResource(R.string.limit_editor_updated)
     val requested = stringResource(R.string.limit_editor_requested)
@@ -431,38 +436,35 @@ internal fun LimitEditor(
         onChangeApp?.let { TextButton(onClick = it, enabled = editable) { Text(stringResource(R.string.limit_copy_other_app)) } }
         if (!suggesting) PlantPicker(packageName, icon, plant, editable) { plant = it }
 
+        val waitingHere = waiting != null && !suggesting
+        // A change waiting for an answer shows on the card; the week stays as it is until then.
+        val changeWaiting = waitingHere && waiting?.type == RequestType.CHANGE_LIMIT
+        if (waitingHere) PendingCard(waiting!!, action)
         MeadowCard(Modifier.fillMaxWidth()) {
-            ToggleRow(stringResource(R.string.limit_editor_daily), dailyOn, editable) { dailyOn = it }
-            if (dailyOn) {
-                val label = stringResource(R.string.limit_editor_daily)
-                MinutesStepper(daily, step = 5, min = 5, max = 16 * 60, editable, label = label) { daily = it }
-                PresetChips(listOf(15, 30, 45, 60, 90, 120), daily, editable) { daily = it }
-                Spacer(Modifier.height(4.dp))
-                DayLimitsEditor(groups, week.first, editable) { groupsJson = ScheduleJson.encodeToString(GroupsSerializer, it) }
-            }
+            WeekCard(
+                limit = WeekLimit(schedule, caps, week.daily, week.weekly, week.dayMinutes),
+                firstDay = weekRule.first,
+                step = step,
+                enabled = editable && !changeWaiting,
+                waiting = changeWaiting,
+                onChange = { weekJson = ScheduleJson.encodeToString(WeekLimitSerializer, WeekLimitState(it.daily, it.weekly, it.schedule, it.dayMinutes, it.caps)) },
+                onStep = {
+                    step = it
+                    AppGraph.store.setDragStep(packageName, it)
+                },
+                onHelp = { guide = true },
+            )
+            if (changeWaiting) AsNowNote()
         }
-        MeadowCard(Modifier.fillMaxWidth()) {
-            ToggleRow(stringResource(R.string.limit_editor_weekly), weeklyOn, editable) { weeklyOn = it }
-            if (weeklyOn) {
-                MinutesStepper(weekly, step = 30, min = 30, max = 100 * 60, editable) { weekly = it }
-                PresetChips(listOf(120, 180, 300, 420, 600), weekly, editable) { weekly = it }
+        // The guide shows by itself the first time the week shows on this phone.
+        if (guide || (firstTimeGuide && !guideSeen)) {
+            WeekGuide(state.appName, weekRule.first) {
+                guide = false
+                AppGraph.store.setWeekGuideSeen()
             }
-        }
-        MeadowCard(Modifier.fillMaxWidth()) {
-            ToggleRow(stringResource(R.string.limit_editor_hours), hoursOn, editable) { hoursOn = it }
-            if (hoursOn) {
-                Spacer(Modifier.height(8.dp))
-                ScheduleEditor(schedule, firstDay = week.first, enabled = editable) { scheduleJson = ScheduleJson.encodeToString(Schedule.serializer(), it) }
-            }
-        }
-        MeadowCard(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.limit_editor_caps), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 12.dp))
-            CapsEditor(caps, week.first, editable) { capsJson = ScheduleJson.encodeToString(CapsSerializer, it) }
         }
 
-        if (waiting != null && !suggesting) {
-            PendingCard(waiting, action)
-        } else if (needsApproval && !suggesting) {
+        if (!waitingHere && needsApproval && !suggesting) {
             MeadowCard(Modifier.fillMaxWidth(), tint = MaterialTheme.colorScheme.tertiaryContainer) {
                 Text(stringResource(R.string.limit_editor_loosens_title), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
@@ -567,8 +569,12 @@ internal fun LimitEditor(
 }
 
 private val ScheduleJson = Json { ignoreUnknownKeys = true }
-private val GroupsSerializer = ListSerializer(DayGroup.serializer())
-private val CapsSerializer = ListSerializer(TimeCap.serializer())
+
+/** What the week card edits, as the editor keeps it through rotation. */
+@Serializable
+private data class WeekLimitState(val daily: Int, val weekly: Int, val schedule: Schedule?, val dayMinutes: Map<Int, Int>, val caps: List<TimeCap>)
+
+private val WeekLimitSerializer = WeekLimitState.serializer()
 
 /** The question already waiting about this app, and a way to take it back. */
 @Composable
@@ -585,7 +591,7 @@ private fun PendingCard(request: LimitRequest, action: ActionState) {
             // Only what changes: the rest of the limit is in the cards above.
             val res = LocalResources.current
             val lines = remember(request, res) { res.limitLines(request.proposed, previous).filter { it.change != LineChange.SAME } }
-            LimitLines(lines, Modifier.padding(top = 8.dp))
+            LimitLines(lines, Modifier.padding(top = 8.dp), tinted = false)
         } else {
             Text(
                 stringResource(R.string.limit_editor_pending_body, requestSummary(request).replaceFirstChar { it.uppercase() }),
@@ -599,162 +605,3 @@ private fun PendingCard(request: LimitRequest, action: ActionState) {
         ) { Text(stringResource(R.string.request_withdraw)) }
     }
 }
-
-/** The whole row switches, not just the switch: the label is the bigger, more obvious target. */
-@Composable
-private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
-    }
-}
-
-/**
- * A length of time with − and + either side. With a [label], tapping the time opens a picker of
- * hours and minutes, in steps of 5, for any length under a day.
- */
-@Composable
-internal fun MinutesStepper(value: Int, step: Int, min: Int, max: Int, enabled: Boolean, label: String? = null, onChange: (Int) -> Unit) {
-    var picking by rememberSaveable { mutableStateOf(false) }
-    val clock = label != null && max < 24 * 60
-    val pick = stringResource(R.string.limit_editor_pick_time)
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        // Read through the latest value, so holding a button keeps counting from where it is.
-        val current by rememberUpdatedState(value)
-        RepeatingIconButton(onStep = { onChange((current - step).coerceAtLeast(min)) }, enabled = enabled && value > min) {
-            Icon(Icons.Outlined.Remove, contentDescription = stringResource(R.string.limit_editor_less))
-        }
-        // As wide as the widest value it can show, so the buttons stay put as "5h" becomes "5h 30m".
-        val style = MaterialTheme.typography.headlineMedium
-        val ragged = generateSequence(max) { it - step }.takeWhile { it >= min }.firstOrNull { it % 60 != 0 }
-        val widest = widestLabel(listOfNotNull(min, max, ragged), style)
-        Text(
-            minutesText(value),
-            style = style,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            color = if (clock && enabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
-            // A rounded, tinted button like the − and + beside it, so it reads as one to tap. Its
-            // touch target is 48dp tall, round the smaller tint.
-            modifier = Modifier.padding(horizontal = 8.dp)
-                .then(
-                    if (clock) {
-                        Modifier.heightIn(min = 48.dp).clip(MaterialTheme.shapes.medium)
-                            .clickable(enabled = enabled, onClickLabel = pick, role = Role.Button) { picking = true }
-                            .wrapContentHeight()
-                            .background(
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f),
-                                MaterialTheme.shapes.medium,
-                            )
-                    } else {
-                        Modifier
-                    },
-                )
-                .padding(horizontal = 12.dp, vertical = 4.dp).widthIn(min = widest),
-        )
-        RepeatingIconButton(onStep = { onChange((current + step).coerceAtMost(max)) }, enabled = enabled && value < max) {
-            Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.limit_editor_more))
-        }
-    }
-    if (picking && label != null) {
-        DurationDialog(label, value, min, max, onDismiss = { picking = false }) {
-            picking = false
-            onChange(it)
-        }
-    }
-}
-
-/** The width of the widest of [minutes] as text, in [style]. */
-@Composable
-private fun widestLabel(minutes: List<Int>, style: TextStyle): Dp {
-    val measurer = rememberTextMeasurer()
-    val labels = minutes.map { minutesText(it) }
-    // Measured again when the text size changes: the measurer keeps the density it was made with.
-    val density = LocalDensity.current
-    val widest = remember(labels, style, density) { labels.maxOf { measurer.measure(it, style, density = density).size.width } }
-    return with(density) { widest.toDp() }
-}
-
-/**
- * A stepper button: a tap moves one step, and holding it keeps stepping, faster after a moment,
- * so a far-off value is a press away rather than dozens of taps.
- */
-@Composable
-private fun RepeatingIconButton(onStep: () -> Unit, enabled: Boolean, content: @Composable () -> Unit) {
-    val step by rememberUpdatedState(onStep)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    // Set once a hold starts stepping, so letting go doesn't add the tap's step on top.
-    var held by remember { mutableStateOf(false) }
-    LaunchedEffect(pressed, enabled) {
-        if (!pressed || !enabled) return@LaunchedEffect
-        held = false
-        delay(HOLD_START_MS)
-        held = true
-        var steps = 0
-        while (isActive) {
-            step()
-            steps++
-            delay(if (steps < HOLD_FAST_AFTER) HOLD_REPEAT_MS else HOLD_FAST_REPEAT_MS)
-        }
-    }
-    FilledTonalIconButton(
-        onClick = {
-            if (!held) step()
-            held = false
-        },
-        enabled = enabled,
-        interactionSource = interaction,
-        content = content,
-    )
-}
-
-private const val HOLD_START_MS = 400L
-private const val HOLD_REPEAT_MS = 120L
-private const val HOLD_FAST_REPEAT_MS = 50L
-private const val HOLD_FAST_AFTER = 8
-
-/**
- * Common lengths in even columns, centred under the stepper, so a second row lines up with the
- * first. Up to three columns, fewer when the longest length wouldn't fit (large text, narrow phone).
- */
-@Composable
-private fun PresetChips(options: List<Int>, selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
-    val widest = widestLabel(options, MaterialTheme.typography.labelLarge) + CHIP_PADDING
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val gap = 8.dp
-        fun widthFor(columns: Int) = (maxWidth - gap * (columns - 1)) / columns
-        val columns = (PRESET_COLUMNS downTo 1).firstOrNull { widthFor(it) >= widest } ?: 1
-        val width = widthFor(columns)
-        FlowRow(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
-            maxItemsInEachRow = columns,
-        ) {
-            options.forEach { minutes ->
-                FilterChip(
-                    selected = minutes == selected,
-                    onClick = { onSelect(minutes) },
-                    label = { Text(minutesText(minutes), Modifier.fillMaxWidth(), textAlign = TextAlign.Center, maxLines = 1) },
-                    enabled = enabled,
-                    modifier = Modifier.width(width),
-                )
-            }
-        }
-    }
-}
-
-private const val PRESET_COLUMNS = 3
-
-/**
- * The room a filter chip needs besides its label: its own padding and the label's, 8dp each on
- * either side, and room to spare. With less, a length like "1h 30m" wraps to "1h" at large text.
- */
-private val CHIP_PADDING = 40.dp

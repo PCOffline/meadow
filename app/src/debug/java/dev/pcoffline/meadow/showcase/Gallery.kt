@@ -1,5 +1,7 @@
 package dev.pcoffline.meadow.showcase
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import dev.pcoffline.meadow.ui.components.MeadowCard
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -70,7 +72,21 @@ import dev.pcoffline.meadow.ui.components.SectionTitle
 import dev.pcoffline.meadow.ui.components.TabTitle
 import dev.pcoffline.meadow.ui.home.GardenContent
 import dev.pcoffline.meadow.ui.home.GardenState
+import dev.pcoffline.meadow.ui.limits.AsNowNote
 import dev.pcoffline.meadow.ui.limits.BackTopBar
+import dev.pcoffline.meadow.ui.limits.DurationKeypadDialog
+import dev.pcoffline.meadow.ui.limits.FineTune
+import dev.pcoffline.meadow.ui.limits.FineTuneSheet
+import dev.pcoffline.meadow.ui.limits.KeypadChoice
+import dev.pcoffline.meadow.ui.limits.Picked
+import dev.pcoffline.meadow.ui.limits.Stretch
+import dev.pcoffline.meadow.ui.limits.WeekCard
+import dev.pcoffline.meadow.ui.limits.WeekGuide
+import dev.pcoffline.meadow.ui.limits.WeekLimit
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.outlined.TimerOff
+import java.time.DayOfWeek
 import dev.pcoffline.meadow.ui.limits.LimitEditor
 import dev.pcoffline.meadow.ui.components.flora.namedPlace
 import dev.pcoffline.meadow.data.PLANTS_PER_THEME
@@ -262,6 +278,22 @@ private object Demo {
         pending = waiting ?: DemoGarden.waitingAsk.copy(packageName = "demo.youtube", appName = "YouTube").takeIf { pending }, loaded = true,
     )
 
+    /**
+     * A full week: weekdays 10:00–22:00, Friday also 22:00 to 02:00 on Saturday, weekends
+     * 06:00–22:00 and Sunday resting. Caps at weekends, and one past midnight on Friday. Saturday
+     * has an hour of its own, and Sunday no limit.
+     */
+    val week = WeekLimit(
+        schedule = Schedule(
+            (1..4).associateWith { listOf(TimeWindow(600, 1320)) } +
+                mapOf(5 to listOf(TimeWindow(600, 1080), TimeWindow(1320, 1440)), 6 to listOf(TimeWindow(0, 120), TimeWindow(360, 1320)), 7 to emptyList()),
+        ),
+        caps = listOf(TimeCap(listOf(6), 840, 1320, 30), TimeCap(listOf(5), 1320, 1560, 20)),
+        daily = 30,
+        weekly = 180,
+        dayMinutes = mapOf(6 to 60, 7 to 0),
+    )
+
     /** Ana's Instagram limit as it is, and her question to change it. */
     private val anaLimit = AppLimit(
         "demo.instagram", "Instagram", 30, 180,
@@ -375,6 +407,24 @@ internal object Scenarios {
             EditorDemo(Demo.editor(bumblebees = 0, existing = Demo.youtube.copy(plant = (namedPlace(Demo.youtube.packageName) + 2) % PLANTS_PER_THEME)))
         },
         Scenario("Limit", "Tending one, with Bumblebees (loosening asks)") { EditorDemo(Demo.editor(bumblebees = 2)) },
+        Scenario("Limit", "Your week, with hours, caps and days' own limits") { WeekDemo(Demo.week) },
+        Scenario("Limit", "Your week, a stretch picked") { WeekDemo(Demo.week, Picked.Hours(Stretch(5, 1320, 1560))) },
+        Scenario("Limit", "Your week, a cap past midnight picked") { WeekDemo(Demo.week, Picked.Cap(1)) },
+        Scenario("Limit", "Your week, a day picked") { WeekDemo(Demo.week, Picked.Day(6)) },
+        Scenario("Limit", "Your week, nothing drawn yet") { WeekDemo(WeekLimit(null, emptyList(), 30, 0, emptyMap())) },
+        Scenario("Limit", "Your week, zoomed in for 5-minute steps") { WeekDemo(Demo.week, step = 5) },
+        Scenario("Limit", "Your week, waiting for an answer") { WeekDemo(Demo.week, waiting = true) },
+        Scenario("Limit", "The keypad for an amount") {
+            Page {
+                DurationKeypadDialog(
+                    "Daily limit", Icons.Outlined.Today, 90, 24 * 60, "Up to 24h a day.", listOf(15, 30, 45, 60, 90, 120), onDismiss = {},
+                    choices = listOf(KeypadChoice(Icons.Outlined.TimerOff, "No limit") {}),
+                ) {}
+            }
+        },
+        Scenario("Limit", "Fine-tune hours") { Page { FineTuneSheet(FineTune(listOf(5), 1320, 1560), DayOfWeek.MONDAY, onDismiss = {}) {} } },
+        Scenario("Limit", "Fine-tune a cap") { Page { FineTuneSheet(FineTune(listOf(6, 7), 840, 1320, 30), DayOfWeek.MONDAY, onDismiss = {}) {} } },
+        Scenario("Limit", "The guide to the week") { Page { WeekGuide("YouTube", DayOfWeek.MONDAY) {} } },
         Scenario("Limit", "Waiting on a question") { EditorDemo(Demo.editor(bumblebees = 2, pending = true)) },
         Scenario("Limit", "Waiting on a change, with what changes") {
             EditorDemo(Demo.editor(bumblebees = 2, existing = Demo.waitingChange.previous, waiting = Demo.waitingChange))
@@ -424,6 +474,20 @@ private fun ChatDemo(error: String? = null, request: LimitRequest = DemoGarden.r
 private fun ChangeDemo(request: LimitRequest) {
     WithTabs(Tab.PEOPLE) {
         PeopleContent(DemoGarden.robin, DemoGarden.people.copy(incomingRequests = listOf(request), incomingInvites = emptyList(), outgoingRequests = emptyList()))
+    }
+}
+
+/** The week card alone, on a page, as the editor shows it. */
+@Composable
+private fun WeekDemo(start: WeekLimit, picked: Picked? = null, step: Int = 15, waiting: Boolean = false) {
+    var limit by remember { mutableStateOf(start) }
+    Page {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+            MeadowCard(Modifier.fillMaxWidth()) {
+                WeekCard(limit, DayOfWeek.MONDAY, step, enabled = !waiting, onChange = { limit = it }, onStep = {}, onHelp = {}, waiting = waiting, startPicked = picked)
+                if (waiting) AsNowNote()
+            }
+        }
     }
 }
 

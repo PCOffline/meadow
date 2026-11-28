@@ -9,6 +9,7 @@ import dev.pcoffline.meadow.data.Schedule
 import dev.pcoffline.meadow.data.TimeCap
 import dev.pcoffline.meadow.data.TimeWindow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -98,5 +99,35 @@ class LimitLinesTest {
         assertEquals("New cap: up to 30m 18:00–22:00 on weekdays", caps[0].description)
         assertEquals("Removed cap: up to 1h 08:00–12:00 on Sun", caps[1].description)
         assertEquals(LineChange.SAME, res.limitLines(base.copy(caps = listOf(cap)), base.copy(caps = listOf(cap))).last().change)
+    }
+
+    @Test
+    fun `hours past midnight show on the day they start, and the next day doesn't change for them`() {
+        val old = base.copy(schedule = Schedule(mapOf(5 to listOf(TimeWindow(600, 1320)), 6 to listOf(TimeWindow(360, 1320)))))
+        // Fri 22:00–24:00 and Sat 00:00–02:00 are one stretch: Fri 10:00 to 02:00.
+        val new = base.copy(schedule = Schedule(mapOf(5 to listOf(TimeWindow(600, 1440)), 6 to listOf(TimeWindow(0, 120), TimeWindow(360, 1320)))))
+        assertEquals(
+            // Two sets of days don't change (all day, and Saturday's hours), so each has its own row.
+            listOf("Hours, Mon, Tue, Wed, Thu, Sun | SAME | All day", "Hours, Fri | CHANGED | 10:00–22:00 → 10:00–02:00", "Hours, Sat | SAME | 06:00–22:00"),
+            rows(new, old).filter { it.startsWith("Hours") || it.startsWith("Other") }.sortedBy { it.startsWith("Hours, Sat") },
+        )
+    }
+
+    @Test
+    fun `a changed day's hours and a new or removed cap have bars of the day now and new`() {
+        val old = base.copy(schedule = Schedule(mapOf(5 to listOf(TimeWindow(600, 1320)))))
+        val new = base.copy(schedule = Schedule(mapOf(5 to listOf(TimeWindow(600, 1440)), 6 to listOf(TimeWindow(0, 120)))), caps = listOf(TimeCap(listOf(5), 840, 1320, 20)))
+        val lines = res.limitLines(new, old)
+        val friday = lines.single { it.label == "Hours, Fri" }
+        assertEquals(LinePart.HOURS, friday.part)
+        assertEquals(DayBar(listOf(600 until 1320), emptyList()), friday.bars!!.now)
+        assertEquals(DayBar(listOf(600 until 1440), listOf(840 until 1320), nextDay = 120), friday.bars!!.new)
+        val cap = lines.single { it.change == LineChange.ADDED }
+        assertEquals(LinePart.CAP, cap.part)
+        assertEquals(emptyList<IntRange>(), cap.bars!!.now.caps)
+        assertEquals(listOf(840 until 1320), cap.bars!!.new.caps)
+        // A part that stays has no bars, and each part has its own icon.
+        assertNull(lines.single { it.label == "Daily" }.bars)
+        assertEquals(listOf(LinePart.DAILY, LinePart.WEEKLY), lines.take(2).map { it.part })
     }
 }

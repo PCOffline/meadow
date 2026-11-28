@@ -67,12 +67,13 @@ service cloud.firestore {
         && dayLimitOk(m, '5') && dayLimitOk(m, '6') && dayLimitOk(m, '7');
     }
 
-    // Up to [minutes] between [from] and [to] on [days] (1 = Monday), as the app's TimeCap.
+    // Up to [minutes] between [from] and [to] on [days] (1 = Monday), as the app's TimeCap. A cap
+    // past midnight ends on the next day (22:00–02:00 is 1320 to 1560), so it lasts up to a day.
     function validCap(c) {
       return c is map && c.keys().hasOnly(['days', 'from', 'to', 'minutes'])
         && c.days is list && c.days.size() >= 1 && c.days.size() <= 7 && c.days.hasOnly([1, 2, 3, 4, 5, 6, 7])
         && c.from is int && c.to is int && c.minutes is int
-        && c.from >= 0 && c.from < c.to && c.to <= 1440
+        && c.from >= 0 && c.from < 1440 && c.from < c.to && c.to <= c.from + 1440
         && c.minutes >= 1 && c.minutes < c.to - c.from;
     }
 

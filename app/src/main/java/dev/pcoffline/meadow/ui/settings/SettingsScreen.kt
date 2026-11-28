@@ -52,6 +52,7 @@ import dev.pcoffline.meadow.data.UserProfile
 import dev.pcoffline.meadow.ui.auth.SecureAccountCard
 import dev.pcoffline.meadow.ui.components.ErrorNote
 import dev.pcoffline.meadow.ui.components.MeadowCard
+import dev.pcoffline.meadow.ui.limits.WeekGuide
 import dev.pcoffline.meadow.ui.components.PersonAvatar
 import dev.pcoffline.meadow.ui.emergency.EmergencyBanner
 import dev.pcoffline.meadow.ui.emergency.EmergencyDialog
@@ -89,6 +90,7 @@ fun SettingsScreen(
         ) {
             ProfileCard(profile, onOpenProfile)
             AppearanceCard()
+            HelpCard()
             WeekStartCard()
 
             if (anonymous) SecureAccountCard(R.string.settings_secure_reason)
@@ -286,6 +288,18 @@ internal fun UpdatesCard(updater: Updater = AppGraph.updater) {
             }
         }
     }
+}
+
+/** Help: the guide to the week card, over a sample week. */
+@Composable
+private fun HelpCard() {
+    var guide by rememberSaveable { mutableStateOf(false) }
+    val week by AppGraph.store.weekRule.collectAsStateWithLifecycle()
+    MeadowCard(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.settings_help_title), style = MaterialTheme.typography.titleMedium)
+        LinkRow(stringResource(R.string.week_help)) { guide = true }
+    }
+    if (guide) WeekGuide(stringResource(R.string.guide_sample_app), week.first) { guide = false }
 }
 
 @Composable

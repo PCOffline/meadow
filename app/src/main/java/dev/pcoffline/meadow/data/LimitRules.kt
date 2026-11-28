@@ -5,17 +5,30 @@ import kotlinx.serialization.Serializable
 /**
  * At most [minutes] of use between [from] and [to] (minutes since midnight) on each of [days]
  * (1 = Monday), on top of the daily limit: "up to 30 minutes between 10:00 and 16:00 on
- * weekdays". Must match Cap in the backend's schedule.ts.
+ * weekdays". A cap past midnight ends on the next day: 22:00–02:00 is from 1320 to 1560, one cap
+ * with one amount. Must match Cap in the backend's schedule.ts.
  */
 @Serializable
 data class TimeCap(val days: List<Int>, val from: Int, val to: Int, val minutes: Int) {
     init {
         require(days.isNotEmpty() && days.all { it in 1..7 }) { "Bad days $days" }
-        require(from in 0 until TimeWindow.MINUTES_IN_DAY && to in 1..TimeWindow.MINUTES_IN_DAY && from < to) { "Bad window $from–$to" }
+        require(from in 0 until TimeWindow.MINUTES_IN_DAY && to > from && to <= from + TimeWindow.MINUTES_IN_DAY) { "Bad window $from–$to" }
         require(minutes in 1 until to - from) { "Bad cap $minutes in $from–$to" }
     }
 
-    val window: TimeWindow get() = TimeWindow(from, to)
+    /** Ends on the day after it starts. */
+    val pastMidnight: Boolean get() = to > TimeWindow.MINUTES_IN_DAY
+
+    /**
+     * How many days back this cap's hours started, when they are on at [minute] of [dayOfWeek]:
+     * 0 when they started that day, 1 when they started the day before and go past midnight.
+     * Null when they are off.
+     */
+    fun startedDaysBack(dayOfWeek: Int, minute: Int): Int? = when {
+        dayOfWeek in days && minute >= from && minute < to -> 0
+        pastMidnight && (dayOfWeek + 5) % 7 + 1 in days && minute < to - TimeWindow.MINUTES_IN_DAY -> 1
+        else -> null
+    }
 
     fun toFirestore(): Map<String, Any> = mapOf("days" to days.distinct().sorted(), "from" to from, "to" to to, "minutes" to minutes)
 

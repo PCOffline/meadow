@@ -1,5 +1,9 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,7 +15,6 @@ import dev.pcoffline.meadow.EmulatorFriend.Companion.await
 import dev.pcoffline.meadow.data.AppLimit
 import dev.pcoffline.meadow.data.ChatRepository
 import dev.pcoffline.meadow.data.TimeCap
-import dev.pcoffline.meadow.ui.limits.CapTemplates
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -45,6 +48,9 @@ class WeekLimitsJourneyTest : EndToEndTest() {
 
     private fun day(name: String) = compose.onNodeWithContentDescription(name)
 
+    /** [name]'s column in the week's grid, which a screen reader reads with the day's actions. */
+    private fun gridDay(name: String) = compose.onNode(hasContentDescription("$name.", substring = true))
+
     @Test
     fun aCapAppliesAtOnceAndGoesToTheChatWhileFreeWeekendsAskFirst() {
         val kai = EmulatorFriend.create(app, "Kai", "🌷").also(people::add)
@@ -60,20 +66,17 @@ class WeekLimitsJourneyTest : EndToEndTest() {
             runBlocking { AppGraph.limits.save(AppLimit(pebbles, "Pebbles", 60, 0)) }
             eventually("Sam counted as Kai's Bumblebee") { AppGraph.store.approverCount.value == 1 }
 
-            // Up to 30 minutes in the afternoons of weekdays, from the quick picks: stricter, so no asking.
+            // Up to 30 minutes from 10:00 to 16:00 on weekdays, from Monday's actions: stricter, so no asking.
             openTheLimit()
-            node(R.string.limit_editor_cap_add).performScrollTo().performClick()
-            inDialog(text(R.string.cap_template_weekdays)).performClick()
-            inDialog(text(R.string.cap_template_afternoons)).performClick()
-            inDialog(text(R.string.action_ok)).performClick()
+            gridDay("Monday").performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_add_cap))
+            listOf("Tuesday", "Wednesday", "Thursday", "Friday").forEach { day(it).performClick() }
+            compose.onNode(hasText(text(R.string.action_ok)) and hasClickAction()).performClick()
             node(R.string.limit_editor_loosens_title).assertDoesNotExist()
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.limit_editor_updated)
             waitForBackend(limit) { it.has("caps") && it.int("dailyMinutes") == 60 }
             eventually("the cap on this phone") {
-                // Weekdays are the days outside this phone's region's weekend.
-                val weekdays = CapTemplates.weekdays(CapTemplates.region())
-                AppGraph.store.limits.value.single { it.packageName == pebbles }.caps == listOf(TimeCap(weekdays, 12 * 60, 17 * 60, 30))
+                AppGraph.store.limits.value.single { it.packageName == pebbles }.caps == listOf(TimeCap(listOf(1, 2, 3, 4, 5), 10 * 60, 16 * 60, 30))
             }
             assertTrue("Sam was asked about a stricter limit", samsInbox(sam).isEmpty())
 
@@ -90,10 +93,10 @@ class WeekLimitsJourneyTest : EndToEndTest() {
 
             // No limit at weekends is looser than an hour a day, so Sam is asked.
             openTheLimit()
-            node(R.string.limit_editor_days_add).performScrollTo().performClick()
-            day("Saturday").performScrollTo().performClick()
-            day("Sunday").performScrollTo().performClick()
-            compose.onNode(hasText(text(R.string.limit_editor_days_no_limit))).performScrollTo().performClick()
+            listOf("Saturday", "Sunday").forEach {
+                gridDay(it).performScrollTo().performCustomAccessibilityActionWithLabel(text(R.string.week_day_limit))
+                inDialog(text(R.string.keypad_no_limit)).performClick()
+            }
             waitFor(R.string.limit_editor_loosens_title)
             tapWhenEnabled(R.string.limit_editor_ask)
             waitFor(R.string.limit_editor_requested)

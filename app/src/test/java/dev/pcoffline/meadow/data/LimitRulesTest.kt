@@ -2,6 +2,7 @@ package dev.pcoffline.meadow.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -71,6 +72,24 @@ class LimitRulesTest {
     }
 
     @Test
+    fun `a cap past midnight is on until its end the next day`() {
+        // Fridays, 22:00 to 02:00.
+        val cap = TimeCap(listOf(5), 22 * 60, 26 * 60, 30)
+        assertTrue(cap.pastMidnight)
+        assertEquals(0, cap.startedDaysBack(5, 22 * 60))
+        assertEquals(0, cap.startedDaysBack(5, 23 * 60 + 59))
+        assertEquals(1, cap.startedDaysBack(6, 0))
+        assertEquals(1, cap.startedDaysBack(6, 60 + 59))
+        assertNull(cap.startedDaysBack(6, 2 * 60))
+        assertNull(cap.startedDaysBack(5, 21 * 60 + 59))
+        assertNull("Friday's early hours belong to Thursday, which has no cap", cap.startedDaysBack(5, 60))
+        // Sundays into Mondays wrap round the week.
+        assertEquals(1, TimeCap(listOf(7), 23 * 60, 25 * 60, 30).startedDaysBack(1, 30))
+        assertFalse(TimeCap(listOf(1), 600, 960, 30).pastMidnight)
+        assertNull(TimeCap(listOf(1), 600, 960, 30).startedDaysBack(2, 30))
+    }
+
+    @Test
     fun `a cap with bad days, hours or minutes can't be made`() {
         val bad = listOf(
             { TimeCap(emptyList(), 600, 960, 30) },
@@ -78,14 +97,14 @@ class LimitRulesTest {
             { TimeCap(weekdays, -1, 960, 30) },
             { TimeCap(weekdays, 1440, 1500, 30) },
             { TimeCap(weekdays, 600, 0, 30) },
-            { TimeCap(weekdays, 600, 1441, 30) },
+            { TimeCap(weekdays, 600, 2041, 30) },
             { TimeCap(weekdays, 960, 600, 30) },
             { TimeCap(weekdays, 600, 960, 0) },
             { TimeCap(weekdays, 600, 960, 360) },
         )
         bad.forEach { make -> assertTrue(runCatching { make() }.isFailure) }
-        assertEquals(TimeWindow(600, 960), cap.window)
         assertEquals(1440, TimeCap(weekdays, 0, 1440, 30).to)
+        assertEquals(2040, TimeCap(weekdays, 600, 2040, 30).to)
     }
 
     @Test

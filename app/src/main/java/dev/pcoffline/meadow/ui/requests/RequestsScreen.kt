@@ -97,6 +97,7 @@ fun RequestCard(request: LimitRequest, myUid: String, modifier: Modifier = Modif
             val lines = remember(request, res) { res.limitLines(request.proposed, request.previous) }
             HorizontalDivider(Modifier.padding(top = 10.dp, bottom = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
             LimitLines(lines)
+            WeekIfApproved(request.proposed, Modifier.padding(top = 8.dp))
         }
         usageText(request)?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))

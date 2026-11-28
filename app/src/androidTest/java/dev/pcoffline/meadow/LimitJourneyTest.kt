@@ -1,5 +1,13 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
 package dev.pcoffline.meadow
 
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 import android.app.Activity
 import android.app.Instrumentation.ActivityResult
 import android.content.Intent
@@ -7,7 +15,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -19,7 +26,6 @@ import androidx.test.espresso.intent.matcher.IntentMatchers.hasAction
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasExtra
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.firebase.auth.FirebaseAuth
-import dev.pcoffline.meadow.ui.clockText
 import dev.pcoffline.meadow.ui.minutesText
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.containsString
@@ -46,9 +52,16 @@ class LimitJourneyTest : EndToEndTest() {
     @After
     fun releaseSharing() = Intents.release()
 
-    private fun toggle(label: Int) = compose.onNode(isToggleable() and hasText(text(label))).performScrollTo().performClick()
-
-    private fun chip(value: String) = compose.onNode(hasText(value) and hasClickAction()).performScrollTo().performClick()
+    /** Opens the keypad for the amount field that now reads [now], then types [keys] and OK, or picks [choice]. */
+    private fun amount(label: Int, now: String, vararg keys: String, choice: Int? = null) {
+        compose.onNodeWithContentDescription("${text(label)} $now").performScrollTo().performClick()
+        if (choice != null) {
+            inDialog(text(choice)).performClick()
+            return
+        }
+        keys.forEach { inDialog(it).performClick() }
+        inDialog(text(R.string.action_ok)).performClick()
+    }
 
     @Test
     fun aLimitIsPlantedTendedSharedAndRemoved() {
@@ -72,16 +85,18 @@ class LimitJourneyTest : EndToEndTest() {
 
             // With every kind of limit off there's nothing to plant.
             waitFor(R.string.limit_editor_new)
-            toggle(R.string.limit_editor_daily)
+            amount(R.string.limit_editor_daily, "30m", choice = R.string.keypad_no_limit)
             eventually("planting turned off") { runCatching { node(R.string.limit_editor_plant).assertIsNotEnabled() }.isSuccess }
-            toggle(R.string.limit_editor_daily)
 
-            // 45 minutes a day, 5 hours a week, and only between 10:00 and 16:00.
-            chip(app.resources.minutesText(45))
-            toggle(R.string.limit_editor_weekly)
-            chip(app.resources.minutesText(300))
-            toggle(R.string.limit_editor_hours)
-            chip(text(R.string.schedule_window, clockText(10 * 60), clockText(16 * 60)))
+            // 45 minutes a day and 5 hours a week, typed on the keypad.
+            amount(R.string.limit_editor_daily, text(R.string.week_off), "4", "5")
+            amount(R.string.limit_editor_weekly, text(R.string.week_off), "5", "00")
+            // Only between 10:00 and 16:00, each day: added with Fine-tune, without a drag.
+            val monday = DayOfWeek.MONDAY.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            compose.onNode(hasContentDescription("$monday.", substring = true)).performScrollTo()
+                .performCustomAccessibilityActionWithLabel(text(R.string.week_add_hours))
+            (2..7).forEach { day -> compose.onNodeWithContentDescription(DayOfWeek.of(day).getDisplayName(TextStyle.FULL, Locale.getDefault())).performClick() }
+            compose.onNode(hasText(text(R.string.action_ok)) and hasClickAction()).performClick()
             node(R.string.limit_editor_plant).performScrollTo().performClick()
             waitFor(R.string.limit_editor_planted)
             waitForBackend(limit) { it.int("dailyMinutes") == 45 && it.int("weeklyMinutes") == 300 && it.has("schedule") }
@@ -98,7 +113,7 @@ class LimitJourneyTest : EndToEndTest() {
             // Back in the garden, it's a flower to tap, and tapping it tends the limit.
             compose.onNode(hasText("Pebbles") and hasClickAction()).performScrollTo().performClick()
             waitFor(R.string.limit_editor_existing)
-            toggle(R.string.limit_editor_weekly)
+            amount(R.string.limit_editor_weekly, app.resources.minutesText(300), choice = R.string.keypad_no_limit)
             node(R.string.action_save).performScrollTo().performClick()
             waitFor(R.string.limit_editor_updated)
             waitForBackend(limit) { it.int("weeklyMinutes") == 0 && it.int("dailyMinutes") == 45 }

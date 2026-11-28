@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The week card in the limit editor (#216): hours, caps, and the daily and weekly limits. -->
+    <string name="week_title">Your week</string>
+    <string name="week_steps">Drag steps</string>
+    <string name="week_steps_now">Drag steps, %1$s</string>
+    <string name="week_allow_all">Allow all hours</string>
+    <string name="week_allow_all_done">Each hour is allowed now.</string>
+    <string name="week_undo">Undo</string>
+    <string name="week_help">How to set your week</string>
+    <string name="week_off">Off</string>
+    <string name="week_hint">Press and hold a day, then drag to set its hours.</string>
+    <string name="week_allowed">Allowed</string>
+    <string name="week_resting">Resting</string>
+    <string name="week_cap">Cap</string>
+    <string name="week_redraw_bar">Draw the new hours</string>
+    <string name="week_redraw_stop">Stop redrawing</string>
+    <string name="week_let_go">Close</string>
+    <string name="week_redraw">Redraw</string>
+    <string name="week_fine_tune">Fine-tune</string>
+    <string name="week_add_cap">Add a cap</string>
+    <string name="week_add_hours">Add hours</string>
+    <string name="week_duplicate">Duplicate</string>
+    <string name="week_remove">Remove</string>
+    <string name="week_amount">Amount</string>
+    <string name="week_day_limit">Day limit</string>
+    <string name="week_day_all">Allowed all day</string>
+    <string name="week_day_hours">Hours</string>
+    <string name="week_day_resting">Resting all day</string>
+    <string name="week_stretch">%1$s %2$s – %3$s %4$s</string>
+    <string name="week_too_many">A day can have up to %1$d stretches.</string>
+    <string name="week_zoom_in">Zoom in</string>
+    <string name="week_zoom_out">Zoom out</string>
+    <string name="week_duplicate_title">Duplicate to</string>
+    <string name="week_no_limit_day">∞</string>
+    <!-- What a screen reader says for each day of the grid. -->
+    <string name="week_day_a11y">%1$s. %2$s.</string>
+    <string name="week_a11y_all_day">Allowed all day</string>
+    <string name="week_a11y_resting">Resting all day</string>
+    <string name="week_a11y_hours">Allowed %1$s</string>
+    <string name="week_a11y_cap">Up to %1$s from %2$s</string>
+    <string name="week_a11y_daily">Daily limit %1$s</string>
+    <string name="week_a11y_no_daily">No daily limit</string>
+    <string name="week_a11y_waiting">Waiting for an answer. Can\'t be changed now.</string>
+    <string name="week_as_now">Your limit as it is now. The changes above start when a Bumblebee approves.</string>
+
+    <!-- The keypad for an amount of time. -->
+    <string name="keypad_delete">Delete the last digit</string>
+    <string name="keypad_no_limit">No limit</string>
+    <string name="keypad_reset">Reset to %1$s</string>
+    <string name="keypad_up_to_day">Up to 24h a day.</string>
+    <string name="keypad_up_to_week">Up to 168h a week.</string>
+    <string name="keypad_at_least">At least 1m.</string>
+    <string name="keypad_day_title">Daily limit on %1$s</string>
+
+    <!-- Fine-tune: exact times, and the way in without a drag. -->
+    <string name="fine_tune_title">Fine-tune hours</string>
+    <string name="fine_tune_starts">Starts</string>
+    <string name="fine_tune_ends">Ends</string>
+    <string name="fine_tune_at">at</string>
+    <string name="fine_tune_days">Days with these hours</string>
+    <string name="fine_tune_cap_days">Days with this cap</string>
+    <string name="fine_tune_pick_day">Choose one or more days.</string>
+
+    <!-- The guide to the week card. -->
+    <string name="guide_draw_title">Draw when %1$s can open</string>
+    <string name="guide_draw_text">Press and hold a day, then drag up or down. Drag sideways to take in more days.</string>
+    <string name="guide_stretch_title">Tap a stretch</string>
+    <string name="guide_stretch_text">Redraw it, fine-tune it, add a cap, duplicate it or remove it.</string>
+    <string name="guide_day_title">Tap a day</string>
+    <string name="guide_day_text">Allow it all day, give it hours, or rest it all day. Set its own limit or duplicate it.</string>
+    <string name="guide_tools_title">Steps and Allow all</string>
+    <string name="guide_tools_text">The ruler sets how far each drag moves. Allow all clears every hour you drew.</string>
+    <string name="guide_time_title">Set how much time</string>
+    <string name="guide_time_text">Tap the daily or weekly limit and type the time. Tap ? to see this again.</string>
+    <string name="guide_skip">Skip</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_done">Got it</string>
+    <string name="guide_step">Step %1$d of %2$d</string>
+    <string name="guide_sample_app">your app</string>
+
+    <!-- Settings: help. -->
+    <string name="settings_help_title">Help</string>
+
+    <!-- Requests: what a change to a limit looks like. -->
+    <string name="limit_line_now">Now</string>
+    <string name="limit_line_new_bar">New</string>
+    <string name="request_week_if_approved">The week if approved</string>
+</resources>

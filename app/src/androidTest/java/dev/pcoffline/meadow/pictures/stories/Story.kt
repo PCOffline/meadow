@@ -42,7 +42,7 @@ import org.junit.runner.RunWith
  * ```
  * class WeekdayHoursStory : Story("Set hours for several weekdays at once") {
  *     @Test fun story() {
- *         show { ScheduleEditorDemo() }
+ *         show { LimitEditorDemo() }
  *         step("Per weekday shows the days to set.") { node("Per weekday").performClick() }
  *         step("Saturday and Sunday are picked together.") { ... }
  *     }

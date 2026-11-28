@@ -297,13 +297,15 @@ describe("limits", () => {
     }
     for (const cap of [
       { ...caps[0], days: [] }, { ...caps[0], days: [0] }, { ...caps[0], days: [8] }, { ...caps[0], days: ["mon"] },
-      { ...caps[0], from: 960, to: 600 }, { ...caps[0], to: 1441 }, { ...caps[0], from: -1 },
+      { ...caps[0], from: 960, to: 600 }, { ...caps[0], to: 2041 }, { ...caps[0], from: 1440, to: 1500 }, { ...caps[0], from: -1 },
       { ...caps[0], minutes: 0 }, { ...caps[0], minutes: 360 }, { ...caps[0], minutes: "30" },
       { ...caps[0], note: "x".repeat(100_000) }, "a cap", null,
     ]) {
       await assertFails(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: [caps[0], cap] }));
     }
     await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.x"), { ...limit(0), packageName: "com.x", caps: Array(6).fill(caps[0]) }));
+    // A cap past midnight ends on the next day, and lasts up to a day.
+    await assertSucceeds(setDoc(doc(as("sam"), "users/sam/limits/com.night"), { ...limit(0), packageName: "com.night", caps: [{ ...caps[0], from: 1320, to: 1560 }] }));
     // Rules can't compare them: with Bumblebees, any change to them goes through the backend.
     await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: { 6: 60, 7: 60 } }));
     await assertFails(setDoc(tok, { ...limit(0), packageName: "com.tok", dayMinutes: weekend, caps }));
