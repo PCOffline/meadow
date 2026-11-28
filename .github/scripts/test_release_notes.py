@@ -11,13 +11,13 @@ from release_notes import (
     FOR_PEOPLE_START,
     NOTE_MAX,
     OVERVIEW_MAX_WORDS,
+    STABILITY,
     Change,
     Note,
     Picture,
     changes_app,
     changes_since,
     check,
-    counted,
     overview_problems,
     parse_note,
     pictures_in,
@@ -157,16 +157,11 @@ class RenderTest(unittest.TestCase):
             kinds,
         )
 
-    def test_the_overview_counts_what_people_get(self):
-        self.assertEqual("This update has 1 new feature, 1 improvement and 1 fix.", counted(self.changes()))
-        self.assertEqual("This update has 2 fixes.", counted([Change("fix: a (#1)", 1), Change("fix: b (#2)", 2)]))
-        self.assertEqual("", counted([Change("test: a (#1)", 1)]))
-
     def test_the_part_for_people_comes_first_then_the_highlights_then_every_change(self):
         text = render(self.changes(), "o/r", "v0.4.0", "v0.5.0")
         people = text[text.index(FOR_PEOPLE_START) : text.index(FOR_PEOPLE_END)]
         self.assertEqual(
-            f"{FOR_PEOPLE_START}\nThis update has 1 new feature, 1 improvement and 1 fix.\n\n"
+            f"{FOR_PEOPLE_START}\n"
             "### New\n- You can now water your garden from the rest screen. (#7)\n\n"
             "### Improved\n- Meadow opens faster. (#9)\n\n"
             "### Fixed\n- A plant that didn't grow (#8)\n\n",
@@ -181,10 +176,11 @@ class RenderTest(unittest.TestCase):
         self.assertIn("- chore: tidy\n- build(deps): bump kotlin (#11)\n", text)
         self.assertTrue(text.endswith("https://github.com/o/r/compare/v0.4.0...v0.5.0\n"))
 
-    def test_a_release_with_nothing_for_people_gets_no_attention(self):
+    def test_a_release_with_nothing_for_people_says_it_improved_stability_and_performance(self):
         changes = [Change("test: cover it (#1)", 1), Change("ci: faster build (#2)", 2)]
         text = render(changes, "o/r", None, "v0.1.0")
-        self.assertTrue(text.startswith(f"{FOR_PEOPLE_START}\n{FOR_PEOPLE_END}\n"))
+        self.assertTrue(text.startswith(f"{FOR_PEOPLE_START}\nImproved stability and performance.\n\n{FOR_PEOPLE_END}\n"))
+        self.assertEqual("Improved stability and performance.", STABILITY)
         self.assertNotIn("Highlights", text)
         self.assertNotIn("Full comparison", text)
 
@@ -218,7 +214,7 @@ class RenderTest(unittest.TestCase):
         later = Change("feat: week (#221)", 221, note=Note("new", "yes", "Set your limits on one week.", replaces="#219"))
         text = render([first, later], "o/r", "v0.6.1", "v0.7.0")
         people = text[: text.index(FOR_PEOPLE_END)]
-        self.assertIn("This update has 1 new feature.\n\n### New\n- Set your limits on one week. (#221)\n", people)
+        self.assertIn(f"{FOR_PEOPLE_START}\n### New\n- Set your limits on one week. (#221)\n", people)
         self.assertNotIn("#219", people)
         self.assertEqual(["### Set your limits on one week (#221)"], [line for line in text.splitlines() if line.startswith("### S")])
         self.assertIn("- feat: rows (#219)\n- feat: week (#221)\n", text)
@@ -227,17 +223,19 @@ class RenderTest(unittest.TestCase):
 
 
 class OverviewTest(unittest.TestCase):
-    NOTES = f"{FOR_PEOPLE_START}\r\nThis update has 1 fix.\r\n\r\n### Fixed\r\n- A (#1)\r\n\r\n{FOR_PEOPLE_END}\r\n\r\n## All changes\r\n\r\n- fix: a (#1)\r\n"
+    NOTES = f"{FOR_PEOPLE_START}\r\nAn older overview.\r\n\r\n### Fixed\r\n- A (#1)\r\n\r\n{FOR_PEOPLE_END}\r\n\r\n## All changes\r\n\r\n- fix: a (#1)\r\n"
 
     def test_the_new_overview_takes_the_old_ones_place_and_the_rest_stays(self):
+        plain = self.NOTES.replace("An older overview.\r\n\r\n", "")
+        self.assertEqual(with_overview(plain, "Your plants grow again after a long night."), with_overview(self.NOTES, "Your plants grow again after a long night."))
         self.assertEqual(
             f"{FOR_PEOPLE_START}\nYour plants grow again after a long night.\n\n### Fixed\n- A (#1)\n\n{FOR_PEOPLE_END}\n\n## All changes\n\n- fix: a (#1)\n",
             with_overview(self.NOTES, "Your plants grow again after a long night."),
         )
 
-    def test_a_release_with_nothing_for_people_gets_no_overview(self):
+    def test_a_release_with_no_notable_change_gets_no_overview(self):
         with self.assertRaises(ValueError):
-            with_overview(f"{FOR_PEOPLE_START}\n{FOR_PEOPLE_END}\n", "Hello.")
+            with_overview(f"{FOR_PEOPLE_START}\n{STABILITY}\n\n{FOR_PEOPLE_END}\n", "Hello.")
         with self.assertRaises(ValueError):
             with_overview("## What's Changed", "Hello.")
 

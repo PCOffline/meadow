@@ -422,8 +422,8 @@ passed Build. It also runs the tests before it puts the signing key on the runne
 
 Each release has notes in three parts:
 
-- the part for people: an overview, and what is new, improved and fixed. The app shows this part
-  in Settings when it offers the update;
+- the part for people: what is new, improved and fixed. The app shows this part in Settings when
+  it offers the update;
 - the highlights, each with its note as the title and one picture from the Pictures workflow of
   its pull request;
 - every change, with its pull request.
@@ -432,11 +432,10 @@ The notes come from the **Release note** section of each pull request that chang
 the latest release (`.github/scripts/release_notes.py`). AGENTS.md says how to write it, and the
 **Release note** workflow checks it. A pull request without the section, such as one from
 Dependabot, counts by its Conventional Commits type. A note can replace the notes of other pull
-requests in the same release. The overview counts the changes. A release
-with nothing for people has an empty part for people, and the app shows no notes. The run's
-summary shows the notes.
+requests in the same release. The notes of a release with nothing for people say "Improved
+stability and performance." The run's summary shows the notes.
 
-To write a better overview after a release, ask a coding agent to use the **release-overview**
+To add an overview at the top of the part for people after a release, ask a coding agent to use the **release-overview**
 skill (`.claude/skills/release-overview/SKILL.md`). Or write it yourself and run:
 
 ```bash

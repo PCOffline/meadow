@@ -95,8 +95,8 @@ section is good. The template (`.github/pull_request_template.md`) has the field
 
 - Write the note in app text, as what a person sees or can do now: "Water your garden from the
   rest screen."
-- Choose `none` for each change that people don't see: tests, CI, docs, refactors and builds. A
-  release with only these changes has no notes for people, and the app shows none.
+- Choose `none` for each change that people don't see: tests, CI, docs, refactors and builds. The
+  notes of a release with only these changes say "Improved stability and performance."
 - Choose `Highlight: yes` only for a change that people notice at once. The notes show its note
   as the title, and one picture from its story. Write that note as a title: "You can now see
   exactly what changed in requests to update limits."

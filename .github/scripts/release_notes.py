@@ -22,17 +22,17 @@ Conventional Commits type: feat is new, perf is improved, fix is fixed, and the 
 Environment: GITHUB_REPOSITORY, SHA (the released commit; HEAD when empty), GH_TOKEN.
 
 The notes have three parts:
-- the part for people, between FOR_PEOPLE_START and FOR_PEOPLE_END: an overview, then what is
-  new, improved and fixed. The app shows it (Releases.notesForPeople). A release with nothing
-  for people leaves this part empty, so the app shows no notes;
+- the part for people, between FOR_PEOPLE_START and FOR_PEOPLE_END: what is new, improved and
+  fixed. The app shows it (Releases.notesForPeople). A release with nothing for people says
+  STABILITY there instead;
 - the highlights, at most MAX_HIGHLIGHTS, each with its note as the title and one picture;
 - every change, with its pull request, and a link to the full comparison.
 
 A note that replaces another pull request's note hides that note when both are in the release.
 It changes nothing when the other pull request is in an earlier release.
 
-Deliver writes an overview that counts the changes. The release-overview skill
-(.claude/skills/release-overview/SKILL.md) can write a better one by hand, with `overview`.
+Deliver writes no overview. The release-overview skill (.claude/skills/release-overview/SKILL.md)
+can add one by hand, with `overview`, at the top of the part for people.
 
 `check` reads BODY (the description), AUTHOR (the pull request's author) and the changed files
 on stdin. A pull request that doesn't change the app, or that a bot opened, needs no note.
@@ -59,7 +59,8 @@ PICTURE_WIDTH = 300
 KINDS = ("new", "improved", "fixed", "none")
 SECTIONS = (("new", "New"), ("improved", "Improved"), ("fixed", "Fixed"))
 # How the overview counts each kind: one, many.
-COUNTED = {"new": ("new feature", "new features"), "improved": ("improvement", "improvements"), "fixed": ("fix", "fixes")}
+# The part for people of a release with no change that people see or feel.
+STABILITY = "Improved stability and performance."
 BY_TYPE = {"feat": "new", "perf": "improved", "fix": "fixed"}
 
 # "feat(chat)!: open at what's new (#12)": the type, and the summary without the pull request.
@@ -237,18 +238,6 @@ def read_pull_request(repo: str, change: Change) -> None:
     change.pictures = pictures_in(body)
 
 
-def counted(changes: list[Change]) -> str:
-    """"This update has 2 new features and 1 fix.", or "" when nothing is for people."""
-    parts = []
-    for kind, (one, many) in COUNTED.items():
-        if n := sum(c.kind == kind for c in changes):
-            parts.append(f"{n} {one if n == 1 else many}")
-    if not parts:
-        return ""
-    listed = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
-    return f"This update has {listed}."
-
-
 def for_people(changes: list[Change]) -> list[Change]:
     """[changes] without each one that a change in the same release replaces."""
     replaced = {n for c in changes if c.note for n in c.note.replaced if n != c.number}
@@ -258,11 +247,11 @@ def for_people(changes: list[Change]) -> list[Change]:
 def render(changes: list[Change], repo: str, previous: str | None, tag: str) -> str:
     shown = for_people(changes)
     lines = [FOR_PEOPLE_START]
-    if overview := counted(shown):
-        lines += [overview, ""]
-        for kind, heading in SECTIONS:
-            if items := [c for c in shown if c.kind == kind]:
-                lines += [f"### {heading}", *(f"- {c.text}" + (f" (#{c.number})" if c.number else "") for c in items), ""]
+    for kind, heading in SECTIONS:
+        if items := [c for c in shown if c.kind == kind]:
+            lines += [f"### {heading}", *(f"- {c.text}" + (f" (#{c.number})" if c.number else "") for c in items), ""]
+    if len(lines) == 1:
+        lines += [STABILITY, ""]
     lines += [FOR_PEOPLE_END, ""]
 
     if highlights := [c for c in shown if c.highlight][:MAX_HIGHLIGHTS]:
@@ -301,7 +290,7 @@ def with_overview(body: str, text: str) -> str:
     lines = body[start + len(FOR_PEOPLE_START) : end].strip().splitlines()
     first = next((i for i, line in enumerate(lines) if line.startswith("### ")), None)
     if first is None:
-        raise ValueError("This release has nothing for people, so it has no overview.")
+        raise ValueError("This release has no notable changes, so it needs no overview.")
     part = "\n".join([text.strip(), "", *lines[first:]])
     return f"{body[:start]}{FOR_PEOPLE_START}\n{part}\n\n{body[end:]}"
 
